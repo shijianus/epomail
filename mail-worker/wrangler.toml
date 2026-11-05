@@ -67,11 +67,11 @@ admin = "admin@epomail.bond"				#管理员的邮箱	示例: admin@example.com
 #   npx wrangler secret put jwt_secret
 #   npx wrangler secret put totp_enc_key
 #   npx wrangler secret put admin_initial_password   # 首次 /init 创建站长账号时必需
-#   npx wrangler secret put init_secret              # 可选，不回退 jwt_secret
+#   npx wrangler secret put init_secret              # 生产/Staging 必需；仅本地/测试回退 jwt_secret
 #   npx wrangler secret put resend_webhook_secret    # 使用 Resend Webhook 时必需
 #   npx wrangler secret put email_enc_key            # 可选，建议与 totp_enc_key 分离
 # 本地开发请在 mail-worker/.dev.vars 中配置（已被 .gitignore 排除，不会入库），模板参见 .dev.vars.example。
-# 注意：/init 初始化门禁优先使用 init_secret，未配置时回退 jwt_secret；推荐使用 POST + x-init-secret 请求头。
+# 注意：/init 初始化门禁优先使用 init_secret；生产/Staging 未配置时直接拒绝，仅本地/测试回退 jwt_secret；推荐使用 POST + x-init-secret 请求头。
 
 [build]
 # 顺序约束：temp_login_ui 必须先于 mail-vue 构建（详见 scripts/build-prod.mjs）。

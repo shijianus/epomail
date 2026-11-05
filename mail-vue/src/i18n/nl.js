@@ -1843,6 +1843,7 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     removePermissionFailed: 'Toegangsrechten intrekken mislukt',
     authorizeFailed: 'Autorisatiebevestiging mislukt',
     loginFailedCheckCreds: 'Inloggen mislukt, controleer inloggegevens',
+    accountLocked: 'Te veel mislukte pogingen. Het account is tijdelijk vergrendeld.',
     getAppsFailed: 'Ophalen applicaties mislukt',
     saveAppFailed: 'Opslaan applicatie mislukt',
     resetSecretFailed: 'Geheime sleutel resetten mislukt',

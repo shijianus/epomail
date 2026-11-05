@@ -17,6 +17,7 @@ const require = createRequire(import.meta.url);
 const linkedomWorker = path.resolve(path.dirname(require.resolve('linkedom')), '..', 'worker.js');
 
 const workerDir = path.dirname(fileURLToPath(import.meta.url));
+const svixStub = path.join(workerDir, 'test', 'stubs', 'svix.js');
 const tempConfigDir = mkdtempSync(path.join(os.tmpdir(), 'epomail-vitest-'));
 const tempConfigPath = path.join(tempConfigDir, 'wrangler-vitest.toml');
 try {
@@ -43,7 +44,10 @@ export default defineWorkersConfig({
 		// "Isolated storage failed" teardown error.
 		hookTimeout: 60000,
 		setupFiles: ['./test/setup-network.js'],
-		alias: [{ find: /^linkedom$/, replacement: linkedomWorker }],
+		alias: [
+			{ find: /^linkedom$/, replacement: linkedomWorker },
+			{ find: /^svix$/, replacement: svixStub }
+		],
 		// These packages trigger the pool's module fallback when externalised.
 		// Inlining lets Vite bundle them instead of routing imports through it.
 		server: {

@@ -202,6 +202,7 @@ const oauthProviderService = {
 			codeChallenge: code_challenge || '',
 			codeChallengeMethod: code_challenge_method || 'S256',
 			nonce: typeof nonce === 'string' ? nonce.trim().slice(0, 512) : '',
+			authTime: Number(payload.iat) || Math.floor(Date.now() / 1000),
 			createdAt: Date.now()
 		};
 
@@ -332,7 +333,7 @@ const oauthProviderService = {
 			iss: origin,
 			aud: app.clientId,
 			...scopedClaims,
-			auth_time: Math.floor((Number(authData.createdAt) || Date.now()) / 1000)
+			auth_time: Number(authData.authTime) || Math.floor((Number(authData.createdAt) || Date.now()) / 1000)
 		};
 		if (authData.nonce) idClaims.nonce = authData.nonce;
 		const idToken = await jwtUtils.generateTokenWithSecret(c, app.clientSecret, idClaims, 7200);

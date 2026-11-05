@@ -40,6 +40,38 @@ import mailLifecycleService from './mail-lifecycle-service.js';
 import { reserveInboundQuota } from './mail-reliability-service.js';
 import rateLimit from '../utils/rate-limit.js';
 
+const ENCRYPTED_SEARCH_BATCH = 100;
+// The default mailbox quota is 5,000 messages. Keep the scan bounded well above
+// that while preventing an unbounded decrypt loop if a deployment raises it.
+const ENCRYPTED_SEARCH_MAX_ROWS = 10000;
+
+function includesNeedle(value, needle) {
+	return String(value || '').toLowerCase().includes(String(needle || '').toLowerCase());
+}
+
+/**
+ * Content matching for the encrypted-search path. SQLite cannot compare a
+ * LIKE pattern against AES-GCM ciphertext, so the visible fields are compared
+ * after decryption. All filters are combined with the same AND semantics as
+ * the plaintext SQL path.
+ */
+export function matchesContentSearch(row, terms) {
+	if (terms.subject && !includesNeedle(row.subject, terms.subject)) return false;
+	if (terms.subjectOrBody
+		&& !includesNeedle(row.subject, terms.subjectOrBody)
+		&& !includesNeedle(row.text, terms.subjectOrBody)) return false;
+	if (terms.body && !includesNeedle(row.text, terms.body)) return false;
+	if (terms.keyword) {
+		const keywordHit = ['subject', 'name', 'sendEmail', 'toEmail', 'text']
+			.some(field => includesNeedle(row[field], terms.keyword));
+		if (!keywordHit) return false;
+	}
+	const visibleSize = String(row.text || '').length + String(row.content || '').length;
+	if (Number.isFinite(terms.sizeAtLeast) && visibleSize < terms.sizeAtLeast) return false;
+	if (Number.isFinite(terms.sizeAtMost) && visibleSize > terms.sizeAtMost) return false;
+	return true;
+}
+
 const emailService = {
 
 	async list(c, params, userId) {
@@ -159,6 +191,20 @@ const emailService = {
 				.trim();
 		}
 
+		const settingData = await settingService.query(c);
+		const contentSearchRequested = Boolean(pSubject || pSubjectOrBody || pBody || pSizeAtLeast || pSizeAtMost || keyword);
+		const encryptedSearch = contentSearchRequested && Number(settingData.allMailMode) !== 1;
+		const parsedSizeAtLeast = pSizeAtLeast === null ? NaN : parseInt(pSizeAtLeast, 10);
+		const parsedSizeAtMost = pSizeAtMost === null ? NaN : parseInt(pSizeAtMost, 10);
+		const contentTerms = {
+			subject: pSubject,
+			subjectOrBody: pSubjectOrBody,
+			body: pBody,
+			keyword: keyword || null,
+			sizeAtLeast: Number.isFinite(parsedSizeAtLeast) ? parsedSizeAtLeast : null,
+			sizeAtMost: Number.isFinite(parsedSizeAtMost) ? parsedSizeAtMost : null
+		};
+
 		const commonConditions = [
 			allReceive ? eq(1,1) : eq(email.accountId, accountId),
 			eq(email.userId, userId),
@@ -190,22 +236,24 @@ const emailService = {
 				or(like(email.toEmail, '%'+ pTo + '%'), like(email.toName, '%'+ pTo + '%'))
 			);
 		}
-		if (pSubject) {
-			commonConditions.push(like(email.subject, '%'+ pSubject + '%'));
-		}
-		if (pSubjectOrBody) {
-			commonConditions.push(
-				or(like(email.subject, '%'+ pSubjectOrBody + '%'), like(email.text, '%'+ pSubjectOrBody + '%'))
-			);
-		}
-		if (pBody) {
-			commonConditions.push(like(email.text, '%'+ pBody + '%'));
-		}
-		if (pSizeAtLeast) {
-			commonConditions.push(sql`ifnull(length(text), 0) + ifnull(length(content), 0) >= ${parseInt(pSizeAtLeast)}`);
-		}
-		if (pSizeAtMost) {
-			commonConditions.push(sql`ifnull(length(text), 0) + ifnull(length(content), 0) <= ${parseInt(pSizeAtMost)}`);
+		if (!encryptedSearch) {
+			if (pSubject) {
+				commonConditions.push(like(email.subject, '%'+ pSubject + '%'));
+			}
+			if (pSubjectOrBody) {
+				commonConditions.push(
+					or(like(email.subject, '%'+ pSubjectOrBody + '%'), like(email.text, '%'+ pSubjectOrBody + '%'))
+				);
+			}
+			if (pBody) {
+				commonConditions.push(like(email.text, '%'+ pBody + '%'));
+			}
+			if (pSizeAtLeast) {
+				commonConditions.push(sql`ifnull(length(text), 0) + ifnull(length(content), 0) >= ${parseInt(pSizeAtLeast)}`);
+			}
+			if (pSizeAtMost) {
+				commonConditions.push(sql`ifnull(length(text), 0) + ifnull(length(content), 0) <= ${parseInt(pSizeAtMost)}`);
+			}
 		}
 		if (pBefore) {
 			commonConditions.push(lt(email.createTime, pBefore));
@@ -217,7 +265,7 @@ const emailService = {
 			commonConditions.push(like(email.labels, '%"' + pLabel + '"%'));
 		}
 
-		if (keyword) {
+		if (!encryptedSearch && keyword) {
 			commonConditions.push(
 				or(
 					like(email.subject, '%'+ keyword + '%'),
@@ -229,29 +277,33 @@ const emailService = {
 			);
 		}
 
-		query.where(
-			and(
-				...commonConditions,
-				timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId)
-			)
-		);
+		let listQuery = null;
+		let totalQuery = null;
+		if (!encryptedSearch) {
+			query.where(
+				and(
+					...commonConditions,
+					timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId)
+				)
+			);
 
-		if (timeSort) {
-			query.orderBy(asc(email.emailId));
-		} else {
-			query.orderBy(desc(email.emailId));
+			if (timeSort) {
+				query.orderBy(asc(email.emailId));
+			} else {
+				query.orderBy(desc(email.emailId));
+			}
+
+			listQuery = query.limit(size).all();
+
+			totalQuery = orm(c).select({ total: count() }).from(email)
+				.leftJoin(
+					account,
+					eq(account.accountId, email.accountId)
+				)
+				.where(
+					and(...commonConditions)
+				).get();
 		}
-
-		const listQuery = query.limit(size).all();
-
-		const totalQuery = orm(c).select({ total: count() }).from(email)
-			.leftJoin(
-				account,
-				eq(account.accountId, email.accountId)
-			)
-			.where(
-				and(...commonConditions)
-			).get();
 
 		const latestEmailQuery = orm(c).select().from(email).where(
 			and(
@@ -263,8 +315,6 @@ const emailService = {
 				(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
-
-		const settingData = await settingService.query(c);
 
 		if (settingData.welcomeExpireDays > 0) {
 			// Auto-clean expired official welcome emails older than welcomeExpireDays
@@ -278,11 +328,23 @@ const emailService = {
 			`).bind(userId, settingData.welcomeExpireDays).run().catch(() => {});
 		}
 
-		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
+		let list;
+		let totalRow;
+		let latestEmail;
+		if (encryptedSearch) {
+			const scanned = await this.searchEncryptedEmails(c, {
+				commonConditions, contentTerms, timeSort, emailId, size, userId
+			});
+			list = scanned.list;
+			totalRow = { total: scanned.total };
+			latestEmail = await latestEmailQuery;
+		} else {
+			[list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
+		}
 
 		if (userId) {
 			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
-			list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
+			if (!encryptedSearch) list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
 			if (latestEmail && latestEmail.emailId) {
 				latestEmail = await emailCryptoUtils.decryptEmailRecord(latestEmail, cryptoKey);
 			}
@@ -314,6 +376,50 @@ const emailService = {
 		}
 
 		return { list, total: totalRow.total, latestEmail };
+	},
+
+	/**
+	 * Bounded decrypted search for encrypted mail modes. SQL LIKE cannot see
+	 * visible subject/text once AES-GCM is applied, so scan only the rows that
+	 * already satisfy every plaintext filter, decrypt them in batches, and
+	 * apply the same AND semantics to both the page and its total.
+	 */
+	async searchEncryptedEmails(c, { commonConditions, contentTerms, timeSort, emailId, size, userId }) {
+		const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+		let cursor = timeSort ? 0 : Number.MAX_SAFE_INTEGER;
+		let scanned = 0;
+		let total = 0;
+		const list = [];
+		while (scanned < ENCRYPTED_SEARCH_MAX_ROWS) {
+			const conditions = [
+				...commonConditions,
+				timeSort ? gt(email.emailId, cursor) : lt(email.emailId, cursor)
+			];
+			const rows = await orm(c)
+				.select({ ...email, starId: star.starId })
+				.from(email)
+				.leftJoin(star, and(eq(star.emailId, email.emailId), eq(star.userId, userId)))
+				.leftJoin(account, eq(account.accountId, email.accountId))
+				.where(and(...conditions))
+				.orderBy(timeSort ? asc(email.emailId) : desc(email.emailId))
+				.limit(ENCRYPTED_SEARCH_BATCH)
+				.all();
+			if (!rows.length) break;
+			const decrypted = await emailCryptoUtils.decryptEmailList(rows, cryptoKey);
+			for (const row of decrypted) {
+				scanned++;
+				cursor = row.emailId;
+				if (!matchesContentSearch(row, contentTerms)) continue;
+				total++;
+				const afterCursor = timeSort ? row.emailId > emailId : row.emailId < emailId;
+				if (afterCursor && list.length < size) list.push(row);
+			}
+			if (rows.length < ENCRYPTED_SEARCH_BATCH) break;
+		}
+		if (scanned >= ENCRYPTED_SEARCH_MAX_ROWS) {
+			throw new BizError('Search is too broad; narrow the filters', 400, 'search_too_broad');
+		}
+		return { list, total };
 	},
 
 	async delete(c, params, userId) {
@@ -546,16 +652,23 @@ const emailService = {
 
 				const categoryLabel = reportCategory || 'spam';
 				const appendNote = `[${new Date().toISOString().slice(0, 16)}] 用户检举: ${categoryLabel}${reportReason ? ` (${reportReason})` : ''}`;
+				const dedupeKey = `report-spam:${userId}:${await mailSha256(cleanSender)}`;
+				let duplicate = false;
+				try { duplicate = (await c.env.kv.get(dedupeKey)) === '1'; } catch (_) {}
 
 				if (existingReport) {
-					// Aggregation within same active cycle: increment count and raise priority
-					const newCount = (existingReport.reportedByOthers || 0) + 1;
-					await userOrm(c).update(auditLog).set({
-						reportedByOthers: newCount,
-						priority: 'CRITICAL', // Higher weight
-						riskLevel: 'high',
-						detailText: (existingReport.detailText ? existingReport.detailText + '\n' : '') + appendNote
-					}).where(eq(auditLog.id, existingReport.id)).run();
+					// Aggregation within same active cycle: increment count and raise
+					// priority. A single user reporting the same sender repeatedly
+					// within the window must not keep inflating the risk score.
+					if (!duplicate) {
+						const newCount = (existingReport.reportedByOthers || 0) + 1;
+						await userOrm(c).update(auditLog).set({
+							reportedByOthers: newCount,
+							priority: 'CRITICAL', // Higher weight
+							riskLevel: 'high',
+							detailText: (existingReport.detailText ? existingReport.detailText + '\n' : '') + appendNote
+						}).where(eq(auditLog.id, existingReport.id)).run();
+					}
 				} else {
 					// Historical count across closed/expired/banned records
 					const histRow = await userOrm(c).select({ count: count() }).from(auditLog).where(
@@ -591,6 +704,11 @@ const emailService = {
 						status: 'active',
 						recommendedAction: isInternal ? 'mute_account' : 'blacklist_sender'
 					}).run();
+				}
+				if (!duplicate) {
+					try {
+						await c.env.kv.put(dedupeKey, '1', { expirationTtl: 86400 });
+					} catch (_) {}
 				}
 			}
 		}
@@ -762,6 +880,7 @@ const emailService = {
 			content, //邮件内容
 			subject, //邮件标题
 			attachments = [],
+			forwarding = false,
 			idempotencyKey
 		} = params;
 
@@ -928,7 +1047,14 @@ const emailService = {
 
 		// Validate and decode before any provider call or send-count reservation.
 		if (imageDataList.length > 10) throw new BizError(t('imageAttLimit'));
-		if (attachments.length > 10) throw new BizError(t('attLimit'));
+		// Inline parts already discovered in the HTML are re-attached as CID
+		// images by toImageUrlHtml. Do not also send the original embed rows a
+		// second time when forwarding a stored message.
+		const embeddedKeys = new Set(imageDataList.map(item => item.key).filter(Boolean));
+		const regularAttachments = attachments.filter(item => !item.key || !embeddedKeys.has(item.key));
+		// Forwarding preserves the original MIME attachment set; user-authored
+		// mail keeps the tighter compose limit at ten.
+		if (regularAttachments.length > (forwarding ? 50 : 10)) throw new BizError(t('attLimit'));
 		if (!name) name = emailUtils.getName(accountRow.email);
 
 		let emailRow = { messageId: null };
@@ -938,7 +1064,7 @@ const emailService = {
 		}
 
 		const providerHtml = html;
-		const attachmentItems = [...imageDataList, ...attachments];
+		const attachmentItems = [...imageDataList, ...regularAttachments];
 		const attachmentMeta = [];
 		let attachmentBytes = 0;
 		for (const [index, item] of attachmentItems.entries()) {
@@ -986,11 +1112,15 @@ const emailService = {
 		const storageCheck = previousTask ? null : await storageQuotaService.checkQuotaAvailable(c, userId, reserveBytes);
 		if (storageCheck && !storageCheck.allowed) throw new BizError(storageCheck.reason);
 		const quota = previousTask ? null : await userService.getUserQuota(c, userId);
+		const providerName = allInternal
+			? 'local'
+			: (useCloudflareEmail ? 'cloudflare' : (String(resendToken || '').startsWith('mailjet:') ? 'mailjet' : 'resend'));
 		const prepared = await mailOutboundService.prepareOutboundTask(c, { userId, accountId, idempotencyKey,
 			contentHash, reservedBytes: reserveBytes, maxStorageBytes: quota?.maxStorageBytes, maxEmails: quota?.maxEmails,
 			bypassStorage: quota?.bypassStorage || storageCheck?.usage?.byoStorageEnabled === 1,
 			storageBlocked: quota?.quotaStorageBlocked || quota?.dbFull,
-			payload: { recipients: receiveEmail, attachmentCount: attachmentItems.length, route: allInternal ? 'local' : 'external' } });
+			payload: { recipients: receiveEmail, attachmentCount: attachmentItems.length,
+				route: allInternal ? 'local' : 'external', providerName } });
 		const readArchived = async task => {
 			let row = await orm(c).select().from(email).where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
 			if (!row) throw new BizError('The accepted send record requires reconciliation', 503, 'outbound_archive_missing');
@@ -2134,24 +2264,103 @@ const emailService = {
 	 */
 	async reconcileUnknownOutbound(c, { limit = 20 } = {}) {
 		const db = getMailDb(c);
-		const bound = Math.max(1, Math.min(Number(limit) || 20, 50));
-		const candidates = await db.prepare(`SELECT task_id, user_id, account_id, provider_id
+		const bound = Math.max(1, Math.min(Number(limit) || 20, 20));
+		// Provider queries are sequential; cap the total wall-clock budget so a
+		// slow/unreachable provider cannot delay the rest of the cron chain.
+		const deadline = Date.now() + 15000;
+		const candidates = await db.prepare(`SELECT task_id, user_id, account_id, provider_id, payload_json
 			FROM mail_outbound_task
 			WHERE state='UNKNOWN' AND provider='external' AND provider_id IS NOT NULL
 				AND updated_at < datetime('now','-30 seconds')
 			ORDER BY updated_at ASC LIMIT ?`).bind(bound).all();
 		const rows = candidates.results || [];
-		if (rows.length === 0) return { checked: 0, accepted: 0, failed: 0 };
+		if (rows.length === 0) return { checked: 0, accepted: 0, failed: 0, stoppedEarly: false };
 
 		const settings = await settingService.query(c);
 		let checked = 0;
 		let accepted = 0;
 		let failed = 0;
+		let stoppedEarly = false;
 		for (const row of rows) {
+			if (Date.now() >= deadline) {
+				stoppedEarly = true;
+				break;
+			}
 			const account = await accountService.selectById(c, row.account_id);
 			const domain = emailUtils.getDomain(account?.email || '');
 			const token = settings?.resendTokens?.[domain];
-			if (!token || String(token).startsWith('mailjet:')) continue;
+			if (!token) continue;
+			let providerName = '';
+			try {
+				providerName = String(JSON.parse(row.payload_json || '{}')?.providerName || '');
+			} catch (_) {}
+			if (!providerName) providerName = String(token).startsWith('mailjet:') ? 'mailjet' : 'resend';
+			// Cloudflare Email exposes no status lookup API; those tasks stay in
+			// the administrator queue rather than being queried against Resend.
+			if (providerName === 'cloudflare') continue;
+
+			const accept = async (providerId, event) => {
+				const updated = await db.prepare(`UPDATE mail_outbound_task
+					SET state='ACCEPTED',reserved_bytes=0,reserved_count=0,lease_until=0,
+						last_error='Reconciled from provider acceptance',updated_at=CURRENT_TIMESTAMP
+					WHERE task_id=? AND state='UNKNOWN' AND provider_id=?
+					RETURNING email_id`).bind(row.task_id, providerId).first();
+				if (!updated) return;
+				accepted++;
+				if (updated.email_id) {
+					const emailStatus = event === 'delivered' || event === 'opened' || event === 'clicked'
+						? emailConst.status.DELIVERED : emailConst.status.SENT;
+					await db.prepare(`UPDATE email SET status=CASE WHEN status=? THEN ? ELSE status END,
+						resend_email_id=COALESCE(resend_email_id,?) WHERE email_id=? AND user_id=?`)
+						.bind(emailConst.status.SAVING, emailStatus, providerId, updated.email_id, row.user_id).run();
+				}
+				if (event !== 'delivered') {
+					await this.replayProviderEventsFromLedger(c, providerId).catch(() => {});
+				}
+			};
+			const fail = async (providerId, emailStatus, reason) => {
+				const updated = await db.prepare(`UPDATE mail_outbound_task
+					SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,
+						last_error=?,updated_at=CURRENT_TIMESTAMP
+					WHERE task_id=? AND state='UNKNOWN' AND provider_id=?
+					RETURNING email_id`).bind(String(reason).slice(0, 500), row.task_id, providerId).first();
+				if (!updated) return;
+				failed++;
+				if (updated.email_id) {
+					await db.prepare('UPDATE email SET status=? WHERE email_id=? AND user_id=? AND status IN (?,?,?)')
+						.bind(emailStatus, updated.email_id, row.user_id, emailConst.status.SAVING,
+							emailConst.status.SENT, emailConst.status.DELAYED).run();
+				}
+				await mailOutboundService.compensateSendCount(c, { taskId: row.task_id }).catch(() => {});
+			};
+
+			if (providerName === 'mailjet') {
+				const parts = String(token).split(':');
+				if (parts.length !== 3 || !parts[1] || !parts[2]) continue;
+				checked++;
+				let response;
+				try {
+					response = await fetch(`https://api.mailjet.com/v3/REST/message/${encodeURIComponent(row.provider_id)}`, {
+						headers: { Authorization: 'Basic ' + btoa(`${parts[1]}:${parts[2]}`) },
+						signal: AbortSignal.timeout(5000)
+					});
+				} catch (_) {
+					continue;
+				}
+				if (!response.ok) continue;
+				const data = await response.json().catch(() => null);
+				const status = String(data?.Data?.[0]?.Status || '').toLowerCase();
+				if (['sent', 'queued', 'opened', 'clicked', 'delivered'].includes(status)) {
+					await accept(row.provider_id, status);
+				} else if (['bounced', 'hardbounced', 'blocked', 'spam', 'error'].includes(status)) {
+					const emailStatus = status === 'bounced' || status === 'hardbounced'
+						? emailConst.status.BOUNCED
+						: status === 'spam' ? emailConst.status.COMPLAINED : emailConst.status.FAILED;
+					await fail(row.provider_id, emailStatus, `Mailjet reported ${status}`);
+				}
+				continue;
+			}
+
 			checked++;
 			let response;
 			try {
@@ -2168,44 +2377,17 @@ const emailService = {
 			if (!event) continue;
 
 			if (['sent', 'delivery_delayed', 'delivered'].includes(event)) {
-				const updated = await db.prepare(`UPDATE mail_outbound_task
-					SET state='ACCEPTED',reserved_bytes=0,reserved_count=0,lease_until=0,
-						last_error='Reconciled from provider acceptance',updated_at=CURRENT_TIMESTAMP
-					WHERE task_id=? AND state='UNKNOWN' AND provider_id=?
-					RETURNING email_id`).bind(row.task_id, row.provider_id).first();
-				if (!updated) continue;
-				accepted++;
-				if (updated.email_id) {
-					const emailStatus = event === 'delivered' ? emailConst.status.DELIVERED : emailConst.status.SENT;
-					await db.prepare(`UPDATE email SET status=CASE WHEN status=? THEN ? ELSE status END,
-						resend_email_id=COALESCE(resend_email_id,?) WHERE email_id=? AND user_id=?`)
-						.bind(emailConst.status.SAVING, emailStatus, row.provider_id, updated.email_id, row.user_id).run();
-				}
-				if (event !== 'delivered') {
-					await this.replayProviderEventsFromLedger(c, row.provider_id).catch(() => {});
-				}
+				await accept(row.provider_id, event);
 				continue;
 			}
 
 			if (['bounced', 'complained', 'failed'].includes(event)) {
-				const updated = await db.prepare(`UPDATE mail_outbound_task
-					SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,
-						last_error=?,updated_at=CURRENT_TIMESTAMP
-					WHERE task_id=? AND state='UNKNOWN' AND provider_id=?
-					RETURNING email_id`).bind(`Provider reported ${event}`, row.task_id, row.provider_id).first();
-				if (!updated) continue;
-				failed++;
-				if (updated.email_id) {
-					const emailStatus = event === 'bounced' ? emailConst.status.BOUNCED
-						: event === 'complained' ? emailConst.status.COMPLAINED : emailConst.status.FAILED;
-					await db.prepare('UPDATE email SET status=? WHERE email_id=? AND user_id=? AND status IN (?,?,?)')
-						.bind(emailStatus, updated.email_id, row.user_id, emailConst.status.SAVING,
-							emailConst.status.SENT, emailConst.status.DELAYED).run();
-				}
-				await mailOutboundService.compensateSendCount(c, { taskId: row.task_id }).catch(() => {});
+				const emailStatus = event === 'bounced' ? emailConst.status.BOUNCED
+					: event === 'complained' ? emailConst.status.COMPLAINED : emailConst.status.FAILED;
+				await fail(row.provider_id, emailStatus, `Provider reported ${event}`);
 			}
 		}
-		return { checked, accepted, failed };
+		return { checked, accepted, failed, stoppedEarly };
 	},
 
 	async listUnknownOutbound(c, { limit = 50 } = {}) {

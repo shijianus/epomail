@@ -1843,6 +1843,7 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     removePermissionFailed: 'Échec de la révocation de l\'accès',
     authorizeFailed: 'Échec de la confirmation d\'autorisation',
     loginFailedCheckCreds: 'Échec de connexion, vérifiez vos identifiants',
+    accountLocked: 'Trop de tentatives échouées. Le compte est temporairement verrouillé.',
     getAppsFailed: 'Échec de la récupération des applications',
     saveAppFailed: 'Échec de l\'enregistrement de l\'application',
     resetSecretFailed: 'Échec de la réinitialisation du secret',

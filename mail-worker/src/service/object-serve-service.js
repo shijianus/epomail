@@ -1,7 +1,7 @@
 import r2Service from './r2-service';
 import { normalizeObjectKey } from '../utils/object-key-utils';
 import { verifyObjectAccess } from '../utils/object-token';
-import { getUserDb } from '../utils/db-accessor.js';
+import { getUserDb, getMailDb } from '../utils/db-accessor.js';
 
 /**
  * Single read path for every worker-hosted object URL (`/oss/*`,
@@ -18,6 +18,7 @@ export async function readObjectForRequest(c, key, url) {
 	if (!safeKey) return null;
 
 	let ownerUserId = null;
+	let filename = null;
 	if (safeKey.startsWith('attachments/')) {
 		const access = await verifyObjectAccess(c, safeKey, url);
 		if (!access) return null;
@@ -29,10 +30,18 @@ export async function readObjectForRequest(c, key, url) {
 				'SELECT status, is_del FROM user WHERE user_id = ? LIMIT 1'
 			).bind(ownerUserId).first();
 			if (!owner || Number(owner.status) !== 0 || Number(owner.is_del) !== 0) return null;
+			try {
+				const attachment = await getMailDb(c).prepare(
+					'SELECT filename FROM attachments WHERE key = ? AND user_id = ? LIMIT 1'
+				).bind(safeKey, ownerUserId).first();
+				filename = attachment?.filename || null;
+			} catch (_) {
+				// A legacy/partial schema must not turn a valid object read into 500.
+			}
 		}
 	}
 
-	return await r2Service.toObjResponse(c, safeKey, ownerUserId);
+	return await r2Service.toObjResponse(c, safeKey, ownerUserId, filename);
 }
 
 export default { readObjectForRequest };

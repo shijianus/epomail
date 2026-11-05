@@ -67,6 +67,30 @@ describe('Module B: Fixed visitor account removal, userId=1 de-escalation, and i
 		expect(isAdminEmail(c, 'admin@example.com')).toBe(true);
 	});
 
+	it('refuses to reuse jwt_secret as the production init secret', async () => {
+		const ctx = {
+			env: {
+				...env,
+				ENVIRONMENT: 'production',
+				dev: undefined,
+				DEV: undefined,
+				init_secret: undefined,
+				jwt_secret: env.jwt_secret
+			},
+			req: {
+				method: 'POST',
+				header: (name) => (name === 'X-Init-Secret' ? env.jwt_secret : ''),
+				param: () => undefined,
+				json: async () => ({})
+			},
+			get: () => undefined,
+			set: () => {},
+			text: (body, status = 200) => new Response(body, { status })
+		};
+		const response = await dbInit.init(ctx);
+		expect(response.status).toBe(403);
+	});
+
 	it('cold-start POST /api/init fails closed in production when admin_initial_password is missing and seeds all 6 roles without visitor account', async () => {
 		await resetTables();
 

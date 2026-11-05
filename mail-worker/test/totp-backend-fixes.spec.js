@@ -80,4 +80,22 @@ describe('TOTP backend security with real D1 mutation paths',()=>{
   expect((await api('/login/totp',null,{tempToken:pending[2],code:actual})).code).not.toBe(200);
   expect(await env.kv.get(`auth-uid:${UID}`)).toBeNull();
  });
+ it('issues replacement recovery codes when the last backup code is used at login',async()=>{
+  const backup=await totpUtils.generateBackupCodes(1,env);
+  await env.db.prepare('UPDATE user SET totp_enabled=1,totp_key_version=2,totp_secret=?,totp_backup_codes=? WHERE user_id=?')
+   .bind(await totpUtils.encryptSecret(SECRET,env),JSON.stringify({hashedCodes:backup.hashedCodes,encryptedRaw:backup.encryptedRaw}),UID).run();
+  const begin=await api('/login',null,{email:EMAIL,password:PASSWORD});
+  expect(begin.data.mfaRequired).toBe(true);
+  expect(begin.data.hasBackupCodes).toBe(true);
+  const completed=await api('/login/totp',null,{
+   tempToken:begin.data.tempToken,code:backup.rawCodes[0],isBackupCode:true
+  });
+  expect(completed.code).toBe(200);
+  expect(completed.data.token).toBeTruthy();
+  expect(completed.data.backupCodes).toHaveLength(10);
+  const stored=JSON.parse((await env.db.prepare('SELECT totp_backup_codes FROM user WHERE user_id=?').bind(UID).first()).totp_backup_codes);
+  expect(stored.hashedCodes).toHaveLength(10);
+  expect(stored.hashedCodes.filter(code=>code.used===0)).toHaveLength(10);
+  expect(completed.data.backupCodes).not.toContain(backup.rawCodes[0]);
+ });
 });

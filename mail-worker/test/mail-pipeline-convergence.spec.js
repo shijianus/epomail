@@ -9,6 +9,8 @@ import jwtUtils from '../src/utils/jwt-utils.js';
 import { emailConst } from '../src/const/entity-const.js';
 import r2Service from '../src/service/r2-service.js';
 import attService from '../src/service/att-service.js';
+import emailCryptoUtils from '../src/utils/email-crypto-utils.js';
+import forwardService from '../src/service/mail-forward-service.js';
 import { acquireInboundClaim, failInboundClaim, cleanupExpiredInboundClaims, clearRawForUser } from '../src/service/mail-reliability-service.js';
 import { buildSignedObjectUrl } from '../src/utils/object-token.js';
 
@@ -816,5 +818,95 @@ describe('Module C: Core mail pipeline, isolation, outbound gates, and webhook c
 			sentUnread: 1,
 			allUnread: 4
 		});
+	});
+
+	it('searches decrypted visible subject and body in encrypted mail mode', async () => {
+		const needle = `EncryptedSearch-${crypto.randomUUID()}`;
+		const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(env, victim.userId);
+		const encrypted = await emailCryptoUtils.encryptEmailRecord({
+			subject: needle,
+			content: `<p>Body ${needle}</p>`,
+			text: `Body ${needle}`,
+			code: ''
+		}, cryptoKey);
+		const welcomeKey = 'WELCOME_ISSUED_' + victim.userId;
+		trackedKvKeys.add(welcomeKey);
+		await env.kv.put(welcomeKey, '1');
+		const inserted = await env.db.prepare(
+			`INSERT INTO email (send_email, name, account_id, user_id, subject, content, text, recipient, type, status, unread, is_del)
+			 VALUES ('sender@external.org', 'Sender', ?, ?, ?, ?, ?, '[]', 0, 0, 0, 0)`
+		).bind(victim.accountId, victim.userId, encrypted.subject, encrypted.content, encrypted.text).run();
+		const emailId = inserted.meta.last_row_id;
+		const baseSettings = await settingService.query({ env });
+		const querySpy = vi.spyOn(settingService, 'query').mockResolvedValue({
+			...baseSettings, allMailMode: 2, welcomeExpireDays: 0
+		});
+		try {
+			const subjectResult = await (await apiFetch(
+				`/api/email/list?accountId=${victim.accountId}&type=0&size=20&keyword=${encodeURIComponent('subject:' + needle)}`,
+				{ jwt: victim.jwt }
+			)).json();
+			expect(subjectResult.code).toBe(200);
+			expect(subjectResult.data.total).toBe(1);
+			expect(subjectResult.data.list).toHaveLength(1);
+			expect(subjectResult.data.list[0]).toMatchObject({ emailId, subject: needle });
+
+			const bodyResult = await (await apiFetch(
+				`/api/email/list?accountId=${victim.accountId}&type=0&size=20&keyword=${encodeURIComponent('body:' + needle)}`,
+				{ jwt: victim.jwt }
+			)).json();
+			expect(bodyResult.code).toBe(200);
+			expect(bodyResult.data.total).toBe(1);
+			expect(bodyResult.data.list[0].emailId).toBe(emailId);
+		} finally {
+			querySpy.mockRestore();
+		}
+	});
+
+	it('persists one forwarding task per target and resends the original attachment bytes', async () => {
+		const key = 'attachments/forward-task-' + crypto.randomUUID() + '.txt';
+		trackedKvKeys.add(key);
+		await env.kv.put(key, new Uint8Array([7, 8, 9]));
+		const inserted = await env.db.prepare(
+			`INSERT INTO email (send_email, name, account_id, user_id, subject, content, text, recipient, type, status, unread, is_del)
+			 VALUES ('sender@external.org', 'Sender', ?, ?, 'Forward subject', '<p>cid image</p>', 'body', '[]', 0, 0, 0, 0)`
+		).bind(victim.accountId, victim.userId).run();
+		const emailId = inserted.meta.last_row_id;
+		await env.db.prepare(
+			`INSERT INTO attachments (user_id, email_id, account_id, key, filename, mime_type, size, type, content_id)
+			 VALUES (?, ?, ?, ?, 'logo.png', 'image/png', 3, 2, 'logo@example')`
+		).bind(victim.userId, emailId, victim.accountId, key).run();
+		const sendSpy = vi.spyOn(emailService, 'send').mockResolvedValue([{ emailId: 999 }]);
+		try {
+			const target = `forward-${crypto.randomUUID()}@external.example`;
+			const task = await forwardService.enqueueForwardTask({ env }, {
+				userId: victim.userId,
+				accountId: victim.accountId,
+				emailId,
+				target,
+				addPrefix: true
+			});
+			expect(task).toMatchObject({ target, state: 'PENDING' });
+			await expect(forwardService.processForwardTask({ env }, task.task_id))
+				.resolves.toMatchObject({ sent: true });
+			expect(sendSpy).toHaveBeenCalledTimes(1);
+			const [context, params] = sendSpy.mock.calls[0];
+			expect(context.env).toBe(env);
+			expect(params).toMatchObject({
+				accountId: victim.accountId,
+				receiveEmail: [target],
+				subject: '[Fwd] Forward subject',
+				forwarding: true
+			});
+			expect(params.attachments).toHaveLength(1);
+			expect(params.attachments[0]).toMatchObject({
+				filename: 'logo.png', mimeType: 'image/png', contentId: 'logo@example'
+			});
+			expect([...params.attachments[0].content]).toEqual([7, 8, 9]);
+			expect(await env.db.prepare('SELECT state FROM mail_forward_task WHERE task_id=?')
+				.bind(task.task_id).first()).toEqual({ state: 'SENT' });
+		} finally {
+			sendSpy.mockRestore();
+		}
 	});
 });

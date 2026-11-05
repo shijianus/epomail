@@ -169,6 +169,9 @@ export async function deleteAccountEvidence(c, userId) {
 		if (await tableExists(db, table)) await db.prepare(`DELETE FROM ${table} WHERE user_id=?`).bind(userId).run();
 	}
 	const mailDb = getMailDb(c);
+	if (await tableExists(mailDb, 'mail_forward_task')) {
+		await mailDb.prepare('DELETE FROM mail_forward_task WHERE user_id=?').bind(userId).run();
+	}
 	if (await tableExists(mailDb, 'mail_outbound_task')) {
 		const statements = [];
 		if (await tableExists(mailDb, 'mail_local_delivery')) {

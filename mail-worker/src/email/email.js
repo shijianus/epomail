@@ -15,6 +15,7 @@ import { applyRules } from './rule-engine';
 import kvConst from '../const/kv-const';
 import mailReliabilityService, { failInboundClaim } from '../service/mail-reliability-service.js';
 import { getMailDb } from '../utils/db-accessor.js';
+import forwardService from '../service/mail-forward-service.js';
 
 /** Read bounded raw bytes; decode only for callers that explicitly need text. */
 export async function readRawEmail(message, maxLimitBytes, maxLimitMB, { decode = true } = {}) {
@@ -457,17 +458,34 @@ export async function email(message, env, ctx) {
 
 								// 若未在 CF 验证，则通过系统邮件发送能力执行自动抄送转发（占用个人发送配额）
 								if (!cfForwardSuccess) {
-									try {
-										const forwardSubject = pfw.addPrefix ? `[Fwd] ${email.subject || emailRow.subject || ''}` : (email.subject || emailRow.subject || '');
-										await emailService.send({ env }, {
-											receiveEmail: [target],
-											subject: forwardSubject,
-											content: email.html || email.text || emailRow.content || '',
-											text: email.text || emailRow.text || '',
-											accountId: emailRow.accountId
-										}, emailRow.userId);
-									} catch (sendErr) {
-										console.error(`Personal CC Forwarding to ${target} failed:`, sendErr.message);
+									const forwardTask = await forwardService.enqueueForwardTask({ env }, {
+										userId: emailRow.userId,
+										accountId: emailRow.accountId,
+										emailId: emailRow.emailId,
+										target: cleanTarget,
+										addPrefix: !!pfw.addPrefix
+									}).catch((err) => {
+										console.warn(`Personal forwarding task enqueue failed: ${err.message}`);
+										return null;
+									});
+									if (forwardTask) {
+										await forwardService.processForwardTask({ env }, forwardTask.task_id)
+											.catch((err) => console.warn(`Personal forwarding task failed: ${err.message}`));
+									} else {
+										try {
+											const forwardSubject = pfw.addPrefix ? `[Fwd] ${email.subject || emailRow.subject || ''}` : (email.subject || emailRow.subject || '');
+											await emailService.send({ env }, {
+												receiveEmail: [target],
+												subject: forwardSubject,
+												content: email.html || email.text || emailRow.content || '',
+												text: email.text || emailRow.text || '',
+												attachments: attachmentsIn,
+												forwarding: true,
+												accountId: emailRow.accountId
+											}, emailRow.userId);
+										} catch (sendErr) {
+											console.error(`Personal CC Forwarding to ${target} failed:`, sendErr.message);
+										}
 									}
 								}
 							}

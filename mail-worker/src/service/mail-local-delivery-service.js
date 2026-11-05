@@ -17,6 +17,7 @@ import r2Service from './r2-service.js';
 import fileUtils from '../utils/file-utils.js';
 import telegramService from './telegram-service.js';
 import { applyRules } from '../email/rule-engine.js';
+import forwardService from './mail-forward-service.js';
 
 const encoder = new TextEncoder();
 const bodyBytes = row => ['subject', 'text', 'content', 'code']
@@ -230,16 +231,31 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 						if (!target || target === recipient.toLowerCase()
 							|| target === String(sender.sendEmail || '').toLowerCase()
 							|| localDomains.has(targetDomain)) continue;
-						await emailService.send(c, {
-							receiveEmail: [target],
-							subject: notificationRow.subject,
-							content: notificationRow.content,
-							text: notificationRow.text,
-							// Forward from the recipient's own mailbox. The sender's
-							// account belongs to a different user, so emailService.send
-							// would reject it as sendEmailNotCurUser.
-							accountId
-						}, userId).catch(err => console.warn('Local personal forwarding failed:', err.message));
+						const forwardTask = await forwardService.enqueueForwardTask(c, {
+							userId,
+							accountId,
+							emailId: inserted.emailId,
+							target,
+							addPrefix: !!pfw.addPrefix
+						}).catch(err => {
+							console.warn('Local personal forwarding enqueue failed:', err.message);
+							return null;
+						});
+						if (forwardTask) {
+							await forwardService.processForwardTask(c, forwardTask.task_id)
+								.catch(err => console.warn('Local personal forwarding task failed:', err.message));
+						} else {
+							await emailService.send(c, {
+								receiveEmail: [target],
+								subject: notificationRow.subject,
+								content: notificationRow.content,
+								text: notificationRow.text,
+								// Forward from the recipient's own mailbox. The sender's
+								// account belongs to a different user, so emailService.send
+								// would reject it as sendEmailNotCurUser.
+								accountId
+							}, userId).catch(err => console.warn('Local personal forwarding failed:', err.message));
+						}
 					}
 				}
 			}

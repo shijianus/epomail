@@ -32,13 +32,17 @@ export async function init() {
     i18n.global.locale.value = settingStore.lang
 
     let setting = null;
+    let transientFailure = false;
+    let authRejected = false;
 
     try {
-        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 10000));
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ __timeout: true }), 10000));
 
         if (token) {
             const userPromise = Promise.race([loginUserInfo(), timeoutPromise]).catch(e => {
                 console.error('loginUserInfo error:', e);
+                if (e?.code === 401 || e?.code === 403 || e?.response?.status === 401 || e?.response?.status === 403) authRejected = true;
+                else transientFailure = true;
                 return null;
             });
 
@@ -48,7 +52,8 @@ export async function init() {
             });
 
             const [s, user] = await Promise.all([settingPromise, userPromise]);
-            setting = s;
+            setting = s && s.__timeout ? null : s;
+            if (user && user.__timeout) transientFailure = true;
 
             if (setting) {
                 settingStore.settings = setting;
@@ -96,6 +101,12 @@ export async function init() {
                 routers.forEach(routerData => {
                     router.addRoute('layout', routerData);
                 });
+            } else if (transientFailure && !authRejected) {
+                // A timeout/5xx/network failure is not proof that the session was
+                // revoked. Keep the stored identity and let the user retry instead
+                // of discarding an unsaved draft or forcing a re-login.
+                console.warn('Session preserved because the backend is temporarily unavailable');
+                return;
             } else {
                 // Token 存在但无法获取用户信息，说明 token 已过期或已被销毁，执行清理并强制退回到登录页
                 uiStore.resetToDefaults();

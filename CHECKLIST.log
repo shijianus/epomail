@@ -1,3 +1,26 @@
+### 后端审计残余项收敛与发布门禁复审 (2026-11-05 续)
+*   **关联提交 (Git Commit)**: `{{CODE_COMMIT}}`
+*   **部署环境 (Deployment)**: 本地 workerd/D1/KV、构建与单测验证；未部署生产或 Staging，未调用真实供应商。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] B5 持久转发：新增 `mail_forward_task`/`mail-forward-service`，按用户/邮件/目标独立任务、cron 重试、原始附件字节与 CID 保留；修正 `accountId` 缺失、`provider_rejected` 判断、主题 998 截断、内嵌图重复发送。
+    - [x] B7 加密搜索：对有界候选集解密后按可见 subject/text/size 过滤，total 与分页同语义，超限返回 `search_too_broad`。
+    - [x] B8 最后一枚恢复码：CAS 自动生成新 10 枚恢复码并在登录 UI 本地化展示；不提升 authVersion，避免刚完成的登录失效。
+    - [x] B11 管理建号：user/profile/account 失败补偿删除，避免唯一邮箱阻塞重试。
+    - [x] U1 OAuth 授权页：`/login` → `/login/totp` 两步契约，TOTP/备用码可回到原授权申请；U6 慢网/5xx 保留会话，仅 401/403 清理。
+    - [x] PAT 仅存 SHA-256 哈希与前缀，创建时明文只返回一次；历史明文读取迁移并删除 KV 索引。
+    - [x] Apple 裸 id_token 强制 state/nonce；profile 字段/图片 URL 限长；举报 24h 去重；init secret 生产不回退；附件下载原名；BYO 关闭读写分离；UNKNOWN 对账预算；邀请码 fail-closed；OIDC auth_time；Telegram 非管理员绑定已保存配置；`mail_forward_task` 纳入账号删除清理。
+    - [x] 测试基础设施：`linkedom/worker` 别名、`svix` 测试桩、hookTimeout 60s，消除 Windows Miniflare module fallback 造成的整套收集失败。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Worker 全量：`npx vitest run` → **37 files / 520 tests passed (exit 0)**。
+    - [x] 定向回归：转发/加密搜索/Apple/PAT/初始化/对象头/邀请码/登录子应用安全套件分步通过。
+    - [x] mail-vue 构建通过（34.05s）；temp_login_ui `tsc --noEmit` + 29/29 单测通过。
+    - [x] i18n symmetry/audit/hardcoded/auth-locale 全通过；新增 accountLocked 六语言词条。
+    - [x] 密钥扫描 1,260 文件 0 命中；Wrangler dry-run 438 文件 / gzip 1,190.90 KiB；`git diff --check` 通过。
+    - [ ] Staging/生产真实 OAuth/邮件/对象存储、备份恢复、Worker 回滚、浏览器 E2E、容量/告警演练未执行。
+*   **结论**: 后端已知 P0/P1 安全与一致性项关闭；受控公测 GO；无条件 GA 待 Staging/恢复演练并接受剩余 P2（SSRF DNS、内部发件人认证头、UNKNOWN 覆盖、Passkey step-up、locator 迁移、转发失败管理 UI）。
+
+---
+
 ### 后端审计修复批次与发布门禁复审 (2026-11-05)
 *   **关联提交 (Git Commit)**: `c003fc8efd74d12b4b4c941d980069347c4d723d` (Short: `c003fc8`)
 *   **部署环境 (Deployment)**: 本地 workerd/D1/KV 与构建验证；未部署生产或 Staging，未调用真实供应商。

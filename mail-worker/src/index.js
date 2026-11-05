@@ -18,6 +18,7 @@ import { purgeAiBudgets } from './utils/ai-budget.js';
 import { cleanupExpiredInboundClaims } from './service/mail-reliability-service.js';
 import { maintainOutboundTasks } from './service/mail-outbound-service.js';
 import { clearNoOne } from './service/mail-lifecycle-service.js';
+import forwardService from './service/mail-forward-service.js';
 
 async function checkScheduledAuth(req, env) {
 	if (req.method !== 'POST') {
@@ -197,6 +198,7 @@ export default {
 		await run('inbound_raw_cleanup', () => cleanupExpiredInboundClaims({ env }, { limit: 100 }));
 		await run('outbound_tasks', () => maintainOutboundTasks({ env }, { limit: 100 }));
 		await run('outbound_reconcile', () => emailService.reconcileUnknownOutbound({ env }, { limit: 20 }));
+		await run('forward_tasks', () => forwardService.processForwardTasks({ env }, { limit: 20 }));
 		await run('security_operation_cleanup', () => getUserDb({ env }).batch([
 			getUserDb({ env }).prepare('DELETE FROM auth_security_operation WHERE rowid IN (SELECT rowid FROM auth_security_operation WHERE expires_at < unixepoch() LIMIT 500)'),
 			getUserDb({ env }).prepare('DELETE FROM auth_totp_replay WHERE rowid IN (SELECT rowid FROM auth_totp_replay WHERE expires_at < unixepoch() LIMIT 500)')

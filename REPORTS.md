@@ -9,6 +9,27 @@
 
 ---
 
+### 后端审计收敛补丁 (2026-11-05 续)
+*   **关联提交 (Git Commit)**: 代码修复与报告提交 `{{CODE_COMMIT}}`；上一轮基线 `c003fc8efd74d12b4b4c941d980069347c4d723d` (Short: `c003fc8`)。
+*   **专项文档索引 (Detailed Doc)**: [后端审计收敛补丁](doc/backend-audit-2026-11-05-convergence.md)；[本轮检查结果](doc/validation/backend-audit-2026-11-05-convergence.json)。
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：`mail-worker` 认证/OAuth/RBAC、邮件入站/转发/生命周期、加密搜索、存储对象、PAT/Telegram、Vitest 配置；`mail-vue` OAuth 授权页/慢网会话/i18n；`temp_login_ui` 恢复码展示。本地 workerd/D1/KV，未部署、未访问生产/Staging、未调用真实供应商。
+    2. 方法：逐项复核上一轮残余 P1/P2；对并行新增的 `mail-forward-service` 与加密搜索做代码审计；实跑 Worker 全量、定向安全/转发/搜索测试、Vue 与登录子应用构建/类型/单测、四项 i18n、密钥扫描、Wrangler dry-run、`git diff --check`。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[已关闭·P1]** B5 持久转发任务与附件/CID 保留（并修正 `accountId` 缺失、`provider_rejected` 判断、主题长度、内嵌图重复发送）；B7 有界解密搜索；B8 最后一枚恢复码自动重发与登录 UI 展示；B11 管理建号失败补偿；U1 OAuth 授权页 TOTP/备用码两步契约；U6 慢网不再误清会话。
+    - **[已关闭·P2]** PAT 仅存哈希并迁移历史明文；Apple 裸 id_token 强制 state/nonce；profile 字段/图片 URL 限长；举报 24h 去重；init secret 生产不回退；附件下载原名；BYO 关闭读写分离；UNKNOWN 对账预算；邀请码 fail-closed；OIDC auth_time；Telegram 非管理员绑定已保存配置。
+    - **[保留·P2]** SSRF DNS 解析后校验；内部发件人 Authentication-Results 信任边界；Cloudflare Email/无 provider id 的 UNKNOWN 人工对账；OIDC 内联 Passkey step-up；存储 locator 变更仍硬阻断；Telegram 首次未保存配置；限流迁移窗口；公开 profile 本人邮箱掩码；转发失败无管理 UI；宽泛加密搜索返回 `search_too_broad`。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 修复 Windows Miniflare `svix`/`linkedom` module fallback 与 hook 超时；增加仅测试用的 svix 桩，避免 37 文件在收集阶段集体失败。
+    - 验证：Worker 全量 `37 files / 520 tests passed (exit 0)`；Vue 构建 34.05s；登录子应用 tsc + 29/29；i18n symmetry/audit/hardcoded/auth-locale 全通过；密钥扫描 1,260 文件 0 命中；dry-run 438 文件 / gzip 1,190.90 KiB；`git diff --check` 通过。
+    - **结论：后端已知 P0/P1 安全与一致性项关闭；受控公测 GO；无条件 GA 待 Staging/恢复演练并接受剩余 P2。**
+*   **未执行/需人工处置 (Manual Follow-up)**:
+    - [ ] Staging/生产真实 OAuth、邮件、对象存储、备份恢复、回滚与告警演练。
+    - [ ] 生产核查历史演示账号、旧库重复邮箱/唯一索引、`rate_limit_counter`/`mail_forward_task` 迁移、独立 `init_secret`。
+    - [ ] 处理剩余 P2（SSRF、内部发件人认证头、UNKNOWN 覆盖、Passkey step-up、locator 迁移、转发失败管理 UI）。
+
+---
+
 ### 后端逻辑、权限边界与发布门禁复审 (2026-11-05)
 *   **关联提交 (Git Commit)**: 代码修复与报告提交 `c003fc8efd74d12b4b4c941d980069347c4d723d` (Short: `c003fc8`)；本索引 Hash 在后续归档提交中记录。
 *   **专项文档索引 (Detailed Doc)**: [后端逻辑、权限边界与发布门禁复审](doc/backend-audit-2026-11-05.md)。

@@ -1192,6 +1192,13 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       canvasRef.current?.burst({ strength: 2 });
     }
 
+    const recoveredBackupCodes = Array.isArray(data.data?.backupCodes) ? data.data.backupCodes : [];
+    if (recoveredBackupCodes.length > 0) {
+      try {
+        window.alert(`${t('backupCodesRecovered')}\n\n${recoveredBackupCodes.join('\n')}`);
+      } catch (_) {}
+    }
+
     setTimeout(() => {
       window.location.href = `/mail/u/${targetU}/#inbox`;
     }, 800);

@@ -147,6 +147,30 @@ const telegramService = {
 			subject: `user:${userId || 'anonymous'}`
 		});
 
+		// A logged-in non-admin may only probe the personal bot they already
+		// saved. Otherwise this endpoint is a generic Telegram send proxy for any
+		// valid bot token. Administrators keep the system-bot test path.
+		if (userId) {
+			try {
+				const [{ default: userService }, { isAdminUser }] = await Promise.all([
+					import('./user-service.js'),
+					import('../utils/admin-utils.js')
+				]);
+				const userRow = await userService.selectById(c, userId);
+				if (userRow && !isAdminUser(c, userRow)) {
+					const raw = await c.env.kv.get('USER_PROFILE_' + userId);
+					const saved = raw ? JSON.parse(raw)?.personalTelegram : null;
+					if (saved?.botToken && saved?.chatId
+						&& (saved.botToken !== botToken.trim() || String(saved.chatId) !== String(chatId).trim())) {
+						throw new BizError('请先保存新的 Telegram 配置后再测试', 400, 'telegram_config_mismatch');
+					}
+				}
+			} catch (error) {
+				if (error instanceof BizError) throw error;
+				// Legacy/partial schemas must not turn a test into a 500.
+			}
+		}
+
 		const body = {
 			chat_id: chatId,
 			parse_mode: 'HTML',

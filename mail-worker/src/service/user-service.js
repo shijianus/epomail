@@ -32,6 +32,7 @@ import rateLimit from '../utils/rate-limit.js';
 import userContext from '../security/user-context.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
+import { mailSha256 } from '../utils/mail-pipeline.js';
 import { deleteKvKeys, deleteKvMatching, forEachKvPage } from '../utils/kv-revocation.js';
 import { assertStorageCanChange, beginAccountDeletion, deleteAccountEvidence, getObjectDeletionCounts,
 	isActiveUser, readPrivacyState, revokeAccountAccess, revokeTelegramLinks, setDeletionStatus } from './privacy-revocation-service.js';
@@ -232,6 +233,36 @@ const userService = {
             };
         }
 
+        // Profile values are persisted in KV and exposed on the public profile.
+        // Bound every free-form field so one request cannot fill a 25 MB KV
+        // value or force oversized public responses.
+        const boundedString = (value, max) => typeof value === 'string' ? value.slice(0, max) : '';
+        const profileImageUrl = (value) => {
+            if (value === undefined || value === null || value === '') return '';
+            const text = String(value).trim();
+            if (!text) return '';
+            if (text.length > 2048) {
+                throw new BizError('Profile image URL is too long', 400, 'invalid_profile_url');
+            }
+            if (/^https?:\/\//i.test(text) || text.startsWith('/')) return text;
+            // Allow small legacy inline images, but never a multi-megabyte data URL.
+            if (/^data:image\/(?:png|jpe?g|gif|webp|avif|bmp);base64,/i.test(text) && text.length <= 512 * 1024) {
+                return text;
+            }
+            throw new BizError('Invalid profile image URL', 400, 'invalid_profile_url');
+        };
+
+        if (safeParams.nickname !== undefined) safeParams.nickname = boundedString(safeParams.nickname, 64);
+        if (safeParams.bio !== undefined) safeParams.bio = boundedString(safeParams.bio, 2000);
+        if (safeParams.signature !== undefined) safeParams.signature = boundedString(safeParams.signature, 500);
+        if (safeParams.background !== undefined) safeParams.background = boundedString(safeParams.background, 2048);
+        if (safeParams.avatarUrl !== undefined) safeParams.avatarUrl = profileImageUrl(safeParams.avatarUrl);
+        if (safeParams.backgroundUrl !== undefined) safeParams.backgroundUrl = profileImageUrl(safeParams.backgroundUrl);
+        if (safeParams.themeMode !== undefined) {
+            safeParams.themeMode = ['auto', 'light', 'dark', 'system'].includes(safeParams.themeMode)
+                ? safeParams.themeMode : 'auto';
+        }
+
         if (safeParams.personalTelegram !== undefined) {
             // Revoke in authoritative D1 before writing eventually consistent KV.
             // A stopped channel can never revive pre-stop links when re-enabled.
@@ -423,9 +454,9 @@ const userService = {
         user.bio = profile.bio || '';
         user.avatarUrl = profile.avatarUrl || '';
         user.backgroundUrl = profile.backgroundUrl || profile.background || '';
-        user.showStats = profile.showStats ?? true;
-        user.showTrend = profile.showTrend ?? true;
-        user.showSources = profile.showSources ?? true;
+        user.showStats = profile.showStats ?? false;
+        user.showTrend = profile.showTrend ?? false;
+        user.showSources = profile.showSources ?? false;
         // Selection of this optional processing feature is not blanket consent.
         user.privacyPreferences = { aiVerificationCode: profile.privacyPreferences?.aiVerificationCode === true };
 
@@ -1186,6 +1217,12 @@ const userService = {
 		const caller = await this.selectById(c, Number(callerUserId));
 		if (!caller) throw new BizError('操作者账号不存在', 403);
 		if (isAdminUser(c, caller)) return caller;
+		await rateLimit.check(c, {
+			scope: 'admin-stepup',
+			limit: 10,
+			windowSeconds: 900,
+			subject: `user:${callerUserId}`
+		});
 		if (typeof currentPassword !== 'string' || !currentPassword) {
 			throw new BizError('该操作需要重新验证管理员身份', 403, 'reauth_required');
 		}
@@ -1432,26 +1469,42 @@ const userService = {
 
 		const { salt, hash } = await saltHashUtils.hashPassword(password, c.env);
 
-		const userId = await userService.insert(c, { email, password: hash, salt, type });
-
-		if (params.lang) {
-			try {
-				await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify({ lang: params.lang, nickname: params.name || assignedName }));
-			} catch (e) {}
-		}
-
-		await userService.updateUserInfo(c, userId, true);
-
-		const acc = await accountService.insert(c, { userId: userId, email, type, name: assignedName });
-
+		let userId = null;
 		try {
-			const emailService = (await import('./email-service')).default;
-			const accountRow = acc || await accountService.selectByEmail(c, email);
-			if (accountRow) {
-				await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
+			userId = await userService.insert(c, { email, password: hash, salt, type });
+
+			if (params.lang) {
+				try {
+					await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify({ lang: params.lang, nickname: params.name || assignedName }));
+				} catch (e) {}
+			}
+
+			await userService.updateUserInfo(c, userId, true);
+
+			const acc = await accountService.insert(c, { userId: userId, email, type, name: assignedName });
+
+			try {
+				const emailService = (await import('./email-service')).default;
+				const accountRow = acc || await accountService.selectByEmail(c, email);
+				if (accountRow) {
+					await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
+				}
+			} catch (err) {
+				console.error('Failed to deliver welcome email on user add:', err);
 			}
 		} catch (err) {
-			console.error('Failed to deliver welcome email on user add:', err);
+			// The user row, profile KV entry and primary account are separate
+			// writes. Compensate the earlier writes when a later one fails so a
+			// retry is not permanently blocked by the unique email constraint.
+			if (userId) {
+				await Promise.allSettled([
+					orm(c).delete(user).where(eq(user.userId, userId)).run(),
+					getMailDb(c).prepare('DELETE FROM account WHERE user_id = ? AND email = ?').bind(userId, email).run(),
+					c.env.kv.delete('USER_PROFILE_' + userId),
+					c.env.kv.delete(KvConst.AUTH_INFO + userId)
+				]);
+			}
+			throw err;
 		}
 	},
 
@@ -1622,7 +1675,43 @@ const userService = {
 			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
 			if (profileStr) profile = JSON.parse(profileStr);
 		} catch (e) {}
-		return Array.isArray(profile.apiTokens) ? profile.apiTokens : [];
+		if (!Array.isArray(profile.apiTokens)) return [];
+
+		let migrated = false;
+		const tokens = [];
+		for (const item of profile.apiTokens) {
+			if (!item || typeof item !== 'object') continue;
+			let tokenHash = typeof item.tokenHash === 'string' ? item.tokenHash : '';
+			let tokenPrefix = typeof item.tokenPrefix === 'string' ? item.tokenPrefix : '';
+			const legacyPlaintext = typeof item.token === 'string' && item.token ? item.token : '';
+			// Legacy tokens stored the plaintext value in KV and in the profile.
+			// Migrate on read and remove the plaintext index/copy.
+			if (!tokenHash && legacyPlaintext) {
+				tokenHash = await mailSha256(legacyPlaintext);
+				tokenPrefix = legacyPlaintext.slice(0, 16);
+			}
+			if (legacyPlaintext) {
+				try { await c.env.kv.delete(`API_TOKEN_${legacyPlaintext}`); } catch (e) {}
+				migrated = true;
+			}
+			if (!tokenHash) continue;
+			item.tokenHash = tokenHash;
+			item.tokenPrefix = tokenPrefix;
+			delete item.token;
+			tokens.push({
+				id: item.id,
+				name: item.name,
+				tokenPrefix,
+				scopes: Array.isArray(item.scopes) ? item.scopes : [],
+				createdAt: item.createdAt || null,
+				expiresAt: item.expiresAt || null,
+				lastUsedAt: item.lastUsedAt || null
+			});
+		}
+		if (migrated) {
+			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
+		}
+		return tokens;
 	},
 
 	async createApiToken(c, userId, params) {
@@ -1632,8 +1721,22 @@ const userService = {
 			throw new BizError('第三方 API 与开发者访问功能已被管理员停用 / Third-party API support is disabled', 403);
 		}
 
-		const { name, expiresInDays, scopes } = params;
-		if (!name) throw new BizError('Token name is required');
+		const { name, expiresInDays, scopes } = params || {};
+		const safeName = typeof name === 'string' ? name.trim().slice(0, 100) : '';
+		if (!safeName) throw new BizError('Token name is required');
+		const allowedScopes = new Set(['emails:read', 'emails:send', 'profile:read']);
+		const requestedScopes = Array.isArray(scopes)
+			? scopes.filter(scope => allowedScopes.has(scope))
+			: [];
+		const tokenScopes = requestedScopes.length > 0
+			? [...new Set(requestedScopes)]
+			: ['emails:read', 'emails:send', 'profile:read'];
+		const days = expiresInDays === undefined || expiresInDays === null || expiresInDays === ''
+			? null
+			: Number(expiresInDays);
+		if (days !== null && (!Number.isInteger(days) || days < 1 || days > 3650)) {
+			throw new BizError('Invalid token lifetime');
+		}
 
 		let profile = {};
 		try {
@@ -1642,18 +1745,24 @@ const userService = {
 		} catch (e) {}
 
 		if (!Array.isArray(profile.apiTokens)) profile.apiTokens = [];
+		if (profile.apiTokens.length >= 20) {
+			throw new BizError('Too many API tokens');
+		}
 
 		const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(24)))
 			.map(b => b.toString(16).padStart(2, '0'))
 			.join('');
 		const tokenStr = `epo_live_${randomHex}`;
+		const tokenHash = await mailSha256(tokenStr);
+		const tokenPrefix = tokenStr.slice(0, 16);
 		const tokenObj = {
 			id: 'tok_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-			name,
-			token: tokenStr,
-			scopes: scopes || ['emails:read', 'emails:send', 'profile:read'],
+			name: safeName,
+			tokenHash,
+			tokenPrefix,
+			scopes: tokenScopes,
 			createdAt: new Date().toISOString(),
-			expiresAt: expiresInDays ? new Date(Date.now() + expiresInDays * 86400000).toISOString() : null,
+			expiresAt: days ? new Date(Date.now() + days * 86400000).toISOString() : null,
 			lastUsedAt: null
 		};
 
@@ -1661,20 +1770,27 @@ const userService = {
 		await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 
 		try {
-			await c.env.kv.put(`API_TOKEN_${tokenStr}`, JSON.stringify({ userId, scopes: tokenObj.scopes, expiresAt: tokenObj.expiresAt }));
-		} catch (e) {}
-
-		try {
 			const securityNoticeService = (await import('./security-notice-service.js')).default;
 			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
 			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PAT_CREATED, {
-				detail: `Token: ${tokenObj.name} (${expiresInDays ? expiresInDays + 'd' : 'never'})`
+				detail: `Token: ${tokenObj.name} (${days ? days + 'd' : 'never'})`
 			});
 		} catch (e) {
 			console.error('Failed to send PAT notice:', e);
 		}
 
-		return tokenObj;
+		// The plaintext value is returned exactly once. Only its SHA-256 hash is
+		// persisted, so a KV/profile read cannot recover a usable credential.
+		return {
+			id: tokenObj.id,
+			name: tokenObj.name,
+			tokenPrefix,
+			scopes: tokenObj.scopes,
+			createdAt: tokenObj.createdAt,
+			expiresAt: tokenObj.expiresAt,
+			lastUsedAt: tokenObj.lastUsedAt,
+			token: tokenStr
+		};
 	},
 
 	async deleteApiToken(c, userId, tokenId) {
@@ -1686,8 +1802,11 @@ const userService = {
 
 		if (Array.isArray(profile.apiTokens)) {
 			const target = profile.apiTokens.find(t => t.id === tokenId);
-			if (target && target.token) {
+			if (target?.token) {
 				try { await c.env.kv.delete(`API_TOKEN_${target.token}`); } catch (e) {}
+			}
+			if (target?.tokenHash) {
+				try { await c.env.kv.delete(`API_TOKEN_${target.tokenHash}`); } catch (e) {}
 			}
 			profile.apiTokens = profile.apiTokens.filter(t => t.id !== tokenId);
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));

@@ -18,6 +18,9 @@ function timingSafeEqual(a, b) {
 
 const dbInit = {
 	async init(c) {
+		const envName = String(c.env?.ENVIRONMENT || '').toLowerCase();
+		const localLike = Boolean(c.env?.DEV || c.env?.dev) || envName === 'development' || envName === 'test';
+		const productionLike = !localLike || envName === 'production' || envName === 'prod';
 		const authHeader = c.req.header('Authorization') || '';
 		const xInitSecret = c.req.header('X-Init-Secret') || '';
 		let secret = xInitSecret;
@@ -33,9 +36,6 @@ const dbInit = {
 		if (!secret) {
 			const urlSecret = c.req.param('secret');
 			if (urlSecret) {
-				const envName = String(c.env?.ENVIRONMENT || '').toLowerCase();
-				const localLike = Boolean(c.env?.DEV || c.env?.dev) || envName === 'development' || envName === 'test';
-				const productionLike = !localLike || envName === 'production' || envName === 'prod';
 				if (c.env?.ALLOW_URL_INIT === 'false' || envName === 'staging' || productionLike) {
 					return c.text('❌ Passing initialization secret via URL is prohibited in this environment. Use POST /api/init with X-Init-Secret header.', 403);
 				}
@@ -43,7 +43,9 @@ const dbInit = {
 			}
 		}
 
-		const expected = c.env.init_secret || c.env.jwt_secret;
+		// Production/staging must not reuse the JWT signing key as the init
+		// secret. Local development and tests may keep the compatibility fallback.
+		const expected = c.env.init_secret || (localLike ? c.env.jwt_secret : '');
 		if (!expected || !secret || !timingSafeEqual(secret, expected)) {
 			return c.text('❌ Forbidden', 403);
 		}

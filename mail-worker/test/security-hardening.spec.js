@@ -143,6 +143,10 @@ describe('Network and storage boundaries', () => {
 		const svg = safeObjectHeaders({ contentType: 'image/svg+xml', contentDisposition: 'inline' });
 		expect(svg['Content-Type']).toBe('application/octet-stream');
 		expect(svg['Content-Disposition']).toBe('attachment');
+
+		const named = safeObjectHeaders({ contentType: 'application/pdf', filename: 'invoice 2026.pdf' });
+		expect(named['Content-Disposition']).toContain('attachment');
+		expect(named['Content-Disposition']).toContain('filename="invoice 2026.pdf"');
 	});
 
 	it('never lets stored metadata make a private attachment publicly cacheable', () => {

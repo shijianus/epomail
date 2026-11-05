@@ -510,7 +510,7 @@ const settingService = {
 		// the per-user assertStorageCanChange guard; an empty instance can still
 		// be reconfigured freely.
 		const storageFields = ['storageProvider', 'bucket', 'endpoint', 'region',
-			's3AccessKey', 's3SecretKey', 'forcePathStyle', 'customDomain', 'userByoStorage'];
+			's3AccessKey', 's3SecretKey', 'forcePathStyle', 'customDomain'];
 		const normalizeStorageValue = value => {
 			if (value === true || value === 1 || value === '1') return '1';
 			if (value === false || value === 0 || value === '0') return '0';

@@ -533,15 +533,15 @@
       <div class="privacy-group">
         <div class="privacy-item">
           <span>{{ $t('showStats') }}</span>
-          <el-switch :model-value="userStore.user.showStats ?? true" @change="val => savePrivacy('showStats', val)" />
+          <el-switch :model-value="userStore.user.showStats ?? false" @change="val => savePrivacy('showStats', val)" />
         </div>
         <div class="privacy-item">
           <span>{{ $t('showTrend') }}</span>
-          <el-switch :model-value="userStore.user.showTrend ?? true" @change="val => savePrivacy('showTrend', val)" />
+          <el-switch :model-value="userStore.user.showTrend ?? false" @change="val => savePrivacy('showTrend', val)" />
         </div>
         <div class="privacy-item">
           <span>{{ $t('showSources') }}</span>
-          <el-switch :model-value="userStore.user.showSources ?? true" @change="val => savePrivacy('showSources', val)" />
+          <el-switch :model-value="userStore.user.showSources ?? false" @change="val => savePrivacy('showSources', val)" />
         </div>
       </div>
     </div>

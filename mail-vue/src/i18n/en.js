@@ -1843,6 +1843,7 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     removePermissionFailed: 'Failed to revoke access permission',
     authorizeFailed: 'Authorization confirmation failed',
     loginFailedCheckCreds: 'Login failed, please check account and password',
+    accountLocked: 'Too many failed attempts. The account is temporarily locked.',
     getAppsFailed: 'Failed to fetch OAuth applications',
     saveAppFailed: 'Failed to save application',
     resetSecretFailed: 'Failed to reset secret',

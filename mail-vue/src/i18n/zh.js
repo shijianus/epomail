@@ -1843,6 +1843,7 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     removePermissionFailed: '移除访问权限失败',
     authorizeFailed: '授权确认失败',
     loginFailedCheckCreds: '登录失败，请检查账号密码',
+    accountLocked: '连续错误次数过多，账号已临时锁定',
     getAppsFailed: '获取 OAuth 应用列表失败',
     saveAppFailed: '保存应用失败',
     resetSecretFailed: '重置密钥失败',

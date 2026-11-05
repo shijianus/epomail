@@ -8,7 +8,7 @@
 		"test": "vitest run",
 		"test:serial": "vitest run --maxWorkers=1",
 		"test:unit": "vitest run test/security-hardening.spec.js test/totp-backend-fixes.spec.js test/email-ingest.spec.js",
-		"test:integration": "vitest run test/index.spec.js test/object-ownership.spec.js test/oauth-security.spec.js test/oauth-atomicity.spec.js test/oauth-bind-recovery.spec.js test/oauth-identity-management.spec.js test/oauth-switch-enforcement.spec.js test/initial-password.spec.js test/login-provenance.spec.js test/audit-service.spec.js test/init-visitor-security.spec.js test/reg-key.spec.js test/security-delivery.spec.js test/mail-pipeline-convergence.spec.js test/security-review-adversarial.spec.js test/security-review-round2.spec.js test/auth-security-operation.spec.js test/auth-convergence.spec.js test/notification-outbox.spec.js test/ai-outbound-policy.spec.js test/beta-migrations.spec.js",
+		"test:integration": "vitest run",
 		"test:mailjet": "node test-mailjet.js",
 		"deploy": "wrangler deploy",
 		"deploy:test": "wrangler deploy --config wrangler-test.toml",

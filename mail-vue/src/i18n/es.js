@@ -1843,6 +1843,7 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     removePermissionFailed: 'Error al revocar el permiso',
     authorizeFailed: 'Error al confirmar la autorización',
     loginFailedCheckCreds: 'Error de inicio de sesión, verifique credenciales',
+    accountLocked: 'Demasiados intentos fallidos. La cuenta está bloqueada temporalmente.',
     getAppsFailed: 'Error al obtener aplicaciones',
     saveAppFailed: 'Error al guardar la aplicación',
     resetSecretFailed: 'Error al restablecer secreto',

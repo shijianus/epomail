@@ -19,13 +19,16 @@ const r2Service = {
 	/**
 	 * Resolve storage engine and config based on user BYO settings and system defaults
 	 */
-	async resolveStorage(c, userId = null, { forDeletion = false } = {}) {
+	async resolveStorage(c, userId = null, { forDeletion = false, forWrite = false } = {}) {
 		// 1. Check User-Level BYO Storage
 		if (userId) {
 			try {
 				const userDb = getUserDb(c);
 				const setting = forDeletion ? {} : await settingService.query(c);
-				const allowUserByo = forDeletion || setting.userByoStorage !== 0;
+				// Disabling BYO must stop new writes but must never make existing
+				// objects unreadable. Reads/deletes keep resolving the historical
+				// user locator; only new writes fall back to system storage.
+				const allowUserByo = forDeletion || !forWrite || setting.userByoStorage !== 0;
 
 				if (allowUserByo) {
 					const userRow = await userDb.prepare(`
@@ -111,7 +114,7 @@ const r2Service = {
 		if (!safeKey) {
 			throw new Error('Invalid storage object key');
 		}
-		const resolved = await this.resolveStorage(c, userId);
+		const resolved = await this.resolveStorage(c, userId, { forWrite: true });
 
 		if (resolved.type === 'KV') {
 			await kvObjService.putObj(c, safeKey, content, metadata);
@@ -178,7 +181,7 @@ const r2Service = {
 		}
 	},
 
-	async toObjResponse(c, key, userId = null) {
+	async toObjResponse(c, key, userId = null, filename = null) {
 		const obj = await this.getObj(c, key, userId);
 		if (!obj) {
 			return null;
@@ -194,7 +197,8 @@ const r2Service = {
 					contentType: obj.headers.get('Content-Type'),
 					contentDisposition: obj.headers.get('Content-Disposition'),
 					cacheControl: obj.headers.get('Cache-Control'),
-					isPublic
+					isPublic,
+					filename
 				})
 			});
 		}
@@ -204,7 +208,8 @@ const r2Service = {
 				contentType: obj.httpMetadata?.contentType,
 				contentDisposition: obj.httpMetadata?.contentDisposition,
 				cacheControl: obj.httpMetadata?.cacheControl,
-				isPublic
+				isPublic,
+				filename
 			})
 		});
 	},

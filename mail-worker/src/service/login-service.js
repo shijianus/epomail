@@ -50,6 +50,18 @@ function getSafeSessionUser(userRow) {
 	return safe;
 }
 
+function unusedBackupCodeCount(value) {
+	if (!value) return 0;
+	try {
+		const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+		if (Array.isArray(parsed)) return parsed.filter(item => item.used === 0).length;
+		if (parsed && Array.isArray(parsed.hashedCodes)) {
+			return parsed.hashedCodes.filter(item => item.used === 0).length;
+		}
+	} catch (_) {}
+	return 0;
+}
+
 /**
  * Per-session authentication provenance. Only the issuing server (OAuth
  * service) can set it, and it is stored next to the token list so a stale or
@@ -434,25 +446,34 @@ const loginService = {
 		try {
 			role = await roleService.selectById(c, regKeyRow.roleId);
 		} catch (err) {
+			// A failed role lookup cannot prove the invite is harmless. Fail
+			// closed for legacy/privileged codes instead of granting a role.
 			console.warn('Invite role lookup unavailable:', err?.message || err);
-			return true;
+			return false;
 		}
-		if (!role) return true;
+		if (!role) return false;
 		const isMasterRole = role.roleCode === 'master' || role.key === 'master';
+		const roleKey = String(role.roleCode || role.key || '').toLowerCase();
 		let roleKeys = [];
+		let permLookupFailed = false;
 		try {
 			roleKeys = await permService.rolePermKeys(c, role.roleId);
 		} catch (err) {
-			// Lightweight/legacy schemas may not expose role_perm yet. The
-			// creation-side guard remains authoritative for new codes; do not
-			// turn a missing auxiliary table into a total registration outage.
+			// Lightweight/legacy schemas may not expose role_perm. Normal roles
+			// may continue for compatibility, but a code that is known to map to
+			// a privileged seed role must not silently bypass the owner check.
+			permLookupFailed = true;
 			console.warn('Invite role permission lookup unavailable:', err?.message || err);
 		}
+		if (permLookupFailed && (isMasterRole || roleKey === 'moderator')) return false;
 		const hasPrivilegedPerm = roleKeys.some(key => rbacGuard.PRIVILEGED_PERMS.has(key));
 		if (!isMasterRole && !hasPrivilegedPerm) return true;
 		const creatorId = Number(regKeyRow.userId) || 0;
 		const creator = creatorId > 0 ? await userService.selectByIdIncludeDel(c, creatorId) : null;
-		return Boolean(creator && isAdminUser(c, creator));
+		const creatorActive = Boolean(creator)
+			&& Number(creator.isDel ?? creator.is_del ?? 0) === 0
+			&& Number(creator.status ?? 0) === 0;
+		return creatorActive && isAdminUser(c, creator);
 	},
 
 	async handleOpenRegKey(c, regKey, code) {
@@ -1004,6 +1025,22 @@ const loginService = {
 		}
 
 		// Generate formal session JWT
+		let recoveredBackupCodes = null;
+		if (factorType === 'backup_code' && unusedBackupCodeCount(userRow.totpBackupCodes) === 0) {
+			// The last recovery code was the only remaining factor. Issue a new
+			// set without bumping authVersion: the just-verified login must remain
+			// usable, while losing the device can no longer strand the account.
+			const backup = await totpUtils.generateBackupCodes(10, c.env);
+			const serialized = JSON.stringify({
+				hashedCodes: backup.hashedCodes,
+				encryptedRaw: backup.encryptedRaw
+			});
+			const updated = await getUserDb(c).prepare(`UPDATE user
+				SET totp_backup_codes=?, update_time=CURRENT_TIMESTAMP
+				WHERE user_id=? AND auth_version=? AND totp_backup_codes=? AND is_del=0`)
+				.bind(serialized, userRow.userId, authVersionOf(userRow), userRow.totpBackupCodes).run();
+			if (Number(updated?.meta?.changes ?? 0) === 1) recoveredBackupCodes = backup.rawCodes;
+		}
 		const activeLoginEmail = targetEmail && targetEmail.includes('@') ? targetEmail : userRow.email;
 		const uuid = uuidv4();
 		const jwt = await JwtUtils.generateToken(c, { 
@@ -1070,7 +1107,8 @@ const loginService = {
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
 		const legalAcceptance = await legalPolicyService.getLegalAcceptanceStatus(c, userRow.userId);
-		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, trustedDeviceToken: issuedTrustToken, legalAcceptance };
+		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, trustedDeviceToken: issuedTrustToken,
+			legalAcceptance, ...(recoveredBackupCodes ? { backupCodes: recoveredBackupCodes } : {}) };
 	},
 
 	async logout(c, userId) {

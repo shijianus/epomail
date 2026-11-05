@@ -179,10 +179,14 @@ app.post('/oauth/:provider/login', async (c) => {
 	await oauthService.assertProviderEnabled(c, provider);
 
 	let loginParams = { ...body };
+	const hasIdentityToken = typeof body?.id_token === 'string' && body.id_token.trim().length > 0;
+	if ((body?.code || hasIdentityToken) && (!body.state || typeof body.state !== 'string')) {
+		// A client-supplied identity token is a bearer credential. Without the
+		// server-issued state (and its nonce binding) a stolen Apple/SSO token
+		// can be replayed directly against this endpoint.
+		throw new BizError('Missing OAuth state', 400, 'oauth_state_required');
+	}
 	if (body?.code) {
-		if (!body.state || typeof body.state !== 'string') {
-			throw new BizError('Missing OAuth state', 400, 'oauth_state_required');
-		}
 		const stateRow = await oauthService.consumeState(c, provider, body.state);
 		loginParams = {
 			...body,
@@ -190,7 +194,7 @@ app.post('/oauth/:provider/login', async (c) => {
 			nonce: stateRow.nonce,
 			codeVerifier: stateRow.codeVerifier || ''
 		};
-	} else if (body?.state) {
+	} else if (hasIdentityToken || body?.state) {
 		const stateRow = await oauthService.consumeState(c, provider, body.state);
 		loginParams = {
 			...body,

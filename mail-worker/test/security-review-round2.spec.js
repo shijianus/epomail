@@ -147,7 +147,7 @@ afterEach(async () => {
 });
 
 describe('Apple id_token is verified on the real HTTP login route', () => {
-	it('accepts a correctly signed id_token and returns only a bind proof for a new identity', async () => {
+	it('rejects a direct id_token without a server-issued state even when its signature is valid', async () => {
 		const { pair, jwk } = await createSigningMaterial('review-kid');
 		await env.kv.put('apple_jwks_v1', JSON.stringify({ keys: [jwk] }), { expirationTtl: 3600 });
 		await env.kv.put('setting:', JSON.stringify({
@@ -180,9 +180,9 @@ describe('Apple id_token is verified on the real HTTP login route', () => {
 			body: JSON.stringify({ id_token: token })
 		});
 		const body = await response.json();
-		expect(body.code, JSON.stringify(body)).toBe(200);
-		expect(body.data.bindToken).toBeTruthy();
-		expect(body.data.token).toBeFalsy();
+		expect(body.code, JSON.stringify(body)).toBe(400);
+		expect(JSON.stringify(body)).toContain('oauth_state_required');
+		expect(JSON.stringify(body)).not.toContain('bindToken');
 
 		await env.db.prepare('DELETE FROM oauth WHERE oauth_user_id = ?').bind('apple:review-apple-user').run();
 	});
@@ -500,5 +500,76 @@ describe('Capacity unit semantics', () => {
 		const row = await env.db.prepare("SELECT length('中') AS sql_length").first();
 		expect(row.sql_length).toBe(1);
 		expect(new Blob(['中']).size).toBe(3);
+	});
+});
+
+describe('Personal access token storage hardening', () => {
+	const userId = 424242;
+	const profileKey = 'USER_PROFILE_' + userId;
+
+	afterAll(async () => {
+		await env.kv.delete(profileKey);
+	});
+
+	it('persists only a SHA-256 marker and never the plaintext token', async () => {
+		const settingSpy = vi.spyOn(settingService, 'query').mockResolvedValue({ userApiSupport: 1 });
+		try {
+			const created = await userService.createApiToken({ env }, userId, {
+				name: 'review-token',
+				expiresInDays: 1,
+				scopes: ['emails:read']
+			});
+			expect(created.token).toMatch(/^epo_live_[a-f0-9]{48}$/);
+			const profile = JSON.parse(await env.kv.get(profileKey));
+			expect(profile.apiTokens[0].token).toBeUndefined();
+			expect(profile.apiTokens[0].tokenHash).toMatch(/^[a-f0-9]{64}$/);
+			expect(profile.apiTokens[0].tokenPrefix).toBe(created.token.slice(0, 16));
+			expect(await env.kv.get('API_TOKEN_' + created.token)).toBeNull();
+
+			const listed = await userService.getApiTokens({ env }, userId);
+			expect(listed[0].token).toBeUndefined();
+			expect(listed[0].tokenHash).toBeUndefined();
+			expect(listed[0].tokenPrefix).toBe(created.token.slice(0, 16));
+		} finally {
+			settingSpy.mockRestore();
+		}
+	});
+
+	it('migrates a legacy plaintext token on read and removes its KV index', async () => {
+		const legacy = 'epo_live_' + 'a'.repeat(48);
+		await env.kv.put(profileKey, JSON.stringify({
+			apiTokens: [{ id: 'legacy-1', name: 'legacy', token: legacy, scopes: ['emails:read'] }]
+		}));
+		await env.kv.put('API_TOKEN_' + legacy, JSON.stringify({ userId }));
+		const listed = await userService.getApiTokens({ env }, userId);
+		expect(listed[0].token).toBeUndefined();
+		expect(listed[0].tokenPrefix).toBe(legacy.slice(0, 16));
+		const profile = JSON.parse(await env.kv.get(profileKey));
+		expect(profile.apiTokens[0].token).toBeUndefined();
+		expect(profile.apiTokens[0].tokenHash).toMatch(/^[a-f0-9]{64}$/);
+		expect(await env.kv.get('API_TOKEN_' + legacy)).toBeNull();
+	});
+});
+
+describe('Telegram test endpoint binding', () => {
+	it('refuses to probe a different bot than the saved personal configuration', async () => {
+		const userId = 424243;
+		const savedToken = '123456:abcdefghijklmnopqrstuvwxyz123456';
+		await env.kv.put('USER_PROFILE_' + userId, JSON.stringify({
+			personalTelegram: { enabled: true, botToken: savedToken, chatId: '12345' }
+		}));
+		const userSpy = vi.spyOn(userService, 'selectById').mockResolvedValue({
+			userId, email: 'telegram-review@example.com', status: 0, isDel: 0
+		});
+		try {
+			const { default: telegramService } = await import('../src/service/telegram-service.js');
+			await expect(telegramService.testPersonalBot({ env }, {
+				botToken: '654321:zyxwvutsrqponmlkjihgfedcba654321',
+				chatId: '12345'
+			}, userId)).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
+		} finally {
+			userSpy.mockRestore();
+			await env.kv.delete('USER_PROFILE_' + userId);
+		}
 	});
 });
