@@ -1,3 +1,24 @@
+### 公测封版前 9 项后端安全边界收敛加固与封版 Tag 发布 (2026-11-05)
+*   **关联提交 (Git Commit)**: `a4a51edf9d07277ec578e926f92c640eead9b263` (Short: `a4a51ed`)；封版 Tag: `v1.2.1-freeze` / `backend-freeze-2026-11-05`
+*   **部署环境 (Deployment)**: 本地全真栈验证 + GitHub 远端封版归档 (`origin/release/2026-10-31`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] [P1-1] 入站邮件认证头与【官方】徽章防伪：`isAuthenticatedInternalSender` 剥离 `ARC-Authentication-Results` 与多头逗号拼接并加固域名右边界；`checkBlock` 拦截伪造官方系统地址的外部邮件；`isOfficialEmailRow` 绑定 `receive_claim_key IS NULL AND outbound_task_id IS NULL`，并拦截用户自定义标签/规则注入系统保留标签。
+    - [x] [P1-2] 博客等级同步角色白名单与高权保护：`userService.syncBlogLevel` 拦截 `visitor` 调用、保护 `master`/`moderator` 不被降级，并强制校验 `mappedEpomailRole` 白名单（`user_lv0`/`user_lv1`/`vip`）。
+    - [x] [P1-3] 登录失败锁定归集至主邮箱：`loginService.login` 在解析别名或短用户名后同步读取与递增 `userRow.email` 锁定计数。
+    - [x] [P1-4] 参观者注册码列表前缀盲注消除：`regKeyService.list` 在 SQL `LIKE` 过滤前优先校验 `isVisitor`。
+    - [x] [P2-1] 短用户名与账号昵称防抢注：`accountService.setName` 拦截 `visitor` 修改、非站长设置 `admin` 及抢注他人邮箱前缀/用户名；`publicService` 优先匹配真实邮箱前缀持有者。
+    - [x] [P2-2] SSRF DoH `CNAME` 绕过修复与 IPv6 内网段补齐：`url-utils` 要求至少一条合法公网 IP 字面量记录，补齐 NAT64/6to4/IPv4-compatible/`fe80::/10` 拦截，并在 `aiService` / `dbService` 接入 `assertSafePublicUrl`。
+    - [x] [P2-3] RBAC 路由表对齐与参观者沙箱写操作门禁：`security.js` 纳管 `/my/delete` 与 `/audit/outbox/*`；`userService.assertNotVisitor` 阻断参观者写操作并为 `uploadImage` 增加配额与速率限制。
+    - [x] [P2-4] 真实客户端 IP 提取加固：`reqUtils.getIp` 移除可伪造的 `X-Forwarded-For` 回退，仅读取 `CF-Connecting-IP`。
+    - [x] [P2-5] 邮箱加密密钥派生与密码盐解耦：`emailCryptoUtils.getUserEmailCryptoKey` 使用确定性用户盐值，与密码重置 `user.salt` 解耦。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建与打包核验：`mail-vue` + `temp_login_ui` + `wrangler deploy --dry-run` 通过 (438 files, gzip 1,194.01 KiB)
+    - [x] 自动化安全回归套件：`security-hardening` (25/25)、`email-ingest` (12/12)、`reg-key` (5/5)、`init-visitor-security` (6/6)、`security-review-round2` (14/14)、`security-review-adversarial` (13/13)、`auth-convergence` (10/10) 全绿
+    - [x] i18n 与密钥扫描：6 语言字典 100% 对称，`secret-scan` 1,268 文件 0 泄露，`git diff --check` 零告警
+    - [x] 零假数据残留：测试临时数据全部在用例生命周期内自动清理
+
+---
+
 ### Cloudflare 生产环境全量部署与在线实测验收 (2026-11-05)
 *   **关联提交 (Git Commit)**: `a0f01684d56708fd25d102204d2858dd09789c75` (Short: `a0f0168`)
 *   **部署环境 (Deployment)**: 生产 Cloudflare (Version ID: `625c1291-386f-4ff9-8d8c-465ca1422f4f`)，绑定域名 `mail.epocanvas.com`、`mail.epomail.bond`、`mail.epomail.cyou`、`epomail.epocanvas.workers.dev`。

@@ -9,6 +9,32 @@
 
 ---
 
+### 公测封版前后端安全深度审计与 9 项边界收敛报告 (2026-11-05)
+*   **关联提交 (Git Commit)**: `a4a51edf9d07277ec578e926f92c640eead9b263` (Short: `a4a51ed`)；封版 Tag: `v1.2.1-freeze` / `backend-freeze-2026-11-05`。
+*   **专项文档索引 (Detailed Doc)**: [后端 Freeze 门禁复核](doc/backend-freeze-2026-11-05.md)。
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：`mail-worker/src` 全量 28 个 API 路由模块、38 个业务服务层、安全鉴权中间件、入站 MIME 解析与规则引擎、SSRF 网络边界、AES-GCM 邮件加密与 D1/KV 状态机。
+    2. 工具与脚本：逐行白盒代码走查 + Vitest 自动化回归测试套件（`security-hardening.spec.js`、`email-ingest.spec.js`、`reg-key.spec.js`、`init-visitor-security.spec.js`、`security-review-round2.spec.js`、`security-review-adversarial.spec.js`、`auth-convergence.spec.js`）+ 静态安全/i18n 扫描。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 0 项（未发现远程代码执行、SQL 注入、JWT 伪造或跨租户邮件越权读取）。
+    - **[P1·重要/逻辑越权]**: 4 项已全部闭环修复：
+        1. **P1-1 入站 `Authentication-Results` 多头/ARC 拼接与【官方】徽章伪造**：剥离外部可控 `ARC-Authentication-Results` 与逗号多头拼接，增加域名右边界定界符；`checkBlock` 拦截外部伪造 `announcement@epocanvas.com` / `admin@epocanvas.com`；`isOfficialEmailRow` 强制绑定 `receive_claim_key IS NULL AND outbound_task_id IS NULL`，并禁止用户自定义标签或规则写入系统保留标签（`官方`、`全域公告`、`安全`、`裁决留痕`）。
+        2. **P1-2 博客等级同步接口 (`syncBlogLevel`) 角色白名单与高权保护**：拦截 `visitor` 调用，保护 `master` / `moderator` 不被降级覆盖，并强制校验 `mappedEpomailRole` 仅允许 `user_lv0`、`user_lv1`、`vip`。
+        3. **P1-3 别名/短用户名登录失败锁定归集**：`loginService.login` 在解析出 `userRow.email` 后同步检查并累加主邮箱锁定计数，阻断通过轮换别名绕过 5 次失败锁定阈值。
+        4. **P1-4 参观者邀请码前缀盲注消除**：`regKeyService.list` 在构造 `LIKE '${code}%'` 查询前优先判定 `isVisitor`，阻断逐字符探测未过期注册码明文。
+    - **[P2·次要/纵深防御]**: 5 项已全部闭环修复：
+        1. **P2-1 短用户名与昵称防抢注**：`accountService.setName` 拦截 `visitor` 修改、非站长设置 `admin` 以及抢注他人邮箱前缀/用户名；`publicService` 优先解析真实邮箱前缀持有者。
+        2. **P2-2 SSRF DoH `CNAME` 绕过修复与 IPv6 私网段补齐**：`assertSafePublicUrl` 要求至少存在一条合法公网 IP 字面量记录，补齐 NAT64 (`64:ff9b::`)、6to4 (`2002::`)、IPv4-compatible (`::127.0.0.1`) 与 `fe80::/10` 校验，并在 `aiService` / `dbService` 接入 `assertSafePublicUrl`。
+        3. **P2-3 RBAC 路由表对齐与参观者沙箱写门禁**：`security.js` 纳管 `/my/delete` 与 `/audit/outbox/*`；`userService.assertNotVisitor` 阻断参观者修改个人资料、签发 PAT、配置 BYO 与上传头像（并为头像上传补齐配额校验与频率限制）。
+        4. **P2-4 真实客户端 IP 提取加固**：`reqUtils.getIp` 移除可伪造的 `X-Forwarded-For` 回退，统一仅信任 `CF-Connecting-IP`。
+        5. **P2-5 邮件加密密钥派生与密码盐解耦**：`emailCryptoUtils.getUserEmailCryptoKey` 统一使用确定性用户盐值，杜绝重置密码轮换 `user.salt` 影响历史邮件解密。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 定向与对抗安全测试套件全部通过（`security-hardening` 25/25、`email-ingest` 12/12、`reg-key` 5/5、`init-visitor-security` 6/6、`security-review-round2` 14/14、`security-review-adversarial` 13/13、`auth-convergence` 10/10）；
+    - 前端 `mail-vue` + `temp_login_ui` 构建与 `wrangler deploy --dry-run`（438 files, gzip 1,194.01 KiB）零报错通过；
+    - i18n 六语言对称与 `secret-scan`（1,268 文件 0 命中）全部通过。
+
+---
+
 ### Cloudflare 生产环境全量发布与在线验证审计报告 (2026-11-05)
 *   **关联提交 (Git Commit)**: `a0f01684d56708fd25d102204d2858dd09789c75` (Short: `a0f0168`)；生产部署 Version ID: `625c1291-386f-4ff9-8d8c-465ca1422f4f`。
 *   **专项文档索引 (Detailed Doc)**: [生产发布运行手册](doc/production-release-runbook-2026-11-05.md)。
