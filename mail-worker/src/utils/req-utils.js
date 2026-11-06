@@ -1,9 +1,7 @@
 import { UAParser } from 'ua-parser-js';
 const reqUtils = {
 	getIp(c) {
-		const raw = c.req.header('CF-Connecting-IP') ||
-			c.req.header('X-Forwarded-For') ||
-			'Unknown';
+		const raw = (typeof c?.req?.header === 'function' ? c.req.header('CF-Connecting-IP') : '') || 'Unknown';
 		if (raw && raw.includes(',')) {
 			return raw.split(',')[0].trim();
 		}

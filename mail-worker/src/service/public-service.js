@@ -258,16 +258,16 @@ const publicService = {
 			// 2. 纯 'admin' 明确指向主站长 c.env.admin
 			userRow = await userOrm(c).select().from(user).where(sql`${user.email} COLLATE NOCASE = ${c.env.admin}`).get();
 		} else {
-			// 3. 优先匹配抢注该短用户名的持有者（account.name = cleanTarget）
-			const accRow = await accountService.selectByNameIncludeDel(c, cleanTarget);
-			if (accRow && (Number(accRow.isDel) !== 0 || Number(accRow.status) !== 0)) {
-				throw new BizError(t('notExistUser'), 404);
-			}
-			if (accRow && accRow.userId) {
-				userRow = await userOrm(c).select().from(user).where(eq(user.userId, accRow.userId)).get();
-			}
+			// 3. 优先匹配真实邮箱前缀持有者，其次匹配未与他人邮箱前缀冲突的短用户名持有者
+			userRow = await userOrm(c).select().from(user).where(like(user.email, `${cleanTarget}@%`)).get();
 			if (!userRow) {
-				userRow = await userOrm(c).select().from(user).where(like(user.email, `${cleanTarget}@%`)).get();
+				const accRow = await accountService.selectByNameIncludeDel(c, cleanTarget);
+				if (accRow && (Number(accRow.isDel) !== 0 || Number(accRow.status) !== 0)) {
+					throw new BizError(t('notExistUser'), 404);
+				}
+				if (accRow && accRow.userId) {
+					userRow = await userOrm(c).select().from(user).where(eq(user.userId, accRow.userId)).get();
+				}
 			}
 		}
 

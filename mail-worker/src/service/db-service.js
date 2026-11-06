@@ -5,7 +5,7 @@ import userEntity from '../entity/user';
 import accountEntity from '../entity/account';
 import emailEntity from '../entity/email';
 import attEntity from '../entity/att';
-import { isSafePublicUrl } from '../utils/url-utils';
+import { isSafePublicUrl, assertSafePublicUrl } from '../utils/url-utils';
 
 const dbService = {
 	/**
@@ -187,7 +187,7 @@ const dbService = {
 				if (!cleanEndpoint.startsWith('http://') && !cleanEndpoint.startsWith('https://')) {
 					cleanEndpoint = 'https://' + cleanEndpoint;
 				}
-				if (!isSafePublicUrl(cleanEndpoint)) {
+				if (!(await assertSafePublicUrl(cleanEndpoint))) {
 					throw new Error('外部数据库 Endpoint 不合法或属于受限内网地址');
 				}
 

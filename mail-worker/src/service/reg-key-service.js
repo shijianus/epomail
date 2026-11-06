@@ -85,15 +85,15 @@ const regKeyService = {
 	async list(c, params, callerUserId) {
 
 		const {code} = params
+		const isVisitor = await this.isCallerVisitor(c, callerUserId);
 		let query = orm(c).select().from(regKey)
 
-		if (code) {
+		if (code && !isVisitor) {
 			query = query.where(like(regKey.code, `${code}%`))
 		}
 
 		const regKeyList = await query.orderBy(desc(regKey.regKeyId)).all();
 		const roleList = await roleService.roleSelectUse(c);
-		const isVisitor = await this.isCallerVisitor(c, callerUserId);
 
 		const today = toUtc().tz('Asia/Shanghai').startOf('day')
 

@@ -554,18 +554,38 @@ const loginService = {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
 
-		const failKey = KvConst.LOGIN_FAIL + inputEmail;
-		const durableFailCount = await readLoginFail(c, inputEmail);
-		let failCount = durableFailCount;
-		if (failCount === null) {
-			const failCountStr = await c.env.kv.get(failKey);
-			failCount = failCountStr ? parseInt(failCountStr) : 0;
-		}
+		const readFailForIdentifier = async (identifier) => {
+			if (!identifier) return 0;
+			const durable = await readLoginFail(c, identifier);
+			if (durable !== null) return durable;
+			const str = await c.env.kv.get(KvConst.LOGIN_FAIL + identifier);
+			return str ? parseInt(str) : 0;
+		};
 
+		const incrementFailForIdentifier = async (identifier) => {
+			if (!identifier) return 0;
+			const durableCount = await incrementLoginFail(c, identifier);
+			if (durableCount !== null) return durableCount;
+			// Pre-migration / test fallback. The D1 counter is authoritative when
+			// the rate_limit_counter table is present.
+			try {
+				const key = KvConst.LOGIN_FAIL + identifier;
+				const latest = await c.env.kv.get(key);
+				const current = latest ? parseInt(latest) : 0;
+				const nextCount = current + 1;
+				await c.env.kv.put(key, nextCount.toString(), { expirationTtl: 12 * 60 * 60 });
+				return nextCount;
+			} catch {
+				return 0;
+			}
+		};
+
+		const failCount = await readFailForIdentifier(inputEmail);
 		if (failCount >= 5) {
 			throw new BizError(t('accountLocked'));
 		}
 
+		let canonicalEmail = '';
 		const notifyLocked = async () => {
 			if (!userRow || !userRow.userId) return;
 			try {
@@ -580,20 +600,14 @@ const loginService = {
 		};
 
 		const incrementFail = async () => {
-			const durableCount = await incrementLoginFail(c, inputEmail);
-			if (durableCount !== null) {
-				if (durableCount >= 5) await notifyLocked();
-				return;
+			const inputCount = await incrementFailForIdentifier(inputEmail);
+			let canonicalCount = 0;
+			if (canonicalEmail && canonicalEmail !== inputEmail) {
+				canonicalCount = await incrementFailForIdentifier(canonicalEmail);
 			}
-			// Pre-migration / test fallback. The D1 counter is authoritative when
-			// the rate_limit_counter table is present.
-			try {
-				let latest = await c.env.kv.get(failKey);
-				let current = latest ? parseInt(latest) : 0;
-				const nextCount = current + 1;
-				await c.env.kv.put(failKey, nextCount.toString(), { expirationTtl: 12 * 60 * 60 });
-				if (nextCount >= 5) await notifyLocked();
-			} catch {}
+			if (inputCount >= 5 || canonicalCount >= 5) {
+				await notifyLocked();
+			}
 		};
 
 		let userRow = await userService.selectByEmailIncludeDel(c, inputEmail);
@@ -617,6 +631,16 @@ const loginService = {
 					if (accountRow && accountRow.userId) {
 						userRow = await userService.selectByIdIncludeDel(c, accountRow.userId);
 					}
+				}
+			}
+		}
+
+		if (userRow?.email) {
+			canonicalEmail = String(userRow.email).trim().toLowerCase();
+			if (canonicalEmail && canonicalEmail !== inputEmail) {
+				const canonicalFailCount = await readFailForIdentifier(canonicalEmail);
+				if (canonicalFailCount >= 5) {
+					throw new BizError(t('accountLocked'));
 				}
 			}
 		}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { readRawEmail, senderPatternMatches, isAuthenticatedInternalSender } from '../src/email/email.js';
+import { readRawEmail, senderPatternMatches, isAuthenticatedInternalSender, checkBlock } from '../src/email/email.js';
 
 function streamFromBytes(bytes) {
 	return new ReadableStream({
@@ -107,5 +107,50 @@ describe('Authenticated internal sender detection', () => {
 			transportHeaders: new Map([['authentication-results', 'mx.example; dkim=pass header.d=example.com']]),
 			trustedAuthservId: 'mx.cloudflare.net', requireTransport: true
 		})).toBe(false);
+	});
+
+	it('rejects ARC-Authentication-Results, comma-joined multi-header injection, and domain prefix spoofing', () => {
+		const arcOnly = {
+			from: { address: 'user@example.com' },
+			headers: []
+		};
+		expect(isAuthenticatedInternalSender(arcOnly, ['example.com'], {
+			transportHeaders: new Map([
+				['authentication-results', 'mx.cloudflare.net; spf=fail'],
+				['arc-authentication-results', 'i=1; attacker.mx; dkim=pass header.d=example.com']
+			]),
+			trustedAuthservId: 'mx.cloudflare.net',
+			requireTransport: true
+		})).toBe(false);
+
+		expect(isAuthenticatedInternalSender(arcOnly, ['example.com'], {
+			transportHeaders: new Map([
+				['authentication-results', 'mx.cloudflare.net; spf=fail, attacker.mx; dkim=pass header.d=example.com']
+			]),
+			trustedAuthservId: 'mx.cloudflare.net',
+			requireTransport: true
+		})).toBe(false);
+
+		expect(isAuthenticatedInternalSender(arcOnly, ['example.com'], {
+			transportHeaders: new Map([
+				['authentication-results', 'mx.cloudflare.net; dkim=pass header.d=example.com.attacker.com']
+			]),
+			trustedAuthservId: 'mx.cloudflare.net',
+			requireTransport: true
+		})).toBe(false);
+	});
+
+	it('marks unauthenticated external mail spoofing reserved official system addresses as spam', () => {
+		const spoofedOfficial = {
+			from: { address: 'announcement@epocanvas.com' },
+			subject: 'Urgent Notice',
+			html: '<p>Spoof</p>',
+			text: 'Spoof'
+		};
+		const transport = new Map([
+			['authentication-results', 'mx.cloudflare.net; spf=fail; dmarc=fail']
+		]);
+		const res = checkBlock('', '', '', spoofedOfficial, { domain: ['epocanvas.com'] }, 'victim@epocanvas.com', transport);
+		expect(res).toEqual({ block: true, hardBlock: false });
 	});
 });

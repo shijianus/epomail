@@ -253,11 +253,41 @@ const accountService = {
 	},
 
 	async setName(c, params, userId) {
-		const { name, accountId } = params
-		if (name.length > 30) {
+		const { name, accountId } = params;
+		const cleanName = typeof name === 'string' ? name.trim() : '';
+		if (!cleanName) {
+			throw new BizError('名称不能为空', 400);
+		}
+		if (cleanName.length > 30) {
 			throw new BizError(t('usernameLengthLimit'));
 		}
-		await orm(c).update(account).set({name}).where(and(eq(account.userId, userId),eq(account.accountId, accountId))).run();
+		const userRow = await userService.selectById(c, userId);
+		if (!userRow) {
+			throw new BizError(t('notExistUser'), 404);
+		}
+		const roleRow = await roleService.selectById(c, userRow.type);
+		if (roleRow?.roleCode === 'visitor') {
+			throw new BizError('【参观者模式】仅提供只读体验，不支持修改账号名称', 403, 'visitor_readonly');
+		}
+		const lowerName = cleanName.toLowerCase();
+		const adminLocal = c?.env?.admin ? emailUtils.getName(c.env.admin).toLowerCase() : 'admin';
+		if ((lowerName === 'admin' || (adminLocal && lowerName === adminLocal)) && userRow.email !== c?.env?.admin) {
+			throw new BizError(t('adminReserved'), 403);
+		}
+		const existingByName = await this.selectByNameIncludeDel(c, cleanName);
+		if (existingByName && Number(existingByName.userId) !== Number(userId)) {
+			throw new BizError(t('isRegAccount'), 409);
+		}
+		const existingByPrefix = await orm(c).select({ userId: account.userId }).from(account).where(
+			and(
+				sql`lower(${account.email}) LIKE ${lowerName + '@%'}`,
+				ne(account.userId, userId)
+			)
+		).limit(1).get();
+		if (existingByPrefix) {
+			throw new BizError(t('isRegAccount'), 409);
+		}
+		await orm(c).update(account).set({ name: cleanName }).where(and(eq(account.userId, userId), eq(account.accountId, accountId))).run();
 	},
 
 	async allAccount(c, params) {

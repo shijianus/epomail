@@ -87,11 +87,15 @@ const requirePerms = [
 	'/setting/storage/cleanup',
 	'/setting/storage/orphans/cleanup',
 	'/oauth/verify',
+	'/my/delete',
 	'/audit/list',
 	'/audit/action',
 	'/audit/adjudicate',
 	'/audit/purge',
-	'/audit/circuit-breaker'
+	'/audit/circuit-breaker',
+	'/audit/outbox/list',
+	'/audit/outbox/retry',
+	'/audit/outbox/process'
 ];
 
 const premKey = {
@@ -114,15 +118,17 @@ const premKey = {
 	'user:delete': ['/user/delete','/user/deleteAccount', '/user/purgeEmails'],
 	'all-email:query': ['/allEmail/list','/allEmail/latest','/allEmail/outbound/unknown'],
 	'all-email:delete': ['/allEmail/delete','/allEmail/batchDelete','/allEmail/outbound/resolve'],
-	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig', '/audit/list', '/audit/circuit-breaker'],
+	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig', '/audit/list', '/audit/circuit-breaker', '/audit/outbox/list'],
 	'setting:set': [
 		'/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist',
 		'/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status', '/admin/oauthApp/delete',
 		'/setting/sendWelcomeEmail', '/setting/sendGlobalEmail', '/setting/globalEmailConfig',
 		'/setting/ai/test', '/setting/ai/models', '/setting/s3/test', '/setting/db/test', '/setting/storage/scan', '/setting/storage/cleanup', '/setting/storage/orphans/cleanup',
 		'/oauth/verify',
-		'/audit/action', '/audit/adjudicate', '/audit/purge', '/audit/circuit-breaker'
+		'/audit/action', '/audit/adjudicate', '/audit/purge', '/audit/circuit-breaker',
+		'/audit/outbox/list', '/audit/outbox/retry', '/audit/outbox/process'
 	],
+	'audit:Manage': ['/audit/outbox/list', '/audit/outbox/retry', '/audit/outbox/process'],
 	'analysis:query': ['/analysis/echarts'],
 	'reg-key:add': ['/regKey/add'],
 	'reg-key:query': ['/regKey/list','/regKey/history'],

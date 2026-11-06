@@ -98,4 +98,27 @@ describe('Invite code atomic redemption', () => {
 		perms.mockRestore();
 		creator.mockRestore();
 	});
+
+	it('prevents visitor role from using regKeyService.list code filter as a blind prefix oracle', async () => {
+		await env.db.prepare('DELETE FROM reg_key').run();
+		await env.db.prepare('INSERT INTO reg_key (code, count, role_id, expire_time) VALUES (?, ?, ?, ?)')
+			.bind('SECRET-ALPHA-01', 1, 1, '2030-01-01').run();
+		await env.db.prepare('INSERT INTO reg_key (code, count, role_id, expire_time) VALUES (?, ?, ?, ?)')
+			.bind('OTHER-BETA-02', 1, 1, '2030-01-01').run();
+
+		const roleSelectSpy = vi.spyOn(roleService, 'roleSelectUse').mockResolvedValue([{ roleId: 1, name: '普通用户' }]);
+		const visitorSpy = vi.spyOn(regKeyService, 'isCallerVisitor').mockResolvedValue(true);
+
+		const visitorRows = await regKeyService.list({ env }, { code: 'SECRET-A' }, 999);
+		expect(visitorRows).toHaveLength(2);
+		expect(visitorRows.every(row => row.code === '••••••••••••••••' && row.isMasked === true)).toBe(true);
+
+		visitorSpy.mockResolvedValue(false);
+		const adminRows = await regKeyService.list({ env }, { code: 'SECRET-A' }, 1);
+		expect(adminRows).toHaveLength(1);
+		expect(adminRows[0].code).toBe('SECRET-ALPHA-01');
+
+		roleSelectSpy.mockRestore();
+		visitorSpy.mockRestore();
+	});
 });

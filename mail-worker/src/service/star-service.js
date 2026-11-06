@@ -1,6 +1,6 @@
 import { mailOrm as orm } from '../entity/orm';
 import { star } from '../entity/star';
-import emailService from './email-service';
+import emailService, { isOfficialEmailRow } from './email-service';
 import BizError from '../error/biz-error';
 import { and, desc, eq, lt, sql, inArray, or } from 'drizzle-orm';
 import email from '../entity/email';
@@ -95,7 +95,7 @@ const starService = {
 		list.forEach(emailRow => {
 			const atts = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);
 			emailRow.attList = atts;
-			const isOfficial = emailRow.sendEmail === 'announcement@epocanvas.com' || emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
+			const isOfficial = isOfficialEmailRow(emailRow);
 			if (isOfficial) {
 				emailRow.isOfficial = 1;
 				if (!emailRow.content && settingData.welcomeContent) {

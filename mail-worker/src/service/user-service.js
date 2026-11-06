@@ -53,7 +53,29 @@ const userService = {
 		return changed.authVersion;
 	},
 
+	async assertNotVisitor(c, userId) {
+		let userRow = null;
+		try {
+			userRow = await this.selectById(c, Number(userId));
+		} catch (_) {}
+		if (!userRow) return null;
+		const demoEmail = String(c?.env?.DEMO_VISITOR_EMAIL || '').trim().toLowerCase();
+		if (demoEmail && String(userRow.email || '').trim().toLowerCase() === demoEmail) {
+			throw new BizError('【参观者模式】仅提供只读体验，不支持修改个人资料或安全凭据', 403, 'visitor_readonly');
+		}
+		try {
+			const roleRow = await roleService.selectById(c, userRow.type);
+			if (roleRow?.roleCode === 'visitor') {
+				throw new BizError('【参观者模式】仅提供只读体验，不支持修改个人资料或安全凭据', 403, 'visitor_readonly');
+			}
+		} catch (err) {
+			if (err instanceof BizError) throw err;
+		}
+		return userRow;
+	},
+
 	async setCustomLabels(c, params, userId) {
+		await this.assertNotVisitor(c, userId);
 		const { customLabels } = params;
 		let sanitizedLabels;
 		try {
@@ -73,6 +95,7 @@ const userService = {
 	async updateProfile(c, params, userId) {
         const accountState = await userService.selectById(c, userId);
         if (!isActiveUser(accountState)) throw new BizError(t('authExpired'), 403, 'account_unavailable');
+        await this.assertNotVisitor(c, userId);
         if (!params || typeof params !== 'object' || Array.isArray(params)) {
             throw new BizError('Invalid profile update', 400, 'invalid_profile');
         }
@@ -316,6 +339,8 @@ const userService = {
 	},
 	
 	async uploadImage(c, userId) {
+        await this.assertNotVisitor(c, userId);
+        await rateLimit.check(c, { scope: 'upload-image', limit: 20, windowSeconds: 900, subject: `user:${userId}` });
         const formData = await c.req.formData();
         const file = formData.get('file');
 
@@ -326,6 +351,9 @@ const userService = {
         }
 
         const arrayBuffer = await file.arrayBuffer();
+        if (arrayBuffer.byteLength > 5 * 1024 * 1024) {
+            throw new BizError('Image too large (max 5MB)');
+        }
         const detectedMime = fileUtils.detectImageMime(arrayBuffer);
         if (!detectedMime) {
             throw new BizError('Only PNG/JPEG/GIF/WebP/BMP/ICO/AVIF images are accepted');
@@ -358,6 +386,9 @@ const userService = {
             if (!url) throw new BizError('Failed to upload image to host');
             return url;
         }
+
+        const storageQuotaService = (await import('./storage-quota-service')).default;
+        await storageQuotaService.checkQuotaAvailable(c, userId, arrayBuffer.byteLength);
 
         const buffHash = await fileUtils.getBuffHash(arrayBuffer);
         const ext = fileUtils.imageExtensionForMime(detectedMime);
@@ -582,6 +613,7 @@ const userService = {
 		const userRow = await this.selectById(c, Number(userId));
 		if (!userRow) throw new BizError(t('notExistUser'));
 		if (options.requireCurrent) {
+			await this.assertNotVisitor(c, userRow.userId);
 			await userContext.requireSession(c, userRow.userId, userRow);
 			const check = await cryptoUtils.verifyPasswordWithUpgrade(currentPassword || '', userRow.salt, userRow.password, c.env);
 			if (!check.isValid) {
@@ -850,8 +882,13 @@ const userService = {
 	async delete(c, userId) {
 		const target = await this.selectByIdIncludeDel(c, userId);
 		if (!target) throw new BizError(t('notExistUser'), 404);
+		let isVisitorRole = false;
+		try {
+			const roleRow = await roleService.selectById(c, target.type);
+			isVisitorRole = roleRow?.roleCode === 'visitor';
+		} catch (_) {}
 		const demoEmail = String(c.env.DEMO_VISITOR_EMAIL || '').trim().toLowerCase();
-		if (Number(userId) === 1 || isAdminUser(c, target)
+		if (Number(userId) === 1 || isAdminUser(c, target) || isVisitorRole
 			|| (demoEmail && String(target.email).toLowerCase() === demoEmail)) {
 			throw new BizError('This managed account cannot be self-deleted', 403, 'managed_account_deletion_forbidden');
 		}
@@ -1357,6 +1394,12 @@ const userService = {
 		const userRow = await this.selectById(c, userId);
 		if (!userRow) throw new BizError(t('notExistUser'));
 
+		const allRoles = await roleService.roleList(c);
+		const currentRole = allRoles.find(r => r.roleId === userRow.type);
+		if (currentRole?.roleCode === 'visitor') {
+			throw new BizError('【参观者模式】仅提供只读体验，不支持同步晋升角色', 403, 'visitor_readonly');
+		}
+
 		const blogInfo = await this.getBlogLevelInfo(c, userId);
 		if (!blogInfo || !blogInfo.hasBlogAccount) {
 			return {
@@ -1366,8 +1409,22 @@ const userService = {
 			};
 		}
 
-		const targetRoleCode = blogInfo.mappedEpomailRole || (blogInfo.level >= 1 ? 'user_lv1' : 'user_lv0');
-		const allRoles = await roleService.roleList(c);
+		if (isAdminUser(c, userRow) || currentRole?.roleCode === 'master' || currentRole?.roleCode === 'moderator') {
+			return {
+				synced: true,
+				level: blogInfo.level,
+				levelName: blogInfo.levelName,
+				newRoleName: currentRole?.name || '站长',
+				message: `您已拥有高级管理身份【${currentRole?.name || '站长'}】，无需降级覆盖。博客书友等级为【${blogInfo.levelName}】。`
+			};
+		}
+
+		const ALLOWED_BLOG_SYNC_ROLES = new Set(['user_lv0', 'user_lv1', 'vip']);
+		const targetRoleCode = String(blogInfo.mappedEpomailRole || (blogInfo.level >= 1 ? 'user_lv1' : 'user_lv0')).trim();
+		if (!ALLOWED_BLOG_SYNC_ROLES.has(targetRoleCode)) {
+			throw new BizError('非法的目标同步角色分组', 403, 'invalid_blog_sync_role');
+		}
+
 		const targetRole = allRoles.find(r => r.roleCode === targetRoleCode);
 
 		if (!targetRole) {
@@ -1375,16 +1432,6 @@ const userService = {
 				synced: false,
 				message: `未找到目标身份分组 [${targetRoleCode}]`,
 				level: blogInfo.level
-			};
-		}
-
-		if (isAdminUser(c, userRow)) {
-			return {
-				synced: true,
-				level: blogInfo.level,
-				levelName: blogInfo.levelName,
-				newRoleName: '站长',
-				message: `您是站长，已自动享有最高权限。博客书友等级为【${blogInfo.levelName}】。`
 			};
 		}
 
@@ -1715,6 +1762,7 @@ const userService = {
 	},
 
 	async createApiToken(c, userId, params) {
+		await this.assertNotVisitor(c, userId);
 		const settingService = (await import('./setting-service')).default;
 		const settingData = await settingService.query(c);
 		if (Number(settingData.userApiSupport ?? 1) === 0) {
@@ -1794,6 +1842,7 @@ const userService = {
 	},
 
 	async deleteApiToken(c, userId, tokenId) {
+		await this.assertNotVisitor(c, userId);
 		let profile = {};
 		try {
 			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
@@ -1819,6 +1868,7 @@ const userService = {
 	},
 
 	async testUserStorage(c, userId, params) {
+		await this.assertNotVisitor(c, userId);
 		const settingService = (await import('./setting-service')).default;
 		const settingData = await settingService.query(c);
 		if (Number(settingData.userByoStorage ?? 1) === 0) {
@@ -1830,6 +1880,7 @@ const userService = {
 	},
 
 	async updateUserStorage(c, userId, params) {
+		await this.assertNotVisitor(c, userId);
 		const settingService = (await import('./setting-service')).default;
 		const settingData = await settingService.query(c);
 		if (Number(settingData.userByoStorage ?? 1) === 0) {
@@ -1877,6 +1928,7 @@ const userService = {
 	},
 
 	async clearUserStorage(c, userId) {
+		await this.assertNotVisitor(c, userId);
 		await assertStorageCanChange(c, userId);
 		const userDb = (await import('../utils/db-accessor')).getUserDb(c);
 		await userDb.prepare(`

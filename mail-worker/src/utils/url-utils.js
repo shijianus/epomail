@@ -27,8 +27,12 @@ function isPrivateIpv6(hostname) {
 	const inner = hostname.slice(1, -1).toLowerCase();
 	if (!inner) return true;
 	if (inner === '::' || inner === '::1') return true;
-	if (inner.startsWith('fe80:') || inner.startsWith('fec0:')) return true;
+	if (/^fe[89ab][0-9a-f]:/.test(inner) || inner.startsWith('fec0:')) return true;
 	if (inner.startsWith('fc') || inner.startsWith('fd')) return true; // unique local
+	if (inner.startsWith('64:ff9b:')) return true; // NAT64
+	if (inner.startsWith('2002:')) return true; // 6to4
+	if (inner.startsWith('100::')) return true; // discard
+	if (inner.startsWith('2001:db8:')) return true; // documentation
 	if (inner.startsWith('::ffff:')) {
 		const mapped = inner.slice('::ffff:'.length);
 		if (mapped.includes('.')) {
@@ -43,6 +47,16 @@ function isPrivateIpv6(hostname) {
 			}
 		}
 		return true;
+	}
+	if (inner.startsWith('::')) {
+		const compat = inner.slice(2);
+		if (compat.includes('.')) {
+			return isPrivateIpv4(compat.split('.').map(Number));
+		}
+		const hex = compat.split(':');
+		if (hex.length <= 2 && hex.every(h => /^[0-9a-f]{1,4}$/.test(h))) {
+			return true;
+		}
 	}
 	return false;
 }
@@ -133,12 +147,16 @@ export async function assertSafePublicUrl(urlStr, {
 		if (!response?.ok) continue;
 		const data = await response.json().catch(() => null);
 		for (const answer of data?.Answer || []) {
-			const value = String(answer?.data || '').trim();
+			const value = String(answer?.data || '').trim().replace(/\.$/, '');
 			if (!value) continue;
+			if (!isIpLiteral(value)) {
+				if (!isSafePublicUrl(`http://${value}`)) return false;
+				continue;
+			}
 			// A/AAAA answers are normally IP literals; tolerate a provider that
 			// returns an IPv4 value for the AAAA slot without constructing an
 			// invalid bracketed URL.
-			const probe = type === 'AAAA' && value.includes(':') ? `http://[${value}]` : `http://${value}`;
+			const probe = value.includes(':') ? `http://[${value}]` : `http://${value}`;
 			if (!isSafePublicUrl(probe)) return false;
 			publicAnswer = true;
 		}

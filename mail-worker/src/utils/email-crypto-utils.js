@@ -44,11 +44,11 @@ const emailCryptoUtils = {
 			throw new Error('email encryption key is not configured (set email_enc_key or totp_enc_key)');
 		}
 
-		let uid = typeof userOrUserId === 'object' ? userOrUserId?.userId : userOrUserId;
-		let salt = typeof userOrUserId === 'object' ? userOrUserId?.salt : userSalt;
-		if (!salt) {
-			salt = `epomail-user-salt-${uid || 0}`;
-		}
+		const uid = typeof userOrUserId === 'object' ? userOrUserId?.userId : userOrUserId;
+		// Always derive the HKDF salt deterministically from userId (unless an explicit
+		// userSalt argument is passed) so password resets rotating userRow.salt never
+		// change the user's mailbox encryption key.
+		const salt = userSalt || `epomail-user-salt-${uid || 0}`;
 
 		const baseKey = await crypto.subtle.importKey(
 			'raw',

@@ -3,7 +3,7 @@ import { settingConst } from '../const/entity-const';
 import settingService from './setting-service';
 import kvConst from '../const/kv-const';
 import dayjs from 'dayjs';
-import { isSafePublicUrl } from '../utils/url-utils';
+import { isSafePublicUrl, assertSafePublicUrl } from '../utils/url-utils';
 import BizError from '../error/biz-error.js';
 import { isAdminUser } from '../utils/admin-utils.js';
 import { reserveAiRequest } from '../utils/ai-budget.js';
@@ -1021,7 +1021,7 @@ STRICT RULES:
 		const apiKey = (aiApiKey || '').trim();
 		const startTime = Date.now();
 
-		if (aiApiUrl && !isSafePublicUrl(aiApiUrl)) {
+		if (aiApiUrl && !(await assertSafePublicUrl(aiApiUrl))) {
 			return {
 				success: false,
 				models: [],
@@ -1315,7 +1315,7 @@ STRICT RULES:
 		const apiKey = (aiApiKey || '').trim();
 		const apiUrl = (aiApiUrl || '').trim();
 
-		if (apiUrl && !isSafePublicUrl(apiUrl)) {
+		if (apiUrl && !(await assertSafePublicUrl(apiUrl))) {
 			return {
 				success: false,
 				avgLatency: 0,

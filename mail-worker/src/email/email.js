@@ -575,19 +575,28 @@ export function isAuthenticatedInternalSender(email, envDomains, {
 	if (!domains.includes(senderDomain)) return false;
 	if (requireTransport && !transportHeaders) return false;
 	const source = transportHeaders || email;
-	const auth = `${headerValue(source, 'authentication-results')} ${headerValue(source, 'arc-authentication-results')}`;
-	if (!auth.trim()) return false;
+	const rawAuth = headerValue(source, 'authentication-results');
+	if (!rawAuth || /[\r\n]/.test(rawAuth)) return false;
+	// Headers.get() joins multiple headers with ', '. Evaluate only the first
+	// Authentication-Results header and never concatenate caller-supplied ARC headers.
+	const auth = rawAuth.split(',')[0].trim();
+	if (!auth) return false;
 	if (trustedAuthservId) {
 		const authservId = auth.split(';')[0].trim().split(/\s+/)[0].replace(/:$/, '').toLowerCase();
 		if (authservId !== String(trustedAuthservId).toLowerCase()) return false;
 	}
 	const domain = senderDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	const passThenFrom = new RegExp(`(?:dmarc=pass|dkim=pass)[^;]*(?:header\\.from|header\\.d)\\s*=\\s*${domain}`, 'i');
-	const fromThenPass = new RegExp(`(?:header\\.from|header\\.d)\\s*=\\s*${domain}[^;]*(?:dmarc=pass|dkim=pass)`, 'i');
+	const passThenFrom = new RegExp(`(?:dmarc=pass|dkim=pass)[^;]*(?:header\\.from|header\\.d)\\s*=\\s*${domain}(?=$|[\\s;)])`, 'i');
+	const fromThenPass = new RegExp(`(?:header\\.from|header\\.d)\\s*=\\s*${domain}(?=$|[\\s;)])[^;]*(?:dmarc=pass|dkim=pass)`, 'i');
 	return passThenFrom.test(auth) || fromThenPass.test(auth);
 }
 
-function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, messageTo, transportHeaders = null) {
+const RESERVED_OFFICIAL_SENDERS = new Set([
+	'announcement@epocanvas.com',
+	'admin@epocanvas.com'
+]);
+
+export function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, messageTo, transportHeaders = null) {
 
 	const senderAddress = (email.from?.address || '').toLowerCase();
 	const senderDomain = emailUtils.getDomain(senderAddress) || '';
@@ -601,6 +610,10 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, 
 		trustedAuthservId: String(env?.INBOUND_AUTHSERV_ID || 'mx.cloudflare.net'),
 		requireTransport: true
 	});
+
+	if (!isInternal && RESERVED_OFFICIAL_SENDERS.has(senderAddress)) {
+		return { block: true, hardBlock: false };
+	}
 
 	let blockInternalList = false;
 	if (blackFromStr && blackFromStr.includes('__blockInternal,')) {

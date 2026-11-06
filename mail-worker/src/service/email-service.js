@@ -39,6 +39,16 @@ import { deliverLocalMail } from './mail-local-delivery-service.js';
 import mailLifecycleService from './mail-lifecycle-service.js';
 import { reserveInboundQuota } from './mail-reliability-service.js';
 import rateLimit from '../utils/rate-limit.js';
+import { RESERVED_SYSTEM_LABELS } from '../email/rule-engine.js';
+
+export function isOfficialEmailRow(item) {
+	if (!item || typeof item !== 'object') return false;
+	if (item.receiveClaimKey || item.receive_claim_key || item.outboundTaskId || item.outbound_task_id) {
+		return false;
+	}
+	const sender = String(item.sendEmail || item.send_email || '').trim().toLowerCase();
+	return sender === 'announcement@epocanvas.com' || sender === 'admin@epocanvas.com';
+}
 
 const ENCRYPTED_SEARCH_BATCH = 100;
 // The default mailbox quota is 5,000 messages. Keep the scan bounded well above
@@ -216,7 +226,7 @@ const emailService = {
 		} else {
 			commonConditions.push(folder === 'trash' ? eq(email.isDel, 1) : (isTrash ? eq(email.isDel, 1) : eq(email.isDel, 0)));
 			commonConditions.push(folder === 'spam' ? eq(email.isSpam, 1) : (isSpam ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0))));
-			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com'))`));
+			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR (send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') AND receive_claim_key IS NULL AND outbound_task_id IS NULL))`));
 			
 			if (isSent) {
 				const currentType = (folder === 'all' ? emailConst.type.RECEIVE : (type !== undefined ? type : emailConst.type.RECEIVE));
@@ -311,7 +321,7 @@ const emailService = {
 				eq(email.userId, userId),
 				folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
 				folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
-				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com'))`),
+				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR (send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') AND receive_claim_key IS NULL AND outbound_task_id IS NULL))`),
 				(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
@@ -323,6 +333,8 @@ const emailService = {
 				SET is_del = 1, trashed_at = COALESCE(trashed_at,CURRENT_TIMESTAMP), snoozed_time = NULL, snoozed_end_time = NULL
 				WHERE user_id = ? 
 				  AND send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') 
+				  AND receive_claim_key IS NULL
+				  AND outbound_task_id IS NULL
 				  AND is_del = 0 
 				  AND datetime(create_time, '+' || ? || ' days') < datetime('now')
 			`).bind(userId, settingData.welcomeExpireDays).run().catch(() => {});
@@ -351,7 +363,7 @@ const emailService = {
 		}
 
 		list = list.map(item => {
-			const isOfficial = item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
+			const isOfficial = isOfficialEmailRow(item);
 			return {
 				...item,
 				isStar: item.starId != null ? 1 : 0,
@@ -719,7 +731,30 @@ const emailService = {
 
 	async updateLabels(c, params, userId) {
 		const { emailId, labels } = params;
-		const labelsStr = Array.isArray(labels) ? JSON.stringify(labels) : String(labels || '[]');
+		const existing = await orm(c).select({ labels: email.labels }).from(email).where(
+			and(eq(email.userId, userId), eq(email.emailId, Number(emailId)))
+		).get();
+		if (!existing) return;
+		let existingList = [];
+		try {
+			const parsed = JSON.parse(existing.labels || '[]');
+			if (Array.isArray(parsed)) existingList = parsed;
+		} catch (_) {}
+		const existingSet = new Set(existingList);
+		let incomingList = [];
+		if (Array.isArray(labels)) {
+			incomingList = labels;
+		} else if (typeof labels === 'string') {
+			try {
+				const parsed = JSON.parse(labels);
+				if (Array.isArray(parsed)) incomingList = parsed;
+			} catch (_) {}
+		}
+		const filtered = incomingList
+			.filter(lbl => typeof lbl === 'string' && lbl.trim())
+			.map(lbl => lbl.trim())
+			.filter(lbl => !RESERVED_SYSTEM_LABELS.has(lbl) || existingSet.has(lbl));
+		const labelsStr = JSON.stringify([...new Set(filtered)]);
 		await orm(c).update(email).set({ labels: labelsStr }).where(
 			and(eq(email.userId, userId), eq(email.emailId, Number(emailId)))
 		).run();
@@ -1688,7 +1723,8 @@ const emailService = {
 			const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 				and(
 					eq(email.userId, userId),
-					inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com'])
+					inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
+					sql`${email.receiveClaimKey} IS NULL AND ${email.outboundTaskId} IS NULL`
 				)
 			).limit(1).get();
 
@@ -1774,7 +1810,8 @@ const emailService = {
 		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 			and(
 				eq(email.userId, userId),
-				inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com'])
+				inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
+				sql`${email.receiveClaimKey} IS NULL AND ${email.outboundTaskId} IS NULL`
 			)
 		).limit(1).get();
 
@@ -1963,6 +2000,7 @@ const emailService = {
 			and(
 				eq(email.userId, userId),
 				inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
+				sql`${email.receiveClaimKey} IS NULL AND ${email.outboundTaskId} IS NULL`,
 				eq(email.subject, globalConfig.subject),
 				eq(email.isDel, isDel.NORMAL)
 			)
@@ -2869,7 +2907,7 @@ const emailService = {
 		const mailDb = getMailDb(c);
 		const stats = await mailDb.prepare(`
 			SELECT 
-				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com')) AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
+				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR (send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') AND receive_claim_key IS NULL AND outbound_task_id IS NULL)) AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status = 6 AND unread = 0 THEN 1 ELSE 0 END) as draftUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status != 6 AND unread = 0 THEN 1 ELSE 0 END) as sentUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 1 AND unread = 0 THEN 1 ELSE 0 END) as spamUnread,
