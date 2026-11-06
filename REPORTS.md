@@ -10,7 +10,7 @@
 ---
 
 ### 公测上线前最终安全收敛与全量就绪审计报告 (2026-11-06)
-*   **关联提交 (Git Commit)**: PENDING_COMMIT_HASH (Short: PENDING_SHORT_HASH)
+*   **关联提交 (Git Commit)**: `9ab784c873119d5e4dc09c94cf87196df8fab7e8` (Short: `9ab784c`)
 *   **专项文档索引 (Detailed Doc)**: 
     - [最终安全审计报告](SECURITY-AUDIT-FINAL.md)
     - [安全测试矩阵与实测证据](SECURITY-TEST-MATRIX.md)

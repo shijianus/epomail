@@ -1,5 +1,5 @@
 ### 公测上线前最终安全收敛、全量测试矩阵与 6 项交付归档 (2026-11-06)
-*   **关联提交 (Git Commit)**: PENDING_COMMIT_HASH (Short: PENDING_SHORT_HASH)
+*   **关联提交 (Git Commit)**: `9ab784c873119d5e4dc09c94cf87196df8fab7e8` (Short: `9ab784c`)
 *   **部署环境 (Deployment)**: 本地全真栈验证 + 生产准备检查 (`mail.epocanvas.com`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 逐项核实历史所有 P1/P2/P3 审计发现，确认 100% 闭环修复状态或受控条件性风险。
