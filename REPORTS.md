@@ -9,6 +9,31 @@
 
 ---
 
+### 公测上线前最终安全收敛与全量就绪审计报告 (2026-11-06)
+*   **关联提交 (Git Commit)**: PENDING_COMMIT_HASH (Short: PENDING_SHORT_HASH)
+*   **专项文档索引 (Detailed Doc)**: 
+    - [最终安全审计报告](SECURITY-AUDIT-FINAL.md)
+    - [安全测试矩阵与实测证据](SECURITY-TEST-MATRIX.md)
+    - [上线就绪度与环境检查报告](RELEASE-READINESS.md)
+    - [封版冻结门禁清单](FROZEN-CHECKLIST.md)
+    - [部署失败与安全事件应急回滚方案](ROLLBACK-PLAN.md)
+    - [剩余风险评估与接受理由](REMAINING-RISKS.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：后端 28 个 API 模块、所有例行定时任务 (Cron)、外部 Webhook 接口 (Resend/Telegram)、OAuth 2.0 / OIDC 身份管道、AI 工具与防提示词注入、D1/KV/R2 存储状态机与前端渲染消费链。
+    2. 标准与方法：以 OWASP ASVS 5.0 为基准；白盒代码逐行走查 + Vitest 自动化回归与对抗性测试套件（186 项断言）+ 密钥离线扫描 + 多语言对称校验 + Wrangler 打包 Dry-Run。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/安全]**: 0 项（未发现远程代码执行、SQL 注入、未授权认证绕过、JWT 伪造或跨租户数据遍历）。
+    - **[P1·重要/权限逻辑]**: 历史报告所有 P1 项（入站认证头伪造、博客等级同步提权、别名绕过失败锁定、注册码前缀盲注、邀请码角色委派、管理员删除生命周期事务、个人转发附件丢失、加密搜索语义等）经逐项实测代码复核，**已 100% 确认闭环修复，存量 0 项未关闭**。
+    - **[P2·条件性风险 / 架构边界]**: 10 项已知受控风险（SSRF DNS Rebinding 出网限制、非 Cloudflare MTA 认证头依赖、Cloudflare Email 缺少回执 API 需人工处置、存储 Locator 变更硬阻断等），已在 `REMAINING-RISKS.md` 建立对应生产控制方案与接受理由。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 核心安全自动化回归测试 186/186 项全部通过；
+    - 1,268 个受追踪代码文件机密扫描 0 泄漏；
+    - 6 语言字典 100% 对称，未包裹硬编码 0 可疑行；
+    - `mail-vue` + `temp_login_ui` 生产构建通过，Wrangler Dry-Run 438 个文件资源同步成功；
+    - **最终交付结论：安全防线收敛闭环，8 项 Frozen 门禁全部通过，准许进入 Release Candidate 冻结状态，受控公测决策：GO。**
+
+---
+
 ### 公测封版前后端安全深度审计与 9 项边界收敛报告 (2026-11-05)
 *   **关联提交 (Git Commit)**: `a4a51edf9d07277ec578e926f92c640eead9b263` (Short: `a4a51ed`)；封版 Tag: `v1.2.1-freeze` / `backend-freeze-2026-11-05`。
 *   **专项文档索引 (Detailed Doc)**: [后端 Freeze 门禁复核](doc/backend-freeze-2026-11-05.md)。

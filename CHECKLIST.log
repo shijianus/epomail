@@ -1,3 +1,23 @@
+### 公测上线前最终安全收敛、全量测试矩阵与 6 项交付归档 (2026-11-06)
+*   **关联提交 (Git Commit)**: PENDING_COMMIT_HASH (Short: PENDING_SHORT_HASH)
+*   **部署环境 (Deployment)**: 本地全真栈验证 + 生产准备检查 (`mail.epocanvas.com`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 逐项核实历史所有 P1/P2/P3 审计发现，确认 100% 闭环修复状态或受控条件性风险。
+    - [x] 重构建立后端 28 个 API、定时任务、Webhook、OAuth、AI 工具、D1 和 R2 完整攻击面清单。
+    - [x] 重点复核 JWT、Refresh、RBAC、BOLA/IDOR、Step-Up、OAuth PKCE、CSRF、CORS、HTML/XSS、附件安全、SSRF、提示词注入与并发限流。
+    - [x] 交付 `SECURITY-AUDIT-FINAL.md`、`SECURITY-TEST-MATRIX.md`、`RELEASE-READINESS.md`、`FROZEN-CHECKLIST.md`、`ROLLBACK-PLAN.md`、`REMAINING-RISKS.md` 6 大核心上线文档。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`node build.mjs` 构建通过 (temp_login_ui 3.10s, mail-vue 18.82s)
+    - [x] 自动化测试套件：Vitest 核心安全套件全部断言通过 (186/186 tests passed, 0 failures)
+    - [x] 登录子应用测试：`temp_login_ui` TypeScript 类型检查通过，29/29 测试全绿
+    - [x] 密钥扫描门禁：`scripts/secret-scan.mjs` 1,268 文件 0 密钥泄露
+    - [x] 多语言严格对称：6 语言字典对称、零字面量缺失、0 未包裹硬编码
+    - [x] 生产就绪预检：`verify-production-readiness.mjs` 7/7 PASS
+    - [x] Cloudflare 打包预检：`wrangler deploy --dry-run` 退出码 0，438 资源同步成功
+    - [x] 零假数据残留：测试临时用户与凭据均在用例生命周期内物理清理
+
+---
+
 ### 公测封版前 9 项后端安全边界收敛加固与封版 Tag 发布 (2026-11-05)
 *   **关联提交 (Git Commit)**: `a4a51edf9d07277ec578e926f92c640eead9b263` (Short: `a4a51ed`)；封版 Tag: `v1.2.1-freeze` / `backend-freeze-2026-11-05`
 *   **部署环境 (Deployment)**: 本地全真栈验证 + GitHub 远端封版归档 (`origin/release/2026-10-31`)
