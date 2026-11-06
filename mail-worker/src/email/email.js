@@ -575,7 +575,6 @@ export function isAuthenticatedInternalSender(email, envDomains, {
 	if (!domains.includes(senderDomain)) return false;
 	if (requireTransport && !transportHeaders) return false;
 	const source = transportHeaders || email;
-	const source = transportHeaders || email;
 	const rawAuth = headerValue(source, 'authentication-results');
 	if (!rawAuth || /[\r\n]/.test(rawAuth)) return false;
 	// Headers.get() joins multiple headers with ', '. Evaluate only the first

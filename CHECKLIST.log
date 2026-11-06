@@ -1,3 +1,25 @@
+### 审计 P0/P1 加固收敛：提权链/裁决目标/登录与审计 DoS/入站信任边界 (2026-11-07)
+*   **关联提交 (Git Commit)**: `751586f0bd37ca2912d5ff0e839cdf613daf3535` (Short: `751586f`)
+*   **部署环境 (Deployment)**: 本地 workerd/D1/KV 定向回归 + 构建 dry-run；未部署生产/Staging，未调用真实供应商。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] [P0] 博客等级同步服务端角色白名单（user_lv0/user_lv1/vip），拦截 visitor 调用、保护 master/moderator 不被降级、mappedEpomailRole 非法值直接拒绝，斩断博客接口→站长角色直通提权链（与远端 P1-2 收敛融合取并集）。
+    - [x] [P1] audit.adjudicate 目标保护：站长(User 1/env.admin)与管理员案件仅站长本人可裁决；audit:adjudicate/audit:* 纳入 PRIVILEGED_PERMS 禁止向下转授。
+    - [x] [P1] /audit/list 卡片指标改为单批 D1 SQL 聚合（6 条 COUNT 语句批量执行），移除每次请求全表加载 audit_log 的低权限(setting:query/参观者) DoS 面；visitor allowlist 与 counts 语义对齐。
+    - [x] [P1] /login 输入上限：邮箱≤254、密码≤128、拒绝 CR/LF/NUL，先于 PBKDF2 派生与任何 D1/KV 访问执行（消除 1102 CPU 耗尽与 rate_limit_counter 行膨胀入口）。
+    - [x] [P1] 入站内部发件人判定 fail-closed（与远端 P1-1 融合）：仅信任首条 Authentication-Results、剥离外部可控 ARC 拼接与 CR/LF 注入，且可信 authserv-id 在该值内出现 ≥2 次（判定段被注入拼接）一律按外部发件人处理，仍受全局黑名单约束。
+    - [x] [P1] 注册/别名：RFC 2142 保留本地部分（postmaster/abuse/security 等 27 项）拒绝；邮箱总长≤254；emailPrefixFilter 大小写归一且空条目不再全量拦截。
+    - [x] [P2] JWT 校验强制 exp（杜绝永不过期令牌）；rememberDevice 严格布尔（字符串 false 不再签发 30 天可信设备令牌）；user.setStatus 仅允许 0/1。
+    - [x] 收敛上次审计会话遗留未提交加固：密码上限 128（注册/重置/管理员建号/设置页）、设备签名与邮件哈希常时比较、scheduled_secret 独立调度密钥与 cron 分轮清理、TG 消息模板全量 HTML 转义、.dev.vars.example 补 scheduled_secret 条目。
+    - [x] 预提交 staged-file 门禁仅豁免 .dev.vars.example 占位模板（对齐 .gitignore 白名单意图，真实 .dev.vars 与其余敏感文件名仍拦截），附 9/9 回归固件；.gitignore 排除 .zcode/ 本地会话数据。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 定向安全回归：audit-service 6/6、email-ingest、login-provenance 5/5、security-hardening、auth-convergence、security-review-adversarial 13/13、oauth-security 12/12、auth-security-operation 15/15、security-review-round2、check-staged-files 9/9 全绿（rebase 融合远端扩充用例后复跑）。
+    - [x] i18n 三件套（symmetry/audit/hardcoded）PASS；密钥扫描 1,266 文件 0 命中；预提交钩子 PASS。
+    - [x] wrangler deploy --dry-run 构建通过（前端生产构建 + Worker bundle + 438 静态资源）。
+    - [ ] 遗留（后续迭代随 Staging 演练）：转发/Telegram/BYO/PAT 变更强制 step-up、模式 0/2 未绑定 2FA 仅放行绑定流程、外发默认关闭等部署面配置。
+*   **结论**: 2026-11-06 审计 P0 与全部可直接落地 P1 已收敛于 `751586f`；冻结判定升级为有条件 GO（剩余项需 Staging 全真栈验证）。
+
+---
+
 ### 公测封版前 9 项后端安全边界收敛加固与封版 Tag 发布 (2026-11-05)
 *   **关联提交 (Git Commit)**: `a4a51edf9d07277ec578e926f92c640eead9b263` (Short: `a4a51ed`)；封版 Tag: `v1.2.1-freeze` / `backend-freeze-2026-11-05`
 *   **部署环境 (Deployment)**: 本地全真栈验证 + GitHub 远端封版归档 (`origin/release/2026-10-31`)
