@@ -5,8 +5,11 @@ const TRUNCATED_SUFFIX = '...';
 
 function escapeHtml(text = '') {
 	return text
+		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;');
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#x27;');
 }
 
 function truncateText(text, maxLength) {

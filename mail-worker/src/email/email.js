@@ -575,6 +575,7 @@ export function isAuthenticatedInternalSender(email, envDomains, {
 	if (!domains.includes(senderDomain)) return false;
 	if (requireTransport && !transportHeaders) return false;
 	const source = transportHeaders || email;
+	const source = transportHeaders || email;
 	const rawAuth = headerValue(source, 'authentication-results');
 	if (!rawAuth || /[\r\n]/.test(rawAuth)) return false;
 	// Headers.get() joins multiple headers with ', '. Evaluate only the first
@@ -584,6 +585,11 @@ export function isAuthenticatedInternalSender(email, envDomains, {
 	if (trustedAuthservId) {
 		const authservId = auth.split(';')[0].trim().split(/\s+/)[0].replace(/:$/, '').toLowerCase();
 		if (authservId !== String(trustedAuthservId).toLowerCase()) return false;
+		// 深度防御：A-R 可被发件人在原始 MIME 中自行注入。仅评估首条之外，
+		// 若可信 authserv-id 在该值内出现 ≥2 次（判定段被拼接注入）仍无法归属
+		// 判定结果，一律按外部发件人处理 (fail closed)，邮件因此仍受全局黑名单约束。
+		const needle = String(trustedAuthservId).toLowerCase();
+		if (auth.toLowerCase().split(needle).length - 1 !== 1) return false;
 	}
 	const domain = senderDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	const passThenFrom = new RegExp(`(?:dmarc=pass|dkim=pass)[^;]*(?:header\\.from|header\\.d)\\s*=\\s*${domain}(?=$|[\\s;)])`, 'i');

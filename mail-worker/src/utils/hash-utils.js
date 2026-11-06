@@ -122,11 +122,11 @@ export const hashUtils = {
       );
       const expectedSig = new Uint8Array(expectedSigBuf).subarray(0, 8);
 
-      let valid = true;
+      let diff = 0;
       for (let i = 0; i < 8; i++) {
-        if (sig[i] !== expectedSig[i]) valid = false;
+        diff |= sig[i] ^ expectedSig[i];
       }
-      if (valid && emailId > 0) {
+      if (diff === 0 && emailId > 0) {
         return emailId;
       }
       return null;

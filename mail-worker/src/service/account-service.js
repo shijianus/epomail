@@ -1,6 +1,6 @@
 import BizError from '../error/biz-error';
 import verifyUtils from '../utils/verify-utils';
-import emailUtils from '../utils/email-utils';
+import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES } from '../utils/email-utils';
 import userService from './user-service';
 import emailService from './email-service';
 import { mailOrm as orm } from '../entity/orm';
@@ -53,6 +53,11 @@ const accountService = {
 		const adminName = c.env.admin ? emailUtils.getName(c.env.admin) : '';
 		const userRow = await userService.selectById(c, userId);
 		if (adminName && localName.toLowerCase() === adminName.toLowerCase() && userRow?.email !== c.env.admin) {
+			throw new BizError(t('adminReserved'));
+		}
+
+		// RFC 2142 合规保留地址：别名创建同样不得占用官方身份地址
+		if (RESERVED_EMAIL_LOCAL_NAMES.has(localName.toLowerCase())) {
 			throw new BizError(t('adminReserved'));
 		}
 

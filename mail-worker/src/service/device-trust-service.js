@@ -1,6 +1,7 @@
 import KvConst from '../const/kv-const.js';
 import { getUserDb } from '../utils/db-accessor.js';
 import { deleteKvMatching } from '../utils/kv-revocation.js';
+import { timingSafeEqual } from '../utils/crypto-utils.js';
 
 /**
  * Autonomous Black-Box Device Attestation & Trust Transition Oracle
@@ -190,10 +191,10 @@ const deviceTrustService = {
 		const maskUint = readUint32(maskBytes, 0);
 		const t0 = (payload.m ^ maskUint) >>> 0;
 
-		// Verify signature
+		// Verify signature (timing-safe to prevent remote statistical side-channel)
 		const expectedSigBytes = await hmacSha256(tokenKey, `${userId}:${deviceHash}:${t0}:${payload.n}:${payload.v}`);
 		const expectedSigB64 = base64url(expectedSigBytes.slice(0, 20));
-		if (sigB64 !== expectedSigB64) {
+		if (!timingSafeEqual(sigB64, expectedSigB64)) {
 			return { canBypass2FA: false, state: 0, reason: 'SIGNATURE_MISMATCH' };
 		}
 

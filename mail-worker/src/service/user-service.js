@@ -609,7 +609,7 @@ const userService = {
 		if (typeof password !== 'string' || password.length < 6) {
 			throw new BizError(t('pwdMinLength'));
 		}
-		if (password.length > 30) throw new BizError(t('pwdLengthLimit'));
+		if (password.length > 128) throw new BizError(t('pwdLengthLimit'));
 		const userRow = await this.selectById(c, Number(userId));
 		if (!userRow) throw new BizError(t('notExistUser'));
 		if (options.requireCurrent) {
@@ -782,7 +782,7 @@ const userService = {
 		if (typeof password !== 'string' || password.length < 6) {
 			throw new BizError(t('pwdMinLength'), 400, 'password_too_short');
 		}
-		if (password.length > 30) {
+		if (password.length > 128) {
 			throw new BizError(t('pwdLengthLimit'), 400, 'password_too_long');
 		}
 
@@ -1284,14 +1284,19 @@ const userService = {
 		if (Number(userId) === 1) {
 			throw new BizError('系统超级管理员禁止停用或封禁！', 403);
 		}
+		// 状态值仅允许 0(正常)/1(封禁)：任意数字曾可直接写入 user.status
+		const nextStatus = Number(status);
+		if (![userConst.status.NORMAL, userConst.status.BAN].includes(nextStatus)) {
+			throw new BizError('非法的账号状态值 (status 仅允许 0 或 1)', 400, 'invalid_status');
+		}
 		await rbacGuard.assertCanManageUser(c, callerUserId, Number(userId));
 		await orm(c)
 			.update(user)
-			.set({ status })
+			.set({ status: nextStatus })
 			.where(eq(user.userId, userId))
 			.run();
 
-		if (status === userConst.status.BAN) {
+		if (nextStatus === userConst.status.BAN) {
 			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
 		}
 	},
@@ -1419,6 +1424,9 @@ const userService = {
 			};
 		}
 
+		// 服务端白名单映射：博客侧永远只能授予普通书友等级。绝不接受
+		// mappedEpomailRole 直接指定 master/moderator/visitor 等系统角色——
+		// 博客接口被劫持、缓存串号或返回脏数据时，这曾是“博客等级 → 站长角色”的直通提权链。
 		const ALLOWED_BLOG_SYNC_ROLES = new Set(['user_lv0', 'user_lv1', 'vip']);
 		const targetRoleCode = String(blogInfo.mappedEpomailRole || (blogInfo.level >= 1 ? 'user_lv1' : 'user_lv0')).trim();
 		if (!ALLOWED_BLOG_SYNC_ROLES.has(targetRoleCode)) {
@@ -1427,7 +1435,7 @@ const userService = {
 
 		const targetRole = allRoles.find(r => r.roleCode === targetRoleCode);
 
-		if (!targetRole) {
+		if (!targetRole || targetRole.roleCode === 'master' || targetRole.roleCode === 'moderator' || targetRole.roleCode === 'visitor') {
 			return {
 				synced: false,
 				message: `未找到目标身份分组 [${targetRoleCode}]`,
@@ -1479,6 +1487,9 @@ const userService = {
 
 		if (password.length < 6) {
 			throw new BizError(t('pwdMinLength'));
+		}
+		if (password.length > 128) {
+			throw new BizError(t('pwdLengthLimit'));
 		}
 
 		const role = await roleService.selectById(c, type);
