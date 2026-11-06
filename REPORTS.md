@@ -9,6 +9,23 @@
 
 ---
 
+### 后端安全深度审计 — 公测前 Freeze 候选审查 (2026-11-06)
+*   **关联提交 (Git Commit)**: `8268125` (Short: `8268125`)
+*   **专项文档索引 (Detailed Doc)**: [后端安全深度审计报告](doc/backend-security-audit-2026-11-06.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：`mail-worker/src/` 全量 106 个 JS 源文件（~49,000 行），覆盖认证/JWT/TOTP/WebAuthn/OAuth/RBAC/限流/SSRF/注入/XSS/加密/隔离/邮件管道/定时任务/隐私删除/Telegram/存储。基线 `release/2026-10-31 @ 6818773`。
+    2. 方法：7 路并行静态代码 review，分别针对项目结构、认证授权、API 路由输入校验、邮件/存储安全、数据库 Schema/RBAC、高危路径精查、定时任务/邮件管道/隐私生命周期。无生产环境访问。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P1·加固建议]**: 3 项 — Device Trust HMAC 非恒时比较(F1)、`jwt_secret` 多域复用含 cron 共享机密(F2)、密码上限 30 字符低于 NIST 建议(F3)
+    - **[P2·次要加固]**: 8 项 — Email hash 非 XOR-OR 比较(F4)、Cron 机密 `===` 比较(F5)、Rate limit 清理吞吐上限(F6)、BYO S3 重定向残余(F7)、TG 模板 escapeHtml 不完整(F8)、附件未加密存储(F9)、邮件 HTML 原文存储(F10)、OAuth client_secret 明文(F11)
+    - **[Info]**: 3 项 — Admin step-up 绕过(F12)、WebAuthn attestation none(F13)、无 FK 约束(F14)
+    - **[零日漏洞]**: **未发现可远程利用的 P0 级零日漏洞**
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 建议在公测部署前优先修复 F1(恒时比较)、F3(密码长度)、F5(cron 恒时)、F8(TG 转义)
+    - 完整修复清单与 GA 路线图见专项文档
+
+---
+
 ### 公测封版前后端安全深度审计与 9 项边界收敛报告 (2026-11-05)
 *   **关联提交 (Git Commit)**: `a4a51edf9d07277ec578e926f92c640eead9b263` (Short: `a4a51ed`)；封版 Tag: `v1.2.1-freeze` / `backend-freeze-2026-11-05`。
 *   **专项文档索引 (Detailed Doc)**: [后端 Freeze 门禁复核](doc/backend-freeze-2026-11-05.md)。
@@ -339,8 +356,6 @@
     - `node scripts/secret-scan.mjs` 工作区 0 命中；`--history --baseline` 仅基线内已知历史泄露；`node mail-worker/test-mailjet.js` 离线通过、live 缺配置安全退出。
     - Worker 测试 **28/28** 通过；`wrangler deploy --dry-run` 成功（gzip 1067.49 KiB）；`mail-vue` 构建成功；i18n 三件套全绿；worker 生产依赖 `pnpm audit --prod` **0**，mail-vue 剩余 1 moderate（ECharts）。
     - **未执行**：生产凭据轮换、Mailjet/Cloudflare/Resend 后台日志核查、公共 Git 历史重写/强推、154 个浏览器 E2E 全量回归；原因与人工 Runbook 见专项文档。
-
----
 
 ---
 
