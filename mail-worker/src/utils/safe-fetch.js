@@ -2,7 +2,7 @@ import { BizError } from '../error/biz-error.js';
 
 /**
  * 校验目标 URL 是否安全，拦截一切内网 IP、回环地址、云厂商元数据服务及私有协议 (SSRF 防护)
- * @param {string} rawUrl 
+ * @param {string} rawUrl
  * @param {object} [options]
  * @returns {boolean}
  */
@@ -131,8 +131,8 @@ function stripSensitiveHeaders(headers) {
 
 /**
  * 统一出站安全 Fetch 请求包装器
- * @param {string} targetUrl 
- * @param {RequestInit} [init] 
+ * @param {string} targetUrl
+ * @param {RequestInit} [init]
  * @param {object} [options]
  * @returns {Promise<Response>}
  */
@@ -200,7 +200,7 @@ export async function safeFetch(targetUrl, init = {}, options = {}) {
 
 /**
  * 安全有限流读取响应体文本，杜绝内存耗尽与上游流式死循环 (Bounded Response Reader)
- * @param {Response} response 
+ * @param {Response} response
  * @param {number} [maxBytes=5242880] 默认 5MB 限制
  * @returns {Promise<string>}
  */

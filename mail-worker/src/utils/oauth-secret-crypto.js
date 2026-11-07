@@ -92,9 +92,9 @@ async function deriveAesGcmKey(rawKey) {
 /**
  * AES-256-GCM 信封加密 Client Secret 并强制 AAD 绑定 client_id
  * 格式: v1:iv:tag:ciphertext
- * @param {object} env 
- * @param {string} clientId 
- * @param {string} plaintextSecret 
+ * @param {object} env
+ * @param {string} clientId
+ * @param {string} plaintextSecret
  * @returns {Promise<string>}
  */
 export async function encryptClientSecret(env, clientId, plaintextSecret) {
@@ -133,9 +133,9 @@ export async function encryptClientSecret(env, clientId, plaintextSecret) {
 
 /**
  * 解密 AES-256-GCM 封装的 Client Secret (支持对存量明文记录的平滑兼容 Dual-Read)
- * @param {object} env 
- * @param {string} clientId 
- * @param {string} storedSecret 
+ * @param {object} env
+ * @param {string} clientId
+ * @param {string} storedSecret
  * @returns {Promise<string>}
  */
 export async function decryptClientSecret(env, clientId, storedSecret) {
@@ -184,10 +184,10 @@ export async function decryptClientSecret(env, clientId, storedSecret) {
 
 /**
  * 校验候选明文 Secret 与存储记录是否匹配
- * @param {object} env 
- * @param {string} clientId 
- * @param {string} candidatePlaintext 
- * @param {string} storedSecret 
+ * @param {object} env
+ * @param {string} clientId
+ * @param {string} candidatePlaintext
+ * @param {string} storedSecret
  * @returns {Promise<boolean>}
  */
 export async function verifyClientSecret(env, clientId, candidatePlaintext, storedSecret) {
