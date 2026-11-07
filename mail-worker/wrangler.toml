@@ -88,7 +88,6 @@ command = "node ./build.mjs"
 name = "epomail-staging"
 compatibility_date = "2025-06-04"
 compatibility_flags = ["nodejs_als"]
-keep_vars = true
 
 [env.staging.observability]
 enabled = true
@@ -99,24 +98,24 @@ enabled = true
 [[env.staging.d1_databases]]
 binding = "USER_DB"
 database_name = "epomail-staging-db"
-database_id = "PLACEHOLDER_STAGING_D1_DATABASE_ID"
+database_id = "c3a49885-603e-4387-b4df-82a1117e963a"
 
 [[env.staging.d1_databases]]
 binding = "MAIL_DB"
 database_name = "epomail-staging-db"
-database_id = "PLACEHOLDER_STAGING_D1_DATABASE_ID"
+database_id = "c3a49885-603e-4387-b4df-82a1117e963a"
 
 [[env.staging.d1_databases]]
 binding = "db"
 database_name = "epomail-staging-db"
-database_id = "PLACEHOLDER_STAGING_D1_DATABASE_ID"
+database_id = "c3a49885-603e-4387-b4df-82a1117e963a"
 
 # --------------------------------------------------------------------------------------
 # Staging 独立 KV 命名空间绑定 (严格物理隔离，禁止复用生产环境KV命名空间)
 # --------------------------------------------------------------------------------------
 [[env.staging.kv_namespaces]]
 binding = "kv"
-id = "PLACEHOLDER_STAGING_KV_NAMESPACE_ID"
+id = "c5a59d7cfc6a4091b792238ec569e315"
 
 # AI 绑定 (用于测试文本与规则智能研判)
 [env.staging.ai]
@@ -137,9 +136,9 @@ crons = ["0 16 * * *", "*/5 * * * *"]
 [env.staging.vars]
 ENVIRONMENT = "staging"
 ALLOW_URL_INIT = "false"
-# 预发布域名与管理员配置（等待用户提供真实分配域名，使用显式占位符）
-domain = ["PLACEHOLDER_STAGING_DOMAIN"]
-admin = "admin@PLACEHOLDER_STAGING_DOMAIN"
+# 预发布域名与管理员配置
+domain = ["epomail-staging.epocanvas.workers.dev"]
+admin = "admin@epomail-staging.epocanvas.workers.dev"
 # 邮件外发总开关 (第一阶段默认关闭，严防任意真实外发)
 EMAIL_OUTBOUND_ENABLED = "false"
 # 官方测试白名单 (第二阶段启用)
