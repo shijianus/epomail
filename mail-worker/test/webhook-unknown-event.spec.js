@@ -27,10 +27,15 @@ describe('B9: Webhook Unknown Event & State Transition Protection Specification'
 
 		await db.prepare(`
 			CREATE TABLE IF NOT EXISTS notification_outbox (
-				task_id TEXT PRIMARY KEY,
-				channel TEXT NOT NULL,
-				status TEXT NOT NULL,
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				task_id TEXT NOT NULL UNIQUE,
+				channel TEXT NOT NULL DEFAULT 'resend',
+				status TEXT NOT NULL DEFAULT 'pending',
 				provider_message_id TEXT,
+				recipient TEXT NOT NULL DEFAULT 'user@example.com',
+				template_code TEXT NOT NULL DEFAULT 'notice_tpl',
+				subject TEXT NOT NULL DEFAULT 'Notice Subject',
+				content TEXT NOT NULL DEFAULT 'Notice Content',
 				last_error TEXT,
 				delivered_at DATETIME,
 				claimant_id TEXT,
@@ -39,6 +44,11 @@ describe('B9: Webhook Unknown Event & State Transition Protection Specification'
 				update_time DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
 		`).run();
+
+		try { await db.prepare("ALTER TABLE notification_outbox ADD COLUMN recipient TEXT NOT NULL DEFAULT 'user@example.com'").run(); } catch {}
+		try { await db.prepare("ALTER TABLE notification_outbox ADD COLUMN template_code TEXT NOT NULL DEFAULT 'notice_tpl'").run(); } catch {}
+		try { await db.prepare("ALTER TABLE notification_outbox ADD COLUMN subject TEXT NOT NULL DEFAULT 'Notice Subject'").run(); } catch {}
+		try { await db.prepare("ALTER TABLE notification_outbox ADD COLUMN content TEXT NOT NULL DEFAULT 'Notice Content'").run(); } catch {}
 
 		await db.prepare(`
 			CREATE TABLE IF NOT EXISTS email (
@@ -58,8 +68,8 @@ describe('B9: Webhook Unknown Event & State Transition Protection Specification'
 
 		// 预先插入一笔已有的 notification_outbox 记录 (处于 delivered 终态)
 		await env.db.prepare(`
-			INSERT INTO notification_outbox (task_id, channel, status, provider_message_id)
-			VALUES (?, 'resend', 'delivered', ?)
+			INSERT INTO notification_outbox (task_id, channel, status, provider_message_id, recipient, template_code, subject, content)
+			VALUES (?, 'resend', 'delivered', ?, 'user@example.com', 'notice_tpl', 'Notice Subject', 'Notice Content')
 		`).bind(taskId, emailId).run();
 
 		// 预先插入 email 记录 (处于 DELIVERED 终态)
@@ -108,8 +118,8 @@ describe('B9: Webhook Unknown Event & State Transition Protection Specification'
 
 		// 1. 初始化为 delivered 终态
 		await env.db.prepare(`
-			INSERT INTO notification_outbox (task_id, channel, status, provider_message_id)
-			VALUES (?, 'resend', 'delivered', ?)
+			INSERT INTO notification_outbox (task_id, channel, status, provider_message_id, recipient, template_code, subject, content)
+			VALUES (?, 'resend', 'delivered', ?, 'user@example.com', 'notice_tpl', 'Notice Subject', 'Notice Content')
 		`).bind(taskId, emailId).run();
 
 		await env.db.prepare(`
