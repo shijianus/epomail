@@ -3,6 +3,7 @@ import orm from '../entity/orm';
 import { oauthApp, oauthGrant } from '../entity/oauth-app';
 import { eq, desc } from 'drizzle-orm';
 import { getUserDb } from '../utils/db-accessor';
+import { encryptClientSecret, decryptClientSecret, verifyClientSecret } from '../utils/oauth-secret-crypto.js';
 
 function genRandomHex(bytesCount = 16) {
 	const array = new Uint8Array(bytesCount);
@@ -31,6 +32,89 @@ function normalizeRedirectUris(input) {
 		}
 	}
 	return Array.from(new Set(list.map(s => s.trim()).filter(Boolean)));
+}
+
+/**
+ * 严格校验单个 OAuth Redirect URI
+ * @param {string} rawUri
+ * @param {object} [options]
+ * @returns {string} 校验通过的标准 URI 字符串
+ */
+export function validateSingleRedirectUri(rawUri, options = {}) {
+	if (!rawUri || typeof rawUri !== 'string') {
+		throw new BizError('Redirect URI 不能为空', 400);
+	}
+	const trimmed = rawUri.trim();
+	if (!trimmed) {
+		throw new BizError('Redirect URI 不能为空', 400);
+	}
+
+	// 1. 禁止非法控制字符、换行与空白
+	if (/[\x00-\x1f\x7f\s]/.test(trimmed)) {
+		throw new BizError('Redirect URI 不能包含换行、空白或控制字符', 400);
+	}
+
+	// 2. 禁止通配符
+	if (trimmed.includes('*')) {
+		throw new BizError('Redirect URI 不能包含通配符 (wildcard: *)', 400);
+	}
+
+	// 3. 禁止 Fragment 标识符 (#)
+	if (trimmed.includes('#')) {
+		throw new BizError('Redirect URI 不能包含 Fragment 锚点 (#)', 400);
+	}
+
+	// 4. 标准 URL 结构解析
+	let u;
+	try {
+		u = new URL(trimmed);
+	} catch (e) {
+		throw new BizError(`无效的 Redirect URI 格式 (Invalid host or URL): ${trimmed}`, 400);
+	}
+
+	// 5. 禁止内嵌 Userinfo
+	if (u.username || u.password) {
+		throw new BizError('Redirect URI 不能包含认证凭据 (Userinfo credentials)', 400);
+	}
+
+	// 6. 必须具备有效 Host
+	if (!u.hostname) {
+		throw new BizError('Redirect URI 必须包含有效的 Host (Invalid host)', 400);
+	}
+
+	// 7. 协议要求：必须为 https://；仅允许 localhost / 127.0.0.1 / [::1] 使用 http://
+	const hostname = u.hostname.toLowerCase();
+	const isLocal = hostname === 'localhost' ||
+		hostname === '127.0.0.1' ||
+		hostname === '[::1]' ||
+		hostname === '::1';
+
+	if (u.protocol === 'http:') {
+		if (!isLocal) {
+			throw new BizError(`非回环域名的 Redirect URI 必须使用 HTTPS 协议: ${trimmed}`, 400);
+		}
+		if (options.isProd) {
+			throw new BizError('生产环境禁止注册 Localhost 回调地址', 400);
+		}
+	} else if (u.protocol !== 'https:') {
+		throw new BizError(`Redirect URI 仅支持 HTTPS (或本地开发调试 HTTP): ${trimmed}`, 400);
+	}
+
+	return trimmed;
+}
+
+/**
+ * 批量校验并规范化 Redirect URIs
+ * @param {string|string[]} input
+ * @param {object} [options]
+ * @returns {string[]}
+ */
+export function validateRedirectUris(input, options = {}) {
+	const list = normalizeRedirectUris(input);
+	if (!list || list.length === 0) {
+		throw new BizError('请至少提供一个有效的授权回调地址 (Redirect URI)', 400);
+	}
+	return list.map(uri => validateSingleRedirectUri(uri, options));
 }
 
 function maskSecret(secret) {
@@ -180,29 +264,15 @@ const oauthAppService = {
 			throw new BizError('应用名称不能为空');
 		}
 
-		const parsedUris = normalizeRedirectUris(redirectUris);
-		if (parsedUris.length === 0) {
-			throw new BizError('请至少提供一个有效的授权回调地址 (Redirect URI)');
-		}
-
-		// 验证每个 URL 的格式
-		for (const uri of parsedUris) {
-			try {
-				const u = new URL(uri);
-				if (!['http:', 'https:'].includes(u.protocol)) {
-					throw new BizError(`无效的回调协议: ${uri}，必须为 http:// 或 https://`);
-				}
-			} catch (err) {
-				throw new BizError(`无效的回调 URL 格式: ${uri}`);
-			}
-		}
+		const parsedUris = validateRedirectUris(redirectUris);
 
 		const clientId = `epo_live_${genRandomHex(12)}`;
 		const clientSecret = `epo_sec_${genSecureSecret(32)}`;
+		const encryptedSecret = await encryptClientSecret(c.env, clientId, clientSecret);
 
 		const newRecord = {
 			clientId,
-			clientSecret,
+			clientSecret: encryptedSecret,
 			name: name.trim(),
 			homepageUrl: (homepageUrl || '').trim(),
 			description: (description || '').trim(),
@@ -254,10 +324,7 @@ const oauthAppService = {
 		}
 
 		if (redirectUris !== undefined) {
-			const parsedUris = normalizeRedirectUris(redirectUris);
-			if (parsedUris.length === 0) {
-				throw new BizError('请至少保留一个有效的授权回调地址');
-			}
+			const parsedUris = validateRedirectUris(redirectUris);
 			updatePayload.redirectUris = JSON.stringify(parsedUris);
 		}
 
@@ -286,8 +353,9 @@ const oauthAppService = {
 		}
 
 		const newSecret = `epo_sec_${genSecureSecret(32)}`;
+		const encryptedSecret = await encryptClientSecret(c.env, app.clientId, newSecret);
 		await orm(c).update(oauthApp).set({
-			clientSecret: newSecret,
+			clientSecret: encryptedSecret,
 			updatedAt: new Date().toISOString()
 		}).where(eq(oauthApp.id, id)).run();
 
