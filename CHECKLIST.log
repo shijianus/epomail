@@ -1,5 +1,10 @@
 ### B1–B12 公测阻断项全量修复、Exact-SHA CI 加固与发布收敛核验 (2026-11-07)
-*   **关联提交 (Git Commit)**: `fix/public-beta-go-blockers-2026-11-07` 系列原子提交
+*   **关联提交 (Git Commit)**: `7554aeeee0dc1bbb5afaa34e0ba8cf7664f4add3` (Short: `7554aee`)
+*   **关联 PR (Pull Request)**: PR #2 (`fix/public-beta-go-blockers-2026-11-07` ➡️ `release/2026-10-31`)
+*   **远端 CI 官方核验 (GitHub Actions 100% PASS)**:
+    - `Offline Secret Scanning Gate`: Run ID `42352380334` (conclusion: `success`)
+    - `Security Audit`: Run ID `42352380109` (conclusion: `success`)
+    - `Quality Gates`: Run ID `42352380209` (conclusion: `success`, 7/7 jobs all passed)
 *   **部署环境 (Deployment)**: `本地全真栈 / GitHub Actions CI (epomail-staging 待授权)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] B1 HTTP 错误状态契约：BizError 4xx/5xx 作为真实 HTTP status，与 JSON code 保持绝对一致，前端 Axios 拦截器适配结构化业务错误读取，429 保留 Retry-After。

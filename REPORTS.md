@@ -10,7 +10,12 @@
 ---
 
 ### Epocanvas Mail — B1–B12 公测阻断项全量修复与 Exact-SHA 收敛专项体检报告 (2026-11-07)
-*   **关联提交 (Git Commit)**: `fix/public-beta-go-blockers-2026-11-07`
+*   **关联提交 (Git Commit)**: `7554aeeee0dc1bbb5afaa34e0ba8cf7664f4add3` (Short: `7554aee`)
+*   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
+*   **远端 CI 状态 (GitHub Actions)**:
+    - Offline Secret Scanning Gate: Run `42352380334` (`success`)
+    - Security Audit: Run `42352380109` (`success`)
+    - Quality Gates: Run `42352380209` (`success`)
 *   **专项文档索引 (Detailed Doc)**:
     - [制度治理建议案](doc/release/AGENTS-GOVERNANCE-AMENDMENT-PROPOSAL.md)
     - [公测终审裁决书](doc/release/PUBLIC-BETA-GATE-DECISION.md)
