@@ -1,5 +1,5 @@
 ### PR 模式质量门禁 diff-hygiene 修复与 GitHub Actions 全绿闭环 (2026-11-07)
-*   **关联提交 (Git Commit)**: `54d9d3a0ce6270c68ec338b465dcdda837724245` (Short: `54d9d3a`)
+*   **关联提交 (Git Commit)**: `192183258217f6fc6e861e27d87b881d589f3065` (Short: `1921832`)
 *   **部署环境 (Deployment)**: `GitHub Actions Quality Gates (#36, PR #37)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] PR 门禁差异基线修复：消除 `doc/production-release-runbook-2026-11-05.md` 第 3-7 行尾随空格与 `doc/backend-security-audit-2026-11-06.md` 文件末尾空行，确保在 PR 触发时对比 `master...HEAD` (`3e1ef74...HEAD`) 100% 洁净。
