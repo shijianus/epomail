@@ -9,6 +9,25 @@
 
 ---
 
+### Epocanvas Mail — 最终安全收敛、差异复核与正式交付报告 (2026-11-07)
+*   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
+*   **专项文档索引 (Detailed Doc)**:
+    - [最终安全收敛交付报告](doc/release/FINAL-SECURITY-CONVERGENCE-2026-11-07.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：执行 READ → VERIFY → CLASSIFY → MINIMAL FIX → FINAL TEST → INDEPENDENT REVIEW → TERMINATE 正式收敛流程；全面复核 HTTP 错误契约、日志脱敏、定时隔离、AI XSS、SSRF、OAuth、Webhook、Workers AI、BOLA/IDOR 及供应链硬化等 10 项核心安全路径。
+    2. 工具与脚本：Vitest (47 个测试文件、612 项断言全绿)、GitHub Actions 门禁 (10/10 SUCCESS)、Wrangler 4.90.0 dry-run、Secret Scan、i18n 静态扫描三件套。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·复核通过/10 项核心安全路径]**: 10 项关键安全机制全部在代码与测试中达成闭环，无新增 Fail-Open，无绕过路径，无租户隔离缺陷。
+    - **[P1·状态标定/环境漂移 (Staging Drift)]**: Staging 活跃版本为历史 commit `fecde6d`，如实标定为 ENVIRONMENT DRIFT，等待后续显式部署授权。
+    - **[P1·安全隔离/未验收功能受控]**: 外部真实发信保持默认封锁 (`EMAIL_OUTBOUND_ENABLED="false"`)，外部 Webhook 与真实 IdP 保持离线模拟。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 47 个测试套件 612 项用例 100% 通过；
+    - GitHub Actions PR #2 必需门禁 10/10 SUCCESS；
+    - 生产环境 100% 保持只读零触碰 (`625c1291`)；
+    - 独立复核终审判定：READY FOR NEXT AUTHORIZED RELEASE GATE。
+
+---
+
 ### Epocanvas Mail — B1–B12 公测阻断项全量修复与 Exact-SHA 收敛专项体检报告 (2026-11-07)
 *   **关联提交 (Git Commit)**: `7554aeeee0dc1bbb5afaa34e0ba8cf7664f4add3` (Short: `7554aee`)
 *   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
