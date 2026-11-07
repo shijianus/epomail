@@ -9,6 +9,33 @@
 
 ---
 
+### Cloudflare Staging 部署验收与测试交接专项报告 (2026-11-07)
+*   **关联提交 (Git Commit)**: `fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)
+*   **专项文档索引 (Detailed Doc)**: 
+    - [部署执行记录](DEPLOYMENT-EXECUTION.md)
+    - [Staging 真实资源清单](STAGING-RESOURCE-INVENTORY.md)
+    - [机密凭证状态矩阵](STAGING-SECRET-MATRIX.md)
+    - [外部集成端点清单](STAGING-EXTERNAL-INTEGRATIONS.md)
+    - [D1 初始化与迁移记录](STAGING-MIGRATION-RECORD.md)
+    - [回滚与容灾指南](STAGING-ROLLBACK-HANDOFF.md)
+    - [独立测试交接包](TEST-ROUND-HANDOFF.md)
+    - [下一轮测试任务指令](NEXT-ROUND-TEST-PROMPT.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围：Cloudflare Staging 环境 (`epomail-staging`) 部署发布、独立 D1 数据库 (`epomail-staging-db`)、KV 命名空间 (`epomail-staging-kv`)、机密密钥库 (Secrets)、静态前端资源 (438 资产) 及生产隔离性。
+    2. 工具与脚本：Wrangler 4.90.0、`node build.mjs`、Cloudflare Worker 远程 API、D1 远程查询工具、HTTP 部署 Smoke Check 探针。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻塞/配置]**: Cloudflare Free 账户总计 5 个 Cron 限制导致初始部署报错（错误码 10072）。通过在 Staging 显式设置 `crons = []` 覆盖顶层继承完成解脱，定时任务支持受控 API 触发。
+    - **[P1·重要/机密安全]**: Staging 初始部署要求 `init_secret` 与 `admin_initial_password`。已通过本地密码学高强度随机生成并通过 `wrangler secret put` 安全注入，零明文泄露。
+    - **[P2·外部集成/待填凭据]**: OAuth 开放平台测试凭证、真实入站邮件自定义子域待下一轮测试按需配置，已在交接文档中准确标记为 ACTION REQUIRED。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - `epomail-staging` 成功部署上线 (Version ID: `b7962593-5735-4783-a7c4-7c9a302da341`)；
+    - D1 远程数据库 40 张核心安全与业务表全量迁移成功 (HTTP 200)；
+    - 12 项最低限度部署 Smoke Check 全部通过；
+    - 生产 Worker `epomail` (`625c1291`) 保持 100% 独立未变，生产安全红线零穿透；
+    - **结论：Staging 部署完全就绪，交付独立测试交接包，状态：DEPLOYED — READY FOR DEDICATED TEST ROUND。**
+
+---
+
 ### 公测上线前最终安全收敛与全量就绪审计报告 (2026-11-06)
 *   **关联提交 (Git Commit)**: `9ab784c873119d5e4dc09c94cf87196df8fab7e8` (Short: `9ab784c`)
 *   **专项文档索引 (Detailed Doc)**: 

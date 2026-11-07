@@ -1,3 +1,22 @@
+### Cloudflare Staging 真实环境部署、D1迁移与独立测试交接 (2026-11-07)
+*   **关联提交 (Git Commit)**: `fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)
+*   **部署环境 (Deployment)**: Cloudflare Staging (`epomail-staging.epocanvas.workers.dev`, Version ID: `b7962593-5735-4783-a7c4-7c9a302da341`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 基础设施真实绑定：Staging 独立 D1 (`epomail-staging-db` `c3a49885`)、独立 KV (`epomail-staging-kv` `c5a59d7c`) 与域名配置入库。
+    - [x] 密钥安全注入：通过 `wrangler secret put` 注入 Staging 专用 `init_secret`、`admin_initial_password`，明文零泄露。
+    - [x] 调度配额优化：显式置空 Staging triggers (`crons = []`)，突破 Cloudflare Free 账户总计 5 个 Cron 限制（错误码 10072）。
+    - [x] 远程 D1 架构迁移：调用 `POST /api/init` 成功执行 45 个迁移函数（HTTP 200），全量 40 张安全与业务表落地。
+    - [x] 交付测试交接包：交付 `DEPLOYMENT-EXECUTION.md`、`STAGING-RESOURCE-INVENTORY.md`、`STAGING-SECRET-MATRIX.md`、`STAGING-EXTERNAL-INTEGRATIONS.md`、`STAGING-MIGRATION-RECORD.md`、`STAGING-ROLLBACK-HANDOFF.md`、`TEST-ROUND-HANDOFF.md` 与 `NEXT-ROUND-TEST-PROMPT.md`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：`node build.mjs` 构建通过 (temp_login_ui 3.10s, mail-vue 15.77s)
+    - [x] 打包与 Dry-Run：`wrangler deploy --dry-run` 退出码 0，438 静态资产完整同步
+    - [x] 真实 Staging 部署：`wrangler deploy --env staging` 成功发布 (Version: `b7962593-5735-4783-a7c4-7c9a302da341`)
+    - [x] 部署 Smoke Check：12 项非破坏性部署健康检查全部 PASS (HTTPS/SPA/Settings/401/40张D1表/KV/外发熔断/生产隔离)
+    - [x] 生产环境零影响：生产 Worker `epomail` 版本保持 `625c1291`，域名 `mail.epocanvas.com` 正常
+    - [x] 零假数据残留：测试调用均走幂等或无状态验证，数据库无非预期临时脏数据
+
+---
+
 ### 公测上线前最终安全收敛、全量测试矩阵与 6 项交付归档 (2026-11-06)
 *   **关联提交 (Git Commit)**: `9ab784c873119d5e4dc09c94cf87196df8fab7e8` (Short: `9ab784c`)
 *   **部署环境 (Deployment)**: 本地全真栈验证 + 生产准备检查 (`mail.epocanvas.com`)
