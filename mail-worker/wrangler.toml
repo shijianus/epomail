@@ -129,9 +129,9 @@ not_found_handling = "single-page-application"
 run_worker_first = true
 
 # 定时调度 (夜间清理 + 每 5 分钟 Outbox 调度与租约检查)
-# Staging 受 Cloudflare Free 账户总计 5 个 Cron 限制，避免占用生产环境调度配额
-#[env.staging.triggers]
-#crons = ["0 16 * * *", "*/5 * * * *"]
+# Staging 环境显式置空 crons，覆盖顶层继承，避免触碰 Cloudflare 账户 5 个 Cron 的上限
+[env.staging.triggers]
+crons = []
 
 # Staging 环境变量隔离配置
 [env.staging.vars]
