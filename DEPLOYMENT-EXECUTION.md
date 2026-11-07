@@ -1,12 +1,12 @@
 # Epocanvas Mail - Staging 真实部署执行记录 (DEPLOYMENT-EXECUTION.md)
 
-> **部署批次**：`release/2026-10-31`  
-> **源码基线 SHA**：`7149cfa4d4f828a2579dfd132643a0eeb9bb4a9b` (Short: `7149cfa`)  
-> **实际部署 SHA**：`fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)  
-> **目标环境**：Cloudflare Staging (`epomail-staging`)  
-> **Cloudflare 账号**：`shijian` (`0a1276d9d2f920936dc2f3eda8c126f8`)  
-> **部署生效时间**：`2026-11-07 01:37:06 UTC`  
-> **Deployment Version ID**：`b7962593-5735-4783-a7c4-7c9a302da341`  
+> **部署批次**：`release/2026-10-31`
+> **源码基线 SHA**：`7149cfa4d4f828a2579dfd132643a0eeb9bb4a9b` (Short: `7149cfa`)
+> **实际部署 SHA**：`fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)
+> **目标环境**：Cloudflare Staging (`epomail-staging`)
+> **Cloudflare 账号**：`shijian` (`0a1276d9d2f920936dc2f3eda8c126f8`)
+> **部署生效时间**：`2026-11-07 01:37:06 UTC`
+> **Deployment Version ID**：`b7962593-5735-4783-a7c4-7c9a302da341`
 > **部署状态**：**DEPLOYED — READY FOR DEDICATED TEST ROUND**
 
 ---

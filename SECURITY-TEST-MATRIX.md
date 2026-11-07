@@ -1,9 +1,9 @@
 # Epocanvas Mail - 安全测试矩阵与实测证据 (SECURITY-TEST-MATRIX.md)
 
-> **测试基线**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)  
-> **测试执行引擎**：Vitest 3.2.7 (`@cloudflare/vitest-pool-workers` + Miniflare/workerd 真实沙箱)  
-> **静态扫描引擎**：Node.js ESM 静态 AST 分析器 + 密钥规则正则匹配器  
-> **前端测试套件**：Node.js 内置 Test Runner (`--experimental-strip-types`) + TypeScript Compiler  
+> **测试基线**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
+> **测试执行引擎**：Vitest 3.2.7 (`@cloudflare/vitest-pool-workers` + Miniflare/workerd 真实沙箱)
+> **静态扫描引擎**：Node.js ESM 静态 AST 分析器 + 密钥规则正则匹配器
+> **前端测试套件**：Node.js 内置 Test Runner (`--experimental-strip-types`) + TypeScript Compiler
 > **测试环境规范**：全隔离内存 D1 / KV / R2 实例，测试断言执行后严格 `finally` 清理，零假数据残留。
 
 ---

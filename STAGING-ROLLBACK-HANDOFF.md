@@ -1,8 +1,8 @@
 # Epocanvas Mail - Staging 回滚与容灾交接指南 (STAGING-ROLLBACK-HANDOFF.md)
 
-> **当前部署环境**：`epomail-staging`  
-> **当前部署 Version ID**：`b7962593-5735-4783-a7c4-7c9a302da341` (对应 Commit `fecde6d`)  
-> **前一可用 Version ID**：`15339ebb-d842-45ae-81aa-4a49c0bbe2a6` (2026-10-24 23:20 UTC)  
+> **当前部署环境**：`epomail-staging`
+> **当前部署 Version ID**：`b7962593-5735-4783-a7c4-7c9a302da341` (对应 Commit `fecde6d`)
+> **前一可用 Version ID**：`15339ebb-d842-45ae-81aa-4a49c0bbe2a6` (2026-10-24 23:20 UTC)
 > **回滚责任人**：Release Engineer / Site Ops
 
 ---

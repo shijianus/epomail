@@ -222,7 +222,7 @@ jobs:
         run: node tests/fullstack-smoke.mjs
 
       - name: Bounded local backend load and recovery
-        run: node tests/backend-stress.mjs --soak=3m --out=tests/artifacts/backend-stress.json
+        run: node tests/backend-stress.mjs --profile=limited-beta --soak=3m --out=tests/artifacts/backend-stress.json
 
       - name: Save backend verification evidence
         if: always()

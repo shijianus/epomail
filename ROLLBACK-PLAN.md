@@ -1,6 +1,6 @@
 # Epocanvas Mail - 部署失败与安全事件应急回滚方案 (ROLLBACK-PLAN.md)
 
-> **文档适用范围**：Cloudflare 生产环境（`mail.epocanvas.com` 及多租户域名）  
+> **文档适用范围**：Cloudflare 生产环境（`mail.epocanvas.com` 及多租户域名）
 > **应对场景**：
 > 1. 新版本发布失败、静态资源加载异常或核心业务接口 500 熔断。
 > 2. 突发零日漏洞利用、重大越权攻击或系统密钥泄漏安全事件。

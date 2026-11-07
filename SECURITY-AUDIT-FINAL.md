@@ -1,10 +1,10 @@
 # Epocanvas Mail - 最终安全审计报告 (SECURITY-AUDIT-FINAL.md)
 
-> **审计主体**：Epocanvas Mail 团队 (应用安全工程与 Release Engineering)  
-> **审计基线版本**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)  
-> **安全基准标准**：OWASP ASVS 5.0 (Application Security Verification Standard L2/L3)  
-> **执行环境**：Linux x86_64 / Node v24.14.0 / npm 11.9.0 / Vitest 3.2.7 (@cloudflare/vitest-pool-workers) / Wrangler 4.90.0  
-> **审计模式**：白盒全量源代码审计、攻击面威胁建模、自动化对抗性与回归用例验证、静态密钥与多语言闭环扫描。  
+> **审计主体**：Epocanvas Mail 团队 (应用安全工程与 Release Engineering)
+> **审计基线版本**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
+> **安全基准标准**：OWASP ASVS 5.0 (Application Security Verification Standard L2/L3)
+> **执行环境**：Linux x86_64 / Node v24.14.0 / npm 11.9.0 / Vitest 3.2.7 (@cloudflare/vitest-pool-workers) / Wrangler 4.90.0
+> **审计模式**：白盒全量源代码审计、攻击面威胁建模、自动化对抗性与回归用例验证、静态密钥与多语言闭环扫描。
 
 ---
 

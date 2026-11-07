@@ -1,7 +1,7 @@
 # Epocanvas Mail - 剩余风险评估与接受理由 (REMAINING-RISKS.md)
 
-> **评估基线**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)  
-> **适用阶段**：受控公测阶段 (Controlled Public Beta)  
+> **评估基线**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
+> **适用阶段**：受控公测阶段 (Controlled Public Beta)
 > **风险管理原则**：知悉风险、受控容灾、透明记录、不留隐患。禁止在无证据支撑的情况下宣称“系统 100% 绝对安全”。
 
 ---

@@ -1,7 +1,7 @@
 # Epocanvas Mail - Staging 机密凭据状态矩阵 (STAGING-SECRET-MATRIX.md)
 
-> **环境目标**：`epomail-staging`  
-> **审计基线**：`fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)  
+> **环境目标**：`epomail-staging`
+> **审计基线**：`fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)
 > **机密安全红线**：本文件**严禁记录任何 Secret 明文、部分内容或单向哈希值**。仅记录凭据元数据与注入状态。
 
 ---

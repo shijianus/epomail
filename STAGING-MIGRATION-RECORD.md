@@ -1,8 +1,8 @@
 # Epocanvas Mail - Staging D1 数据库初始化与迁移记录 (STAGING-MIGRATION-RECORD.md)
 
-> **目标数据库**：`epomail-staging-db` (UUID: `c3a49885-603e-4387-b4df-82a1117e963a`)  
-> **所属环境**：`staging` (`epomail-staging`)  
-> **执行时间**：`2026-11-07 01:37:52 UTC`  
+> **目标数据库**：`epomail-staging-db` (UUID: `c3a49885-603e-4387-b4df-82a1117e963a`)
+> **所属环境**：`staging` (`epomail-staging`)
+> **执行时间**：`2026-11-07 01:37:52 UTC`
 > **对应代码基线 SHA**：`fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)
 
 ---

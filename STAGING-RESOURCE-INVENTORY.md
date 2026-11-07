@@ -1,10 +1,10 @@
 # Epocanvas Mail - Staging 真实资源清单 (STAGING-RESOURCE-INVENTORY.md)
 
-> **环境名称**：`staging`  
-> **所属 Cloudflare 账号**：`shijian` (`0a1276d9d2f920936dc2f3eda8c126f8`)  
-> **对应 Worker**：`epomail-staging`  
-> **访问域名**：`https://epomail-staging.epocanvas.workers.dev`  
-> **对应部署 SHA**：`fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)  
+> **环境名称**：`staging`
+> **所属 Cloudflare 账号**：`shijian` (`0a1276d9d2f920936dc2f3eda8c126f8`)
+> **对应 Worker**：`epomail-staging`
+> **访问域名**：`https://epomail-staging.epocanvas.workers.dev`
+> **对应部署 SHA**：`fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)
 > **核实时间**：`2026-11-07 01:38:09 UTC`
 
 ---

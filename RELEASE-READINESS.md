@@ -1,8 +1,8 @@
 # Epocanvas Mail - 上线就绪度与环境检查报告 (RELEASE-READINESS.md)
 
-> **发布批次标识**：`release/2026-10-31`  
-> **候选发布基线 (RC SHA)**：`4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)  
-> **生产投产目标**：Cloudflare Workers / D1 Database (`epomail`) / KV Namespace (`kv`) / Cloudflare Pages/Assets  
+> **发布批次标识**：`release/2026-10-31`
+> **候选发布基线 (RC SHA)**：`4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
+> **生产投产目标**：Cloudflare Workers / D1 Database (`epomail`) / KV Namespace (`kv`) / Cloudflare Pages/Assets
 > **生产服务域名**：
 > - 主服务入口：`https://mail.epocanvas.com`
 > - 备用/多租户域名：`https://mail.epomail.bond`、`https://mail.epomail.cyou`

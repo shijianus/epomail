@@ -1,7 +1,7 @@
 # Epocanvas Mail - Staging 外部集成端点配置与准备状态 (STAGING-EXTERNAL-INTEGRATIONS.md)
 
-> **当前部署 SHA**：`fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)  
-> **Staging 访问地址**：`https://epomail-staging.epocanvas.workers.dev`  
+> **当前部署 SHA**：`fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)
+> **Staging 访问地址**：`https://epomail-staging.epocanvas.workers.dev`
 > **状态分类标准**：`CONFIGURED`（已配置）、`ACTION REQUIRED`（需人工控制台提供）、`BLOCKED`（因权限或环境阻断）、`NOT USED`（未启用/不适用）。
 
 ---

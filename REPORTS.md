@@ -9,9 +9,32 @@
 
 ---
 
+### Release Candidate 最终审计、CI 修复与 Staging 验收收敛专项报告 (2026-11-07)
+*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING_SHORT`)
+*   **专项文档索引 (Detailed Doc)**:
+    - [CI 失败归因与修复报告](doc/release/CI-FAILURE-TRIAGE-2026-11-07.md)
+    - [RC Git 版本一致性与部署漂移报告](doc/release/RC-SHA-CONSISTENCY.md)
+    - [后端安全审计与风险对齐矩阵](doc/release/SECURITY-RISK-RECONCILIATION.md)
+    - [Staging 运行验收差距与缺口清单](doc/release/STAGING-VALIDATION-GAPS.md)
+    - [公测终审裁决书 (NO-GO)](doc/release/PUBLIC-BETA-GATE-DECISION.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：GitHub Actions Quality Gates (#34, #35)、后端全量 49,000 行代码安全边界、Cloudflare Staging 基础设施 (`epomail-staging`)、本地全真隔离栈 (127.0.0.1 随机端口 + 真实 D1/KV 沙箱)。
+    2. 工具与脚本：GitHub API 原始日志萃取器、Playwright Chromium 浏览器自动化、Node.js 22 本地全真测试套件、Vitest 3.2.7、Wrangler 4.90.0、i18n 静态扫描三件套、`git diff --check`。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·阻断/CI 失败]**: CI 存在 3 类失败：B1 (Markdown 行尾空格导致 diff-hygiene 退出码 2)、B2 (条款强制确认与 epo_sessions 会话隔离未在测试中同步导致 Playwright 30s 超时)、B3 (CI 未传递 `--profile=limited-beta` 导致 local-stack SQLite 锁争用样本不足)。已全部完成最小范围根因修复并本地回归 100% 通过。
+    - **[P0·阻断/版本漂移]**: Cloudflare Staging 目前运行的代码版本为 `fecde6d` (2026-11-07 01:37 UTC)，滞后于包含 `751586f` 安全加固与 `9cc0db0` 分支融合的最新代码库，存在部署版本漂移。
+    - **[P1·重要/外部集成缺口]**: Staging 运行于 `*.workers.dev`，缺乏顶级域名导致无法挂载 Cloudflare Email Routing；`EMAIL_OUTBOUND_ENABLED` 处于安全锁定状态（`"false"`）；第三方 OAuth 回调与 Resend/Mailjet Webhook 在真实云端尚未联调。
+    - **[P2·次要/安全加固闭环]**: 核对 2026-11-06 审计发现 F1–F14 与 REMAINING-RISKS.md：F1 (时序安全)、F3 (128 字符密码)、F4 (邮件哈希恒时比较)、F5 (Cron 时序安全)、F6 (Rate limit 有界批次清理)、F8 (TG 模板转义) 均已验证修复。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 静态代码与差异规范：`git diff --check` 退出码 0；`scripts/check-staged-files.mjs` PASS；i18n 对称/引用/硬编码零缺陷。
+    - 自动化测试与构建：`temp_login_ui` 29/29 PASS；`oauth-bind-login-ui-e2e.mjs` 13/13 PASS；`mail-worker` 37 文件 430 用例全绿；`load-runner.test.mjs` 28/28 PASS；`backend-stress.mjs` 7 阶段全部达标；`fullstack-smoke.mjs` 13/13 PASS；`wrangler deploy --dry-run` 438 资产校验通过。
+    - 终审决议：**NO-GO FOR PUBLIC BETA**。阻断项清单明确，严禁直接上线公测。
+
+---
+
 ### Cloudflare Staging 部署验收与测试交接专项报告 (2026-11-07)
 *   **关联提交 (Git Commit)**: `fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)
-*   **专项文档索引 (Detailed Doc)**: 
+*   **专项文档索引 (Detailed Doc)**:
     - [部署执行记录](DEPLOYMENT-EXECUTION.md)
     - [Staging 真实资源清单](STAGING-RESOURCE-INVENTORY.md)
     - [机密凭证状态矩阵](STAGING-SECRET-MATRIX.md)
@@ -38,7 +61,7 @@
 
 ### 公测上线前最终安全收敛与全量就绪审计报告 (2026-11-06)
 *   **关联提交 (Git Commit)**: `9ab784c873119d5e4dc09c94cf87196df8fab7e8` (Short: `9ab784c`)
-*   **专项文档索引 (Detailed Doc)**: 
+*   **专项文档索引 (Detailed Doc)**:
     - [最终安全审计报告](SECURITY-AUDIT-FINAL.md)
     - [安全测试矩阵与实测证据](SECURITY-TEST-MATRIX.md)
     - [上线就绪度与环境检查报告](RELEASE-READINESS.md)

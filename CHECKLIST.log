@@ -1,3 +1,25 @@
+### Release Candidate CI 修复、安全收敛与公测门禁审查 (2026-11-07)
+*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING_SHORT`)
+*   **部署环境 (Deployment)**: `本地全真栈 / GitHub Actions Quality Gates` (Staging 部署暂缓，生产严格禁止)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] B1 Diff Hygiene 修复：全量清理 DEPLOYMENT-EXECUTION.md、REPORTS.md 等 15 个 Markdown 文件中的行尾空格与末尾空行，git diff --check 零报错通过。
+    - [x] B2 OAuth E2E 修复：对齐 Commit 49f8b30 的 GDPR 条款强制确认协议，在 tests/oauth-bind-login-ui-e2e.mjs 补充 legalNotice/registrationReadiness 桩数据，增加条款勾选操作；适配 session.ts 的 epo_sessions 多账号安全隔离机制，13/13 scenarios 全部 PASS。
+    - [x] B3 Worker 压测 Profile 对齐：在 .github/workflows/quality-gates.yml 与 tests/backend-stress.mjs 中将受控公测压测 Profile 设为 limited-beta，消除 local-stack SQLite 锁争用导致的并发样本下限失败，7 个压测阶段 100% 达成配额，SLO 读延时 P95 56.21ms，认证 P95 587.19ms。
+    - [x] 安全发现与风险对齐：逐项核对 F1–F14 与 RISK-01–RISK-10，确认 F1/F3/F4/F5/F6/F8 已在 751586f 完整落地，交付 5 份 release 专项审计报告。
+    - [x] 公测门禁裁决：完成独立 QA 审计，鉴于远端 CI 尚未重跑、Staging 存在代码版本漂移、真实邮件链路未经验收，发布门禁维持明确 NO-GO。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建通过 (耗时 15.9s)，temp_login_ui 构建通过 (耗时 2.6s)
+    - [x] 静态规范审计：check-staged-files.mjs PASS，git diff --check 退出码 0 零输出
+    - [x] 多语言对称闭环：i18n-symmetry / i18n-audit / i18n-hardcoded 静态扫描三件套 100% PASS
+    - [x] 单元测试套件：temp_login_ui 29/29 PASS，mail-worker vitest 37 文件 430 用例全绿 PASS
+    - [x] 浏览器端到端：oauth-bind-login-ui-e2e.mjs 13/13 全场景 PASS
+    - [x] 压测与契约：backend-stress.mjs 7 个阶段 100% 达成，SLO 全部达标
+    - [x] 全真栈冷启动：fullstack-smoke.mjs 13/13 自动化全绿通过
+    - [x] 部署预检核验：wrangler deploy --dry-run 退出码 0，438 个静态资产完整校验
+    - [x] 零假数据残留：测试临时状态与端口全部于 finally 块物理清理
+
+---
+
 ### Git 远端与本地全量分支融合收口：冲突消解、测试门禁与全量推送 (2026-11-07)
 *   **关联提交 (Git Commit)**: `9cc0db084c35f2f4cf67e9f7ef8b43a0e064cc05` (Short: `9cc0db0`)
 *   **部署环境 (Deployment)**: GitHub 远端同步 (`git push --all origin`)；包含本地 Staging 交付物与远端加固审计补丁全量闭环。

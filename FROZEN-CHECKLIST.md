@@ -1,8 +1,8 @@
 # Epocanvas Mail - 封版冻结门禁清单 (FROZEN-CHECKLIST.md)
 
-> **当前冻结基线 (Frozen Baseline SHA)**：`4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)  
-> **基线分支**：`release/2026-10-31`  
-> **发布候选标签 (RC Tags)**：`v1.2.1-freeze`、`backend-freeze-2026-11-05`  
+> **当前冻结基线 (Frozen Baseline SHA)**：`4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
+> **基线分支**：`release/2026-10-31`
+> **发布候选标签 (RC Tags)**：`v1.2.1-freeze`、`backend-freeze-2026-11-05`
 > **状态判定**：**FROZEN (封版冻结就绪)**。所有已知 P0/P1 安全与数据缺陷已清零，未授权禁止合入任何新代码。
 
 ---

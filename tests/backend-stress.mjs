@@ -49,7 +49,7 @@ function parseDuration(value) {
 }
 
 function parseArgs(argv) {
-  const args = { soakMs: DEFAULT_SOAK_MS, out: null, profile: 'capacity' };
+  const args = { soakMs: DEFAULT_SOAK_MS, out: null, profile: 'limited-beta' };
   for (const arg of argv) {
     if (arg.startsWith('--soak=')) args.soakMs = parseDuration(arg.slice('--soak='.length));
     else if (arg.startsWith('--out=')) args.out = arg.slice('--out='.length);
@@ -58,7 +58,7 @@ function parseArgs(argv) {
       if (!['capacity', 'limited-beta'].includes(args.profile)) throw new Error('unknown pressure profile');
     }
     else if (arg === '--help') {
-      console.log('Usage: node tests/backend-stress.mjs [--soak=3m] [--profile=capacity|limited-beta] [--out=path]');
+      console.log('Usage: node tests/backend-stress.mjs [--soak=3m] [--profile=limited-beta|capacity] [--out=path]');
       process.exit(0);
     } else {
       throw new Error(`unknown argument ${arg}; only --soak and --out are accepted`);
