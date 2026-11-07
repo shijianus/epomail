@@ -10,6 +10,7 @@ import regKeyService from "./reg-key-service";
 import { verifyAppleIdToken } from "../utils/oauth-jwt-utils";
 import rateLimit from '../utils/rate-limit.js';
 import { isSafePublicUrl } from '../utils/url-utils.js';
+import { safeFetch } from '../utils/safe-fetch.js';
 import { getUserDb } from '../utils/db-accessor.js';
 import oneTimeCredential, { OTC_PURPOSE } from '../utils/one-time-credential.js';
 import oauthBindClaim from '../utils/oauth-bind-claim.js';
@@ -644,7 +645,7 @@ const oauthService = {
 			formBody.append('grant_type', 'authorization_code');
 			if (codeVerifier) formBody.append('code_verifier', codeVerifier);
 
-			const tokenRes = await fetch(config.tokenUrl, {
+			const tokenRes = await safeFetch(config.tokenUrl, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/x-www-form-urlencoded',
@@ -659,7 +660,7 @@ const oauthService = {
 			const tokenData = await tokenRes.json();
 			const accessToken = tokenData.access_token;
 
-			const userRes = await fetch(config.userInfoUrl, {
+			const userRes = await safeFetch(config.userInfoUrl, {
 				headers: {
 					'Authorization': `Bearer ${accessToken}`,
 					'Accept': 'application/json'
@@ -769,7 +770,7 @@ const oauthService = {
 			}
 			// Probe connectivity to tokenUrl host
 			try {
-				const testRes = await fetch(config.tokenUrl, {
+				const testRes = await safeFetch(config.tokenUrl, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 					body: 'grant_type=client_credentials'
@@ -790,7 +791,7 @@ const oauthService = {
 		const url = testUrls[providerKey];
 		if (url) {
 			try {
-				const res = await fetch(url, { method: 'GET', headers: { 'User-Agent': 'Epocanvas-Mail' } });
+				const res = await safeFetch(url, { method: 'GET', headers: { 'User-Agent': 'Epocanvas-Mail' } });
 				if (!res.ok && res.status >= 500) {
 					throw new BizError(`Provider endpoint responded with status ${res.status}`);
 				}
