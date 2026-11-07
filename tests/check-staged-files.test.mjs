@@ -24,6 +24,17 @@ test('private environment files and credential dumps remain blocked', () => {
   }
 });
 
+test('dev.vars.example template is committable but never a credential carrier', () => {
+  // 与 .gitignore 的 !.dev.vars.example 白名单对齐：占位模板必须可持续维护
+  assert.equal(validateStagedFile('mail-worker/.dev.vars.example', 'jwt_secret=<your-strong-random-secret>\n'), null);
+  // 模板路径变体不得打开豁免口子
+  for (const file of ['mail-worker/.dev.vars', 'mail-worker/.dev.vars.local', 'nested/mail-worker/.dev.vars.example/real']) {
+    assert.ok(validateStagedFile(file, '{}'), file);
+  }
+  // 内容层防护不在本函数职责内：模板正文的凭据由 scan-staged-secrets 与
+  // inspectStagedChanges 的 staged-additions 扫描拦截（见下方 index inspection 用例）。
+});
+
 test('only the root baseline accepts reviewed fingerprint metadata', () => {
   assert.equal(validateStagedFile('.secret-scan-baseline.json', JSON.stringify(baseline())), null);
   const noPath = baseline();

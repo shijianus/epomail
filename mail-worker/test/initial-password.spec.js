@@ -310,7 +310,7 @@ describe('setting the first password', () => {
 
 		await expect(userService.setInitialPassword(c, { password: '12345' }, USER_ID))
 			.rejects.toMatchObject({ code: 400 });
-		await expect(userService.setInitialPassword(c, { password: 'x'.repeat(31) }, USER_ID))
+		await expect(userService.setInitialPassword(c, { password: 'x'.repeat(129) }, USER_ID))
 			.rejects.toMatchObject({ code: 400 });
 		expect((await reloadUser()).password).toBe(GENERATED_HASH);
 	});

@@ -501,24 +501,43 @@ const auditService = {
 			query.orderBy(desc(auditLog.id));
 		}
 
-		// 并行执行独立查询以深度优化加载速度 (Promise.all 毫秒级极速响应)
-		const [list, countRes, allItems, settings, circuitBreaker] = await Promise.all([
+		// 并行执行独立查询以深度优化加载速度 (Promise.all 毫秒级极速响应)。
+		// 卡片指标改为 SQL 聚合：严禁把整张 audit_log 载入内存再过滤——
+		// 持 setting:query 的低权限角色（含参观者）曾可借此反复拉取全表打出 DoS。
+		const metricDb = getUserDb(c) || c?.env?.db;
+		const closedStatusSql = "('banned','unbanned','resolved','rejected','expired')";
+		const metricStatements = metricDb ? [
+			// 0 威胁：risk 未结案；无集群各记 1 案，同集群只计 1 个主案
+			metricDb.prepare(`SELECT
+					COALESCE(SUM(CASE WHEN cluster_id IS NULL OR cluster_id = '' THEN 1 ELSE 0 END), 0)
+					+ COUNT(DISTINCT CASE WHEN cluster_id IS NOT NULL AND cluster_id != '' THEN cluster_id END) AS total
+				FROM audit_log
+				WHERE warning_type = 'risk' AND status NOT IN ${closedStatusSql}`),
+			// 1 申诉：仅待复核
+			metricDb.prepare(`SELECT COUNT(*) AS total FROM audit_log WHERE warning_type = 'appeal' AND status = 'pending'`),
+			// 2 风险管理：14 天审计期内且未延期结案的待审工单
+			metricDb.prepare(`SELECT COUNT(*) AS total FROM audit_log
+				WHERE warning_type = 'audit' AND status IN ('active', 'pending')
+				AND (create_time >= datetime('now', '-14 days') OR detail_text LIKE '%[延期处置]%')`),
+			// 3 操作记录：全部已处置/已驳回/已封禁/已解禁/已过期案件
+			metricDb.prepare(`SELECT COUNT(*) AS total FROM audit_log
+				WHERE warning_type = 'ban' OR status IN ${closedStatusSql}
+				OR (warning_type = 'audit' AND (status = 'expired'
+					OR (create_time < datetime('now', '-14 days') AND (detail_text IS NULL OR detail_text NOT LIKE '%[延期处置]%'))))`),
+			// 4 当前有效封禁案件数
+			metricDb.prepare(`SELECT COUNT(*) AS total FROM audit_log WHERE status = 'banned'`),
+			// 5 全库案件总数
+			metricDb.prepare(`SELECT COUNT(*) AS total FROM audit_log`)
+		] : [];
+
+		const [list, countRes, metricRows, settings, circuitBreaker] = await Promise.all([
 			query.limit(size).offset(offset),
 			orm(c)
 				.select({ total: count() })
 				.from(auditLog)
 				.where(conditions.length > 0 ? and(...conditions) : undefined)
 				.get(),
-			orm(c).select({
-				id: auditLog.id,
-				warningType: auditLog.warningType,
-				status: auditLog.status,
-				riskLevel: auditLog.riskLevel,
-				priority: auditLog.priority,
-				clusterId: auditLog.clusterId,
-				detailText: auditLog.detailText,
-				createTime: auditLog.createTime
-			}).from(auditLog),
+			metricStatements.length > 0 ? metricDb.batch(metricStatements) : Promise.resolve([]),
 			settingService.get(c),
 			this.getCircuitBreaker(c)
 		]);
@@ -594,37 +613,15 @@ const auditService = {
 			return (Date.now() - createTs) >= 14 * 86400000;
 		};
 
-		// 1. 滥用威胁卡片指标：同集群账号聚合为 1 个威胁主案，仅统计真正活动待审案件，与表格显式展示行数 100% 绝对对齐
-		const seenClusters = new Set();
-		const threatActiveDistinct = allItems.filter(i => {
-			if (i.warningType !== 'risk') return false;
-			if (isClosedStatus(i.status)) return false;
-			if (i.clusterId) {
-				if (seenClusters.has(i.clusterId)) return false;
-				seenClusters.add(i.clusterId);
-				return true;
-			}
-			return true;
-		});
-		const threatCount = threatActiveDistinct.length;
-
-		// 2. 申诉审计卡片指标：仅统计待复核申诉 (status = 'pending')
-		const appealPendingItems = allItems.filter(i => i.warningType === 'appeal' && i.status === 'pending');
-		const appealCount = appealPendingItems.length;
-
-		// 3. 风险管理卡片指标：仅统计处于 14 天审计期限内且待审的工单 (未解决、未过期)
-		const auditActiveItems = allItems.filter(i => i.warningType === 'audit' && (i.status === 'active' || i.status === 'pending') && !isAuditExpired(i));
-		const auditCount = auditActiveItems.length;
-
-		// 4. 操作记录卡片指标：汇聚全平台所有已处理、已驳回、已封禁、已解禁、已过期案件
-		const recordItems = allItems.filter(i => {
-			if (i.warningType === 'ban') return true;
-			if (isClosedStatus(i.status)) return true;
-			if (i.warningType === 'audit' && isAuditExpired(i)) return true;
-			return false;
-		});
-		const recordCount = recordItems.length;
-		const banActive = recordItems.filter(i => i.status === 'banned').length;
+		// 指标全部来自上方批次内的 SQL 聚合，与历史 JS 全表过滤语义一一对齐：
+		// 0=威胁(集群去重) 1=待审申诉 2=审计期内工单 3=操作记录 4=有效封禁 5=全库总数
+		const metricTotal = (index) => Number(metricRows?.[index]?.results?.[0]?.total ?? 0) || 0;
+		const threatCount = metricTotal(0);
+		const appealCount = metricTotal(1);
+		const auditCount = metricTotal(2);
+		const recordCount = metricTotal(3);
+		const banActive = metricTotal(4);
+		const allTotal = metricTotal(5);
 		const totalPending = threatCount + appealCount + auditCount;
 
 		const counts = {
@@ -645,13 +642,13 @@ const auditService = {
 			banTotal: recordCount,
 			record: recordCount,
 			total: totalPending,
-			allTotal: allItems.length,
+			allTotal,
 			categories: {
 				audit: { pending: auditCount, total: auditCount },
 				risk: { pending: threatCount, total: threatCount },
 				appeal: { pending: appealCount, total: appealCount },
 				ban: { pending: recordCount, total: recordCount },
-				total: { pending: totalPending, total: allItems.length }
+				total: { pending: totalPending, total: allTotal }
 			}
 		};
 
@@ -1371,6 +1368,14 @@ const auditService = {
 
 		// 严格绑定目标账号，不信任客户端随意指定的任何外部主体字段
 		const targetUser = await orm(c).select().from(user).where(eq(user.email, targetLog.email)).get();
+
+		// 目标保护：站长 (User 1 / env.admin) 与管理员账号的案件只能由站长本人裁决。
+		// 缺失这道闸时，持 audit:adjudicate 的协管可直接封禁站长，造成全站管理面失陷。
+		if (targetUser && (Number(targetUser.userId) === 1 || isAdminUser(c, targetUser))) {
+			if (!isAdminUser(c, currentUser)) {
+				throw new BizError('无权对站长或管理员账号执行案件裁决（仅站长本人可操作）', 403, 'admin_target_protected');
+			}
+		}
 
 		// 状态转换与业务场景合法性校验 (严防非法状态机跃迁)
 		const isAppealCase = targetLog.warningType === 'appeal' || Boolean(targetLog.appealReason);

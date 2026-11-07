@@ -20,15 +20,25 @@ import { maintainOutboundTasks } from './service/mail-outbound-service.js';
 import { clearNoOne } from './service/mail-lifecycle-service.js';
 import forwardService from './service/mail-forward-service.js';
 
+function scheduledTimingSafeEqual(a, b) {
+	if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+	let diff = 0;
+	for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+	return diff === 0;
+}
+
 async function checkScheduledAuth(req, env) {
 	if (req.method !== 'POST') {
 		return { ok: false, status: 405, message: 'Method Not Allowed: Scheduled trigger requires POST' };
 	}
 
-	// 1. 系统内部安全头校验 (共享机密)
+	// 1. 系统内部安全头校验 (独立调度密钥优先，降级兼容 jwt_secret)
 	const secretHeader = req.headers.get('x-scheduled-secret') || req.headers.get('x-admin-secret');
-	if (env?.jwt_secret && secretHeader && secretHeader === env.jwt_secret) {
-		return { ok: true };
+	if (secretHeader) {
+		const expected = env?.scheduled_secret || env?.jwt_secret;
+		if (expected && scheduledTimingSafeEqual(secretHeader, expected)) {
+			return { ok: true };
+		}
 	}
 
 	// 2. 真实管理员凭据校验 (JWT + KV 真实会话 + 封禁状态 + RBAC 真实角色判权)
@@ -199,15 +209,30 @@ export default {
 		await run('outbound_tasks', () => maintainOutboundTasks({ env }, { limit: 100 }));
 		await run('outbound_reconcile', () => emailService.reconcileUnknownOutbound({ env }, { limit: 20 }));
 		await run('forward_tasks', () => forwardService.processForwardTasks({ env }, { limit: 20 }));
-		await run('security_operation_cleanup', () => getUserDb({ env }).batch([
-			getUserDb({ env }).prepare('DELETE FROM auth_security_operation WHERE rowid IN (SELECT rowid FROM auth_security_operation WHERE expires_at < unixepoch() LIMIT 500)'),
-			getUserDb({ env }).prepare('DELETE FROM auth_totp_replay WHERE rowid IN (SELECT rowid FROM auth_totp_replay WHERE expires_at < unixepoch() LIMIT 500)')
-		]));
+		await run('security_operation_cleanup', async () => {
+			const db = getUserDb({ env });
+			const tables = [
+				{ name: 'auth_security_operation', sql: 'DELETE FROM auth_security_operation WHERE rowid IN (SELECT rowid FROM auth_security_operation WHERE expires_at < unixepoch() LIMIT 500)' },
+				{ name: 'auth_totp_replay', sql: 'DELETE FROM auth_totp_replay WHERE rowid IN (SELECT rowid FROM auth_totp_replay WHERE expires_at < unixepoch() LIMIT 500)' }
+			];
+			for (const t of tables) {
+				for (let round = 0; round < 10; round++) {
+					const r = await db.prepare(t.sql).run();
+					if (!r.meta?.changes) break;
+				}
+			}
+		});
 		// Keep this separate: a pre-migration database without the new table must
 		// not roll back the auth-table cleanup above.
-		await run('rate_limit_cleanup', () => getUserDb({ env }).prepare(
-			'DELETE FROM rate_limit_counter WHERE rowid IN (SELECT rowid FROM rate_limit_counter WHERE expires_at < unixepoch() LIMIT 500)'
-		).run());
+		await run('rate_limit_cleanup', async () => {
+			const db = getUserDb({ env });
+			for (let round = 0; round < 10; round++) {
+				const r = await db.prepare(
+					'DELETE FROM rate_limit_counter WHERE rowid IN (SELECT rowid FROM rate_limit_counter WHERE expires_at < unixepoch() LIMIT 500)'
+				).run();
+				if (!r.meta?.changes) break;
+			}
+		});
 		if (c?.cron === '*/30 * * * *') {
 			await run('analytics', () => analysisService.refreshEchartsCache({ env }));
 		} else {

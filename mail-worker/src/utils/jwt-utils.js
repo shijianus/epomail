@@ -103,7 +103,9 @@ const jwtUtils = {
 			const payload = JSON.parse(payloadJson);
 
 			const now = Math.floor(Date.now() / 1000);
-			if (payload.exp && payload.exp < now) return null;
+			// 无 exp 的令牌一律拒绝：本系统签发的所有 JWT（会话/受限通知/分享/访问令牌）
+			// 都携带 exp，缺失即异常构造，绝不给"永不过期"留任何通道。
+			if (!payload.exp || payload.exp < now) return null;
 
 			return payload;
 

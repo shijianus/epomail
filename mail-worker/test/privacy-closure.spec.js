@@ -96,12 +96,18 @@ beforeAll(async () => {
   'CREATE TABLE IF NOT EXISTS oauth_grant (id INTEGER PRIMARY KEY, user_id INTEGER, client_id TEXT)',
   'CREATE TABLE IF NOT EXISTS oauth_one_time_credential (token_hash TEXT PRIMARY KEY, payload TEXT, consumed INTEGER DEFAULT 0)',
   'CREATE TABLE IF NOT EXISTS legal_acceptance (id INTEGER PRIMARY KEY, user_id INTEGER)',
+  'CREATE TABLE IF NOT EXISTS role (role_id INTEGER PRIMARY KEY, name TEXT, key TEXT, role_code TEXT)',
+  'CREATE TABLE IF NOT EXISTS perm (perm_id INTEGER PRIMARY KEY, name TEXT, perm_key TEXT, pid INTEGER DEFAULT 0, type INTEGER DEFAULT 2)',
+  'CREATE TABLE IF NOT EXISTS role_perm (id INTEGER PRIMARY KEY AUTOINCREMENT, role_id INTEGER, perm_id INTEGER)',
   `CREATE TABLE IF NOT EXISTS object_deletion_queue (
    id INTEGER PRIMARY KEY AUTOINCREMENT, object_key TEXT NOT NULL, user_id INTEGER NOT NULL DEFAULT 0,
    attempts INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', last_error TEXT,
    next_retry_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, create_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
    UNIQUE(object_key, user_id))`
  ]) await env.db.prepare(ddl).run();
+ await env.db.prepare("INSERT OR IGNORE INTO role (role_id, name, key, role_code) VALUES (2, 'User', 'user', 'user_lv0')").run();
+ await env.db.prepare("INSERT OR IGNORE INTO perm (perm_id, name, perm_key, pid, type) VALUES (1, 'Delete Self', 'my:delete', 0, 2)").run();
+ await env.db.prepare("INSERT OR IGNORE INTO role_perm (role_id, perm_id) VALUES (2, 1)").run();
  await ensureMailReliabilitySchema(c);
 });
 

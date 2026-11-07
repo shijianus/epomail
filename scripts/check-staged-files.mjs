@@ -3,6 +3,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const sensitiveName = /(?:\.env.*|\.dev\.vars(?:\..*)?|d1_output\.json|kv_setting\.json|secret.*\.json|credentials\.json)/i;
+// .gitignore 白名单 !.dev.vars.example 的对齐豁免：官方机密占位模板必须可持续维护。
+// 仅豁免模板文件名本身；其内容仍会经过 scan-staged-secrets 的凭据模式扫描。
+const devVarsTemplate = /(?:^|\/)\.dev\.vars\.example$/;
 const providerKey = /(?:re_[a-zA-Z0-9]{24,}|sk-[a-zA-Z0-9]{24,}|AIza[0-9A-Za-z_-]{35}|[0-9]{8,10}:[a-zA-Z0-9_-]{35})/;
 const publicReleaseKeys = new Set(['VITE_APP_TITLE', 'VITE_BASE_URL', 'VITE_PWA_NAME', 'VITE_OUT_DIR', 'VITE_STATIC_URL']);
 
@@ -35,7 +38,7 @@ export function validateStagedFile(file, content) {
       }
     }
     if (providerKey.test(content)) return 'provider credential detected in historical scan baseline';
-  } else if (sensitiveName.test(file)) {
+  } else if (sensitiveName.test(file) && !devVarsTemplate.test(file)) {
     return 'sensitive filename is not permitted';
   }
   return null;

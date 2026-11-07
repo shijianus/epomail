@@ -199,4 +199,5 @@ const saltHashUtils = {
 	}
 };
 
+export { timingSafeEqual };
 export default saltHashUtils;

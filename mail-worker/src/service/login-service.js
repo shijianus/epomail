@@ -1,6 +1,6 @@
 import BizError from '../error/biz-error.js';
 import userService from './user-service.js';
-import emailUtils from '../utils/email-utils.js';
+import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES } from '../utils/email-utils.js';
 import { isDel, settingConst, userConst } from '../const/entity-const.js';
 import JwtUtils from '../utils/jwt-utils.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -200,11 +200,21 @@ const loginService = {
 			throw new BizError(t('notEmail'), undefined, 'invalid_email');
 		}
 
+		// RFC 5321 邮箱总长上限：拦截超长地址在 account/audit/rate-limit 等键位上的存储滥用
+		if (email.length > 254) {
+			throw new BizError(t('emailLengthLimit'), undefined, 'email_too_long');
+		}
+
 		if (emailUtils.getName(email).length < minEmailPrefix) {
 			throw new BizError(t('minEmailPrefix', { msg: minEmailPrefix } ), undefined, 'prefix_too_short');
 		}
 
-		if (emailPrefixFilter.some(content => emailUtils.getName(email).includes(content)))  {
+		// 大小写归一后再匹配：否则 "Support@" 可绕过 "support" 过滤；同时空过滤条目不再全量拦截
+		const registerLocalName = emailUtils.getName(email);
+		if (emailPrefixFilter.some(content => {
+			const needle = String(content || '').trim().toLowerCase();
+			return needle && registerLocalName.toLowerCase().includes(needle);
+		}))  {
 			throw new BizError(t('banEmailPrefix'), undefined, 'invalid_local');
 		}
 
@@ -212,7 +222,7 @@ const loginService = {
 			throw new BizError(t('emailLengthLimit'), undefined, 'prefix_too_long');
 		}
 
-		if (typeof password !== 'string' || password.length > 30) {
+		if (typeof password !== 'string' || password.length > 128) {
 			throw new BizError(t('pwdLengthLimit'), undefined, 'password_too_long');
 		}
 
@@ -242,6 +252,11 @@ const loginService = {
 		const localName = emailUtils.getName(email);
 		const adminName = c.env.admin ? emailUtils.getName(c.env.admin) : '';
 		if (adminName && localName.toLowerCase() === adminName.toLowerCase()) {
+			throw new BizError(t('adminReserved'), undefined, 'email_reserved');
+		}
+
+		// RFC 2142 合规保留地址：严禁新注册/新别名占用 postmaster、abuse、security 等官方身份
+		if (RESERVED_EMAIL_LOCAL_NAMES.has(localName.toLowerCase())) {
 			throw new BizError(t('adminReserved'), undefined, 'email_reserved');
 		}
 
@@ -550,6 +565,14 @@ const loginService = {
 
 		const inputEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 		const inputPassword = typeof password === 'string' ? password : '';
+		// 输入上限必须先于任何 PBKDF2 派生与 D1/KV 查询执行：超长凭据曾是
+		// 冷 isolate CPU 耗尽 (1102) 与 rate_limit_counter 行膨胀的攻击入口。
+		if (inputEmail.length > 254 || /[\r\n\0]/.test(inputEmail)) {
+			throw new BizError(t('notEmail'), undefined, 'invalid_email');
+		}
+		if (inputPassword.length > 128) {
+			throw new BizError(t('pwdLengthLimit'), undefined, 'password_too_long');
+		}
 		if ((!inputEmail || !inputPassword) && !noVerifyPwd) {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
@@ -1080,7 +1103,9 @@ const loginService = {
 		let sessionMaxEpoch = null;
 
 		const effectiveDeviceTag = deviceTag || pendingData.deviceTag || (typeof c.req.header === 'function' ? c.req.header('x-device-tag') : '') || '';
-		if (rememberDevice && effectiveDeviceTag) {
+		// 严格布尔判定：字符串 "false" 曾按 truthy 处理，意外签发 30 天可信设备令牌
+		const wantsRememberDevice = rememberDevice === true || rememberDevice === 'true';
+		if (wantsRememberDevice && effectiveDeviceTag) {
 			const trustResult = await deviceTrustService.issueTrust(c, userRow.userId, effectiveDeviceTag, authVersionOf(userRow));
 			if (trustResult) {
 				issuedTrustToken = trustResult.trustedDeviceToken;
