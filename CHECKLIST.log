@@ -1,3 +1,24 @@
+### Epomail 最终根因治理、全量自动化回归与发布就绪报告归档 (2026-11-07)
+*   **关联 PR (Pull Request)**: PR #2 (`fix/public-beta-go-blockers-2026-11-07` ➡️ `release/2026-10-31`)
+*   **关联提交 (Git Commit)**: `0c8d3fee6d3b479576f4a977f70a4f3a9c86816f` (Short: `0c8d3fe`)
+*   **部署环境 (Deployment)**: `本地全真栈 / GitHub Actions CI (生产 625c1291 零触碰，Staging 待显式授权)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 归档发布就绪终审报告：新增 doc/release/EPOMAIL-FULL-GO-RELEASE-READINESS-2026-11-07.md，详细记录 Release Identity 矩阵、真实根因分析、代码改动清单、Phase C 后端安全复核、自动化测试全集、GitHub Actions 10/10 SUCCESS 凭据、Staging 差距表、集成测试、生产准备与最终 CONDITIONAL 裁决。
+    - [x] 深度定位历史 CI Run 42390243560 压测 503 真实根因，确认业务代码 `outbound_disabled` 契约严格正确，最新 CI Run 42396207517 全绿通过 3m soak 压测。
+    - [x] 更新 REPORTS.md 与 CHECKLIST.log 交付记录与审计索引。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-worker dry-run 438 个资产打包就绪 (5,738.98 KiB)
+    - [x] 单元测试套件：mail-worker Vitest 47 个测试文件、612 个测试用例 100% PASS (584s)
+    - [x] 冷启动全栈冒烟：tests/fullstack-smoke.mjs 13/13 项全真栈检查全绿通过
+    - [x] 浏览器回归测试：tests/oauth-bind-login-ui-e2e.mjs 13/13 项桌面与移动端端到端全绿通过
+    - [x] 压力与恢复测试：tests/backend-stress.mjs 7 阶段 1,800 请求 0 异常 5xx，Read P95 74.86ms，Auth P95 600.55ms 全部通过
+    - [x] 前端单元与类型：temp_login_ui 29/29 测试全绿，TypeScript 类型检查零报错
+    - [x] 密钥扫描门禁：scripts/secret-scan.mjs 1,304 文件 + 4,759 git 历史对象 0 密钥泄露
+    - [x] 多语言对称闭环：i18n 六语言字典 100% 对称，代码字面量引用零缺失，零未包裹硬编码
+    - [x] 零假数据残留：测试数据全部在 finally 物理清理，临时目录和进程树干净回收
+
+---
+
 ### 最终公测交付终审报告归档与全分支安全推送 (2026-11-07)
 *   **关联 PR (Pull Request)**: PR #2 (`fix/public-beta-go-blockers-2026-11-07` ➡️ `release/2026-10-31`)
 *   **部署环境 (Deployment)**: `本地全真栈 / GitHub Actions CI (生产 625c1291 零触碰，Staging 待显式授权)`

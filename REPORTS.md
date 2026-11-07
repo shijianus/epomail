@@ -9,6 +9,27 @@
 
 ---
 
+### Epomail — 最终根因治理、全量自动化回归与公测发布终审报告 (2026-11-07)
+*   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
+*   **关联提交 (Git Commit)**: `0c8d3fee6d3b479576f4a977f70a4f3a9c86816f` (Exact CI Tested SHA)
+*   **专项文档索引 (Detailed Doc)**:
+    - [Epomail Full GO Release Readiness Report](doc/release/EPOMAIL-FULL-GO-RELEASE-READINESS-2026-11-07.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：执行 DETECT → REPRODUCE → TRACE → ROOT CAUSE → FIX → REGRESSION → VERIFY 完整闭环；深度定位 CI Run `42390243560` 压测 503 真实根因；执行本地全真栈 3 分钟持续后端压力测试与全栈冒烟回归；核查 SSRF safeFetch、OAuth、BOLA、Webhook、定时隔离全量安全边界；审计 GitHub Actions、Staging 与 Production 真实状态。
+    2. 工具与脚本：Vitest (47 个文件 612 项用例 100% PASS)、Playwright (13/13 场景)、Load Runner (7 阶段 1,800 请求 0 异常)、Wrangler 4.90.0 dry-run (438 资产)、Secret Scan (working tree + 4,759 history blobs)、i18n 静态扫描三件套。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·严重安全与功能阻断]**: 0 项。无崩溃、无数据泄露、无越权逃逸，所有安全路径均为 VERIFIED。
+    - **[根因治理闭环·CI 压测]**: 确认历史 503 来源于高频压测下 Node 环回代理至 workerd 的瞬态套接字断开，业务代码设计正确且契约严格；最新 GitHub Actions CI Run `42396207517` 与本地全真栈测试已 100% 跑满 3 分钟 soak 压测（0 异常 5xx，SLO 全绿），GitHub Actions 10/10 CheckRuns 全绿。
+    - **[P1·受控条件项]**: Staging 存在版本漂移（ENVIRONMENT DRIFT，需显式部署授权以闭环真实沙箱测试）。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 发布候选 SHA 唯一锚定为 `0c8d3fee6d3b479576f4a977f70a4f3a9c86816f`；
+    - CI 10/10 CheckRuns 真实 SUCCESS；
+    - 本地 Vitest (612/612)、Playwright (13/13)、冒烟 (13/13)、压测 (1800/1800) 100% 通过；
+    - 生产环境 (`625c1291`) 严格保持只读零触碰；
+    - 终审判定：**CONDITIONAL — EXPLICIT BLOCKERS REMAIN**（代码已批准冻结，Staging 部署就绪，等待用户部署授权即可达成 FULL GO）。
+
+---
+
 ### Epocanvas Mail — 最终公测就绪度终审与全量测试报告 (2026-11-07)
 *   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
 *   **专项文档索引 (Detailed Doc)**:
