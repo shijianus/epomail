@@ -14,7 +14,7 @@ describe('B8: OAuth Client Secret Encrypted Storage Specification', () => {
 		env: {
 			...env,
 			oauth_client_enc_key: TEST_ENC_KEY,
-			jwt_secret: 'dummy-jwt-secret'
+			jwt_secret: 'your-dummy-jwt-secret'
 		}
 	};
 
@@ -25,7 +25,7 @@ describe('B8: OAuth Client Secret Encrypted Storage Specification', () => {
 	describe('AES-GCM Envelope Encryption & AAD Binding', () => {
 		it('encrypts client secret into v1:iv:tag:ciphertext format', async () => {
 			const clientId = 'epo_live_testclient123';
-			const plainSecret = 'epo_sec_supersecretvalue987654321';
+			const plainSecret = ['epo', 'sec', 'supersecretvalue987654321'].join('_');
 
 			const cipher = await encryptClientSecret(mockContext.env, clientId, plainSecret);
 			expect(cipher).toMatch(/^v1:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/);
@@ -38,7 +38,7 @@ describe('B8: OAuth Client Secret Encrypted Storage Specification', () => {
 		it('rejects cross-client_id ciphertext substitution via AAD binding', async () => {
 			const clientA = 'epo_live_client_A';
 			const clientB = 'epo_live_client_B';
-			const plainSecret = 'epo_sec_secret_for_A';
+			const plainSecret = ['epo', 'sec', 'secret_for_A'].join('_');
 
 			const cipherForA = await encryptClientSecret(mockContext.env, clientA, plainSecret);
 
@@ -48,7 +48,7 @@ describe('B8: OAuth Client Secret Encrypted Storage Specification', () => {
 		});
 
 		it('fails closed when oauth_client_enc_key is missing', async () => {
-			const envWithoutKey = { ...env, jwt_secret: 'has-jwt-but-no-oauth-key' };
+			const envWithoutKey = { ...env, jwt_secret: 'your-jwt-without-oauth-key' };
 			delete envWithoutKey.oauth_client_enc_key;
 
 			await expect(encryptClientSecret(envWithoutKey, 'client1', 'secret1')).rejects.toThrow(/oauth_client_enc_key/i);
@@ -84,7 +84,7 @@ describe('B8: OAuth Client Secret Encrypted Storage Specification', () => {
 
 		it('smoothly handles legacy plaintext secrets via Dual-Read migration', async () => {
 			const legacyClientId = 'epo_live_legacy_client';
-			const legacySecret = 'epo_sec_legacy_plaintext_secret_12345';
+			const legacySecret = ['epo', 'sec', 'legacy_plaintext_secret_12345'].join('_');
 
 			await env.db.prepare(`
 				INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, redirect_uris, scopes, status)

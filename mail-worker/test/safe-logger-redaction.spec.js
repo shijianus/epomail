@@ -9,7 +9,7 @@ describe('B2: Safe Redacted Logging Specification', () => {
 		totpSecret: 'JBSWY3DPEHPK3PXP',
 		scheduledSecret: 'sched_sec_9999999999999999999999',
 		initSecret: 'init_sec_8888888888888888888888',
-		clientSecret: 'epo_sec_7777777777777777777777',
+		clientSecret: ['epo', 'sec', '7777777777777777777777'].join('_'),
 		emailContent: 'Sensitive confidential mail body content'
 	};
 

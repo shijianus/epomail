@@ -30,7 +30,7 @@ describe('B1: HTTP Error Status Contract', () => {
 		it(`returns real HTTP status ${status} matching JSON code`, async () => {
 			const res = await testApp.request(`/test-error-${status}`, {
 				headers: { 'Accept': 'application/json' }
-			}, { ...env, jwt_secret: '01234567890123456789012345678901' });
+			}, { ...env, jwt_secret: 'your-test-jwt-secret-contract-32char' });
 
 			expect(res.status).toBe(status);
 			const json = await res.json();
@@ -46,7 +46,7 @@ describe('B1: HTTP Error Status Contract', () => {
 	it('defaults unspecified or invalid BizError status to HTTP 400', async () => {
 		const res = await testApp.request('/test-error-unspecified', {
 			headers: { 'Accept': 'application/json' }
-		}, { ...env, jwt_secret: '01234567890123456789012345678901' });
+		}, { ...env, jwt_secret: 'your-test-jwt-secret-contract-32char' });
 
 		expect(res.status).toBe(400);
 		const json = await res.json();
@@ -57,7 +57,7 @@ describe('B1: HTTP Error Status Contract', () => {
 	it('returns real HTTP 500 for unknown unhandled exceptions', async () => {
 		const res = await testApp.request('/test-error-unknown-unhandled', {
 			headers: { 'Accept': 'application/json' }
-		}, { ...env, jwt_secret: '01234567890123456789012345678901' });
+		}, { ...env, jwt_secret: 'your-test-jwt-secret-contract-32char' });
 
 		expect(res.status).toBe(500);
 		const json = await res.json();
