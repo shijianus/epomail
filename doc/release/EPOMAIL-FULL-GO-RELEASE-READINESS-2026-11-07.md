@@ -1,8 +1,8 @@
 # Epomail Full GO Release Readiness Report
 
-**发布候选基准 (Release Candidate Base)**: `0c8d3fee6d3b479576f4a977f70a4f3a9c86816f`  
-**审计报告日期**: 2026-11-07  
-**审计责任人**: Epomail Final Release Engineering Lead  
+**发布候选基准 (Release Candidate Base)**: `0c8d3fee6d3b479576f4a977f70a4f3a9c86816f`<br/>
+**审计报告日期**: 2026-11-07<br/>
+**审计责任人**: Epomail Final Release Engineering Lead
 
 ---
 
