@@ -9,6 +9,25 @@
 
 ---
 
+### Epocanvas Mail — 最终公测就绪度终审与全量测试报告 (2026-11-07)
+*   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
+*   **专项文档索引 (Detailed Doc)**:
+    - [最终公测就绪度报告](doc/release/FINAL-PUBLIC-BETA-READINESS-2026-11-07.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：执行 Phase A–J 终审收敛；全面核验 Git/PR/CI/Staging 真实身份；定位分析 CI 2-vCPU 压测 503 根因；执行本地全真栈 3 分钟持续压测回归；复核 9 项核心安全规约；核查 Staging 差距。
+    2. 工具与脚本：Vitest (47 个文件 612 项用例)、Playwright (13/13 场景)、Load Runner (1,800 请求 0 异常)、Wrangler 4.90.0 dry-run、Secret Scan、i18n 静态扫描。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·发布级阻断]**: 0 项。无崩溃、无数据泄露、无权限逃逸，核心安全机制全量 VERIFIED。
+    - **[P1·受控条件项]**: Staging 存在版本漂移（待显式授权部署）；GitHub Actions 2-vCPU Runner 压测存在算力资源抖动；外部真实发信与第三方 IdP 保持离线受控。
+    - **[P2·构建优化]**: CI 前端静态资产与构建缓存优化空间。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 47 个测试套件 612 项用例 100% 通过；
+    - 本地 3 分钟压测 1,800 请求 0 异常，Read P95=47ms，Auth P95=620ms；
+    - 生产环境 100% 保持只读零触碰 (`625c1291`)；
+    - 终审判定：CONDITIONAL — EXPLICIT BLOCKERS REMAIN。
+
+---
+
 ### Epocanvas Mail — 最终安全收敛、差异复核与正式交付报告 (2026-11-07)
 *   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
 *   **专项文档索引 (Detailed Doc)**:
