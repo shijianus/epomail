@@ -1,6 +1,6 @@
 import { mailOrm as orm } from '../entity/orm';
 import { att } from '../entity/att';
-import { and, eq, isNull, inArray, desc } from 'drizzle-orm';
+import { and, eq, isNull, inArray, desc, asc } from 'drizzle-orm';
 import r2Service from './r2-service';
 import constant from '../const/constant';
 import fileUtils from '../utils/file-utils';
@@ -68,7 +68,7 @@ const attService = {
 		).all();
 	},
 
-	async toImageUrlHtml(c, content) {
+	async toImageUrlHtml(c, content, userId = null) {
 
 		const { r2Domain } = await settingService.query(c);
 
@@ -135,8 +135,8 @@ const attService = {
 		}
 
 		//查询已有内嵌url图片信息
-		const keys = [...new Set(imageDataList.filter(item => !item.content).map(item => item.key))];
-		const dbImageList  = await this.selectOneByKeys(c, keys);
+		const keys = [...new Set(imageDataList.filter(item => !item.content && item.key).map(item => item.key))];
+		const dbImageList  = await this.selectOneByKeys(c, keys, userId);
 
 		//设置给当前附件
 		await Promise.all(imageDataList.map(async image => {
@@ -154,7 +154,7 @@ const attService = {
 			image.mimeType = dbImage.mimeType;
 			image.contentType = dbImage.mimeType;
 
-			const obj = await r2Service.getObj(c, image.key);
+			const obj = await r2Service.getObj(c, image.key, userId);
 			if (!obj) {
 				return;
 			}
@@ -291,11 +291,26 @@ const attService = {
 		await this.removeAttByField(c, "account_id", [accountId])
 	},
 
-	selectOneByKeys(c, keys) {
-		if (!keys || keys.length === 0) {
-			return []
+	selectOneByKeys(c, keys, userId = null) {
+		if (!keys || keys.length === 0) return [];
+		const conditions = [inArray(att.key, [...new Set(keys)])];
+		if (userId !== null && userId !== undefined) conditions.push(eq(att.userId, userId));
+		return orm(c).select().from(att).where(and(...conditions)).orderBy(desc(att.attId)).groupBy(att.key).all();
+	},
+
+	async findOwnedKeyOwners(c, keys, userId = null) {
+		const uniqueKeys = [...new Set((keys || []).filter(key => typeof key === 'string' && key))];
+		const owners = new Map();
+		for (let i = 0; i < uniqueKeys.length; i += 90) {
+			const conditions = [inArray(att.key, uniqueKeys.slice(i, i + 90))];
+			if (userId !== null && userId !== undefined) conditions.push(eq(att.userId, userId));
+			const rows = await orm(c).select({ key: att.key, userId: att.userId })
+				.from(att).where(and(...conditions)).orderBy(asc(att.attId)).all();
+			for (const row of rows) {
+				if (!owners.has(row.key)) owners.set(row.key, row.userId);
+			}
 		}
-		return orm(c).select().from(att).where(inArray(att.key, keys)).orderBy(desc(att.attId)).groupBy(att.key).all();
+		return owners;
 	},
 
 	async existsForUser(c, key, userId) {

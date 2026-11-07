@@ -4,31 +4,103 @@ import oauthService from "../service/oauth-service";
 import userContext from "../security/user-context";
 import { isAdminUser } from "../utils/admin-utils";
 import BizError from "../error/biz-error";
+import rateLimit from '../utils/rate-limit.js';
 
-// Public: list enabled third-party auth providers for login UI
+const FLOW_COOKIE = 'epo_oauth_flow';
+
+function flowCookie(value, maxAge = 600) {
+	return `${FLOW_COOKIE}=${encodeURIComponent(value)}; Path=/api/oauth; HttpOnly; Secure; SameSite=None; Max-Age=${maxAge}`;
+}
+
+function redirectToLogin(c, params) {
+	return c.redirect(`/login?${new URLSearchParams(params).toString()}`);
+}
+
+async function readCallbackParams(c) {
+	if (c.req.method === 'POST') {
+		const contentType = c.req.header('content-type') || '';
+		const body = contentType.includes('application/json')
+			? await c.req.json().catch(() => ({}))
+			: await c.req.parseBody().catch(() => ({}));
+		return { code: body.code, state: body.state, id_token: body.id_token, error: body.error };
+	}
+	return {
+		code: c.req.query('code'), state: c.req.query('state'),
+		id_token: c.req.query('id_token'), error: c.req.query('error')
+	};
+}
+
+async function loginWithState(c, provider, params) {
+	const stateRow = await oauthService.consumeState(c, provider, params.state);
+	return oauthService.exchangeCodeAndLogin(c, provider, {
+		code: params.code,
+		id_token: params.id_token,
+		redirectUri: stateRow.redirectUri,
+		nonce: stateRow.nonce,
+		flowId: params.state
+	});
+}
+
+async function handleOAuthCallback(c) {
+	const provider = c.req.param('provider');
+	try {
+		const params = await readCallbackParams(c);
+		if (params.error) return redirectToLogin(c, { error: 'oauth_denied' });
+		if (!params.code && !params.id_token) return redirectToLogin(c, { error: 'oauth_missing_code' });
+
+		const loginInfo = await loginWithState(c, provider, params);
+		if (loginInfo.token || loginInfo.mfa) {
+			const loginCode = await oauthService.createLoginExchangeCode(c, {
+				token: loginInfo.token, mfa: loginInfo.mfa, userInfo: loginInfo.userInfo, provider
+			});
+			c.header('Set-Cookie', flowCookie('', 0));
+			return redirectToLogin(c, { oauth_code: loginCode });
+		}
+
+		const query = new URLSearchParams({
+			oauth_user_id: loginInfo.userInfo?.oauthUserId || '',
+			oauth_provider: provider
+		});
+		return c.redirect(`/login?${query.toString()}#oauth_bind=${encodeURIComponent(loginInfo.bindToken || '')}`);
+	} catch (err) {
+		console.warn(`OAuth callback failed for ${provider}: ${err?.message || 'unknown error'}`);
+		c.header('Set-Cookie', flowCookie('', 0));
+		return redirectToLogin(c, { error: 'oauth_failed' });
+	}
+}
+
 app.get('/oauth/providers', async (c) => {
 	const list = await oauthService.getPublicProviders(c);
 	return c.json(result.ok(list));
 });
 
-// Public: get OAuth authorization URL for a provider
 app.get('/oauth/authorize/:provider', async (c) => {
 	const provider = c.req.param('provider');
 	const redirectUri = c.req.query('redirect_uri') || '';
 	const state = c.req.query('state') || '';
 	const url = await oauthService.getAuthorizeUrl(c, provider, redirectUri, state);
+	const flowId = new URL(url).searchParams.get('state');
+	c.header('Set-Cookie', flowCookie(flowId));
 	return c.json(result.ok({ url }));
 });
 
-// Public: direct login with OAuth authorization code or ID token
 app.post('/oauth/:provider/login', async (c) => {
 	const provider = c.req.param('provider');
 	const body = await c.req.json();
-	const loginInfo = await oauthService.exchangeCodeAndLogin(c, provider, body);
+	const loginInfo = await loginWithState(c, provider, body);
 	return c.json(result.ok(loginInfo));
 });
 
-// Admin only: test / verify provider configuration and network reachability
+app.post('/oauth/exchange', async (c) => {
+	await rateLimit.check(c, { scope: 'oauth-exchange', limit: 60, windowSeconds: 900 });
+	const body = await c.req.json().catch(() => ({}));
+	const exchange = await oauthService.consumeLoginExchangeCode(c, body.code);
+	if (exchange.mfa) {
+		return c.json(result.ok({ ...exchange.mfa, userInfo: exchange.userInfo }));
+	}
+	return c.json(result.ok({ token: exchange.token, userInfo: exchange.userInfo }));
+});
+
 app.post('/oauth/verify/:provider', async (c) => {
 	let user = userContext.getUser(c);
 	if (!user) {
@@ -55,37 +127,16 @@ app.post('/oauth/verify/:provider', async (c) => {
 	return c.json(result.ok(verifyResult));
 });
 
-// OAuth Callback handling for browser redirect flows
-app.get('/oauth/callback/:provider', async (c) => {
-	const provider = c.req.param('provider');
-	const code = c.req.query('code');
-	const state = c.req.query('state') || '';
-	const origin = new URL(c.req.url).origin;
-	const redirectUri = `${origin}/api/oauth/callback/${provider}`;
+app.get('/oauth/callback/:provider', handleOAuthCallback);
+app.post('/oauth/callback/:provider', handleOAuthCallback);
 
-	if (!code) {
-		return c.redirect(`/login?error=missing_code`);
-	}
-	try {
-		const loginInfo = await oauthService.exchangeCodeAndLogin(c, provider, { code, state, redirectUri });
-		if (loginInfo.token) {
-			return c.redirect(`/login?oauth_token=${encodeURIComponent(loginInfo.token)}`);
-		} else {
-			return c.redirect(`/login?oauth_user_id=${encodeURIComponent(loginInfo.userInfo.oauthUserId)}`);
-		}
-	} catch (err) {
-		return c.redirect(`/login?error=${encodeURIComponent(err.message || 'oauth_failed')}`);
-	}
-});
-
-// Backwards compatibility for LinuxDo
 app.post('/oauth/linuxDo/login', async (c) => {
-	const loginInfo = await oauthService.linuxDoLogin(c, await c.req.json());
+	const loginInfo = await loginWithState(c, 'linuxdo', await c.req.json());
 	return c.json(result.ok(loginInfo));
 });
 
-// Bind user with email
 app.put('/oauth/bindUser', async (c) => {
 	const loginInfo = await oauthService.bindUser(c, await c.req.json());
+	c.header('Set-Cookie', flowCookie('', 0));
 	return c.json(result.ok(loginInfo));
 });

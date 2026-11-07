@@ -7,6 +7,7 @@ describe('Public object storage isolation', () => {
 		await env.kv.delete('setting:');
 		await env.kv.delete('public_key:');
 		await env.kv.delete('attachments/test-secret.txt');
+		await env.kv.delete('static/public.txt');
 	});
 
 	it('does not expose KV control keys through /api/oss', async () => {
@@ -24,15 +25,27 @@ describe('Public object storage isolation', () => {
 		}
 	});
 
-	it('serves explicitly allow-listed object keys', async () => {
-		await env.kv.put('attachments/test-secret.txt', 'hello attachment', {
+	it('serves explicitly allow-listed public static objects', async () => {
+		await env.kv.put('static/public.txt', 'hello public asset', {
 			metadata: { contentType: 'text/plain' }
 		});
 
-		const response = await SELF.fetch('http://example.com/api/oss/attachments/test-secret.txt');
+		const response = await SELF.fetch('http://example.com/api/oss/static/public.txt');
 		expect(response.status).toBe(200);
-		expect(await response.text()).toBe('hello attachment');
+		expect(await response.text()).toBe('hello public asset');
 		expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+	});
+
+	it('denies anonymous attachment reads through both object proxies', async () => {
+		await env.kv.put('attachments/test-secret.txt', 'private attachment body', {
+			metadata: { contentType: 'text/plain' }
+		});
+
+		for (const path of ['/api/oss/attachments/test-secret.txt', '/attachments/test-secret.txt']) {
+			const response = await SELF.fetch(`http://example.com${path}`);
+			expect(response.status, path).toBe(404);
+			expect(await response.text(), path).not.toContain('private attachment body');
+		}
 	});
 
 	it('rejects traversal and encoded KV-style keys', async () => {

@@ -20,7 +20,7 @@ function decodeJson(value) {
 	return JSON.parse(decoder.decode(base64UrlToBytes(value)));
 }
 
-export async function verifyRs256Jwt(token, jwks, { issuer, audience, clockSkewSeconds = 300 } = {}) {
+export async function verifyRs256Jwt(token, jwks, { issuer, audience, nonce, clockSkewSeconds = 300 } = {}) {
 	if (!token || typeof token !== 'string') throw new Error('Missing JWT');
 	const parts = token.split('.');
 	if (parts.length !== 3) throw new Error('Malformed JWT');
@@ -59,11 +59,15 @@ export async function verifyRs256Jwt(token, jwks, { issuer, audience, clockSkewS
 	const now = Math.floor(Date.now() / 1000);
 
 	if (!payload || typeof payload !== 'object') throw new Error('Malformed JWT payload');
-	if (payload.exp !== undefined && Number(payload.exp) + clockSkewSeconds < now) {
+	if (!Number.isFinite(Number(payload.exp))) throw new Error('JWT expiry missing or invalid');
+	if (Number(payload.exp) + clockSkewSeconds < now) {
 		throw new Error('JWT expired');
 	}
 	if (payload.nbf !== undefined && Number(payload.nbf) - clockSkewSeconds > now) {
 		throw new Error('JWT not yet valid');
+	}
+	if (nonce && payload.nonce !== nonce) {
+		throw new Error('JWT nonce mismatch');
 	}
 	if (issuer && payload.iss !== issuer) {
 		throw new Error('JWT issuer mismatch');
@@ -101,11 +105,12 @@ export async function getAppleJwks(c) {
 	return jwks;
 }
 
-export async function verifyAppleIdToken(c, idToken, clientId) {
+export async function verifyAppleIdToken(c, idToken, clientId, { nonce } = {}) {
 	const jwks = await getAppleJwks(c);
 	return verifyRs256Jwt(idToken, jwks, {
 		issuer: 'https://appleid.apple.com',
-		audience: clientId
+		audience: clientId,
+		nonce
 	});
 }
 

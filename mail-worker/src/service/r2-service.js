@@ -4,6 +4,8 @@ import kvObjService from './kv-obj-service';
 import { getUserDb } from '../utils/db-accessor';
 import { detectProvider } from '../utils/s3-signer';
 import { normalizeObjectKey } from '../utils/object-key-utils.js';
+import { buildSignedObjectUrl } from '../utils/object-token.js';
+import { safeObjectHeaders } from '../utils/object-response.js';
 
 const r2Service = {
 
@@ -128,6 +130,30 @@ const r2Service = {
 		}
 	},
 
+	async toObjResponse(c, key, userId = null) {
+		const obj = await this.getObj(c, key, userId);
+		if (!obj) return null;
+		const isPublic = key.startsWith('static/');
+		if (obj instanceof Response) {
+			return new Response(obj.body, {
+				headers: safeObjectHeaders({
+					contentType: obj.headers.get('Content-Type'),
+					contentDisposition: obj.headers.get('Content-Disposition'),
+					cacheControl: obj.headers.get('Cache-Control'),
+					isPublic
+				})
+			});
+		}
+		return new Response(obj.body, {
+			headers: safeObjectHeaders({
+				contentType: obj.httpMetadata?.contentType,
+				contentDisposition: obj.httpMetadata?.contentDisposition,
+				cacheControl: obj.httpMetadata?.cacheControl,
+				isPublic
+			})
+		});
+	},
+
 	async getDownloadUrl(c, key, filename = null, userId = null) {
 		const safeKey = normalizeObjectKey(key);
 		if (!safeKey) {
@@ -139,7 +165,7 @@ const r2Service = {
 		// Content-Type/Disposition sanitizer. A direct S3/B2 presigned URL would
 		// serve the stored text/html + inline metadata unmodified.
 		if (safeKey.startsWith('attachments/')) {
-			return `/oss/${safeKey}`;
+			return await buildSignedObjectUrl(c, safeKey, { userId, ttlSeconds: 300 });
 		}
 
 		if (resolved.type === 'S3' || resolved.type === 'USER_S3') {

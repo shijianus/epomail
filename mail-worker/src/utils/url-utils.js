@@ -27,7 +27,9 @@ function isPrivateIpv6(hostname) {
 	const inner = hostname.slice(1, -1).toLowerCase();
 	if (!inner) return true;
 	if (inner === '::' || inner === '::1') return true;
-	if (inner.startsWith('fe80:') || inner.startsWith('fec0:')) return true;
+	const firstGroup = Number.parseInt(inner.split(':')[0], 16);
+	if (Number.isFinite(firstGroup) && (firstGroup & 0xffc0) === 0xfe80) return true;
+	if (inner.startsWith('fec0:')) return true;
 	if (inner.startsWith('fc') || inner.startsWith('fd')) return true; // unique local
 	if (inner.startsWith('::ffff:')) {
 		const mapped = inner.slice('::ffff:'.length);

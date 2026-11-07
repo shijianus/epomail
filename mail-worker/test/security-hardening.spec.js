@@ -101,6 +101,8 @@ describe('Network and storage boundaries', () => {
 			'http://169.254.169.254/latest/meta-data/',
 			'http://[::1]/',
 			'http://[::ffff:127.0.0.1]/',
+			'http://[fe90::1]/',
+			'http://[febf::1]/',
 			'http://metadata.google.internal/',
 			'https://user:pass@example.com/',
 			'file:///etc/passwd'
@@ -176,6 +178,33 @@ describe('SVG and RS256 hardening', () => {
 		const payload = await verifyRs256Jwt(token, jwks, { issuer: 'https://appleid.apple.com', audience: 'client-id' });
 		expect(payload.sub).toBe('user-1');
 		await expect(verifyRs256Jwt(token, jwks, { issuer: 'https://appleid.apple.com', audience: 'other-client' })).rejects.toThrow('audience');
+	});
+
+	it('requires a numeric unexpired exp and the expected issuer and signature', async () => {
+		const pair = await crypto.subtle.generateKey(
+			{ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+			true,
+			['sign', 'verify']
+		);
+		const publicJwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
+		publicJwk.kid = 'test-key';
+		const jwks = { keys: [publicJwk] };
+		const now = Math.floor(Date.now() / 1000);
+		const header = { alg: 'RS256', kid: 'test-key' };
+		const sign = payload => signRs256(pair.privateKey, header, payload);
+
+		await expect(verifyRs256Jwt(await sign({ iss: 'https://appleid.apple.com', aud: 'client-id', sub: 'u' }), jwks, { issuer: 'https://appleid.apple.com', audience: 'client-id' })).rejects.toThrow('expiry');
+		await expect(verifyRs256Jwt(await sign({ iss: 'https://appleid.apple.com', aud: 'client-id', exp: 'invalid' }), jwks, { issuer: 'https://appleid.apple.com', audience: 'client-id' })).rejects.toThrow('expiry');
+		await expect(verifyRs256Jwt(await sign({ iss: 'https://appleid.apple.com', aud: 'client-id', exp: now - 600 }), jwks, { issuer: 'https://appleid.apple.com', audience: 'client-id' })).rejects.toThrow('expired');
+		await expect(verifyRs256Jwt(await sign({ iss: 'https://evil.example', aud: 'client-id', exp: now + 300 }), jwks, { issuer: 'https://appleid.apple.com', audience: 'client-id' })).rejects.toThrow('issuer');
+
+		const otherPair = await crypto.subtle.generateKey(
+			{ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+			true,
+			['sign', 'verify']
+		);
+		const forged = await signRs256(otherPair.privateKey, header, { iss: 'https://appleid.apple.com', aud: 'client-id', exp: now + 300 });
+		await expect(verifyRs256Jwt(forged, jwks, { issuer: 'https://appleid.apple.com', audience: 'client-id' })).rejects.toThrow('signature');
 	});
 });
 

@@ -5,6 +5,8 @@ vi.setConfig({ testTimeout: 30000 });
 import { dbInit } from '../src/init/init.js';
 import cryptoUtils from '../src/utils/crypto-utils.js';
 import jwtUtils from '../src/utils/jwt-utils.js';
+import resendService from '../src/service/resend-service.js';
+import decisionNoticeService from '../src/service/decision-notice-service.js';
 
 const BASE = 'http://example.com';
 const enc = new TextEncoder();
@@ -117,9 +119,10 @@ async function session(user) {
 	return jwtUtils.generateToken({ env }, { userId: user.userId, token: tokenId, loginEmail: user.email }, 3600);
 }
 
-async function api(path, { method = 'GET', token, body } = {}) {
+async function api(path, { method = 'GET', token, body, flowId } = {}) {
 	const headers = {};
 	if (token) headers.token = token;
+	if (flowId) headers.Cookie = `epo_oauth_flow=${flowId}`;
 	if (body !== undefined) headers['Content-Type'] = 'application/json';
 	return SELF.fetch(`${BASE}${path}`, {
 		method,
@@ -232,6 +235,24 @@ describe('security delivery regressions', () => {
 		expect(after.type).toBe(lowRole);
 	});
 
+	it('rejects rewriting a role whose current permissions exceed the caller', async () => {
+		const highRole = await createRole('probe-role-target-high', 'custom', ['setting:set', 'email:send']);
+		const callerRole = await createRole('probe-role-editor', 'custom', ['role:set', 'email:send']);
+		const caller = await seedUser('probe-role-editor@example.com', callerRole);
+		const token = await session(caller);
+
+		const res = await api('/api/role/set', {
+			method: 'PUT',
+			token,
+			body: { roleId: highRole, name: 'probe-role-target-high', permIds: [await permId('email:send')] }
+		});
+		expect((await res.json()).code).toBe(403);
+		const perms = await env.db.prepare(
+			'SELECT p.perm_key FROM role_perm rp JOIN perm p ON p.perm_id = rp.perm_id WHERE rp.role_id = ?'
+		).bind(highRole).all();
+		expect(perms.results.map(row => row.perm_key).sort()).toEqual(['email:send', 'setting:set']);
+	});
+
 	it('keeps normal users out of settings and visitor queries', async () => {
 		const plainRole = await createRole('probe-plain', 'custom', ['email:send']);
 		const plain = await seedUser('probe-plain@example.com', plainRole);
@@ -287,11 +308,12 @@ describe('security delivery regressions', () => {
 	it('binds only the exact OAuth identity, consumes the proof once, and refuses rebinding', async () => {
 		const oauthUser = 'github:probe-bind';
 		await env.db.prepare("INSERT INTO oauth (oauth_user_id, user_id) VALUES (?, 0)").bind(oauthUser).run();
-		await env.kv.put('oauth_bind:probe-token', JSON.stringify({ oauthUserId: oauthUser }), { expirationTtl: 600 });
+		await env.kv.put('oauth_bind:probe-token', JSON.stringify({ oauthUserId: oauthUser, provider: 'github', flowId: 'probe-flow' }), { expirationTtl: 600 });
 
 		const wrongIdentity = await api('/api/oauth/bindUser', {
 			method: 'PUT',
-			body: { email: 'probe-bind@example.com', oauthUserId: 'github:other', bindToken: 'probe-token' }
+			flowId: 'probe-flow',
+			body: { email: 'probe-bind@example.com', oauthUserId: 'github:other', provider: 'github', bindToken: 'probe-token' }
 		});
 		const wrongBody = await wrongIdentity.json();
 		expect(wrongBody.message).toMatch(/bind proof/i);
@@ -303,7 +325,8 @@ describe('security delivery regressions', () => {
 
 		const rebind = await api('/api/oauth/bindUser', {
 			method: 'PUT',
-			body: { email: 'probe-bind@example.com', oauthUserId: oauthUser, bindToken: 'probe-token' }
+			flowId: 'probe-flow',
+			body: { email: 'probe-bind@example.com', oauthUserId: oauthUser, provider: 'github', bindToken: 'probe-token' }
 		});
 		const rebindBody = await rebind.json();
 		expect(rebindBody.message).toMatch(/已绑定/);
@@ -311,10 +334,35 @@ describe('security delivery regressions', () => {
 
 		const replay = await api('/api/oauth/bindUser', {
 			method: 'PUT',
-			body: { email: 'probe-bind@example.com', oauthUserId: oauthUser, bindToken: 'probe-token' }
+			flowId: 'probe-flow',
+			body: { email: 'probe-bind@example.com', oauthUserId: oauthUser, provider: 'github', bindToken: 'probe-token' }
 		});
 		const replayBody = await replay.json();
 		expect(replayBody.message).toMatch(/bind proof/i);
+	});
+
+	it('fails restricted identities closed when the user is missing or deleted', async () => {
+		const missingToken = await jwtUtils.generateToken({ env }, {
+			userId: 987654321,
+			token: crypto.randomUUID(),
+			purpose: 'restricted_notice',
+			caseId: 1,
+			email: 'missing@example.com',
+			jti: crypto.randomUUID()
+		}, 300);
+		expect(await decisionNoticeService.verifyRestrictedToken({ env }, missingToken)).toBeNull();
+
+		const deleted = await seedUser('probe-deleted-restricted@example.com', await createRole('probe-deleted-role', 'custom'));
+		await env.db.prepare('UPDATE user SET status = 1, is_del = 1 WHERE user_id = ?').bind(deleted.userId).run();
+		const deletedToken = await jwtUtils.generateToken({ env }, {
+			userId: deleted.userId,
+			token: crypto.randomUUID(),
+			purpose: 'restricted_notice',
+			caseId: 1,
+			email: deleted.email,
+			jti: crypto.randomUUID()
+		}, 300);
+		expect(await decisionNoticeService.verifyRestrictedToken({ env }, deletedToken)).toBeNull();
 	});
 
 	it('fails the webhook before dedup when mailbox projection fails, then converges on retry', async () => {
@@ -392,5 +440,32 @@ describe('security delivery regressions', () => {
 
 		const afterLate = await env.db.prepare('SELECT status FROM email WHERE email_id = ?').bind(first.email_id).first();
 		expect(afterLate.status).toBe(3);
+	});
+
+	it('records webhook dedup in USER_DB when dual database bindings are used', async () => {
+		const dualContext = { env: { USER_DB: env.db, MAIL_DB: env.db, kv: env.kv } };
+		const body = { type: 'email.delivered', data: { email_id: 're_dual_db_only' } };
+		const result = await resendService.webhooks(dualContext, body, 'msg_dual_db_only');
+		expect(result.success).toBe(true);
+		const ledger = await env.db.prepare("SELECT status FROM webhook_event WHERE event_id = 'msg_dual_db_only'").first();
+		expect(ledger?.status).toBe('processed');
+	});
+
+	it('marks a provider-accepted outbox row failed after a later failure event', async () => {
+		await env.db.prepare(
+			`INSERT INTO notification_outbox (task_id, recipient, template_code, subject, content, status, provider_message_id)
+			 VALUES ('task_provider_failure', 'user@example.com', 'security', 's', 'c', 'delivered', 're_provider_failure')`
+		).run();
+		const body = JSON.stringify({
+			type: 'email.failed',
+			data: { email_id: 're_provider_failure', failed: { reason: 'synthetic provider failure' } }
+		});
+		const timestamp = String(Math.floor(Date.now() / 1000));
+		const headers = await svixHeaders(env.resend_webhook_secret, 'msg_provider_failure', timestamp, body);
+		const response = await SELF.fetch(`${BASE}/api/webhooks`, { method: 'POST', headers, body });
+		expect(response.status).toBe(200);
+		const row = await env.db.prepare("SELECT status, last_error FROM notification_outbox WHERE task_id = 'task_provider_failure'").first();
+		expect(row.status).toBe('failed');
+		expect(row.last_error).toBe('synthetic provider failure');
 	});
 });

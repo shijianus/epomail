@@ -70,6 +70,15 @@ const rbacGuard = {
 		return caller;
 	},
 
+	async assertCanManageRole(c, callerUserId, roleId) {
+		const caller = await loadCaller(c, callerUserId);
+		if (isAdminUser(c, caller)) return caller;
+		const targetKeys = await permService.rolePermKeys(c, roleId);
+		const callerKeys = new Set(await permService.userPermKeys(c, caller.userId));
+		assertSubset(targetKeys, callerKeys, '无权修改该角色');
+		return caller;
+	},
+
 	async assertCanAssignRole(c, callerUserId, roleId) {
 		const caller = await loadCaller(c, callerUserId);
 		if (isAdminUser(c, caller)) return caller;

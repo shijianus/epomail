@@ -8,6 +8,51 @@ import cryptoUtils from "../utils/crypto-utils";
 import settingService from "./setting-service";
 import { verifyAppleIdToken } from "../utils/oauth-jwt-utils";
 import rateLimit from '../utils/rate-limit.js';
+import { isSafePublicUrl } from '../utils/url-utils.js';
+
+const OAUTH_STATE_PREFIX = 'oauth_state:';
+const OAUTH_LOGIN_CODE_PREFIX = 'oauth_login_code:';
+const OAUTH_BIND_PREFIX = 'oauth_bind:';
+const OAUTH_STATE_TTL_SECONDS = 600;
+const OAUTH_LOGIN_CODE_TTL_SECONDS = 60;
+const OAUTH_BIND_TTL_SECONDS = 600;
+const OAUTH_FLOW_COOKIE = 'epo_oauth_flow';
+const OIDC_NONCE_PROVIDERS = new Set(['google', 'microsoft', 'apple', 'custom']);
+
+function randomToken() {
+	return `${crypto.randomUUID().replace(/-/g, '')}${crypto.randomUUID().replace(/-/g, '')}`;
+}
+
+function defaultCallbackUri(c, providerKey) {
+	return c.req ? `${new URL(c.req.url).origin}/api/oauth/callback/${providerKey}` : '';
+}
+
+function resolveAllowedRedirectUri(c, providerKey, redirectUri, config) {
+	const expected = defaultCallbackUri(c, providerKey);
+	const configured = typeof config.redirectUri === 'string' ? config.redirectUri.trim() : '';
+	if (!redirectUri) return configured || expected;
+	if (redirectUri === expected || (configured && redirectUri === configured)) return redirectUri;
+	throw new BizError('Invalid redirect_uri for OAuth callback');
+}
+
+function assertSafeCustomEndpoints(config) {
+	for (const field of ['authUrl', 'tokenUrl', 'userInfoUrl']) {
+		if (!isSafePublicUrl(config?.[field])) {
+			throw new BizError(`Custom provider ${field} is invalid or points to a restricted network`);
+		}
+	}
+}
+
+function splitLoginResult(loginResult) {
+	if (loginResult && typeof loginResult === 'object') return { token: null, mfa: loginResult };
+	return { token: loginResult };
+}
+
+function requestFlowId(c) {
+	const cookie = c.req?.header?.('cookie') || '';
+	const match = cookie.match(new RegExp(`(?:^|;\\s*)${OAUTH_FLOW_COOKIE}=([^;]+)`));
+	return match ? decodeURIComponent(match[1]) : '';
+}
 
 const PROVIDER_METADATA = {
 	github: {
@@ -127,33 +172,79 @@ const oauthService = {
 		} else if (providerKey === 'custom') {
 			authUrl = config.authUrl;
 			if (!authUrl) throw new BizError('Custom provider authorization URL (authUrl) is required');
+			assertSafeCustomEndpoints(config);
 		} else if (providerKey === 'linuxdo') {
 			authUrl = 'https://connect.linux.do/oauth2/authorize';
 		}
 
-		const finalRedirectUri = redirectUri || config.redirectUri || (c.req ? `${new URL(c.req.url).origin}/api/oauth/callback/${providerKey}` : '');
+		const finalRedirectUri = resolveAllowedRedirectUri(c, providerKey, redirectUri, config);
 		const scope = config.scope || meta?.defaultScope || 'openid email profile';
+		const stateToken = randomToken();
+		const nonce = randomToken();
+		await c.env.kv.put(`${OAUTH_STATE_PREFIX}${stateToken}`, JSON.stringify({
+			provider: providerKey,
+			redirectUri: finalRedirectUri,
+			nonce,
+			clientState: typeof state === 'string' ? state : '',
+			createdAt: Date.now()
+		}), { expirationTtl: OAUTH_STATE_TTL_SECONDS });
 
 		const url = new URL(authUrl);
 		url.searchParams.set('client_id', config.clientId);
-		if (finalRedirectUri) {
-			url.searchParams.set('redirect_uri', finalRedirectUri);
-		}
+		if (finalRedirectUri) url.searchParams.set('redirect_uri', finalRedirectUri);
 		url.searchParams.set('response_type', 'code');
 		url.searchParams.set('scope', scope);
-		if (state) {
-			url.searchParams.set('state', state);
-		}
-		if (providerKey === 'apple') {
-			url.searchParams.set('response_mode', 'form_post');
-		}
+		url.searchParams.set('state', stateToken);
+		if (OIDC_NONCE_PROVIDERS.has(providerKey)) url.searchParams.set('nonce', nonce);
+		if (providerKey === 'apple') url.searchParams.set('response_mode', 'form_post');
 		return url.toString();
+	},
+
+	async consumeState(c, providerKey, state) {
+		if (!state || typeof state !== 'string') throw new BizError('Missing OAuth state', 400);
+		const stateKey = `${OAUTH_STATE_PREFIX}${state}`;
+		const row = await c.env.kv.get(stateKey, { type: 'json' });
+		if (!row || row.provider !== providerKey || !row.redirectUri) {
+			throw new BizError('Invalid or expired OAuth state', 400);
+		}
+		this.assertFlow(c, state);
+		await c.env.kv.delete(stateKey);
+		return row;
+	},
+
+	assertFlow(c, flowId) {
+		if (!flowId || requestFlowId(c) !== flowId) {
+			throw new BizError('OAuth flow does not match the initiating browser session', 400);
+		}
+	},
+
+	async createLoginExchangeCode(c, { token = null, userInfo, provider, mfa = null }) {
+		if (!token && !mfa) throw new BizError('Missing OAuth login result');
+		const code = randomToken();
+		await c.env.kv.put(`${OAUTH_LOGIN_CODE_PREFIX}${code}`, JSON.stringify({
+			token, mfa, provider, userInfo, createdAt: Date.now()
+		}), { expirationTtl: OAUTH_LOGIN_CODE_TTL_SECONDS });
+		return code;
+	},
+
+	async consumeLoginExchangeCode(c, code) {
+		if (!code || typeof code !== 'string') throw new BizError('Missing OAuth login code', 401);
+		const codeKey = `${OAUTH_LOGIN_CODE_PREFIX}${code}`;
+		const row = await c.env.kv.get(codeKey, { type: 'json' });
+		if (!row || (!row.token && !row.mfa) || !row.createdAt) {
+			throw new BizError('Invalid or expired OAuth login code', 401);
+		}
+		await c.env.kv.delete(codeKey);
+		if (Date.now() - Number(row.createdAt) > OAUTH_LOGIN_CODE_TTL_SECONDS * 1000) {
+			throw new BizError('Expired OAuth login code', 401);
+		}
+		return row;
 	},
 
 	async exchangeCodeAndLogin(c, providerKey, params) {
 		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
 
-		const { code, id_token, redirectUri } = params;
+		const { code, id_token, redirectUri, nonce, flowId } = params;
 		if (!code && !id_token) {
 			throw new BizError('Authorization code or ID token is required');
 		}
@@ -170,7 +261,7 @@ const oauthService = {
 			throw new BizError(`Unsupported provider: ${providerKey}`);
 		}
 
-		const callbackUri = redirectUri || config.redirectUri || (c.req ? `${new URL(c.req.url).origin}/api/oauth/callback/${providerKey}` : '');
+		const callbackUri = resolveAllowedRedirectUri(c, providerKey, redirectUri, config);
 		let userInfo = null;
 
 		if (providerKey === 'github') {
@@ -326,11 +417,11 @@ const oauthService = {
 				if (!tokenData.id_token) {
 					throw new BizError('Apple token exchange did not return an id_token');
 				}
-				claims = await verifyAppleIdToken(c, tokenData.id_token, config.clientId);
+				claims = await verifyAppleIdToken(c, tokenData.id_token, config.clientId, { nonce });
 			} else if (id_token) {
 				// Never trust a client-supplied identity token without checking
 				// its RS256 signature, issuer and audience.
-				claims = await verifyAppleIdToken(c, id_token, config.clientId);
+				claims = await verifyAppleIdToken(c, id_token, config.clientId, { nonce });
 			} else {
 				throw new BizError('Apple authorization requires a code or a verified id_token');
 			}
@@ -355,6 +446,7 @@ const oauthService = {
 			if (!config.tokenUrl || !config.userInfoUrl) {
 				throw new BizError('Custom provider missing Token URL or UserInfo URL');
 			}
+			assertSafeCustomEndpoints(config);
 			const formBody = new URLSearchParams();
 			formBody.append('client_id', config.clientId);
 			formBody.append('client_secret', config.clientSecret);
@@ -423,20 +515,15 @@ const oauthService = {
 		}
 
 		if (!userRow) {
-			// Prove possession of the completed OAuth flow before allowing an
-			// account to be created/bound. Without this one-time token any
-			// caller could submit a guessed oauthUserId.
-			const bindToken = `${crypto.randomUUID().replace(/-/g, '')}${crypto.randomUUID().replace(/-/g, '')}`;
-			await c.env.kv.put(
-				`oauth_bind:${bindToken}`,
-				JSON.stringify({ oauthUserId: oauthRow.oauthUserId, provider: providerKey, createdAt: Date.now() }),
-				{ expirationTtl: 600 }
-			);
+			const bindToken = randomToken();
+			await c.env.kv.put(`${OAUTH_BIND_PREFIX}${bindToken}`, JSON.stringify({
+				oauthUserId: oauthRow.oauthUserId, provider: providerKey, flowId, createdAt: Date.now()
+			}), { expirationTtl: OAUTH_BIND_TTL_SECONDS });
 			return { userInfo: oauthRow, token: null, bindToken };
 		}
 
-		const jwtToken = await loginService.login(c, { email: userRow.email, password: null }, true);
-		return { userInfo: oauthRow, token: jwtToken };
+		const loginResult = await loginService.login(c, { email: userRow.email, password: null }, true);
+		return { userInfo: oauthRow, ...splitLoginResult(loginResult) };
 	},
 
 	async verifyProvider(c, providerKey, config = {}) {
@@ -447,6 +534,7 @@ const oauthService = {
 			if (!config.authUrl || !config.tokenUrl || !config.userInfoUrl) {
 				throw new BizError('Auth URL, Token URL, and UserInfo URL are required for Custom provider');
 			}
+			assertSafeCustomEndpoints(config);
 			try {
 				new URL(config.authUrl);
 				new URL(config.tokenUrl);
@@ -494,30 +582,28 @@ const oauthService = {
 
 		await rateLimit.check(c, { scope: 'oauth-bind', limit: 10, windowSeconds: 900 });
 
-		const { email, oauthUserId, code, bindToken } = params;
+		const { email, oauthUserId, code, bindToken, provider } = params;
 
 		if (!bindToken || typeof bindToken !== 'string') {
 			throw new BizError('Missing OAuth bind proof; restart the OAuth login flow');
 		}
 
-		const bindKey = `oauth_bind:${bindToken}`;
+		const bindKey = `${OAUTH_BIND_PREFIX}${bindToken}`;
 		const pendingBind = await c.env.kv.get(bindKey, { type: 'json' });
-		if (!pendingBind || pendingBind.oauthUserId !== oauthUserId) {
+		if (!pendingBind || pendingBind.oauthUserId !== oauthUserId || pendingBind.provider !== provider) {
 			throw new BizError('Invalid or expired OAuth bind proof; restart the OAuth login flow');
 		}
-		// Single use: consume before creating the account.
+		this.assertFlow(c, pendingBind.flowId);
 		await c.env.kv.delete(bindKey);
 
 		const oauthRow = await this.getById(c, oauthUserId);
 		if (!oauthRow) {
 			throw new BizError('OAuth identity not found');
 		}
+		if (Number(oauthRow.userId) > 0) throw new BizError('该 OAuth 身份已绑定邮箱，无法重复绑定');
 
 		let userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
-
-		if (userRow) {
-			throw new BizError('用户已绑定有邮箱')
-		}
+		if (userRow) throw new BizError('用户已绑定有邮箱');
 
 		await loginService.register(c, { email, password: cryptoUtils.genRandomPwd(), code }, true);
 
@@ -527,16 +613,16 @@ const oauthService = {
 		}
 
 		await orm(c).update(oauth).set({ userId: userRow.userId }).where(eq(oauth.oauthUserId, oauthUserId)).run();
-		const jwtToken = await loginService.login(c, { email, password: null }, true);
+		const loginResult = await loginService.login(c, { email, password: null }, true);
 
-		return { userInfo: oauthRow, token: jwtToken}
+		return { userInfo: oauthRow, ...splitLoginResult(loginResult) }
 	},
 
 	async linuxDoLogin(c, params) {
 
 		await rateLimit.check(c, { scope: 'oauth-login', limit: 30, windowSeconds: 900 });
 
-		const { code } = params;
+		const { code, flowId } = params;
 
 		let token = '';
 		let userInfo = {}
@@ -586,11 +672,15 @@ const oauthService = {
 		const userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
 
 		if (!userRow) {
-			return { userInfo: oauthRow, token: null }
+			const bindToken = randomToken();
+			await c.env.kv.put(`${OAUTH_BIND_PREFIX}${bindToken}`, JSON.stringify({
+				oauthUserId: oauthRow.oauthUserId, provider: 'linuxdo', flowId, createdAt: Date.now()
+			}), { expirationTtl: OAUTH_BIND_TTL_SECONDS });
+			return { userInfo: oauthRow, token: null, bindToken };
 		}
 
-		const JwtToken = await loginService.login(c, { email: userRow.email, password: null }, true);
-		return { userInfo: oauthRow, token: JwtToken }
+		const loginResult = await loginService.login(c, { email: userRow.email, password: null }, true);
+		return { userInfo: oauthRow, ...splitLoginResult(loginResult) }
 	},
 
 	async saveUser(c, userInfo) {

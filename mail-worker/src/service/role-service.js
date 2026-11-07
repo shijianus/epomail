@@ -332,7 +332,8 @@ const roleService = {
 			throw new BizError(t('notExist'));
 		}
 
-		const caller = await rbacGuard.assertCanGrantPermIds(c, callerUserId, permIds);
+		const caller = await rbacGuard.assertCanManageRole(c, callerUserId, roleId);
+		await rbacGuard.assertCanGrantPermIds(c, callerUserId, permIds);
 		const callerIsAdmin = isAdminUser(c, caller);
 
 		if (!callerIsAdmin) {

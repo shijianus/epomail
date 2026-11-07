@@ -782,7 +782,7 @@ const emailService = {
 
 		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
 
-		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
+		let { imageDataList, html } = await attService.toImageUrlHtml(c, content, userId);
 
 		//判断是否关闭发件功能
 		if (send === settingConst.send.CLOSE) {

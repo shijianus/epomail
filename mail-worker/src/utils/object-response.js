@@ -8,7 +8,7 @@ const SAFE_INLINE_IMAGE_TYPES = [
  * may return an attacker-controlled Content-Type. Only passive image types may
  * be rendered inline; everything else is forced to a download with nosniff.
  */
-export function safeObjectHeaders({ contentType, contentDisposition, cacheControl } = {}) {
+export function safeObjectHeaders({ contentType, contentDisposition, cacheControl, isPublic = false } = {}) {
 	const rawType = String(contentType || '').toLowerCase().split(';')[0].trim();
 	const isSafeImage = SAFE_INLINE_IMAGE_TYPES.includes(rawType);
 	const wantsInline = String(contentDisposition || '').toLowerCase().trim().startsWith('inline');
@@ -16,7 +16,7 @@ export function safeObjectHeaders({ contentType, contentDisposition, cacheContro
 	return {
 		'Content-Type': isSafeImage ? rawType : 'application/octet-stream',
 		'Content-Disposition': isSafeImage && wantsInline ? 'inline' : 'attachment',
-		'Cache-Control': cacheControl || 'public, max-age=86400',
+		'Cache-Control': isPublic ? (cacheControl || 'public, max-age=86400') : 'private, no-store',
 		'X-Content-Type-Options': 'nosniff',
 		'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox"
 	};
