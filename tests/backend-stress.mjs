@@ -112,9 +112,8 @@ function currentGitSha() {
 function expectedStatus(result, status, errorCode = null) {
   const actualStatus = Number(result?.status);
   const actualCode = Number(result?.code);
-  // The Worker contract carries BizError status in JSON `code`; the current
-  // Hono error handler may serialize that body with HTTP 200.
-  const matchesStatus = actualCode === status && (actualStatus === 200 || actualStatus === status);
+  // HTTP error status contract: HTTP status and JSON code must be identical
+  const matchesStatus = actualCode === status && actualStatus === status;
   const matchesErrorCode = errorCode === null || result?.json?.errorCode === errorCode;
   return { ...result, expected4xx: matchesStatus && matchesErrorCode, contractFailure: !matchesStatus || !matchesErrorCode };
 }

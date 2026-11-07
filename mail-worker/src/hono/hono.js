@@ -3,6 +3,7 @@ const app = new Hono();
 
 import result from '../model/result';
 import { cors } from 'hono/cors';
+import safeLogger from '../utils/safe-logger';
 
 const OAUTH_CORS_PATHS = new Set([
 	'/oauth/token',
@@ -60,19 +61,40 @@ app.use('*', async (c, next) => {
 	c.header('Cache-Control', 'no-store');
 });
 
-app.onError((err, c) => {
+export const errorHandler = (err, c) => {
 	if (err?.name === 'BizError') {
-			console.log(err.message);
-			const body = result.fail(err.message, err.code, err.errorCode);
-			if (typeof err.proofConsumed === 'boolean') body.proofConsumed = err.proofConsumed;
-			return c.json(body);
+		const rawCode = Number(err.code);
+		const status = (Number.isInteger(rawCode) && rawCode >= 400 && rawCode <= 599) ? rawCode : 400;
+
+		safeLogger.warn('BizError', {
+			route: c?.req?.path,
+			method: c?.req?.method,
+			status,
+			errorCode: err.errorCode,
+			message: err.message
+		});
+
+		const body = result.fail(err.message, status, err.errorCode);
+		if (typeof err.proofConsumed === 'boolean') body.proofConsumed = err.proofConsumed;
+		if (err.retryAfter !== undefined) {
+			c.header('Retry-After', String(err.retryAfter));
 		}
+		return c.json(body, status);
+	}
 
 	// Internal database/provider errors can contain SQL fragments, binding
-	// names or request parameters. Log them server-side, but never reflect the
-	// raw message to the caller.
-	console.error(err);
-	return c.json(result.fail('Internal Server Error', 500));
-});
+	// names or request parameters. Log them safely server-side without secrets,
+	// and never reflect the raw error message to the client.
+	safeLogger.error('UnhandledException', {
+		route: c?.req?.path,
+		method: c?.req?.method,
+		status: 500,
+		error: err
+	});
+
+	return c.json(result.fail('Internal Server Error', 500, 'INTERNAL_SERVER_ERROR'), 500);
+};
+
+app.onError(errorHandler);
 
 export default app;
