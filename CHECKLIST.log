@@ -1,3 +1,20 @@
+### Git 远端与本地全量分支融合收口：冲突消解、测试门禁与全量推送 (2026-11-07)
+*   **关联提交 (Git Commit)**: `9cc0db084c35f2f4cf67e9f7ef8b43a0e064cc05` (Short: `9cc0db0`)
+*   **部署环境 (Deployment)**: GitHub 远端同步 (`git push --all origin`)；包含本地 Staging 交付物与远端加固审计补丁全量闭环。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 分支融合消解冲突：合并远端 `origin/release/2026-10-31` (tip `0aee99f`) 与本地提交（Staging 部署记录与资源清单），无损合并 `CHECKLIST.log` 与 `REPORTS.md` 冲突。
+    - [x] 审计与测试门禁闭环：适配 NIST 128 位密码长度上限加固 `test/initial-password.spec.js`，为 `test/privacy-closure.spec.js` 补齐 RBAC `role`/`perm`/`role_perm` 结构与 `my:delete` 权限映射，单测全绿。
+    - [x] 远端分支同步与对齐：本地 `security/audit-2026-10-25` 快进对齐远端 `7d88fdf`，本地 5 个分支全部与远端干净对齐。
+    - [x] 远端零覆盖保障：`git push --dry-run --all origin` 预检确认为快进式推进（`0aee99f..HEAD`），绝无覆盖远端提交。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 定向单测核验：`initial-password.spec.js` (11/11)、`privacy-closure.spec.js` (21/21) 全绿通过
+    - [x] 密钥扫描门禁：`scripts/secret-scan.mjs` 1,283 文件 0 密钥泄露
+    - [x] 预提交文件检查：`scripts/check-staged-files.mjs` PASS
+    - [x] 多语言对称审计：6 语言字典对称、零缺失、零未包裹硬编码全 PASS
+    - [x] Dry-run 推送核验：`git push --dry-run --all origin` 退出码 0
+
+---
+
 ### Cloudflare Staging 真实环境部署、D1迁移与独立测试交接 (2026-11-07)
 *   **关联提交 (Git Commit)**: `fecde6df5509d830f7f5a26ddeed28d4be866142` (Short: `fecde6d`)
 *   **部署环境 (Deployment)**: Cloudflare Staging (`epomail-staging.epocanvas.workers.dev`, Version ID: `b7962593-5735-4783-a7c4-7c9a302da341`)
