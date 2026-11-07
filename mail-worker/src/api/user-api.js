@@ -6,8 +6,8 @@ import userContext from '../security/user-context';
 import accountService from '../service/account-service';
 
 app.post('/user/resetTotp', async (c) => {
-	const { userId } = await c.req.json();
-	await totpService.adminResetTotp(c, userContext.getUserId(c), userId);
+	const { userId, operatorPassword = '' } = await c.req.json();
+	await totpService.adminResetTotp(c, userContext.getUserId(c), userId, operatorPassword);
 	return c.json(result.ok());
 });
 

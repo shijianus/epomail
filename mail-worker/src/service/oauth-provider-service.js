@@ -5,9 +5,20 @@ import jwtUtils from '../utils/jwt-utils';
 import constant from '../const/constant';
 import KvConst from '../const/kv-const';
 import { isAdminUser } from '../utils/admin-utils';
-import oneTimeCredential, { OTC_PURPOSE } from '../utils/one-time-credential.js';
+import oneTimeCredential, { OTC_PURPOSE, authVersionOf } from '../utils/one-time-credential.js';
 
 const encoder = new TextEncoder();
+
+/**
+ * The session middleware enforces the 60-day absolute cap by deleting AUTH_INFO.
+ * Provider endpoints read AUTH_INFO directly, so they must apply the same cap or
+ * an old session could still authorize third-party apps.
+ */
+function sessionWithinAbsoluteCap(authInfo) {
+	const epoch = Number(authInfo?.maxSessionEpoch);
+	if (!Number.isFinite(epoch) || epoch <= 0) return true;
+	return Math.floor(Date.now() / 1000) < epoch;
+}
 
 function normalizeScopes(value) {
 	return String(value || '').split(/\s+/).map(item => item.trim()).filter(Boolean);
@@ -33,6 +44,40 @@ async function sha256Base64Url(str) {
 	return base64url(buffer);
 }
 
+async function timingSafeEqualStr(left, right) {
+	if (typeof left !== 'string' || typeof right !== 'string' || !left || !right) return false;
+	const [leftDigest, rightDigest] = await Promise.all([
+		crypto.subtle.digest('SHA-256', encoder.encode(left)),
+		crypto.subtle.digest('SHA-256', encoder.encode(right))
+	]);
+	const a = new Uint8Array(leftDigest);
+	const b = new Uint8Array(rightDigest);
+	let diff = left.length ^ right.length;
+	for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+	return diff === 0;
+}
+
+function buildScopedIdentityClaims(user, isAdmin, scopesStr) {
+	const scopes = normalizeScopes(scopesStr);
+	const includeEmail = scopes.length === 0 || scopes.includes('email');
+	const includeProfile = scopes.length === 0 || scopes.includes('profile');
+	const claims = {
+		sub: String(user.userId),
+		is_admin: isAdmin,
+		role: isAdmin ? 'admin' : 'reader'
+	};
+	if (includeEmail) {
+		claims.email = user.email;
+		claims.email_verified = true;
+	}
+	if (includeProfile) {
+		claims.name = user.name || user.email.split('@')[0];
+		claims.preferred_username = user.email.split('@')[0];
+		claims.picture = user.avatar || user.avatarUrl || '';
+	}
+	return claims;
+}
+
 function genRandomHex(bytesCount = 16) {
 	const array = new Uint8Array(bytesCount);
 	crypto.getRandomValues(array);
@@ -45,6 +90,7 @@ const oauthProviderService = {
 		const redirectUri = query.redirect_uri || query.redirectUri;
 		const scope = query.scope || 'openid profile email';
 		const state = query.state || '';
+		const nonce = typeof query.nonce === 'string' ? query.nonce.trim().slice(0, 512) : '';
 
 		if (!clientId) {
 			throw new BizError('缺少 client_id 参数');
@@ -72,9 +118,10 @@ const oauthProviderService = {
 			const payload = await jwtUtils.verifyToken(c, jwt);
 			if (payload && payload.userId) {
 				const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
-				if (authInfo && Array.isArray(authInfo.tokens) && authInfo.tokens.includes(payload.token)) {
+				if (authInfo && Array.isArray(authInfo.tokens) && authInfo.tokens.includes(payload.token)
+					&& sessionWithinAbsoluteCap(authInfo)) {
 					const userRow = await userService.selectById(c, payload.userId);
-					if (userRow && userRow.status === 0) {
+					if (userRow && userRow.status === 0 && userRow.isDel === 0 && !payload.purpose && authVersionOf(payload) === authVersionOf(userRow)) {
 						currentUser = {
 							userId: userRow.userId,
 							email: userRow.email,
@@ -99,12 +146,13 @@ const oauthProviderService = {
 			},
 			requestedScopes: scope.split(/\s+/).filter(Boolean),
 			redirectUri: redirectUri || (Array.isArray(app.redirectUris) ? app.redirectUris[0] : JSON.parse(app.redirectUris || '[]')[0] || ''),
-			state
+			state,
+			nonce
 		};
 	},
 
 	async authorize(c, params) {
-		const { client_id, redirect_uri, scope, state, code_challenge, code_challenge_method } = params;
+		const { client_id, redirect_uri, scope, state, code_challenge, code_challenge_method, nonce } = params;
 
 		if (!client_id) {
 			throw new BizError('缺少 client_id');
@@ -133,26 +181,34 @@ const oauthProviderService = {
 		}
 
 		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
-		if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(payload.token)) {
+		if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(payload.token)
+			|| !sessionWithinAbsoluteCap(authInfo)) {
 			throw new BizError('登录会话已过期，请重新登录', 401);
 		}
 
 		const user = await userService.selectById(c, payload.userId);
-		if (!user || user.status !== 0) {
+		if (!user || user.status !== 0 || user.isDel !== 0 || payload.purpose || authVersionOf(payload) !== authVersionOf(user)) {
 			throw new BizError('用户账户异常或已被禁用', 403);
 		}
 
 		const code = `epo_code_${genRandomHex(16)}`;
 		const authPayload = {
 			userId: user.userId,
+			authVersion: authVersionOf(user),
 			userEmail: user.email,
 			clientId: app.clientId,
 			redirectUri: redirect_uri,
 			scopes: scope || 'openid profile email',
 			codeChallenge: code_challenge || '',
 			codeChallengeMethod: code_challenge_method || 'S256',
+			nonce: typeof nonce === 'string' ? nonce.trim().slice(0, 512) : '',
+			authTime: Number(payload.iat) || Math.floor(Date.now() / 1000),
 			createdAt: Date.now()
 		};
+
+		// Persist the grant first: an authorization code must never exist without
+		// a durable grant row. A failure here fails the authorization closed.
+		await oauthAppService.recordGrant(c, user.userId, app.clientId, scope || 'openid profile email');
 
 		// 存入 D1，TTL 为 300 秒 (5分钟)。授权码是单次凭证，消费采用原子
 		// 条件更新，两个并发的 token 请求最多只有一个能成功兑换。
@@ -164,13 +220,6 @@ const oauthProviderService = {
 			payload: authPayload,
 			ttlSeconds: 300
 		});
-
-		// 持久化用户授权记录 (oauth_grant)
-		try {
-			await oauthAppService.recordGrant(c, user.userId, app.clientId, scope || 'openid profile email');
-		} catch (e) {
-			console.error('Failed to record oauth_grant:', e);
-		}
 
 		// 发送第三方应用授权安全通知邮件
 		try {
@@ -249,25 +298,26 @@ const oauthProviderService = {
 				throw new BizError('invalid_grant: PKCE code_verifier 校验失败', 400);
 			}
 		} else {
-			if (!clientSecret || clientSecret !== app.clientSecret) {
+			if (!clientSecret || !(await timingSafeEqualStr(String(clientSecret), String(app.clientSecret || '')))) {
 				throw new BizError('invalid_client: client_secret 验证失败', 401);
 			}
 		}
 
 		const user = await userService.selectById(c, authData.userId);
-		if (!user || user.status !== 0) {
+		if (!user || user.status !== 0 || user.isDel !== 0 || authVersionOf(authData) !== authVersionOf(user)) {
 			throw new BizError('invalid_grant: 用户不存在或已被封禁', 400);
 		}
 
-		const now = Math.floor(Date.now() / 1000);
 		const origin = new URL(c.req.url).origin;
 
 		const isAdmin = isAdminUser(c, user);
+		const scopedClaims = buildScopedIdentityClaims(user, isAdmin, authData.scopes);
 
 		// 1. Access Token (2小时有效)
 		const accessToken = await jwtUtils.generateToken(c, {
 			userId: user.userId,
-			email: user.email,
+			authVersion: authVersionOf(user),
+			...(scopedClaims.email ? { email: scopedClaims.email } : {}),
 			clientId: app.clientId,
 			scopes: authData.scopes,
 			is_admin: isAdmin,
@@ -276,18 +326,17 @@ const oauthProviderService = {
 		}, 7200);
 
 		// 2. ID Token (OIDC 标准规范)
-		const idToken = await jwtUtils.generateToken(c, {
+		// Sign with the application's own client secret, never the site's mailbox
+		// JWT secret. This lets confidential clients verify HS256 ID tokens and
+		// keeps the session signing key out of the OIDC contract.
+		const idClaims = {
 			iss: origin,
-			sub: String(user.userId),
 			aud: app.clientId,
-			email: user.email,
-			email_verified: true,
-			name: user.name || user.email.split('@')[0],
-			preferred_username: user.email.split('@')[0],
-			picture: user.avatar || user.avatarUrl || '',
-			is_admin: isAdmin,
-			role: isAdmin ? 'admin' : 'reader'
-		}, 7200);
+			...scopedClaims,
+			auth_time: Number(authData.authTime) || Math.floor((Number(authData.createdAt) || Date.now()) / 1000)
+		};
+		if (authData.nonce) idClaims.nonce = authData.nonce;
+		const idToken = await jwtUtils.generateTokenWithSecret(c, app.clientSecret, idClaims, 7200);
 
 		return {
 			access_token: accessToken,
@@ -309,8 +358,16 @@ const oauthProviderService = {
 		}
 
 		const user = await userService.selectById(c, payload.userId);
-		if (!user || user.status !== 0) {
+		if (!user || user.status !== 0 || user.isDel !== 0 || authVersionOf(payload) !== authVersionOf(user)) {
 			throw new BizError('用户不存在或已失效', 401);
+		}
+
+		// Disabling an application must stop existing access tokens too, not just
+		// new authorizations. The token endpoint already enforces this; userinfo
+		// is the other authoritative consumer.
+		const app = await oauthAppService.getByClientId(c, payload.clientId);
+		if (!app || Number(app.status) !== 1) {
+			throw new BizError('应用无效或已被禁用', 401);
 		}
 
 		if (payload.clientId) {
@@ -322,16 +379,7 @@ const oauthProviderService = {
 
 		const isAdmin = isAdminUser(c, user);
 
-		return {
-			sub: String(user.userId),
-			email: user.email,
-			email_verified: true,
-			name: user.name || user.email.split('@')[0],
-			preferred_username: user.email.split('@')[0],
-			picture: user.avatar || user.avatarUrl || '',
-			is_admin: isAdmin,
-			role: isAdmin ? 'admin' : 'reader'
-		};
+		return buildScopedIdentityClaims(user, isAdmin, payload.scopes);
 	},
 
 	getOpenIdConfiguration(c) {

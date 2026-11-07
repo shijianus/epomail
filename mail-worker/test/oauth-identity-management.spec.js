@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS user (
 	totp_backup_codes TEXT DEFAULT '[]' NOT NULL,
 	totp_created_at TEXT DEFAULT '' NOT NULL,
 	security_keys TEXT DEFAULT '[]' NOT NULL,
+	auth_version INTEGER NOT NULL DEFAULT 0,
+	passkey_history INTEGER NOT NULL DEFAULT 0,
 	storage_quota_mb INTEGER DEFAULT 0 NOT NULL,
 	byo_storage_enabled INTEGER DEFAULT 0 NOT NULL,
 	byo_storage_config TEXT DEFAULT '{}' NOT NULL
@@ -89,7 +91,9 @@ function api(path, { method = 'GET', token = null, body } = {}) {
 	const headers = {};
 	if (token) headers.Authorization = token;
 	if (body !== undefined) headers['Content-Type'] = 'application/json';
-	return SELF.fetch(`http://example.com/api${path}`, {
+	// The real reauth-options route binds a WebAuthn ceremony even for password
+	// proofs; use a secure synthetic origin rather than bypassing that guard.
+	return SELF.fetch(`https://example.com/api${path}`, {
 		method,
 		headers,
 		body: body === undefined ? undefined : JSON.stringify(body),
@@ -110,13 +114,15 @@ async function seedUser({ userId, email, password = passwordHash, salt = passwor
 }
 
 async function seedSession(userId, email, token, meta = null) {
-	const jwt = await JwtUtils.generateToken({ env }, { userId, loginEmail: email, token }, 3600);
+	const current = await env.db.prepare('SELECT auth_version FROM user WHERE user_id = ?').bind(userId).first();
+	const authVersion = Number(current.auth_version);
+	const jwt = await JwtUtils.generateToken({ env }, { userId, loginEmail: email, token, authVersion }, 3600);
 	const authInfo = {
 		tokens: [token],
-		user: { userId, email, isDel: 0, status: 0, type: 2 },
+		user: { userId, email, isDel: 0, status: 0, type: 2, authVersion },
 		refreshTime: new Date().toISOString()
 	};
-	if (meta) authInfo.tokenMeta = { [token]: meta };
+	if (meta) authInfo.tokenMeta = { [token]: { ...meta, authVersion } };
 	await env.kv.put(`auth-uid:${userId}`, JSON.stringify(authInfo), { expirationTtl: 3600 });
 	return jwt;
 }
@@ -126,10 +132,14 @@ async function addSession(userId, token, meta = null) {
 	authInfo.tokens = Array.isArray(authInfo.tokens) ? authInfo.tokens : [];
 	if (!authInfo.tokens.includes(token)) authInfo.tokens.push(token);
 	if (meta) {
+		const current = await env.db.prepare('SELECT auth_version FROM user WHERE user_id = ?').bind(userId).first();
 		authInfo.tokenMeta = authInfo.tokenMeta || {};
-		authInfo.tokenMeta[token] = meta;
+		authInfo.tokenMeta[token] = { ...meta, authVersion: Number(current.auth_version) };
 	}
 	await env.kv.put(`auth-uid:${userId}`, JSON.stringify(authInfo), { expirationTtl: 3600 });
+	return await JwtUtils.generateToken({ env }, {
+		userId, token, authVersion: Number(authInfo.user.authVersion)
+	}, 3600);
 }
 
 async function seedIdentity(oauthUserId, userId, { name = 'Linked User', username = 'linked' } = {}) {
@@ -187,13 +197,23 @@ function stubGithubFetch({ id = GITHUB_ID, login = 'octo-linked' } = {}) {
 	}));
 }
 
-async function reauth(token, extra = {}) {
+async function requestReauth(token, proof = {}, { operation = 'oauth_bind', target = 'github' } = {}) {
+	const binding = { operation, target: String(target) };
+	const optionsResponse = await api('/my/security/reauth-options', {
+		method: 'POST', token, body: binding
+	});
+	const options = await readJson(optionsResponse);
+	expect(options.code, JSON.stringify(options)).toBe(200);
+	expect(options.data.challengeToken).toBeTruthy();
 	const response = await api('/my/oauthIdentities/reauth', {
-		method: 'POST',
-		token,
-		body: { password: PASSWORD, ...extra }
+		method: 'POST', token,
+		body: { ...proof, ...binding, challengeToken: options.data.challengeToken }
 	});
 	return { response, body: await readJson(response) };
+}
+
+async function reauth(token, extra = {}, binding = {}) {
+	return requestReauth(token, { password: PASSWORD, ...extra }, binding);
 }
 
 function stateFromAuthorizeUrl(url) {
@@ -201,17 +221,21 @@ function stateFromAuthorizeUrl(url) {
 }
 
 function claimFromLocation(location) {
-	const match = /#oauth_link=([^&]+)/.exec(location || '');
-	return match ? decodeURIComponent(match[1]) : '';
+	const url = new URL(location);
+	const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+	const queryIndex = hash.indexOf('?');
+	const params = new URLSearchParams(queryIndex >= 0 ? hash.slice(queryIndex + 1) : hash);
+	return params.get('oauth_link') || '';
 }
 
-async function startGithubBind(token) {
+async function startGithubBind(token, extra = {}) {
 	const grant = await reauth(token);
-	expect(grant.response.status, JSON.stringify(grant.body)).toBe(200);
+		expect(grant.response.status, JSON.stringify(grant.body)).toBe(200);
+	expect(grant.body.code, JSON.stringify(grant.body)).toBe(200);
 	const response = await api('/my/oauthIdentities/bind/start', {
 		method: 'POST',
 		token,
-		body: { provider: 'github', stepUpToken: grant.body.data.stepUpToken }
+		body: { provider: 'github', stepUpToken: grant.body.data.stepUpToken, ...extra }
 	});
 	const body = await readJson(response);
 	return { response, body, state: body?.data?.url ? stateFromAuthorizeUrl(body.data.url) : '' };
@@ -244,7 +268,9 @@ function resetRateLimits() {
 		'rate-limit:oauth-identity-unbind:user:7',
 		'rate-limit:oauth-identity-unbind:user:8',
 		'rate-limit:oauth-identity-unbind:user:9',
-		'rate-limit:oauth-identity-callback:local'
+		'rate-limit:oauth-identity-callback:local',
+		...['security-reauth-options', 'security-reauth'].flatMap(scope =>
+			[USER_A, USER_B, USER_C].map(id => `rate-limit:${scope}:user:${id}`))
 	];
 	return Promise.all(keys.map(key => env.kv.delete(key)));
 }
@@ -255,8 +281,10 @@ beforeAll(async () => {
 	await ensureOtcTable(env.db);
 	await ensureBindClaimTable(env.db);
 	await dbInit.v3_21DB({ env });
+	await dbInit.v3_23DB({ env });
 	// Idempotent on a second run, exactly like the upgrade chain.
 	await dbInit.v3_21DB({ env });
+	await dbInit.v3_23DB({ env });
 
 	const hashed = await cryptoUtils.hashPassword(PASSWORD, env);
 	passwordHash = hashed.hash;
@@ -271,6 +299,8 @@ beforeAll(async () => {
 beforeEach(async () => {
 	await env.db.prepare('DELETE FROM oauth').run();
 	await env.db.prepare('DELETE FROM oauth_identity_audit').run();
+	await env.db.prepare('DELETE FROM auth_security_operation').run();
+	await env.db.prepare('DELETE FROM auth_totp_replay').run();
 	await env.db.prepare('DELETE FROM user').run();
 	await clearOtc(env.db);
 	await clearBindClaim(env.db);
@@ -305,17 +335,19 @@ afterAll(async () => {
 	vi.unstubAllGlobals();
 	await env.db.prepare('DELETE FROM oauth').run();
 	await env.db.prepare('DELETE FROM oauth_identity_audit').run();
+	await env.db.prepare('DELETE FROM auth_security_operation').run();
+	await env.db.prepare('DELETE FROM auth_totp_replay').run();
 	await env.db.prepare('DELETE FROM user').run();
 	await clearOtc(env.db);
 	await clearBindClaim(env.db);
 	for (const key of ['auth-uid:7', 'auth-uid:8', 'auth-uid:9', 'initial_pwd:7', 'initial_pwd:8', 'initial_pwd:9', 'setting:']) {
 		await env.kv.delete(key);
 	}
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_identity_audit').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_bind_claim').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_one_time_credential').run();
-	await env.db.prepare('DROP TABLE IF EXISTS user').run();
+	await env.db.prepare('DELETE FROM oauth').run();
+	await env.db.prepare('DELETE FROM oauth_identity_audit').run();
+	await env.db.prepare('DELETE FROM oauth_bind_claim').run();
+	await env.db.prepare('DELETE FROM oauth_one_time_credential').run();
+	await env.db.prepare('DELETE FROM user WHERE user_id IN (7, 8, 9)').run();
 });
 
 describe('listing linked identities', () => {
@@ -361,12 +393,7 @@ describe('listing linked identities', () => {
 describe('re-authentication before a sensitive identity operation', () => {
 	it('rejects a wrong password and records the failure without a secret', async () => {
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
-		const response = await api('/my/oauthIdentities/reauth', {
-			method: 'POST',
-			token: tokenA,
-			body: { password: 'definitely-wrong' }
-		});
-		const body = await readJson(response);
+		const { body } = await requestReauth(tokenA, { password: 'definitely-wrong' });
 		expect(body.code).toBe(403);
 		expect(body.errorCode).toBe('reauth_failed');
 
@@ -377,13 +404,9 @@ describe('re-authentication before a sensitive identity operation', () => {
 
 	it('rejects a request with no body password', async () => {
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
-		const body = await readJson(await api('/my/oauthIdentities/reauth', {
-			method: 'POST',
-			token: tokenA,
-			body: {}
-		}));
-		expect(body.code).toBe(400);
-		expect(body.errorCode).toBe('password_required');
+		const { body } = await requestReauth(tokenA);
+		expect(body.code).toBe(403);
+		expect(body.errorCode).toBe('reauth_password_required');
 	});
 
 	it('requires the second factor when TOTP is enabled, and accepts a valid code', async () => {
@@ -392,7 +415,7 @@ describe('re-authentication before a sensitive identity operation', () => {
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
 
 		const missing = await reauth(tokenA);
-		expect(missing.body.code).toBe(400);
+		expect(missing.body.code).toBe(403);
 		expect(missing.body.errorCode).toBe('totp_required');
 
 		const wrong = await reauth(tokenA, { code: '000000' });
@@ -402,19 +425,15 @@ describe('re-authentication before a sensitive identity operation', () => {
 		const ok = await reauth(tokenA, { code });
 		expect(ok.response.status, JSON.stringify(ok.body)).toBe(200);
 		expect(ok.body.data.stepUpToken).toBeTruthy();
-		expect(ok.body.data.method).toBe('password+totp');
+		expect(ok.body.data.method).toBe('password+factor');
 	}, 30000);
 
 	it('lets an OAuth-only account use a fresh provider session instead of a password', async () => {
 		const tokenC = await seedSession(USER_C, EMAIL_C, 'session-c', {
 			method: 'oauth', provider: 'github', at: Date.now()
 		});
-		const response = await api('/my/oauthIdentities/reauth', {
-			method: 'POST',
-			token: tokenC,
-			body: {}
-		});
-		const body = await readJson(response);
+		await seedIdentity(`github:${GITHUB_ID}`, USER_C);
+		const { body } = await requestReauth(tokenC);
 		expect(body.code, JSON.stringify(body)).toBe(200);
 		expect(body.data.method).toBe('provider_session');
 	});
@@ -423,26 +442,29 @@ describe('re-authentication before a sensitive identity operation', () => {
 		const tokenC = await seedSession(USER_C, EMAIL_C, 'session-c', {
 			method: 'oauth', provider: 'github', at: Date.now() - 16 * 60 * 1000
 		});
-		const body = await readJson(await api('/my/oauthIdentities/reauth', {
-			method: 'POST',
-			token: tokenC,
-			body: {}
-		}));
+		await seedIdentity(`github:${GITHUB_ID}`, USER_C);
+		const { body } = await requestReauth(tokenC);
 		expect(body.code).toBe(403);
 		expect(body.errorCode).toBe('reauth_provider_required');
+	});
+
+	it('rejects provider-session step-up when the account has a usable password', async () => {
+		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a', {
+			method: 'oauth', provider: 'github', at: Date.now()
+		});
+		await seedIdentity(`github:${GITHUB_ID}`, USER_A);
+		const { body } = await requestReauth(tokenA);
+		expect(body.code, JSON.stringify(body)).toBe(403);
+		expect(body.errorCode).toBe('reauth_password_required');
 	});
 
 	it('rejects a password-based session that never had a recent provider login', async () => {
 		// Password is usable, so the password path is the only accepted proof;
 		// an empty body must not fall back to the session.
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
-		const body = await readJson(await api('/my/oauthIdentities/reauth', {
-			method: 'POST',
-			token: tokenA,
-			body: {}
-		}));
-		expect(body.code).toBe(400);
-		expect(body.errorCode).toBe('password_required');
+		const { body } = await requestReauth(tokenA);
+		expect(body.code).toBe(403);
+		expect(body.errorCode).toBe('reauth_password_required');
 	});
 });
 
@@ -491,15 +513,32 @@ describe('binding an additional identity', () => {
 		expect(JSON.stringify(audit)).not.toContain(grant.body.data.stepUpToken);
 	});
 
+	it('returns the claim to the account slot that started the bind', async () => {
+		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
+		const started = await startGithubBind(tokenA, { accountIndex: 3 });
+		expect(started.response.status, JSON.stringify(started.body)).toBe(200);
+
+		const callback = await providerCallback(started.state);
+		const location = callback.headers.get('Location') || '';
+		const url = new URL(location);
+		expect(url.pathname).toBe('/mail/u/3/');
+		expect(url.hash.startsWith('#settings/security?')).toBe(true);
+		expect(new URLSearchParams(url.hash.split('?')[1]).get('oauth_bind')).toBe('linked');
+		expect(claimFromLocation(location)).toBeTruthy();
+	});
+
 	it('refuses a second bind of the same provider for the same account', async () => {
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
 		const first = await bindGithubFor(tokenA);
 		expect(first.claim).toBeTruthy();
-		await api('/my/oauthIdentities/bind/complete', {
+		const committed = await api('/my/oauthIdentities/bind/complete', {
 			method: 'POST', token: tokenA, body: { token: first.claim }
 		});
+		expect((await readJson(committed)).code).toBe(200);
+		expect((await readJson(await api('/my/oauthIdentities', { token: tokenA }))).code).toBe(401);
+		const freshTokenA = await seedSession(USER_A, EMAIL_A, 'session-a-after-bind');
 
-		const second = await startGithubBind(tokenA);
+		const second = await startGithubBind(freshTokenA);
 		expect(second.body.code).toBe(409);
 		expect(second.body.errorCode).toBe('identity_already_bound');
 		expect(await identityRows()).toHaveLength(1);
@@ -579,9 +618,11 @@ describe('binding an additional identity', () => {
 			method: 'POST', token: tokenA, body: { token: claim }
 		});
 		expect((await readJson(first)).code).toBe(200);
+		expect((await readJson(await api('/my/oauthIdentities', { token: tokenA }))).code).toBe(401);
+		const freshTokenA = await seedSession(USER_A, EMAIL_A, 'session-a-after-claim');
 
 		const replay = await api('/my/oauthIdentities/bind/complete', {
-			method: 'POST', token: tokenA, body: { token: claim }
+			method: 'POST', token: freshTokenA, body: { token: claim }
 		});
 		expect((await readJson(replay)).code).toBe(410);
 	});
@@ -658,12 +699,12 @@ describe('binding an additional identity', () => {
 });
 
 describe('unbinding an identity', () => {
-	it('removes only the caller\'s row and revokes sessions issued by that provider', async () => {
+	it('removes only the caller\'s row and revokes every old session after the authentication version changes', async () => {
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
-		await addSession(USER_A, 'session-a-github', { method: 'oauth', provider: 'github', at: Date.now() });
+		const providerTokenA = await addSession(USER_A, 'session-a-github', { method: 'oauth', provider: 'github', at: Date.now() });
 		const oauthId = await seedIdentity(`github:${GITHUB_ID}`, USER_A);
 
-		const grant = await reauth(tokenA);
+		const grant = await reauth(tokenA, {}, { operation: 'oauth_unbind', target: oauthId });
 		const response = await api(`/my/oauthIdentities/${oauthId}`, {
 			method: 'DELETE',
 			token: tokenA,
@@ -677,8 +718,13 @@ describe('unbinding an identity', () => {
 		expect(await identityRows()).toHaveLength(0);
 
 		const authInfo = await env.kv.get(`auth-uid:${USER_A}`, { type: 'json' });
-		expect(authInfo.tokens).toEqual(['session-a']);
-		expect(authInfo.tokenMeta['session-a-github']).toBeUndefined();
+		expect(authInfo).toBeNull();
+		expect(body.data.reauthRequired).toBe(true);
+		const changed = await env.db.prepare('SELECT auth_version FROM user WHERE user_id = ?').bind(USER_A).first();
+		expect(changed.auth_version).toBe(1);
+		for (const token of [tokenA, providerTokenA]) {
+			expect((await readJson(await api('/my/oauthIdentities', { token }))).code).toBe(401);
+		}
 
 		const audit = await auditRows(USER_A);
 		expect(audit.some(row => row.event === 'identity_unbound')).toBe(true);
@@ -689,7 +735,7 @@ describe('unbinding an identity', () => {
 		const tokenB = await seedSession(USER_B, EMAIL_B, 'session-b');
 		const oauthId = await seedIdentity(`github:${GITHUB_ID}`, USER_A);
 
-		const grant = await reauth(tokenB);
+		const grant = await reauth(tokenB, {}, { operation: 'oauth_unbind', target: oauthId });
 		const response = await api(`/my/oauthIdentities/${oauthId}`, {
 			method: 'DELETE',
 			token: tokenB,
@@ -715,7 +761,7 @@ describe('unbinding an identity', () => {
 	it('never mutates an identity on GET', async () => {
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
 		const oauthId = await seedIdentity(`github:${GITHUB_ID}`, USER_A);
-		const grant = await reauth(tokenA);
+		const grant = await reauth(tokenA, {}, { operation: 'oauth_unbind', target: oauthId });
 
 		for (const path of [
 			`/my/oauthIdentities/${oauthId}`,
@@ -733,10 +779,7 @@ describe('unbinding an identity', () => {
 		});
 		const oauthId = await seedIdentity(`github:${GITHUB_ID}`, USER_C);
 
-		const grant = await api('/my/oauthIdentities/reauth', {
-			method: 'POST', token: tokenC, body: {}
-		});
-		const grantBody = await readJson(grant);
+		const { body: grantBody } = await requestReauth(tokenC, {}, { operation: 'oauth_unbind', target: oauthId });
 		expect(grantBody.code).toBe(200);
 
 		const response = await api(`/my/oauthIdentities/${oauthId}`, {
@@ -754,7 +797,7 @@ describe('unbinding an identity', () => {
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
 		const oauthId = await seedIdentity(`github:${GITHUB_ID}`, USER_A);
 
-		const grant = await reauth(tokenA);
+		const grant = await reauth(tokenA, {}, { operation: 'oauth_unbind', target: oauthId });
 		const response = await api(`/my/oauthIdentities/${oauthId}`, {
 			method: 'DELETE',
 			token: tokenA,
@@ -854,7 +897,7 @@ describe('service-level guards', () => {
 
 	it('rejects a bind start for a provider the operator has not enabled', async () => {
 		const tokenA = await seedSession(USER_A, EMAIL_A, 'session-a');
-		const grant = await reauth(tokenA);
+		const grant = await reauth(tokenA, {}, { operation: 'oauth_bind', target: 'linode' });
 		const response = await api('/my/oauthIdentities/bind/start', {
 			method: 'POST',
 			token: tokenA,

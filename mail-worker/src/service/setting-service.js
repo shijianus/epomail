@@ -1,6 +1,82 @@
 import KvConst from '../const/kv-const';
 import settingEntity from '../entity/setting';
 import orm from '../entity/orm';
+import { getTableColumns, sql } from 'drizzle-orm';
+import legalPolicyService, {
+	LEGAL_EXT_KEYS,
+	CONTENT_PROCESSING_DEFAULTS,
+	isValidNoticeUrl,
+	isValidContactEmail,
+	normalizeContentProcessing,
+	getRegistrationReadiness,
+	readAuthoritativeLegalSettings
+} from './legal-policy-service.js';
+import { assertSystemStorageCanChange } from './privacy-revocation-service.js';
+import { isAdminUser } from '../utils/admin-utils.js';
+
+const D1_MAX_SELECT_COLUMNS = 60;
+const AUDIT_EXT_DEFAULTS = Object.freeze({
+	auditLogEnabled: 1,
+	auditMaxIpPerAccount: 3,
+	auditMaxDevicePerAccount: 3,
+	auditAutoCleanOldest: 1,
+	auditPrioritizeNonCriticalClean: 1,
+	auditCriticalQuota: 3
+});
+const LEGAL_EXT_DEFAULTS = Object.freeze({
+	operatorName: '',
+	operatorCountry: '',
+	contactEmail: '',
+	contactAddress: '',
+	policyVersion: '',
+	recipientsUrl: '',
+	retentionUrl: ''
+});
+const CONTENT_PROCESSING_KEY = 'contentProcessing';
+
+function parseExtValue(value) {
+	if (typeof value !== 'string') return value;
+	try { return JSON.parse(value); } catch (_) { return value; }
+}
+
+async function selectSettingRow(c) {
+	const entries = Object.entries(getTableColumns(settingEntity));
+	const merged = {};
+	for (let i = 0; i < entries.length; i += D1_MAX_SELECT_COLUMNS) {
+		const projection = Object.fromEntries(entries.slice(i, i + D1_MAX_SELECT_COLUMNS));
+		const part = await orm(c).select(projection).from(settingEntity).get();
+		if (!part) return null;
+		Object.assign(merged, part);
+	}
+	return merged;
+}
+
+async function loadSettingExt(c) {
+	const out = { ...AUDIT_EXT_DEFAULTS, ...LEGAL_EXT_DEFAULTS, contentProcessing: { ...CONTENT_PROCESSING_DEFAULTS } };
+	try {
+		const { getUserDb } = await import('../utils/db-accessor');
+		const userDb = getUserDb(c);
+		if (!userDb || typeof userDb.prepare !== 'function') return out;
+		const rows = await userDb.prepare(`SELECT key, value FROM setting_ext`).all();
+		for (const row of rows?.results || []) {
+			if (row?.key && Object.prototype.hasOwnProperty.call(AUDIT_EXT_DEFAULTS, row.key)) {
+				const num = Number(row.value);
+				if (Number.isFinite(num)) out[row.key] = num;
+				continue;
+			}
+			if (row?.key && Object.prototype.hasOwnProperty.call(LEGAL_EXT_DEFAULTS, row.key)) {
+				out[row.key] = typeof row.value === 'string' ? row.value : '';
+				continue;
+			}
+			if (row?.key === CONTENT_PROCESSING_KEY) {
+				out.contentProcessing = normalizeContentProcessing(parseExtValue(row.value), c);
+			}
+		}
+	} catch (_) {
+		// Fallback to defaults when setting_ext is absent in lightweight unit mocks.
+	}
+	return out;
+}
 import {verifyRecordType} from '../const/entity-const';
 import fileUtils from '../utils/file-utils';
 import r2Service from './r2-service';
@@ -30,10 +106,9 @@ const settingService = {
 			if (!value || typeof value !== 'object') continue;
 			const hasClientId = Boolean(value.clientId && String(value.clientId).trim());
 			const hasClientSecret = Boolean(value.clientSecret && String(value.clientSecret).trim());
-			const isAppleConfigured = key === 'apple' && hasClientId && (hasClientSecret || Boolean(value.teamId && value.keyId));
 			sanitized[key] = {
 				enabled: (value.enabled === 1 || value.enabled === true) ? 1 : 0,
-				configured: (hasClientId && hasClientSecret) || isAppleConfigured ? 1 : 0,
+				configured: (hasClientId && hasClientSecret) ? 1 : 0,
 				clientId: value.clientId || '',
 				// Keep a non-empty mask so the admin form can distinguish
 				// "configured" from "empty"; the save path merges the real
@@ -77,14 +152,19 @@ const settingService = {
 				{ name: 'terms_url', sql: `ALTER TABLE setting ADD COLUMN terms_url TEXT NOT NULL DEFAULT '';` },
 				{ name: 'privacy_url', sql: `ALTER TABLE setting ADD COLUMN privacy_url TEXT NOT NULL DEFAULT '';` },
 				{ name: 'oauth_login_enabled', sql: `ALTER TABLE setting ADD COLUMN oauth_login_enabled INTEGER NOT NULL DEFAULT 0;` },
-				{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` },
-				{ name: 'audit_log_enabled', sql: `ALTER TABLE setting ADD COLUMN audit_log_enabled INTEGER NOT NULL DEFAULT 1;` },
-				{ name: 'audit_max_ip_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_ip_per_account INTEGER NOT NULL DEFAULT 3;` },
-				{ name: 'audit_max_device_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_device_per_account INTEGER NOT NULL DEFAULT 3;` },
-				{ name: 'audit_auto_clean_oldest', sql: `ALTER TABLE setting ADD COLUMN audit_auto_clean_oldest INTEGER NOT NULL DEFAULT 1;` },
-				{ name: 'audit_prioritize_non_critical_clean', sql: `ALTER TABLE setting ADD COLUMN audit_prioritize_non_critical_clean INTEGER NOT NULL DEFAULT 1;` },
-				{ name: 'audit_critical_quota', sql: `ALTER TABLE setting ADD COLUMN audit_critical_quota INTEGER NOT NULL DEFAULT 3;` }
+				{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` }
 			];
+
+			try {
+				await userDb.prepare(`
+					CREATE TABLE IF NOT EXISTS setting_ext (
+						key TEXT PRIMARY KEY,
+						value TEXT NOT NULL
+					)
+				`).run();
+			} catch (_) {
+				// Ignore when mocked DB does not support DDL
+			}
 
 			let existingCols = new Set();
 			try {
@@ -114,7 +194,11 @@ const settingService = {
 
 	async refresh(c) {
 		await this.ensureSettingColumns(c);
-		const settingRow = await orm(c).select().from(settingEntity).get();
+		const settingRow = await selectSettingRow(c);
+		if (!settingRow) {
+			throw new BizError('数据库未初始化 Database not initialized.');
+		}
+		Object.assign(settingRow, await loadSettingExt(c));
 		settingRow.resendTokens = JSON.parse(settingRow.resendTokens);
 		if (typeof settingRow.authI18n === 'string') {
 			try {
@@ -158,7 +242,7 @@ const settingService = {
 
 		if (!settingVal) {
 			await this.ensureSettingColumns(c);
-			const settingRow = await orm(c).select().from(settingEntity).get();
+			const settingRow = await selectSettingRow(c);
 			if (!settingRow) {
 				throw new BizError('数据库未初始化 Database not initialized.');
 			}
@@ -274,6 +358,14 @@ const settingService = {
 		setting.multiAccountEnabled = setting.multiAccountEnabled !== undefined && setting.multiAccountEnabled !== null ? Number(setting.multiAccountEnabled) : 0;
 		setting.termsUrl = setting.termsUrl || '';
 		setting.privacyUrl = setting.privacyUrl || '';
+		setting.operatorName = setting.operatorName || '';
+		setting.operatorCountry = setting.operatorCountry || '';
+		setting.contactEmail = setting.contactEmail || '';
+		setting.contactAddress = setting.contactAddress || '';
+		setting.policyVersion = setting.policyVersion || '';
+		setting.recipientsUrl = setting.recipientsUrl || '';
+		setting.retentionUrl = setting.retentionUrl || '';
+		setting.contentProcessing = normalizeContentProcessing(setting.contentProcessing, c);
 		setting.oauthLoginEnabled = setting.oauthLoginEnabled !== undefined && setting.oauthLoginEnabled !== null ? Number(setting.oauthLoginEnabled) : 0;
 		if (typeof setting.oauthProviders === 'string') {
 			try { setting.oauthProviders = JSON.parse(setting.oauthProviders); } catch (e) { setting.oauthProviders = {}; }
@@ -322,18 +414,31 @@ const settingService = {
 			settingRow.siteKey = settingRow.siteKey ? `${settingRow.siteKey.slice(0, 6)}******` : null;
 		}
 
-		settingRow.secretKey = settingRow.secretKey ? `${settingRow.secretKey.slice(0, 6)}******` : null;
-		settingRow.aiApiKey = settingRow.aiApiKey ? `${settingRow.aiApiKey.slice(0, 8)}******` : null;
+		// Non-admin callers (for example the read-only visitor sandbox) may see
+		// that a secret is configured, but not a usable prefix of it. Admins keep
+		// the familiar prefix so the settings form can distinguish credential
+		// changes without ever receiving the full value.
+		const requester = c.get?.('user');
+		const adminViewer = Boolean(requester && isAdminUser(c, requester));
+		const secretView = (value, keep) => value
+			? (adminViewer ? `${String(value).slice(0, keep)}******` : '******')
+			: null;
+		settingRow.secretKey = secretView(settingRow.secretKey, 6);
+		settingRow.aiApiKey = secretView(settingRow.aiApiKey, 8);
 
 		Object.keys(settingRow.resendTokens).forEach(key => {
-			const value = String(settingRow.resendTokens[key] || '');
-			settingRow.resendTokens[key] = `${value.slice(0, 12)}******`;
+			if (adminViewer) {
+				const value = String(settingRow.resendTokens[key] || '');
+				settingRow.resendTokens[key] = `${value.slice(0, 12)}******`;
+			} else {
+				settingRow.resendTokens[key] = '******';
+			}
 		});
 
-		settingRow.s3AccessKey = settingRow.s3AccessKey ? `${settingRow.s3AccessKey.slice(0, 12)}******` : null;
-		settingRow.s3SecretKey = settingRow.s3SecretKey ? `${settingRow.s3SecretKey.slice(0, 12)}******` : null;
-		settingRow.externalDbToken = settingRow.externalDbToken ? `${settingRow.externalDbToken.slice(0, 8)}******` : null;
-		settingRow.tgBotToken = settingRow.tgBotToken ? `${settingRow.tgBotToken.slice(0, 20)}******` : null;
+		settingRow.s3AccessKey = secretView(settingRow.s3AccessKey, 12);
+		settingRow.s3SecretKey = secretView(settingRow.s3SecretKey, 12);
+		settingRow.externalDbToken = secretView(settingRow.externalDbToken, 8);
+		settingRow.tgBotToken = secretView(settingRow.tgBotToken, 20);
 		settingRow.hasR2 = !!c.env.r2
 		settingRow.hasCfEmail = !!c.env.email
 
@@ -400,6 +505,25 @@ const settingService = {
 	async set(c, params) {
 		await this.ensureSettingColumns(c);
 		const settingData = await this.query(c);
+
+		// Storage engine changes must not strand existing objects. This mirrors
+		// the per-user assertStorageCanChange guard; an empty instance can still
+		// be reconfigured freely.
+		const storageFields = ['storageProvider', 'bucket', 'endpoint', 'region',
+			's3AccessKey', 's3SecretKey', 'forcePathStyle', 'customDomain'];
+		const normalizeStorageValue = value => {
+			if (value === true || value === 1 || value === '1') return '1';
+			if (value === false || value === 0 || value === '0') return '0';
+			return String(value ?? '');
+		};
+		const changingStorage = storageFields.some(field => {
+			const incoming = params[field];
+			if (incoming === undefined) return false;
+			if (typeof incoming === 'string' && incoming.includes('******')) return false;
+			return normalizeStorageValue(incoming) !== normalizeStorageValue(settingData[field]);
+		});
+		if (changingStorage) await assertSystemStorageCanChange(c);
+
 		let resendTokens = { ...settingData.resendTokens, ...(params.resendTokens || {}) };
 		Object.keys(resendTokens).forEach(domain => {
 			const incoming = params.resendTokens?.[domain];
@@ -441,6 +565,7 @@ const settingService = {
 			params.oauthLoginEnabled = Number(params.oauthLoginEnabled) === 1 ? 1 : 0;
 		}
 
+		const disabledOAuthProviders = [];
 		if (params.oauthProviders && typeof params.oauthProviders === 'object') {
 			const currentProviders = (typeof settingData.oauthProviders === 'object' && settingData.oauthProviders) ? settingData.oauthProviders : {};
 			const incomingProviders = params.oauthProviders;
@@ -456,6 +581,9 @@ const settingService = {
 					if (!nextValue || String(nextValue).includes('******')) {
 						merged[secretField] = previous[secretField] || '';
 					}
+				}
+				if (merged.enabled !== 1 && merged.enabled !== true) {
+					disabledOAuthProviders.push(key.toLowerCase());
 				}
 				mergedProviders[key] = merged;
 			}
@@ -494,30 +622,22 @@ const settingService = {
 				totpVal = '1';
 				params.totp = 1;
 			}
-			try {
-				await c.env.kv.put('setting_totp_status', totpVal);
-			} catch (e) {}
-
-			// When global 2FA is explicitly disabled in All Mail Mode, completely purge all users' 2FA data
-			// so that when 2FA is re-enabled later, all users are cleanly required to re-configure
+			// Revoke all old sessions/challenges in the same statement that removes
+			// factors. Publishing the global switch must follow the durable change.
 			if (totpVal === '0') {
-				try {
-					const user = (await import('../entity/user')).default;
-					await orm(c).update(user).set({
-						totpEnabled: 0,
-						totpSecret: '',
-						totpBackupCodes: '[]',
-						totpCreatedAt: '',
-						securityKeys: '[]'
-					}).run();
-					console.log(JSON.stringify({
-						auditEvent: 'GLOBAL_TOTP_DISABLED_ALL_USERS_PURGED',
-						timestamp: new Date().toISOString()
-					}));
-				} catch (err) {
-					console.error('Failed to purge user 2FA records upon global TOTP disable:', err);
-				}
+				const user = (await import('../entity/user')).default;
+				await orm(c).update(user).set({
+					totpEnabled: 0,
+					totpSecret: '',
+					totpBackupCodes: '[]',
+					totpCreatedAt: '',
+					securityKeys: '[]',
+					authVersion: sql`${user.authVersion} + 1`,
+					passkeyHistory: sql`CASE WHEN ${user.securityKeys} NOT IN ('', '[]') THEN 1 ELSE ${user.passkeyHistory} END`
+				}).run();
+				console.log(JSON.stringify({ auditEvent: 'GLOBAL_TOTP_DISABLED_ALL_USERS_PURGED', timestamp: new Date().toISOString() }));
 			}
+			await c.env.kv.put('setting_totp_status', totpVal);
 		}
 
 		if (params.publicProfile !== undefined) {
@@ -579,6 +699,38 @@ const settingService = {
 			params.auditCriticalQuota = Number(params.auditCriticalQuota) > 0 ? Number(params.auditCriticalQuota) : 3;
 		}
 
+		const legalTextFields = ['operatorName', 'operatorCountry', 'contactEmail', 'contactAddress', 'policyVersion', 'recipientsUrl', 'retentionUrl'];
+		for (const key of legalTextFields) {
+			if (params[key] !== undefined) params[key] = typeof params[key] === 'string' ? params[key].trim().slice(0, key === 'contactAddress' ? 500 : 320) : '';
+		}
+		if (params.contactEmail !== undefined && params.contactEmail && !isValidContactEmail(params.contactEmail)) {
+			throw new BizError('A valid operator contact email is required.', 400, 'legal_contact_email_invalid');
+		}
+		for (const key of ['termsUrl', 'privacyUrl', 'recipientsUrl', 'retentionUrl']) {
+			if (params[key] !== undefined && params[key]) {
+				const checked = isValidNoticeUrl(params[key], c);
+				if (!checked.ok) throw new BizError(`Invalid ${key} URL.`, 400, 'legal_policy_url_invalid');
+				params[key] = checked.value;
+			}
+		}
+		if (params.contentProcessing !== undefined) {
+			const normalized = normalizeContentProcessing(params.contentProcessing, c);
+			const raw = typeof params.contentProcessing === 'string' ? parseExtValue(params.contentProcessing) : params.contentProcessing;
+			if (raw?.publicTranslationFallbackEnabled === true) {
+				throw new BizError('Public translation fallback is unavailable in this version.', 400, 'content_public_fallback_unavailable');
+			}
+			if (raw?.noticeUrl && !normalized.noticeUrl) {
+				throw new BizError('Invalid content processing notice URL.', 400, 'content_notice_url_invalid');
+			}
+			if (Object.entries(normalized).some(([key, value]) => key !== 'noticeUrl' && value === true) && !normalized.noticeUrl) {
+				throw new BizError('A content processing notice URL is required before enabling this feature.', 400, 'content_notice_url_required');
+			}
+			if ((normalized.ocrEnabled || normalized.publicTranslationFallbackEnabled) && !normalized.translationEnabled) {
+				throw new BizError('Translation must be enabled before enabling OCR or public fallback.', 400, 'content_translation_required');
+			}
+			params.contentProcessing = normalized;
+		}
+
 		params.resendTokens = JSON.stringify(resendTokens);
 
 		// Whitelist only valid DB columns in setting table
@@ -605,9 +757,7 @@ const settingService = {
 			'externalDbToken', 'externalDbName', 'externalDbTarget',
 			'attachmentPolicy', 'attachmentMaxSizeMb', 'attachmentCascadeDelete',
 			'multiAccountEnabled', 'termsUrl', 'privacyUrl',
-			'oauthLoginEnabled', 'oauthProviders',
-			'auditLogEnabled', 'auditMaxIpPerAccount', 'auditMaxDevicePerAccount',
-			'auditAutoCleanOldest', 'auditPrioritizeNonCriticalClean', 'auditCriticalQuota'
+			'oauthLoginEnabled', 'oauthProviders'
 		];
 
 		const updateData = {};
@@ -620,7 +770,44 @@ const settingService = {
 		if (Object.keys(updateData).length > 0) {
 			await orm(c).update(settingEntity).set(updateData).run();
 		}
+
+		const extUpdates = [
+			...Object.keys(AUDIT_EXT_DEFAULTS).filter(key => params[key] !== undefined),
+			...LEGAL_EXT_KEYS.filter(key => params[key] !== undefined),
+			...(params.contentProcessing !== undefined ? [CONTENT_PROCESSING_KEY] : [])
+		];
+		if (extUpdates.length > 0) {
+			await this.ensureSettingColumns(c);
+			const { getUserDb } = await import('../utils/db-accessor');
+			const userDb = getUserDb(c);
+			if (userDb && typeof userDb.prepare === 'function') {
+				for (const key of extUpdates) {
+					const value = key === CONTENT_PROCESSING_KEY
+						? JSON.stringify(params.contentProcessing)
+						: String(params[key] ?? '');
+					await userDb.prepare(
+						`INSERT INTO setting_ext (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+					).bind(key, value).run();
+				}
+			}
+		}
+
 		await this.refresh(c);
+
+		if (params.oauthLoginEnabled === 0 || disabledOAuthProviders.length > 0) {
+			try {
+				const oneTimeCredential = (await import('../utils/one-time-credential.js')).default;
+				if (params.oauthLoginEnabled === 0) {
+					await oneTimeCredential.revokeClientFlows(c);
+				} else {
+					for (const providerKey of disabledOAuthProviders) {
+						await oneTimeCredential.revokeClientFlows(c, { provider: providerKey });
+					}
+				}
+			} catch (_) {
+				// Best-effort revocation; runtime assertProviderEnabled also blocks all disabled endpoints
+			}
+		}
 	},
 
 	async deleteBackground(c) {
@@ -903,7 +1090,10 @@ const settingService = {
 
 	async websiteConfig(c) {
 
-		const settingRow = await this.get(c, true);
+		const cachedSetting = await this.get(c, true);
+		const authoritative = await readAuthoritativeLegalSettings(c, cachedSetting);
+		const settingRow = authoritative.settings;
+		const registrationReadiness = getRegistrationReadiness(settingRow, c);
 		const token = await userContext.getToken(c);
 
 		return {
@@ -964,10 +1154,26 @@ const settingService = {
 			supportUrl: (c.env.SUPPORT_URL || settingRow.supportUrl || 'https://blog.epocanvas.com/support').replace(/\/+$/, ''),
 			telegramLink: (c.env.TELEGRAM_LINK || settingRow.telegramLink || 'https://t.me/epomail').replace(/\/+$/, ''),
 			githubLink: (c.env.GITHUB_LINK || settingRow.githubLink || 'https://github.com/shijianus/epomail').replace(/\/+$/, ''),
-			multiAccountEnabled: settingRow.multiAccountEnabled ?? 0,
-			termsUrl: settingRow.termsUrl || '',
-			privacyUrl: settingRow.privacyUrl || '',
-			oauthLoginEnabled: settingRow.oauthLoginEnabled ?? 0,
+				multiAccountEnabled: settingRow.multiAccountEnabled ?? 0,
+				termsUrl: settingRow.termsUrl || '',
+				privacyUrl: settingRow.privacyUrl || '',
+				legalNotice: (() => {
+					const readiness = getRegistrationReadiness(settingRow, c);
+					return {
+						operatorName: readiness.notice.operatorName,
+						operatorCountry: readiness.notice.operatorCountry,
+						contactEmail: readiness.notice.contactEmail,
+						contactAddress: readiness.notice.contactAddress,
+						termsVersion: readiness.notice.termsVersion,
+						termsUrl: readiness.notice.termsUrl,
+						privacyUrl: readiness.notice.privacyUrl,
+						recipientsUrl: readiness.notice.recipientsUrl,
+						retentionUrl: readiness.notice.retentionUrl
+					};
+				})(),
+				registrationReadiness: { ready: registrationReadiness.ready, missing: registrationReadiness.missing },
+				contentProcessing: normalizeContentProcessing(settingRow.contentProcessing, c),
+				oauthLoginEnabled: settingRow.oauthLoginEnabled ?? 0,
 			oauthProviders: (() => {
 				let p = settingRow.oauthProviders;
 				if (typeof p === 'string') {
@@ -980,8 +1186,7 @@ const settingService = {
 					if (v && typeof v === 'object') {
 						const hasClientId = Boolean(v.clientId && typeof v.clientId === 'string' && v.clientId.trim() !== '');
 						const hasClientSecret = Boolean(v.clientSecret && typeof v.clientSecret === 'string' && v.clientSecret.trim() !== '');
-						const isAppleConfigured = k === 'apple' && hasClientId && (hasClientSecret || Boolean(v.teamId && v.keyId));
-						const isConfigured = (hasClientId && hasClientSecret) || isAppleConfigured ? 1 : 0;
+						const isConfigured = (hasClientId && hasClientSecret) ? 1 : 0;
 						sanitized[k] = {
 							enabled: (v.enabled === 1 || v.enabled === true) ? 1 : 0,
 							configured: isConfigured,

@@ -3,7 +3,17 @@ import { settingConst } from '../const/entity-const';
 import settingService from './setting-service';
 import kvConst from '../const/kv-const';
 import dayjs from 'dayjs';
-import { isSafePublicUrl } from '../utils/url-utils';
+import { isSafePublicUrl, assertSafePublicUrl } from '../utils/url-utils';
+import BizError from '../error/biz-error.js';
+import { isAdminUser } from '../utils/admin-utils.js';
+import { reserveAiRequest } from '../utils/ai-budget.js';
+import { t } from '../i18n/i18n.js';
+import {
+	getContentProcessingConfig,
+	requireTranslationConfirmation,
+	isVerificationCodeAllowed,
+	isValidNoticeUrl
+} from './content-processing-service.js';
 
 
 const aiService = {
@@ -38,6 +48,13 @@ const aiService = {
 	},
 
 	async extractCode(c, email, options = {}) {
+		const processingConfig = await getContentProcessingConfig(c);
+		if (
+			!isVerificationCodeAllowed(processingConfig, options.userProfile) ||
+			!isValidNoticeUrl(processingConfig.noticeUrl, c?.env || {})
+		) {
+			return '';
+		}
 		if (!this.shouldExtractCode(options.aiCode, options.aiCodeFilter, email)) {
 			return '';
 		}
@@ -504,11 +521,6 @@ const aiService = {
 			try {
 				const chatEndpoints = this.getCandidateChatEndpoints(apiUrl);
 				const candidateModels = Array.from(new Set([model, ...poolModels].filter(Boolean)));
-				if (apiUrl && apiUrl.includes('121628.xyz')) {
-					for (const m of ['gemma-26b-a4b-it-free', 'deepseek-v4-flash-free', 'glm-5.2-free', 'llama-3.1-8b-free']) {
-						if (!candidateModels.includes(m)) candidateModels.push(m);
-					}
-				}
 				if (candidateModels.length === 0) candidateModels.push('gpt-4o-mini');
 
 				let activeEndpoint = preferredEndpoint;
@@ -585,8 +597,9 @@ const aiService = {
 			} catch (_) {}
 		}
 
-		// 2. Cloudflare Workers AI 兜底
-		if (c.env?.ai && (Date.now() - startTime < overallDeadlineMs)) {
+		// Workers AI is the default provider only when no external text provider
+		// was configured; failure of a configured endpoint does not change custody.
+		if (!apiKey && c.env?.ai && (Date.now() - startTime < overallDeadlineMs)) {
 			const cfModels = [
 				c.env.ai_model,
 				'@cf/meta/llama-3.1-8b-instruct',
@@ -616,44 +629,19 @@ const aiService = {
 			}
 		}
 
-		// 3. 公共 API 兜底 (MyMemory & Google)
-		if (Date.now() - startTime < overallDeadlineMs) {
-			const sampleSnippet = prompt.slice(0, 1000);
-			const targetParam = targetLang === 'zh-Hant' ? 'zh-TW' : (targetLang || 'zh');
-			const srcParam = srcLang === 'zh-Hant' ? 'zh-TW' : (srcLang || 'en');
-			try {
-				const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sampleSnippet)}&langpair=${encodeURIComponent(srcParam)}|${encodeURIComponent(targetParam)}`;
-				const mmRes = await fetch(mmUrl, { signal: AbortSignal.timeout(4000) }).catch(() => null);
-				if (mmRes && mmRes.ok) {
-					const mmData = await mmRes.json().catch(() => null);
-					const transText = mmData?.responseData?.translatedText;
-					if (transText && typeof transText === 'string' && transText.trim() && !transText.includes('IS AN INVALID SOURCE LANGUAGE')) {
-						return { text: transText.trim(), model: 'mymemory-translate', tokens: 0, endpoint: null };
-					}
-				}
-			} catch (_) {}
-
-			try {
-				const gtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetParam)}&dt=t&q=${encodeURIComponent(sampleSnippet)}`;
-				const gtRes = await fetch(gtUrl, { signal: AbortSignal.timeout(4000) }).catch(() => null);
-				if (gtRes && gtRes.ok) {
-					const gtData = await gtRes.json().catch(() => null);
-					if (Array.isArray(gtData) && Array.isArray(gtData[0])) {
-						const transText = gtData[0].map(item => item[0]).filter(Boolean).join('');
-						if (transText) {
-							return { text: transText.trim(), model: 'google-translate', tokens: 0, endpoint: null };
-						}
-					}
-				}
-			} catch (_) {}
-		}
-
-		return { text: prompt, model: 'original', tokens: 0, endpoint: null };
+		// A configured provider failing must not transfer mail to another public
+		// service. Callers preserve the original content and report failure.
+		return { text: '', model: 'unavailable', tokens: 0, endpoint: null };
 	},
 
 	async translate(c, options = {}) {
 		let { text, html, targetLang = 'zh', strategy = 'auto', enableOcr } = options;
-		const shouldOcr = enableOcr !== undefined ? Boolean(enableOcr) : true;
+		const processingConfig = await requireTranslationConfirmation(c, options);
+		const shouldOcr = enableOcr === true && processingConfig.ocrEnabled === true;
+		const inputBytes = new TextEncoder().encode(String(text || '') + String(html || '')).byteLength;
+		if (inputBytes > 256 * 1024) {
+			throw new BizError(t('translateFailed'), 413, 'translation_too_large');
+		}
 		const isHtml = Boolean(html && /<[a-z][\s\S]*>/i.test(html));
 
 		const sampleContent = (text || emailUtils.htmlToText(html || '')).slice(0, 3000);
@@ -666,40 +654,49 @@ const aiService = {
 		}
 
 		// 检查官方未修改系统邮件模板（欢迎邮件/全域公告），若未被修改则直接调用对应语言官方模板，若发生修改则退回 AI 翻译
+		let predefined = null;
 		try {
 			const { getPredefinedTranslation } = await import('../const/welcome-template');
-			const predefined = getPredefinedTranslation({
+			predefined = getPredefinedTranslation({
 				content: html,
 				text,
 				subject: options.subject || '',
 				toEmail: options.toEmail || '',
 				toName: options.toName || ''
 			}, finalTargetLang);
-			if (predefined) {
-				return {
-					translatedText: predefined.translatedText,
-					translatedHtml: predefined.translatedHtml,
-					translatedSubject: predefined.translatedSubject,
-					isHtml: Boolean(predefined.isHtml),
-					model: 'system-template',
-					engine: 'template'
-				};
-			}
 		} catch (e) {
 			console.warn('Predefined template check failed, falling back to AI:', e);
 		}
 
-		const settingRow = await settingService.query(c).catch(() => null);
-		if (settingRow && settingRow.aiEnabled === 0) {
+		const settingRow = await settingService.query(c);
+		const requester = c.get?.('user');
+		if (!settingRow || Number(settingRow.aiEnabled) !== 1) {
+			throw new BizError(t('translateFailed'), 403, 'ai_disabled');
+		}
+		if (!requester?.userId) throw new BizError(t('authExpired'), 401, 'auth_required');
+		if (Number(settingRow.aiAdminOnly) === 1 && !isAdminUser(c, requester)) {
+			throw new BizError(t('unauthorized'), 403, 'ai_admin_only');
+		}
+		if (predefined) {
 			return {
-				translatedText: isHtml ? emailUtils.htmlToText(html) : (text || ''),
-				translatedHtml: isHtml ? html : '',
-				isHtml
+				translatedText: predefined.translatedText,
+				translatedHtml: predefined.translatedHtml,
+				translatedSubject: predefined.translatedSubject,
+				isHtml: Boolean(predefined.isHtml),
+				model: 'system-template',
+				engine: 'template'
 			};
 		}
+		await reserveAiRequest(c, Number(requester.userId), {
+			minuteLimit: settingRow.aiRateLimitRpm ?? 60,
+			dayLimit: settingRow.aiDailyQuota ?? 0
+		});
 
 		const apiKey = (settingRow?.aiApiKey || c.env?.AI_API_KEY || '').trim();
 		const apiUrl = (settingRow?.aiApiUrl || c.env?.AI_API_URL || 'https://api.openai.com/v1').trim();
+		if (apiKey && !isSafePublicUrl(apiUrl)) {
+			throw new BizError(t('translateFailed'), 503, 'ai_endpoint_invalid');
+		}
 		let model = (options.model || settingRow?.aiModel || c.env?.ai_model || 'gpt-4o-mini').trim();
 
 		// 角色权限模型分级校验
@@ -768,13 +765,27 @@ STRICT RULES:
 1. Maintain original paragraph breaks, indentation, and formatting cleanly.
 2. Directly output ONLY the translated text without commentary, thinking steps, conversational preambles, or markdown code fences.`;
 
-			const res = await this.callSingleLlm(c, sourceText.slice(0, 4000), systemPrompt, llmConfig);
+			const parts = [];
+			let tokens = 0;
+			let usedModel = model;
+			for (let start = 0; start < sourceText.length; start += 4000) {
+				if (Date.now() - startTime >= overallDeadlineMs) {
+					throw new BizError(t('translateFailed'), 503, 'translation_incomplete');
+				}
+				const res = await this.callSingleLlm(c, sourceText.slice(start, start + 4000), systemPrompt, llmConfig);
+				if (!res.text || res.model === 'unavailable') {
+					throw new BizError(t('translateFailed'), 503, 'translation_unavailable');
+				}
+				parts.push(res.text);
+				tokens += res.tokens || 0;
+				usedModel = res.model;
+			}
 			return {
-				translatedText: res.text,
+				translatedText: parts.join('\n'),
 				translatedHtml: '',
 				isHtml: false,
-				model: res.model,
-				tokens: res.tokens
+				model: usedModel,
+				tokens
 			};
 		}
 
@@ -794,11 +805,6 @@ STRICT RULES:
 			if (model) candidateModels.push(model);
 			for (const m of poolModels) {
 				if (!candidateModels.includes(m)) candidateModels.push(m);
-			}
-			if (apiUrl && apiUrl.includes('121628.xyz')) {
-				for (const m of ['gemma-26b-a4b-it-free', 'deepseek-v4-flash-free', 'glm-5.2-free', 'llama-3.1-8b-free']) {
-					if (!candidateModels.includes(m)) candidateModels.push(m);
-				}
 			}
 			if (candidateModels.length === 0) candidateModels.push('gpt-4o-mini');
 
@@ -868,44 +874,9 @@ STRICT RULES:
 			const workers = Array.from({ length: concurrency }, () => worker());
 			await Promise.all(workers);
 
-			// =========================================================================
-			// 零截断全链路终极保障 (Zero-Truncation Global Batch Compensation)
-			// 检查全邮件所有分片，若有任何条目未翻译（因模型漏行、超时中断或提前退出），立即并发极速补偿，彻底杜绝后半部分未翻译痛点！
-			// =========================================================================
 			const missingSegments = segments.filter(item => !translatedMap[item.id]);
 			if (missingSegments.length > 0) {
-				const targetParam = finalTargetLang === 'zh-Hant' ? 'zh-TW' : (finalTargetLang || 'zh');
-				const srcParam = (detectedSrcLang === 'zh-Hant' ? 'zh-TW' : detectedSrcLang) || 'en';
-				await Promise.allSettled(missingSegments.map(async (item) => {
-					try {
-						const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(item.text.slice(0, 500))}&langpair=${encodeURIComponent(srcParam)}|${encodeURIComponent(targetParam)}`;
-						const mmRes = await fetch(mmUrl, { signal: AbortSignal.timeout(3500) }).catch(() => null);
-						if (mmRes && mmRes.ok) {
-							const mmData = await mmRes.json().catch(() => null);
-							const transText = mmData?.responseData?.translatedText;
-							if (transText && typeof transText === 'string' && transText.trim() && !transText.includes('IS AN INVALID SOURCE LANGUAGE')) {
-								translatedMap[item.id] = transText.trim();
-								return;
-							}
-						}
-					} catch (_) {}
-
-					if (c.env?.ai && !translatedMap[item.id]) {
-						try {
-							const cfRes = await c.env.ai.run('@cf/meta/llama-3.1-8b-instruct', {
-								messages: [
-									{ role: 'system', content: `Translate into ${targetLangName}. Output ONLY the translated text:` },
-									{ role: 'user', content: item.text.slice(0, 500) }
-								],
-								max_tokens: 250
-							}).catch(() => null);
-							const raw = cfRes?.response || '';
-							if (raw && raw.trim()) {
-								translatedMap[item.id] = raw.trim();
-							}
-						} catch (_) {}
-					}
-				}));
+				throw new BizError(t('translateFailed'), 503, 'translation_incomplete');
 			}
 
 			// 回填译文并还原所有原始样式与代码块
@@ -941,7 +912,8 @@ STRICT RULES:
 2. All HTML tags, attributes, inline styles, CSS, links, tables, and colors must remain 100% identical. Only the human-readable text between tags should be translated.
 3. Do NOT wrap output in markdown code fences (no \`\`\`html or \`\`\`).`;
 
-		const directRes = await this.callSingleLlm(c, html.slice(0, 4000), directSystemPrompt, llmConfig);
+			if (html.length > 4000) throw new BizError(t('translateFailed'), 503, 'translation_incomplete');
+			const directRes = await this.callSingleLlm(c, html, directSystemPrompt, llmConfig);
 		let cleanDirectHtml = directRes.text.replace(/```(?:html|xml)?\s*\n?([\s\S]*?)\n?```/i, '$1').trim();
 		const hasValidStructure = cleanDirectHtml && /<[a-z][\s\S]*>/i.test(cleanDirectHtml);
 
@@ -1049,7 +1021,7 @@ STRICT RULES:
 		const apiKey = (aiApiKey || '').trim();
 		const startTime = Date.now();
 
-		if (aiApiUrl && !isSafePublicUrl(aiApiUrl)) {
+		if (aiApiUrl && !(await assertSafePublicUrl(aiApiUrl))) {
 			return {
 				success: false,
 				models: [],
@@ -1343,7 +1315,7 @@ STRICT RULES:
 		const apiKey = (aiApiKey || '').trim();
 		const apiUrl = (aiApiUrl || '').trim();
 
-		if (apiUrl && !isSafePublicUrl(apiUrl)) {
+		if (apiUrl && !(await assertSafePublicUrl(apiUrl))) {
 			return {
 				success: false,
 				avgLatency: 0,

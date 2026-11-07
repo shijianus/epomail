@@ -81,5 +81,14 @@ export function useAttachmentUrls(getMessages) {
 			.replace(/{{domain}}/g, '/');
 	}
 
-	return { formatImage, attachmentUrl };
+	const trustedImageUrls = computed(() => {
+		const publicDomain = toOssDomain(settingStore.settings?.r2Domain);
+		const keys = publicDomain
+			? [...new Set((getMessages() || []).flatMap(message => (message?.attList || []).map(attachment => attachment?.key)).filter(key => typeof key === 'string' && key.startsWith('attachments/')))]
+			: attachmentKeys.value;
+		// Public-domain placeholders in sender HTML are not proof of ownership;
+		// trust only API attachment records or URLs returned by the signing API.
+		return keys.map(key => attachmentUrl(key)).filter(Boolean);
+	});
+	return { formatImage, attachmentUrl, trustedImageUrls };
 }

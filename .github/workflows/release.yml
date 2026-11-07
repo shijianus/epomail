@@ -7,24 +7,48 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   release:
-    name: Publish GitHub Release
+    name: Publish verified GitHub Release
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout tagged commit
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Require successful quality and security runs for this commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha = (await exec.getExecOutput('git', ['rev-parse', 'HEAD'])).stdout.trim();
+            const required = ['quality-gates.yml', 'security.yml', 'secret-scanning.yml'];
+            for (const workflow_id of required) {
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner, repo, workflow_id, head_sha: sha, event: 'push', per_page: 100
+              });
+              const runs = data.workflow_runs
+                .filter(run => run.head_sha === sha &&
+                  (['master', 'main'].includes(run.head_branch) || run.head_branch?.startsWith('release/')))
+                .sort((a, b) => b.run_number - a.run_number || b.run_attempt - a.run_attempt);
+              const latest = runs[0];
+              if (!latest || latest.status !== 'completed' || latest.conclusion !== 'success') {
+                throw new Error(`${workflow_id} has no successful latest push run for ${sha}`);
+              }
+              core.info(`${workflow_id}: ${latest.html_url}`);
+            }
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
         run: |
-          TAG_NAME="${{ github.ref_name }}"
-          echo "Publishing release for tag: ${TAG_NAME}"
-          gh release create "${TAG_NAME}" \
-            --title "EpoMail ${TAG_NAME}" \
-            --notes-file RELEASE_NOTES.md \
-            --latest
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            gh release create "$RELEASE_TAG" --title "EpoMail $RELEASE_TAG" --notes-file RELEASE_NOTES.md --prerelease
+          else
+            gh release create "$RELEASE_TAG" --title "EpoMail $RELEASE_TAG" --notes-file RELEASE_NOTES.md --latest
+          fi

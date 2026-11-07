@@ -15,6 +15,7 @@ import { buildSignedObjectUrl } from '../utils/object-token';
 import storageQuotaService from './storage-quota-service';
 import { getMailDb } from '../utils/db-accessor';
 import { normalizeObjectKey } from '../utils/object-key-utils';
+import { buildBoundedInserts, prepareMailQuery } from '../utils/mail-pipeline.js';
 
 const ATTACHMENT_CONTENT_PATTERN = /{{domain}}(attachments\/[A-Za-z0-9._-]+)/g;
 
@@ -73,56 +74,93 @@ function collectContentAttachmentKeys(content) {
 
 const attService = {
 
+	async stageInboundAtt(c, attachments) {
+		if (!Array.isArray(attachments) || attachments.length === 0) return { rows: [], uploaded: [] };
+		const userId = attachments[0]?.userId;
+		if (attachments.some(item => item.userId !== userId)) throw new Error('Inbound attachment batch must have one storage owner');
+		const uploaded = [];
+		const rows = [];
+		try {
+			for (const attachment of attachments) {
+				const attSize = Number(attachment.size || attachment.content?.byteLength || attachment.content?.length || 0);
+				if (userId && attSize > 0) {
+					const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, attSize);
+					if (!sizeCheck.allowed) throw new BizError(sizeCheck.reason);
+				}
+				const ownerUserId = attachment.userId || userId || null;
+				await r2Service.putObj(c, attachment.key, attachment.content, {
+					contentType: attachment.mimeType,
+					contentDisposition: fileUtils.encodeContentDisposition(
+						attachment.filename,
+						attachment.contentId ? 'inline' : 'attachment'
+					),
+					...(attachment.contentId ? { cacheControl: 'max-age=259200' } : {})
+				}, ownerUserId);
+				uploaded.push({ key: attachment.key, userId: ownerUserId });
+				rows.push({
+					userId: attachment.userId,
+					accountId: attachment.accountId,
+					key: attachment.key,
+					filename: attachment.filename || null,
+					mimeType: attachment.mimeType || null,
+					size: attSize,
+					type: typeof attachment.type === 'number' ? attachment.type : attConst.type.ATT,
+					contentId: attachment.contentId || null,
+					disposition: attachment.disposition || null,
+					related: attachment.related || null,
+					encoding: attachment.encoding || null
+				});
+			}
+			return { rows, uploaded };
+		} catch (error) {
+			await this.cleanupUnreferencedObjects(c, uploaded);
+			throw error;
+		}
+	},
+
 	async addAtt(c, attachments) {
 		if (!attachments || attachments.length === 0) return;
 
 		const userId = attachments[0]?.userId;
+		if (attachments.some(item => item.userId !== userId)) {
+			throw new Error('Inbound attachment batch must have one storage owner');
+		}
+
+		const totalIncomingBytes = attachments.reduce((sum, item) => sum + Number(item.size || item.content?.byteLength || item.content?.length || 0), 0);
 		if (userId) {
-			const totalIncomingBytes = attachments.reduce((sum, item) => sum + Number(item.size || item.content?.byteLength || item.content?.length || 0), 0);
 			const quotaCheck = await storageQuotaService.checkQuotaAvailable(c, userId, totalIncomingBytes);
-			if (!quotaCheck.allowed) {
-				console.warn(`User ${userId} storage quota exceeded: ${quotaCheck.reason}`);
-				return;
-			}
+			if (!quotaCheck.allowed) throw new BizError(quotaCheck.reason);
 		}
 
 		const stored = [];
 		const uploaded = [];
-
-		for (let attachment of attachments) {
+		for (const attachment of attachments) {
 			const attSize = Number(attachment.size || attachment.content?.byteLength || attachment.content?.length || 0);
 			if (userId && attSize > 0) {
 				const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, attSize);
-				if (!sizeCheck.allowed) {
-					console.warn(`Attachment ${attachment.filename} skipped: ${sizeCheck.reason}`);
-					continue;
-				}
+				if (!sizeCheck.allowed) throw new BizError(sizeCheck.reason);
 			}
-			let metadate = {
+
+			const metadata = {
 				contentType: attachment.mimeType,
+				contentDisposition: fileUtils.encodeContentDisposition(
+					attachment.filename,
+					attachment.contentId ? 'inline' : 'attachment'
+				),
+				...(attachment.contentId ? { cacheControl: 'max-age=259200' } : {})
 			};
-
-			if (!attachment.contentId) {
-				metadate.contentDisposition = fileUtils.encodeContentDisposition(attachment.filename, 'attachment');
-			} else {
-				metadate.contentDisposition = fileUtils.encodeContentDisposition(attachment.filename, 'inline');
-				metadate.cacheControl = `max-age=259200`;
-			}
-
 			const ownerUserId = attachment.userId || userId || null;
 			try {
-				await r2Service.putObj(c, attachment.key, attachment.content, metadate, ownerUserId);
+				await r2Service.putObj(c, attachment.key, attachment.content, metadata, ownerUserId);
 				uploaded.push({ key: attachment.key, userId: ownerUserId });
 				stored.push(attachment);
 			} catch (e) {
-				// Keep the rest of the message: one bad object must not drop every
-				// other attachment, but it must never produce a metadata row either.
-				console.error(`[attachment-store] failed to store ${attachment.key}:`, e.message);
+				await this.cleanupUnreferencedObjects(c, uploaded);
+				throw e;
 			}
 		}
 
 		if (stored.length === 0) return;
-
 		const rows = stored.map(attachment => ({
 			userId: attachment.userId,
 			emailId: attachment.emailId,
@@ -139,17 +177,21 @@ const attService = {
 		}));
 
 		try {
-			await orm(c).insert(att).values(rows).run();
+			const mailDb = getMailDb(c);
+			const statements = buildBoundedInserts(chunk => orm(c).insert(att).values(chunk), rows)
+				.map(query => prepareMailQuery(c, query));
+			await mailDb.batch(statements);
 		} catch (e) {
-			// The insert failed after the objects were written: remove the
-			// unreferenced objects so D1 and storage do not diverge.
 			await this.cleanupUnreferencedObjects(c, uploaded);
 			throw e;
 		}
 	},
 
-	list(c, params, userId) {
-		const { emailId } = params;
+	async list(c, params, userId) {
+		const emailId = Number(params?.emailId);
+		if (!Number.isInteger(emailId) || emailId <= 0 || !userId) {
+			return [];
+		}
 
 		return orm(c).select().from(att).where(
 			and(
@@ -510,11 +552,41 @@ const attService = {
 				continue;
 			}
 
+			// Inbound staging writes the object before its attachment metadata is
+			// committed. A stale queue row from an earlier failed attempt must not
+			// delete the re-uploaded object between PUT and completeInboundReceive.
+			const inboundClaim = key.match(/^attachments\/([a-f0-9]{64})-/i);
+			if (inboundClaim) {
+				const active = await mailDb.prepare(`SELECT 1 AS present FROM mail_receive_claim
+					WHERE claim_key = ? AND state IN ('CLAIMED','SAVING') AND lease_until > unixepoch()`)
+					.bind(inboundClaim[1].toLowerCase()).first();
+				if (active) {
+					skipped++;
+					continue;
+				}
+			}
+
 			let referenced;
 			try {
-				referenced = await mailDb.prepare(
-					`SELECT 1 AS present FROM attachments WHERE key = ? LIMIT 1`
-				).bind(key).first();
+				const storage = await r2Service.resolveStorage(c, owner > 0 ? owner : null, { forDeletion: true });
+				if (storage.type === 'USER_S3') {
+					referenced = await mailDb.prepare(
+						`SELECT 1 AS present FROM attachments WHERE key = ? AND user_id = ? LIMIT 1`
+					).bind(key, owner).first();
+					if (!referenced) {
+						const other = await mailDb.prepare(
+							`SELECT 1 AS present FROM attachments WHERE key = ? AND user_id != ? LIMIT 1`
+						).bind(key, owner).first();
+						// Without a per-object storage locator two owners might use
+						// either different buckets OR the same bucket. Do not drop
+						// this queue row as "shared" or delete another owner's blob.
+						if (other) throw new Error('BYO object has ambiguous cross-owner references; review required');
+					}
+				} else {
+					referenced = await mailDb.prepare(
+						`SELECT 1 AS present FROM attachments WHERE key = ? LIMIT 1`
+					).bind(key).first();
+				}
 			} catch (e) {
 				// Cannot prove the object is unreferenced: never delete blind.
 				await this.scheduleDeletionRetry(mailDb, key, owner, Number(row.attempts) || 0,

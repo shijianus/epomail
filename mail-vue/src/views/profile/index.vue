@@ -56,11 +56,11 @@
                 </div>
                 <div class="sub-tag-item">
                   <Icon class="ic" icon="solar:calendar-linear" />
-                  {{ $t('joinTimeLabel') }}{{ dayjs(profileData.userInfo.joinTime).format('YYYY/MM') }}
+                  {{ $t('joinTimeLabel') }}{{ formatProfileDate(profileData.userInfo.joinTime) }}
                 </div>
               </div>
 
-              <el-button type="primary" size="large" style="width: 100%; border-radius: 12px; height: 46px; font-weight: 600;" @click="handleContact">
+              <el-button type="primary" size="large" style="width: 100%; border-radius: 12px; min-height: 46px; height: auto; white-space: normal; font-weight: 600;" @click="handleContact">
                 <Icon icon="fluent:send-24-filled" class="ic" style="margin-right: 8px;" />
                 {{ $t('contactMeByEmail') }}
               </el-button>
@@ -75,15 +75,15 @@
         <div class="stats-row">
           <div class="stat-card blue">
             <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> {{ $t('todaySent') }}</div>
-            <div class="stat-val">{{ profileData.userInfo.showStats ? profileData.stats.todaySent : '**' }}</div>
+            <div class="stat-val">{{ profileData.userInfo.showStats ? formatProfileNumber(profileData.stats.todaySent) : '**' }}</div>
           </div>
           <div class="stat-card green">
             <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> {{ $t('todayReceived') }}</div>
-            <div class="stat-val">{{ profileData.userInfo.showStats ? profileData.stats.todayReceived : '**' }}</div>
+            <div class="stat-val">{{ profileData.userInfo.showStats ? formatProfileNumber(profileData.stats.todayReceived) : '**' }}</div>
           </div>
           <div class="stat-card orange">
             <div class="stat-title"><svg class="ic" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> {{ $t('personalInterceptRate') }}</div>
-            <div class="stat-val">{{ profileData.userInfo.showStats ? profileData.stats.interceptRate : '**' }}</div>
+            <div class="stat-val">{{ profileData.userInfo.showStats ? formatProfilePercent(profileData.stats.interceptRate) : '**' }}</div>
           </div>
         </div>
 
@@ -109,10 +109,10 @@
               <template v-if="profileData.userInfo.showTrend">
                 <div class="bar-col" v-for="(item, i) in profileData.trend" :key="item.date">
                   <div class="bar-wrapper" style="height: 100%;" :style="i === profileData.trend.length - 1 ? 'box-shadow: 0 0 16px rgba(16,185,129,0.3);' : ''">
-                    <div class="segment seg-receive" :style="{height: item.receivePercent + '%'}" @mousemove="showTooltip($event, `${$t('receive')}: ${item.receivePercent}%`, 'var(--color-receive)')" @mouseleave="hideTooltip"></div>
-                    <div class="segment seg-intercept" :style="{height: item.interceptPercent + '%'}" @mousemove="showTooltip($event, `${$t('intercept')}: ${item.interceptPercent}%`, 'var(--color-intercept)')" @mouseleave="hideTooltip"></div>
+                    <div class="segment seg-receive" :style="{height: item.receivePercent + '%'}" @mousemove="showTooltip($event, `${$t('receive')}: ${formatProfilePercent(item.receivePercent)}`, 'var(--color-receive)')" @mouseleave="hideTooltip"></div>
+                    <div class="segment seg-intercept" :style="{height: item.interceptPercent + '%'}" @mousemove="showTooltip($event, `${$t('intercept')}: ${formatProfilePercent(item.interceptPercent)}`, 'var(--color-intercept)')" @mouseleave="hideTooltip"></div>
                   </div>
-                  <div class="bar-label" :style="i === profileData.trend.length - 1 ? 'color:var(--text-primary); font-weight:bold;' : ''">{{ i === profileData.trend.length - 1 ? $t('today') : item.label }}</div>
+                  <div class="bar-label" :style="i === profileData.trend.length - 1 ? 'color:var(--text-primary); font-weight:bold;' : ''">{{ i === profileData.trend.length - 1 ? $t('today') : formatUiDate(item.date, locale, {month: 'numeric', day: 'numeric', timeZone: 'UTC'}) }}</div>
                 </div>
               </template>
               <div v-else style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2;">
@@ -133,20 +133,20 @@
               <div class="pie-ring">
                 <svg viewBox="0 0 32 32" style="width: 110px; height: 110px; border-radius: 50%; transform: rotate(-90deg); filter: drop-shadow(0 0 10px var(--shadow-deep));">
                   <template v-if="profileData.userInfo.showSources">
-                    <circle v-for="(source, index) in computedSources" :key="source.domain" r="15.9155" cx="16" cy="16" :stroke="source.color" stroke-width="32" :stroke-dasharray="source.dasharray" :stroke-dashoffset="source.dashoffset" fill="none" class="pie-circle" @mousemove="showTooltip($event, `${source.domain}: ${source.percent}%`, source.color)" @mouseleave="hideTooltip" />
+                    <circle v-for="(source, index) in computedSources" :key="source.domain" r="15.9155" cx="16" cy="16" :stroke="source.color" stroke-width="32" :stroke-dasharray="source.dasharray" :stroke-dashoffset="source.dashoffset" fill="none" class="pie-circle" @mousemove="showTooltip($event, `${source.domain}: ${formatProfilePercent(source.percent)}`, source.color)" @mouseleave="hideTooltip" />
                   </template>
                   <circle v-else r="15.9155" cx="16" cy="16" stroke="var(--border-subtle)" stroke-width="32" stroke-dasharray="100 100" fill="none" class="pie-circle" style="opacity: 0.2;" />
                 </svg>
                 <div class="pie-total">
-                  <span class="pie-total-val">{{ profileData.userInfo.showSources ? profileData.sources.total : '**' }}</span>
+                  <span class="pie-total-val">{{ profileData.userInfo.showSources ? formatProfileNumber(profileData.sources.total) : '**' }}</span>
                   <span class="pie-total-lbl">{{ $t('totalAmount') }}</span>
                 </div>
               </div>
               
               <div class="pie-legend" v-if="profileData.userInfo.showSources">
-                <div class="legend-item" v-for="(source, index) in computedSources" :key="source.domain" :style="source.domain === '其它来源' || source.domain === 'Other Sources' ? 'margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--border-subtle);' : ''" @mousemove="showTooltip($event, `${source.domain}: ${source.percent}%`, source.color)" @mouseleave="hideTooltip">
+                <div class="legend-item" v-for="(source, index) in computedSources" :key="source.domain" :style="source.domain === '其它来源' || source.domain === 'Other Sources' ? 'margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--border-subtle);' : ''" @mousemove="showTooltip($event, `${source.domain}: ${formatProfilePercent(source.percent)}`, source.color)" @mouseleave="hideTooltip">
                   <div class="legend-dot"><div class="dot" :style="{background: source.color}"></div> {{ source.domain === '其它来源' ? $t('otherSources') : source.domain }}</div>
-                  <span style="font-family: monospace;" :style="source.domain === '其它来源' || source.domain === 'Other Sources' ? 'color:var(--text-muted);' : ''">{{ source.percent }}%</span>
+                  <span style="font-family: monospace;" :style="source.domain === '其它来源' || source.domain === 'Other Sources' ? 'color:var(--text-muted);' : ''">{{ formatProfilePercent(source.percent) }}</span>
                 </div>
               </div>
               <div class="pie-legend" v-else style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; min-height: 80px; gap: 8px;">
@@ -169,11 +169,18 @@
 
 <script setup>
 import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+const formatProfileDate = value => formatUiDate(value, locale.value, { year: 'numeric', month: '2-digit' })
+const formatProfileNumber = value => formatUiNumber(value, locale.value)
+const formatProfilePercent = value => {
+  if (value === null || value === undefined || String(value).trim() === '') return '-'
+  const numeric = typeof value === 'string' ? Number(value.replace('%', '')) : Number(value)
+  return formatUiNumber(numeric / 100, locale.value, { style: 'percent', maximumFractionDigits: 1 })
+}
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProfile } from '@/request/public.js'
-import dayjs from 'dayjs'
 import { Icon } from '@iconify/vue'
 import { useUiStore } from '@/store/ui.js'
 import { useUserStore } from '@/store/user.js'
@@ -183,6 +190,8 @@ import Header from '@/layout/header/index.vue'
 import { parseInlineMarkdown } from "@/utils/md-parser.js"
 import { cvtR2Url } from "@/utils/convert.js"
 import { ElMessage } from "element-plus"
+import { resolveTabSession } from '@/utils/tab-session.js'
+import { formatUiDate, formatUiNumber } from '@/utils/ui-locale.js'
 
 const uiStore = useUiStore()
 const userStore = useUserStore()
@@ -199,7 +208,7 @@ const timezoneString = computed(() => {
   const offset = -new Date().getTimezoneOffset() / 60;
   const offsetStr = offset >= 0 ? `+${offset}` : `${offset}`;
   let localeName = tz;
-  if (tz === 'Asia/Shanghai') localeName = t('beijing') || 'Beijing';
+  if (tz === 'Asia/Shanghai') localeName = t('beijing');
   return `${localeName} (GMT${offsetStr})`;
 })
 
@@ -207,8 +216,8 @@ const profileData = ref({
     userInfo: {
         account: '',
         email: '',
-        roleName: 'Unknown',
-        joinTime: new Date().toISOString(),
+        roleName: '',
+        joinTime: '',
         avatarInitials: ''
     },
     stats: {
@@ -365,7 +374,13 @@ const fetchProfile = () => {
     loading.value = true
     getProfile(username.value).then(res => {
         if (res && res.userInfo) {
-            profileData.value = res
+            profileData.value = {
+              ...profileData.value,
+              ...res,
+              stats: { ...profileData.value.stats, ...(res.stats || {}) },
+              trend: Array.isArray(res.trend) ? res.trend : [],
+              sources: { ...profileData.value.sources, ...(res.sources || {}), top: Array.isArray(res.sources?.top) ? res.sources.top : [] },
+            }
             if (isOwnProfile.value && userStore.user?.backgroundUrl !== undefined && userStore.user?.backgroundUrl !== '') {
                 profileData.value.userInfo.backgroundUrl = userStore.user.backgroundUrl
             }
@@ -395,7 +410,7 @@ const goBack = () => {
 
 const handleContact = () => {
   const targetEmail = profileData.value.userInfo.email;
-  const isLogged = localStorage.getItem('token');
+  const isLogged = !!resolveTabSession();
   if (isLogged) {
     router.push({ path: '/inbox', query: { composeTo: targetEmail } });
   } else {
@@ -421,8 +436,6 @@ const hideTooltip = () => {
 </script>
 
 <style scoped lang="scss">
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
-
 .settings-container {
   --color-send: #3b82f6;
   --color-receive: #10b981;
@@ -435,7 +448,7 @@ const hideTooltip = () => {
   background: var(--bg-base) !important;
   background-image: none !important;
   position: relative;
-  font-family: 'Archivo', system-ui, -apple-system, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 
   .loading {
     display: flex;
@@ -531,7 +544,7 @@ const hideTooltip = () => {
   margin: -70px auto 0;
   padding: 0 32px;
   display: grid;
-  grid-template-columns: 310px 1fr;
+  grid-template-columns: 310px minmax(0, 1fr);
   gap: 28px;
   position: relative;
   z-index: 10;
@@ -575,6 +588,8 @@ const hideTooltip = () => {
 
 /* Left Profile Identity Card */
 .profile-identity-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
@@ -679,6 +694,7 @@ const hideTooltip = () => {
 
 /* Right Analytics Dashboard */
 .profile-analysis {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -733,7 +749,7 @@ const hideTooltip = () => {
 
   .charts-grid {
     display: grid;
-    grid-template-columns: 1.8fr 1.2fr;
+    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.2fr);
     gap: 16px;
     flex: 1;
     min-height: 240px;
@@ -756,7 +772,7 @@ const hideTooltip = () => {
     position: relative;
   }
 
-  .chart-title { font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .chart-title { flex-wrap: wrap; gap: 8px; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
 
   .bar-chart-container {
     flex: 1; display: flex; align-items: flex-end; justify-content: space-between; position: relative;
@@ -766,7 +782,7 @@ const hideTooltip = () => {
     position: absolute; inset: 0 0 24px 0; display: flex; flex-direction: column; justify-content: space-between; z-index: 0; pointer-events: none;
   }
   .gridline { width: 100%; height: 1px; background: var(--border-subtle); position: relative; }
-  .chart-legends-top { display: flex; gap: 12px; font-size: 11px; font-weight: 600; }
+  .chart-legends-top { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; font-weight: 600; }
   .legend-pill { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); }
   .legend-color { width: 8px; height: 8px; border-radius: 2px; }
 

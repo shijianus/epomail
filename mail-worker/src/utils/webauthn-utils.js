@@ -7,6 +7,8 @@
 export function decodeCBOR(buffer) {
 	const data = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
 	let offset = 0;
+	let items = 0;
+	if (data.length > 65536) throw new Error('CBOR too large');
 
 	function readTypeAndLength() {
 		if (offset >= data.length) throw new Error('Unexpected EOF in CBOR');
@@ -31,10 +33,13 @@ export function decodeCBOR(buffer) {
 		} else {
 			throw new Error(`Unsupported CBOR additional info: ${additionalInfo}`);
 		}
+		if (offset > data.length || typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0) throw new Error('Invalid CBOR length');
+		if ([2, 3, 4, 5].includes(majorType) && length > data.length - offset) throw new Error('Truncated CBOR');
 		return { majorType, length };
 	}
 
 	function decodeItem() {
+		if (++items > 512) throw new Error('CBOR nesting/item limit exceeded');
 		const { majorType, length } = readTypeAndLength();
 
 		switch (majorType) {
@@ -62,9 +67,10 @@ export function decodeCBOR(buffer) {
 				return arr;
 			}
 			case 5: { // map
-				const map = {};
+				const map = Object.create(null);
 				for (let i = 0; i < length; i++) {
 					const key = decodeItem();
+					if (!['string', 'number'].includes(typeof key) || Object.hasOwn(map, key)) throw new Error('Invalid CBOR map key');
 					const val = decodeItem();
 					map[key] = val;
 				}
@@ -105,7 +111,7 @@ export const webauthnUtils = {
 	 * Convert Base64URL or Base64 string to Uint8Array
 	 */
 	base64UrlToBuffer(base64url) {
-		if (!base64url) return new Uint8Array(0);
+		if (typeof base64url !== 'string' || !base64url || base64url.length > 100000 || !/^[A-Za-z0-9_+/=-]+$/.test(base64url)) throw new Error('Invalid WebAuthn encoding');
 		let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
 		while (base64.length % 4 !== 0) {
 			base64 += '=';
@@ -116,6 +122,57 @@ export const webauthnUtils = {
 			bytes[i] = binary.charCodeAt(i);
 		}
 		return bytes;
+	},
+
+	/** Expected origin is derived from the server URL, never a client Origin/Host override. */
+	ceremonyContext(c) {
+		const url = new URL(c.req.url);
+		if (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
+			throw new Error('WebAuthn requires a secure origin');
+		}
+		return { origin: url.origin, rpId: url.hostname };
+	},
+
+	async verifyCeremony({ clientDataJSON, authenticatorData, challenge, origin, rpId, type }) {
+		if (!challenge || !origin || !rpId) throw new Error('Missing WebAuthn ceremony binding');
+		const data = this.parseClientData(clientDataJSON);
+		if (data.type !== type || data.challenge !== challenge || data.origin !== origin
+			|| data.crossOrigin === true || data.topOrigin !== undefined) throw new Error('WebAuthn client binding mismatch');
+		const bytes = authenticatorData instanceof Uint8Array ? authenticatorData : this.base64UrlToBuffer(authenticatorData);
+		if (bytes.length < 37 || (bytes[32] & 0x05) !== 0x05 || ((bytes[32] & 0x10) && !(bytes[32] & 0x08))) {
+			throw new Error('WebAuthn user presence and verification are required');
+		}
+		const expected = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rpId)));
+		if (!expected.every((byte, i) => byte === bytes[i])) throw new Error('WebAuthn relying party mismatch');
+		return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(33, false);
+	},
+
+	async verifyRegistration(params, expected) {
+		const attestation = decodeCBOR(this.base64UrlToBuffer(params.attestationObject));
+		// We request attestation=none. Never accept an arbitrary x5c certificate
+		// as identity proof; unsupported formats fail closed.
+		if (attestation.fmt !== 'none' || !attestation.attStmt || Object.keys(attestation.attStmt).length) {
+			throw new Error('Unsupported WebAuthn attestation format');
+		}
+		await this.verifyCeremony({ ...expected, clientDataJSON: params.clientDataJSON,
+			authenticatorData: attestation.authData, type: 'webauthn.create' });
+		const parsed = this.parseAttestationObject(params.attestationObject);
+		if (!params.credentialId || parsed.credentialId !== params.credentialId) throw new Error('WebAuthn credential ID mismatch');
+		if (!['EC', 'RSA'].includes(parsed.publicKeyJwk?.kty)) throw new Error('Unsupported WebAuthn public key');
+		return parsed;
+	},
+
+	async verifyAssertion(params, key, expected) {
+		if (!key || key.status === 'pending_verification' || params.credentialId !== key.credentialId) {
+			throw new Error('Unrecognized active security key');
+		}
+		const signCount = await this.verifyCeremony({ ...expected, clientDataJSON: params.clientDataJSON,
+			authenticatorData: params.authenticatorData, type: 'webauthn.get' });
+		if ((key.signCount || signCount) && signCount <= (key.signCount || 0)) throw new Error('WebAuthn signature counter did not advance');
+		if (!await this.verifyAuthenticationSignature({ clientDataJSONBase64: params.clientDataJSON,
+			authenticatorDataBase64: params.authenticatorData, signatureBase64: params.signature,
+			publicKeyJwk: key.publicKeyJwk, publicKeyRaw: key.publicKeyRaw })) throw new Error('WebAuthn signature invalid');
+		return signCount;
 	},
 
 	/**
@@ -145,7 +202,7 @@ export const webauthnUtils = {
 		const attestation = decodeCBOR(attestationBytes);
 
 		const authData = attestation.authData;
-		if (!authData || authData.length < 37) {
+		if (!authData || authData.length < 56) {
 			throw new Error('Invalid authenticator data');
 		}
 
@@ -163,6 +220,7 @@ export const webauthnUtils = {
 		// 37..52: aaguid (16)
 		// 53..54: credentialIdLength (2)
 		const credIdLen = (authData[53] << 8) | authData[54];
+		if (!credIdLen || credIdLen > 1024 || 55 + credIdLen >= authData.length) throw new Error('Invalid credential length');
 		const credIdBytes = authData.slice(55, 55 + credIdLen);
 		const credentialId = this.bufferToBase64Url(credIdBytes);
 
@@ -185,6 +243,7 @@ export const webauthnUtils = {
 			// EC2 P-256
 			const x = coseKey[-2];
 			const y = coseKey[-3];
+			if (coseKey[-1] !== 1 || x?.length !== 32 || y?.length !== 32) throw new Error('Invalid EC credential');
 			publicKeyJwk = {
 				kty: 'EC',
 				crv: 'P-256',
@@ -198,10 +257,11 @@ export const webauthnUtils = {
 			rawPoint.set(x, 1);
 			rawPoint.set(y, 1 + x.length);
 			publicKeyRaw = this.bufferToBase64Url(rawPoint);
-		} else if (kty === 3) {
+		} else if (kty === 3 && [-257, -37].includes(alg)) {
 			// RSA algorithms: -257 (RS256), -37 (PS256), -258 (RS384), -259 (RS512)
 			const n = coseKey[-1];
 			const e = coseKey[-2];
+			if (!(n instanceof Uint8Array) || n.length < 256 || !(e instanceof Uint8Array) || !e.length) throw new Error('Invalid RSA credential');
 			const isPss = alg === -37;
 			const jwkAlg = isPss ? 'PS256' : (alg === -258 ? 'RS384' : (alg === -259 ? 'RS512' : 'RS256'));
 			publicKeyJwk = {
@@ -219,7 +279,7 @@ export const webauthnUtils = {
 		return {
 			credentialId,
 			aaguid: this.bufferToBase64Url(authData.slice(37, 53)),
-			signCount: (authData[33] << 24) | (authData[34] << 16) | (authData[35] << 8) | authData[36],
+			signCount: new DataView(authData.buffer, authData.byteOffset, authData.byteLength).getUint32(33, false),
 			publicKeyJwk,
 			publicKeyRaw,
 			coseKeyBytes: this.bufferToBase64Url(coseKeyBytes)

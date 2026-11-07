@@ -7,6 +7,7 @@ import oauthIdentityService from '../service/oauth-identity-service';
 import result from '../model/result';
 import userContext from '../security/user-context';
 import constant from '../const/constant';
+import legalPolicyService from '../service/legal-policy-service.js';
 
 app.get('/my/loginUserInfo', async (c) => {
 	const user = await userService.loginUserInfo(c, userContext.getUserId(c), userContext.getLoginEmail(c));
@@ -62,8 +63,15 @@ app.put('/my/setCustomLabels', async (c) => {
 });
 
 app.delete('/my/delete', async (c) => {
-	await userService.delete(c, userContext.getUserId(c));
-	return c.json(result.ok());
+	const data = await userService.delete(c, userContext.getUserId(c));
+	return c.json(result.ok(data));
+});
+
+// Deliberately under /my, not the anonymous /telegram bearer-read exemption.
+// The authenticated owner revokes all existing links, not another user's ID.
+app.post('/my/telegram/revokeLinks', async (c) => {
+	const data = await telegramService.revokeLinks(c, userContext.getUserId(c));
+	return c.json(result.ok(data));
 });
 
 app.get('/my/geo', (c) => {
@@ -76,9 +84,9 @@ app.get('/my/totp/status', async (c) => {
 	return c.json(result.ok(data));
 });
 
-app.get('/my/totp/setup', async (c) => {
+app.post('/my/totp/setup', async (c) => {
 	const userObj = userContext.getUser(c);
-	const data = await totpService.getSetupInfo(c, userContext.getUserId(c), userObj.email);
+	const data = await totpService.getSetupInfo(c, userContext.getUserId(c), userObj.email, await c.req.json());
 	return c.json(result.ok(data));
 });
 
@@ -102,9 +110,9 @@ app.post('/my/totp/view-backup-codes', async (c) => {
 	return c.json(result.ok(data));
 });
 
-app.get('/my/passkey/setup', async (c) => {
+app.post('/my/passkey/setup', async (c) => {
 	const userObj = userContext.getUser(c);
-	const data = await totpService.getPasskeyRegistrationOptions(c, userContext.getUserId(c), userObj.email);
+	const data = await totpService.getPasskeyRegistrationOptions(c, userContext.getUserId(c), userObj.email, await c.req.json());
 	return c.json(result.ok(data));
 });
 
@@ -120,7 +128,7 @@ app.get('/my/passkey/list', async (c) => {
 
 app.delete('/my/passkey/:id', async (c) => {
 	const passkeyId = c.req.param('id');
-	await totpService.deletePasskey(c, userContext.getUserId(c), passkeyId);
+	await totpService.deletePasskey(c, userContext.getUserId(c), passkeyId, await c.req.json());
 	return c.json(result.ok());
 });
 
@@ -137,7 +145,7 @@ app.post('/my/passkey/:id/approve-totp', async (c) => {
 
 app.post('/my/passkey/:id/activate-timelock', async (c) => {
 	const passkeyId = c.req.param('id');
-	const data = await totpService.activateTimelockedPasskey(c, userContext.getUserId(c), passkeyId);
+	const data = await totpService.activateTimelockedPasskey(c, userContext.getUserId(c), passkeyId, await c.req.json());
 	return c.json(result.ok(data));
 });
 
@@ -166,7 +174,7 @@ app.get('/my/exportData', async (c) => {
 });
 
 app.post('/my/testTelegram', async (c) => {
-	const data = await telegramService.testPersonalBot(c, await c.req.json());
+	const data = await telegramService.testPersonalBot(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok(data));
 });
 
@@ -265,3 +273,20 @@ app.delete('/my/oauthIdentities/:id', async (c) => {
 });
 
 
+
+app.post('/my/security/reauth-options', async (c) => {
+ return c.json(result.ok(await totpService.reauthOptions(c, userContext.getUserId(c), await c.req.json())));
+});
+app.post('/my/security/reauth', async (c) => {
+ return c.json(result.ok(await totpService.reauthenticate(c, userContext.getUserId(c), await c.req.json())));
+});
+
+app.get('/my/legal/status', async (c) => {
+ return c.json(result.ok(await legalPolicyService.getLegalAcceptanceStatus(c, userContext.getUserId(c))));
+});
+
+app.post('/my/legal/accept', async (c) => {
+ const body = await c.req.json().catch(() => ({}));
+ const data = await legalPolicyService.acceptCurrentPolicy(c, userContext.getUserId(c), body);
+ return c.json(result.ok(data));
+});

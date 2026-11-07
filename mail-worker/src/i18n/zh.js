@@ -1,4 +1,5 @@
 const zh = {
+    forwardingNotSupported: '请选择全部邮件或填写非空别名前缀，并保留原件；智能规则和转寄后删除暂不可用。',
     dynamicUi: '动态 UI',
     staticUi: '静态 UI',
     dynamicUiDesc: '适用于默认动态星空交互界面的文案与气泡',
@@ -1914,6 +1915,12 @@ const zh = {
     updateTotpBtn: "更新验证器",
     deleteTotpBtn: "停用验证器",
     passkeyNotFound: "未找到指定的通行密钥",
+
+    privacyProcessing: {
+        disabled: '可选内容处理已关闭，或尚未配置可用的公开说明页面。',
+        confirmationRequired: '翻译前请确认你已查看当前内容处理说明。',
+        noticeChanged: '内容处理说明已变更，请查看当前说明后重试。'
+    },
 
     // ===== 权限树本地化（perm-service.tree：按钮按 perm_key，分组按库内名称）=====
     perms: {

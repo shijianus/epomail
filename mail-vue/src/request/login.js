@@ -1,7 +1,14 @@
 import http from '@/axios/index.js';
 
-export function login(email, password) {
-    return http.post('/login', {email: email, password: password})
+export function login(emailOrPayload, password) {
+    const payload = emailOrPayload && typeof emailOrPayload === 'object'
+        ? emailOrPayload
+        : { email: emailOrPayload, password };
+    return http.post('/login', payload)
+}
+
+export function loginTotp(payload) {
+    return http.post('/login/totp', payload)
 }
 
 export function logout() {

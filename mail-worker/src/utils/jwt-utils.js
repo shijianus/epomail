@@ -21,8 +21,10 @@ function requireJwtSecret(c) {
 }
 
 const jwtUtils = {
-	async generateToken(c, payload, expiresInSeconds) {
-		const secret = requireJwtSecret(c);
+	async generateTokenWithSecret(c, secret, payload, expiresInSeconds) {
+		if (!secret || typeof secret !== 'string' || !secret.trim()) {
+			throw new Error('JWT signing secret is not configured');
+		}
 		const header = {
 			alg: 'HS256',
 			typ: 'JWT'
@@ -44,7 +46,7 @@ const jwtUtils = {
 
 		const key = await crypto.subtle.importKey(
 			'raw',
-			encoder.encode(secret),
+			encoder.encode(secret.trim()),
 			{ name: 'HMAC', hash: 'SHA-256' },
 			false,
 			['sign']
@@ -54,6 +56,10 @@ const jwtUtils = {
 		const signatureStr = base64url(signature);
 
 		return `${data}.${signatureStr}`;
+	},
+
+	async generateToken(c, payload, expiresInSeconds) {
+		return await this.generateTokenWithSecret(c, requireJwtSecret(c), payload, expiresInSeconds);
 	},
 
 	async verifyToken(c, token) {
@@ -97,7 +103,9 @@ const jwtUtils = {
 			const payload = JSON.parse(payloadJson);
 
 			const now = Math.floor(Date.now() / 1000);
-			if (payload.exp && payload.exp < now) return null;
+			// 无 exp 的令牌一律拒绝：本系统签发的所有 JWT（会话/受限通知/分享/访问令牌）
+			// 都携带 exp，缺失即异常构造，绝不给"永不过期"留任何通道。
+			if (!payload.exp || payload.exp < now) return null;
 
 			return payload;
 

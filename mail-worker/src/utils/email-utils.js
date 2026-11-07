@@ -1,5 +1,17 @@
 import { parseHTML } from 'linkedom';
 
+/**
+ * 公共保留本地部分（统一小写比较）。注册与别名创建不得占用官方/合规身份地址，
+ * 防止公测期被抢注用于品牌冒充或钓鱼（postmaster/abuse 等为 RFC 2142 要求地址）。
+ * 仅约束新注册与新别名；存量账号不受影响。
+ */
+export const RESERVED_EMAIL_LOCAL_NAMES = new Set([
+	'admin', 'administrator', 'postmaster', 'abuse', 'security', 'support', 'help',
+	'noreply', 'no-reply', 'donotreply', 'do-not-reply', 'mailer-daemon', 'mailerdaemon',
+	'dmarc', 'spf', 'dkim', 'root', 'hostmaster', 'webmaster',
+	'billing', 'legal', 'privacy', 'contact', 'info', 'sales', 'hr', 'jobs'
+]);
+
 const emailUtils = {
 
 	getDomain(email) {

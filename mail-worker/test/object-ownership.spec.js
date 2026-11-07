@@ -1,5 +1,5 @@
 import { env, SELF } from 'cloudflare:test';
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import attService from '../src/service/att-service.js';
 import settingService from '../src/service/setting-service.js';
@@ -23,10 +23,28 @@ CREATE TABLE IF NOT EXISTS attachments (
 	create_time TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
 )`;
 
+const CREATE_USERS = `
+CREATE TABLE IF NOT EXISTS user (
+	user_id INTEGER PRIMARY KEY,
+	email TEXT NOT NULL,
+	type INTEGER NOT NULL DEFAULT 2,
+	is_del INTEGER NOT NULL DEFAULT 0,
+	status INTEGER NOT NULL DEFAULT 0,
+	auth_version INTEGER NOT NULL DEFAULT 0,
+	byo_storage_enabled INTEGER NOT NULL DEFAULT 0,
+	byo_storage_config TEXT NOT NULL DEFAULT '{}'
+)`;
+
+async function seedUser(userId, email) {
+	await env.db.prepare(`INSERT OR REPLACE INTO user (user_id, email, type, is_del, status)
+		VALUES (?, ?, ?, 0, 0)`).bind(userId, email, userId === 1 ? 1 : 2).run();
+}
+
 async function seedAuth(userId, email, sessionToken) {
-	const token = await jwtUtils.generateToken({ env }, { userId, token: sessionToken }, 3600);
+	await seedUser(userId, email);
+	const token = await jwtUtils.generateToken({ env }, { userId, token: sessionToken, authVersion: 0 }, 3600);
 	await env.kv.put(`auth-uid:${userId}`, JSON.stringify({
-		user: { userId, email, isDel: 0, status: 0, type: userId === 1 ? 1 : 2 },
+		user: { userId, email, isDel: 0, status: 0, authVersion: 0, type: userId === 1 ? 1 : 2 },
 		tokens: [sessionToken],
 		refreshTime: new Date().toISOString()
 	}), { expirationTtl: 3600 });
@@ -35,6 +53,7 @@ async function seedAuth(userId, email, sessionToken) {
 
 async function cleanup() {
 	await env.db.prepare('DELETE FROM attachments').run();
+	await env.db.prepare('DELETE FROM user WHERE user_id IN (1, 2, 3)').run();
 	for (const key of ['auth-uid:1', 'auth-uid:2', 'auth-uid:3', 'attachments/owned-by-2.txt', 'attachments/owned-by-3.txt']) {
 		await env.kv.delete(key);
 	}
@@ -43,19 +62,32 @@ async function cleanup() {
 describe('Object ownership and capability signing', () => {
 	beforeAll(async () => {
 		await env.db.prepare(CREATE_ATTACHMENTS).run();
+		await env.db.prepare(CREATE_USERS).run();
 	});
 
 	afterAll(async () => {
 		await cleanup();
-		await env.db.prepare('DROP TABLE IF EXISTS attachments').run();
 	});
 
-	afterEach(() => {
-		vi.restoreAllMocks();
+	beforeEach(async () => {
+		await cleanup();
+		await seedUser(2, 'user2@example.com');
+		await seedUser(3, 'user3@example.com');
+		// Explicit settings fixture; keep real BYO lookup, ownership and KV reads.
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			userByoStorage: 1, r2Domain: '', bucket: '', endpoint: '', s3AccessKey: '', s3SecretKey: ''
+		});
+	});
+
+	afterEach(async () => {
+		try {
+			await cleanup();
+		} finally {
+			vi.restoreAllMocks();
+		}
 	});
 
 	it('only signs keys owned by the caller and never another user key', async () => {
-		await cleanup();
 		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
 			.bind(2, 10, 20, 'attachments/owned-by-2.txt', 'owned-by-2.txt', 10, 0).run();
 		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
@@ -86,7 +118,6 @@ describe('Object ownership and capability signing', () => {
 	});
 
 	it('allows an administrator to sign existing attachment keys for mailbox audit views', async () => {
-		await cleanup();
 		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
 			.bind(3, 11, 21, 'attachments/owned-by-3.txt', 'owned-by-3.txt', 10, 0).run();
 		await env.kv.put('attachments/owned-by-3.txt', 'user-three-file');
@@ -106,6 +137,28 @@ describe('Object ownership and capability signing', () => {
 		expect(await download.text()).toBe('user-three-file');
 	});
 
+	it('rejects a signed attachment URL after the owner is banned or deleted', async () => {
+		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
+			.bind(2, 10, 20, 'attachments/owned-by-2.txt', 'owned-by-2.txt', 10, 0).run();
+		await env.kv.put('attachments/owned-by-2.txt', 'user-two-file');
+		const token = await seedAuth(2, 'user2@example.com', 'session-user-2');
+		const signed = await SELF.fetch('http://example.com/api/oss-url/batch', {
+			method: 'POST',
+			headers: { Authorization: token, 'Content-Type': 'application/json' },
+			body: JSON.stringify({ keys: ['attachments/owned-by-2.txt'] })
+		});
+		const signedBody = await signed.json();
+		const url = signedBody.data.urls['attachments/owned-by-2.txt'];
+		expect(url).toBeTruthy();
+		expect((await SELF.fetch(`http://example.com/api${url}`)).status).toBe(200);
+
+		await env.db.prepare('UPDATE user SET status = 1 WHERE user_id = 2').run();
+		expect((await SELF.fetch(`http://example.com/api${url}`)).status).toBe(404);
+
+		await env.db.prepare('UPDATE user SET status = 0, is_del = 1 WHERE user_id = 2').run();
+		expect((await SELF.fetch(`http://example.com/api${url}`)).status).toBe(404);
+	});
+
 	it('rejects anonymous batch signing', async () => {
 		const response = await SELF.fetch('http://example.com/api/oss-url/batch', {
 			method: 'POST',
@@ -117,14 +170,12 @@ describe('Object ownership and capability signing', () => {
 	});
 
 	it('never embeds another mailbox inline image while preparing a send', async () => {
-		await cleanup();
 		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
 			.bind(2, 10, 20, 'attachments/owned-by-2.txt', 'owned-by-2.txt', 13, 2).run();
 		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
 			.bind(3, 11, 21, 'attachments/owned-by-3.txt', 'owned-by-3.txt', 15, 2).run();
 		await env.kv.put('attachments/owned-by-2.txt', 'user-two-file');
 		await env.kv.put('attachments/owned-by-3.txt', 'user-three-file');
-		vi.spyOn(settingService, 'query').mockResolvedValue({ r2Domain: '' });
 
 		const foreign = await attService.toImageUrlHtml(
 			{ env },

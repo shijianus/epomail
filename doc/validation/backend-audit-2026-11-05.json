@@ -1,0 +1,62 @@
+{
+  "audit": "backend-logic-permissions-release-gate",
+  "date": "2026-11-05",
+  "branch": "release/2026-10-31",
+  "baseCommit": "13dbdfccc8c8b1a9eaf6a8644ac30c6e5f4f8a8a",
+  "codeCommit": "c003fc8efd74d12b4b4c941d980069347c4d723d",
+  "environment": {
+    "deployment": "local workerd/D1/KV only",
+    "productionOrStagingAccessed": false,
+    "realProvidersCalled": false
+  },
+  "checks": {
+    "workerTests": "37 files / 513 tests passed (exit 0, 1038.65s)",
+    "workerTestConfig": "pass (committed wrangler-vitest.toml parses; no audit-only config required)",
+    "vueBuild": "pass (1m15s; largest chunk 1464.53 kB / gzip 479.05 kB)",
+    "i18nSymmetry": "pass (mail-vue 3259 keys, mail-worker 1950 keys, six languages identical)",
+    "i18nAudit": "pass (2289 literal keys, 0 missing, 0 duplicate)",
+    "i18nHardcoded": "pass (0 suspicious lines)",
+    "secretScan": "pass (1258 tracked files, 0 findings)",
+    "wranglerDryRun": "pass (438 files, gzip 1185.34 KiB)",
+    "gitDiffCheck": "pass"
+  },
+  "closed": [
+    "R1 invalid committed Vitest TOML",
+    "B1 invite-code role-grant escalation",
+    "B2 admin delete bypassing mail lifecycle",
+    "B3 system storage change without inventory guard",
+    "B4 partial: UNKNOWN outbound reconciliation and admin resolution",
+    "B6 local-delivery user rules, notifications and forwarding",
+    "B8 partial: first passkey recovery codes",
+    "B9 durable initial-password marker",
+    "B10 partial: OIDC nonce, app status, client-secret ID token signing",
+    "B12 unique index migration order"
+  ],
+  "remainingP1": [
+    "B7 encrypted subject/body search filters ciphertext",
+    "B5 inbound personal forwarding fallback loses attachments/CID and has no durable per-target task",
+    "U1 OAuth authorize page login/MFA contract broken",
+    "U6 slow-network timeout clears authenticated session",
+    "B8 last recovery code cannot self-rotate factors",
+    "B11 admin user creation can be half-committed"
+  ],
+  "remainingP2": [
+    "profile field length/URL limits",
+    "report-spam deduplication",
+    "Telegram test bot not bound to saved configuration",
+    "PAT plaintext and no consumer route",
+    "Apple direct id_token can skip state/nonce",
+    "SSRF policy lacks DNS-resolution validation",
+    "attachment download lacks original filename",
+    "init_secret falls back to jwt_secret",
+    "storage change guard blocks policy toggle and has no migration path",
+    "UNKNOWN reconciliation limited to Resend provider ids",
+    "reconcileUnknownOutbound sequential timeout budget",
+    "invite role boundary fails open on lookup error",
+    "internal-sender Authentication-Results trust boundary",
+    "OIDC auth_time semantics",
+    "public profile owner email masking",
+    "rate-limit KV fallback before migration"
+  ],
+  "verdict": "NO-GO for unconditional GA; conditional GO for controlled public beta after accepting residual P1 risks and completing the pre-release checklist"
+}

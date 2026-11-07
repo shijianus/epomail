@@ -10,8 +10,7 @@
         >
         </el-input>
       </div>
-      <el-select v-model="params.status" placeholder="Select" class="status-select"
-                 :style="`width: ${locale === 'en' ? 95 : 80 }px`">
+      <el-select v-model="params.status" :placeholder="$t('select')" class="status-select">
         <el-option :key="-1" :label="$t('all')" :value="-1"/>
         <el-option :key="0" :label="$t('active')" :value="0"/>
         <el-option :key="1" :label="$t('banned')" :value="1"/>
@@ -111,12 +110,15 @@
           </template>
           <el-table-column v-if="createTimeShow" :label="$t('tabRegisteredAt')" min-width="160" prop="createTime">
             <template #default="props">
-              {{ tzDayjs(props.row.createTime).format('YYYY-MM-DD HH:mm') }}
+              {{ formatUiDateTime(props.row.createTime) }}
             </template>
           </el-table-column>
-          <el-table-column v-if="statusShow" min-width="60px" :label="$t('tabStatus')" prop="status">
+          <el-table-column v-if="statusShow" min-width="120" :label="$t('tabStatus')" prop="status">
             <template #default="props">
-              <el-tag disable-transitions v-if="props.row.isDel === 1" type="info">{{ $t('deleted') }}</el-tag>
+              <el-tag disable-transitions size="small" class="deletion-status" v-if="hasDeletionWorkflow(props.row)" :type="deletionTagType(props.row)">
+                {{ $t(`privacyDeletionUi.${deletionLabelKey(props.row)}`) }}
+              </el-tag>
+              <el-tag disable-transitions v-else-if="props.row.isDel === 1" type="info">{{ $t('privacyDeletionUi.softDeleted') }}</el-tag>
               <el-tag disable-transitions v-else-if="props.row.status === 0" type="primary">{{ $t('active') }}</el-tag>
               <el-tag disable-transitions v-else-if="props.row.status === 1" type="danger">{{ $t('banned') }}</el-tag>
             </template>
@@ -128,7 +130,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column :label="$t('tabSetting')" :width="settingWidth">
+          <el-table-column :label="$t('tabSetting')" :min-width="settingWidth">
             <template #default="props">
               <el-button size="small" type="primary" v-if="(props.row.type === 0 && userStore.user.type !== 0)" >{{ $t('action') }}</el-button>
               <el-dropdown v-else >
@@ -142,7 +144,8 @@
                       <el-dropdown-item v-if="props.row.isDel !== 1" @click="setStatus(props.row)">
                         {{ setStatusName(props.row) }}
                       </el-dropdown-item>
-                      <el-dropdown-item v-else @click="restore(props.row)">{{ $t('restore') }}</el-dropdown-item>
+                      <el-dropdown-item v-else-if="!hasDeletionRequest(props.row)" @click="restore(props.row)">{{ $t('restore') }}</el-dropdown-item>
+                      <el-dropdown-item v-else disabled>{{ $t('privacyDeletionUi.restoreBlocked') }}</el-dropdown-item>
                       <el-dropdown-item @click="handlePurgeUserEmails(props.row)" style="color: #ff4d4f;">
                         {{ $t('purgeUserEmails') }}
                       </el-dropdown-item>
@@ -188,6 +191,8 @@
       <div class="dialog-box">
         <el-input v-model="userForm.password" type="password" :placeholder="$t('newPassword')" autocomplete="off">
         </el-input>
+        <el-input v-model="userForm.operatorPassword" type="password" :placeholder="$t('adminPassword')" autocomplete="off">
+        </el-input>
         <el-button class="btn" type="primary" :loading="settingLoading" @click="updatePwd"
         >{{ $t('save') }}
         </el-button>
@@ -196,7 +201,7 @@
     <el-dialog class="dialog" v-model="setTypeShow" :title="$t('changePerm')" @closed="resetUserForm">
       <div class="dialog-box">
         <el-input disabled :model-value="$t('admin')" v-if="userForm.type === 0"/>
-        <el-select v-else v-model="userForm.type" placeholder="Select">
+        <el-select v-else v-model="userForm.type" :placeholder="$t('select')">
           <el-option v-for="item in roleList" :label="item.name" :value="item.roleId" :key="item.roleId"/>
         </el-select>
         <el-button :disabled="userForm.type === 0" class="btn" :loading="settingLoading" type="primary" @click="setType"
@@ -245,13 +250,13 @@
             <div class="email-row">{{ props.row.email }}</div>
           </template>
         </el-table-column>
-        <el-table-column property="isDel" :label="t('tabStatus')"  :width="locale === 'en' ? 75 : 65" >
+        <el-table-column property="isDel" :label="t('tabStatus')"  min-width="110" >
           <template #default="props">
             <el-tag type="primary" disable-transitions v-if="props.row.isDel === 0">{{$t('active')}}</el-tag>
             <el-tag type="info" disable-transitions v-if="props.row.isDel === 1">{{$t('deleted')}}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="t('action')" :width="locale === 'en' ? 75 : 65" >
+        <el-table-column :label="t('action')" min-width="110" >
           <template #default="props">
             <el-dropdown trigger="click">
               <el-button type="primary" size="small">{{t('action')}}</el-button>
@@ -293,19 +298,24 @@
           }}
         </div>
         <div v-if="!createTimeShow"><span class="details-item-title">{{ $t('tabRegisteredAt') }}:</span>{{
-            tzDayjs(userDetails.createTime).format('YYYY-MM-DD HH:mm')
+            formatUiDateTime(userDetails.createTime)
           }}
         </div>
         <div v-if="!typeShow"><span class="details-item-title">{{ $t('perm') }}:</span>
           {{ toRoleName(userDetails.type) }}
         </div>
-        <div v-if="!statusShow">
+        <div v-if="hasDeletionWorkflow(userDetails)" class="deletion-details">
+          <div><span class="details-item-title">{{ $t('privacyDeletionUi.requestedAt') }}:</span>{{ formatDeletionRequestedAt(userDetails.deletionRequestedAt) }}</div>
+          <div><span class="details-item-title">{{ $t('privacyDeletionUi.status') }}:</span><el-tag size="small" class="deletion-status" :type="deletionTagType(userDetails)">{{ $t(`privacyDeletionUi.${deletionLabelKey(userDetails)}`) }}</el-tag></div>
+          <div><span class="details-item-title">{{ $t('privacyDeletionUi.objectQueue') }}:</span>{{ formatObjectDeletionQueue(userDetails.objectDeletionQueue) }}</div>
+          <p class="deletion-note">{{ $t('privacyDeletionUi.scopeNote') }}</p>
+          <p v-if="hasDeletionRequest(userDetails)" class="deletion-note">{{ $t('privacyDeletionUi.restoreBlocked') }}</p>
+        </div>
+        <div v-if="!statusShow && !hasDeletionWorkflow(userDetails)">
           <span class="details-item-title">{{ $t('tabStatus') }}:</span>
-          <el-tag disable-transitions v-if="userDetails.isDel === 1" type="info">{{ $t('deleted') }}</el-tag>
-          <el-tag disable-transitions v-else-if="userDetails.status === 0" type="primary">{{ $t('active') }}
-          </el-tag>
-          <el-tag disable-transitions v-else-if="userDetails.status === 1" type="danger">{{ $t('banned') }}
-          </el-tag>
+          <el-tag disable-transitions v-if="userDetails.isDel === 1" type="info">{{ $t('privacyDeletionUi.softDeleted') }}</el-tag>
+          <el-tag disable-transitions v-else-if="userDetails.status === 0" type="primary">{{ $t('active') }}</el-tag>
+          <el-tag disable-transitions v-else-if="userDetails.status === 1" type="danger">{{ $t('banned') }}</el-tag>
         </div>
         <div><span class="details-item-title">{{ $t('registrationIp') }}:</span>{{
             userDetails.createIp || $t('unknown')
@@ -316,7 +326,7 @@
           }}
         </div>
         <div><span class="details-item-title">{{ $t('recentActivity') }}:</span>{{
-            userDetails.activeTime ? tzDayjs(userDetails.activeTime).format('YYYY-MM-DD') : $t('unknown')
+            formatUiDate(userDetails.activeTime)
           }}
         </div>
         <div><span
@@ -372,16 +382,20 @@
               </div>
             </template>
           </el-dropdown-item>
-          <el-dropdown-item v-if="rightClickUser.type !== 0">
+          <el-dropdown-item v-if="rightClickUser.type !== 0" :disabled="rightClickUser.isDel === 1 && hasDeletionRequest(rightClickUser)">
             <template #default>
               <div class="right-dropdown-item" v-if="rightClickUser.isDel !== 1" @click="setStatus(rightClickUser)" >
                 <Icon icon="ion:reload" v-if="rightClickUser.status" style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
                 <Icon icon="ion:ban-outline" v-else style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
                 <span>{{ setRightStatusName(rightClickUser) }}</span>
               </div>
-              <div class="right-dropdown-item" v-else @click="restore(rightClickUser)">
+              <div class="right-dropdown-item" v-else-if="!hasDeletionRequest(rightClickUser)" @click="restore(rightClickUser)">
                 <Icon icon="ion:reload" style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
                 <span>{{ t('restoreUser') }}</span>
+              </div>
+              <div class="right-dropdown-item" v-else>
+                <Icon icon="ion:information-circle-outline" style="margin-left: 1px;margin-right: 1px" width="19" height="19" />
+                <span>{{ t('privacyDeletionUi.restoreBlocked') }}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -450,10 +464,9 @@ import {
 import {roleSelectUse} from "@/request/role.js";
 import {Icon} from "@iconify/vue";
 import loading from "@/components/loading/index.vue";
-import {tzDayjs} from "@/utils/day.js";
+import {formatUiDate as formatUiDateValue, formatUiNumber} from "@/utils/ui-locale.js";
 import {useSettingStore} from "@/store/setting.js";
 import {isEmail} from "@/utils/verify-utils.js";
-import {formatBytes} from "@/utils/file-utils.js";
 import {useRoleStore} from "@/store/role.js";
 import {useUserStore} from "@/store/user.js";
 import {useI18n} from 'vue-i18n';
@@ -463,6 +476,8 @@ defineOptions({
 })
 
 const {t, locale} = useI18n();
+const formatUiDate = value => formatUiDateValue(value, locale.value);
+const formatUiDateTime = value => formatUiDateValue(value, locale.value, {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'});
 const roleStore = useRoleStore()
 const userStore = useUserStore()
 const settingStore = useSettingStore()
@@ -471,16 +486,75 @@ const currentMode = computed(() => Number(settingStore.settings?.allMailMode ?? 
 function formatUserStorage(row) {
   if (!row) return '0 B';
   if (row.storageSize) {
-    return typeof row.storageSize === 'number' ? formatBytes(row.storageSize) : row.storageSize;
+    return typeof row.storageSize === 'number' ? formatBytesLocalized(row.storageSize) : row.storageSize;
   }
   const recv = Number(row.receiveEmailCount || 0);
   const send = Number(row.sendEmailCount || 0);
   const estimatedBytes = (recv * 142000) + (send * 85000) + 1048576;
-  return formatBytes(estimatedBytes);
+  return formatBytesLocalized(estimatedBytes);
+}
+
+function formatBytesLocalized(bytes) {
+  const numericBytes = Number(bytes);
+  if (!Number.isFinite(numericBytes) || numericBytes < 0) return '-';
+  if (numericBytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const index = Math.max(0, Math.min(units.length - 1, Math.floor(Math.log(numericBytes) / Math.log(1024))));
+  const value = numericBytes / (1024 ** index);
+  return `${formatUiNumber(value, locale.value, {maximumFractionDigits: 2})} ${units[index]}`;
+}
+
+function hasDeletionRequest(row) {
+  return Boolean(row?.deletionRequestedAt || row?.deletionStatus);
+}
+
+function hasDeletionWorkflow(row) {
+  if (hasDeletionRequest(row)) return true;
+  const queue = row?.objectDeletionQueue;
+  if (!queue || typeof queue !== 'object') return false;
+  return ['pending', 'failed', 'total'].some(key => {
+    const value = Number(queue[key]);
+    return Number.isFinite(value) && value > 0;
+  });
+}
+
+function deletionLabelKey(row) {
+  const status = String(row?.deletionStatus || '').toLowerCase();
+  const failed = Number(row?.objectDeletionQueue?.failed);
+  if (Number.isFinite(failed) && failed > 0) return 'needsAttention';
+  if (['cleanup_pending', 'pending', 'processing'].includes(status)) return 'pending';
+  if (['cleanup_failed', 'failed', 'manual_review'].includes(status)) return 'needsAttention';
+  if (status === 'completed') return 'recorded';
+  return 'unknownStatus';
+}
+
+function deletionTagType(row) {
+  const key = deletionLabelKey(row);
+  if (key === 'needsAttention') return 'danger';
+  if (key === 'pending') return 'warning';
+  return 'info';
+}
+
+function formatDeletionRequestedAt(value) {
+  return formatUiDateTime(value);
+}
+
+function formatObjectDeletionQueue(queue) {
+  if (!queue || typeof queue !== 'object') return t('privacyDeletionUi.unavailable');
+  const count = value => {
+    if (typeof value !== 'number' && typeof value !== 'string') return '-';
+    if (typeof value === 'string' && value.trim() === '') return '-';
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number >= 0 ? formatUiNumber(number, locale.value) : '-';
+  };
+  return t('privacyDeletionUi.queueCounts', {
+    pending: count(queue.pending),
+    failed: count(queue.failed)
+  });
 }
 
 const filteredValue = ['normal', 'del']
-const filters = [{text: t('active'), value: 'normal'}, {text: t('deleted'), value: 'del'}]
+const filters = computed(() => [{text: t('active'), value: 'normal'}, {text: t('deleted'), value: 'del'}])
 const preserveExpanded = ref(false)
 const emailWidth = ref(230)
 const expandWidth = ref(40)
@@ -542,6 +616,7 @@ const params = reactive({
 let chooseUser = {}
 const userForm = reactive({
   password: null,
+  operatorPassword: null,
   type: -1,
   userId: 0,
 })
@@ -860,7 +935,7 @@ function formatSendCount(user) {
     return t('unlimited');
   }
 
-  let count = (user.sendCount || 0) + '/' + user.sendAction.sendCount
+  let count = `${formatUiNumber(user.sendCount || 0, locale.value)}/${formatUiNumber(user.sendAction.sendCount, locale.value)}`
 
   return count
 }
@@ -907,11 +982,22 @@ function resetTotp(user) {
       type: 'warning'
     }
   ).then(() => {
-    userResetTotp(user.userId).then(() => {
-      ElMessage({
-        message: t('resetTotpSuccess'),
-        type: 'success',
-        plain: true
+    ElMessageBox.prompt(
+      t('adminPassword'),
+      t('resetTotpTitle'),
+      {
+        confirmButtonText: t('confirm'),
+        cancelButtonText: t('cancel'),
+        inputType: 'password',
+        inputPlaceholder: t('password')
+      }
+    ).then(({ value }) => {
+      userResetTotp(user.userId, value || '').then(() => {
+        ElMessage({
+          message: t('resetTotpSuccess'),
+          type: 'success',
+          plain: true
+        })
       })
     })
   });
@@ -988,6 +1074,10 @@ function delOneUser(user) {
 }
 
 function restore(user) {
+  if (hasDeletionRequest(user)) {
+    ElMessage({ message: t('privacyDeletionUi.restoreBlocked'), type: 'warning', plain: true });
+    return;
+  }
 
   const type = ref(0)
 
@@ -1052,6 +1142,7 @@ function setType() {
 
 function resetUserForm() {
   userForm.password = null
+  userForm.operatorPassword = null
   userForm.userId = 0
 }
 
@@ -1081,7 +1172,7 @@ function updatePwd() {
   }
 
   settingLoading.value = true
-  userSetPwd({password: userForm.password, userId: userForm.userId}).then(() => {
+  userSetPwd({password: userForm.password, userId: userForm.userId, operatorPassword: userForm.operatorPassword || ''}).then(() => {
     setPwdShow.value = false
     ElMessage({
       message: t('saveSuccessMsg'),
@@ -1183,7 +1274,7 @@ function adjustWidth() {
   sendNumShow.value = width > 685
   typeShow.value = width > 767
   emailWidth.value = width > 480 ? 230 : null
-  settingWidth.value = width < 480 ? (locale.value === 'en' ? 85 : 75) : null
+  settingWidth.value = 110
   expandWidth.value = width < 480 ? 30 : 35
   pagerCount.value = width < 768 ? 7 : 11
   receiveWidth.value = width < 480 ? 90 : null
@@ -1214,7 +1305,9 @@ function adjustWidth() {
 }
 
 .user-box {
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;  overflow: hidden;
   height: 100%;
 }
 
@@ -1283,10 +1376,8 @@ function adjustWidth() {
 .scrollbar {
   width: 100%;
   overflow: auto;
-  height: calc(100% - 50px);
-  @media (max-width: 464px) {
-    height: calc(100% - 90px);
-  }
+  flex: 1;
+  min-height: 0;
 }
 
 .details {
@@ -1294,11 +1385,35 @@ function adjustWidth() {
   display: grid;
   gap: 10px;
   .details-item-title {
-    white-space: pre;
+    white-space: normal;
     color: #909399;
     font-weight: bold;
     padding-right: 10px;
   }
+}
+
+.deletion-status {
+  height: auto;
+  min-height: 20px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  padding: 2px 6px;
+}
+
+.deletion-details {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+}
+
+.deletion-note {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--el-text-color-secondary);
 }
 
 :deep(.linuxdo-avatar) {
@@ -1338,6 +1453,9 @@ function adjustWidth() {
 }
 
 .status-select {
+  width: auto;
+  min-width: 10rem;
+  max-width: 100%;
   :deep(.el-select__wrapper) {
     min-height: 28px;
   }

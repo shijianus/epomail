@@ -96,29 +96,26 @@ beforeAll(async () => {
 	await ensureBindClaimTable(env.db);
 });
 
-beforeEach(async () => {
+async function cleanup() {
 	await env.db.prepare('DELETE FROM oauth').run();
 	await clearOtc(env.db);
 	await clearBindClaim(env.db);
 	await resetRateLimits();
 	await env.kv.delete('apple_jwks_v1');
+}
+
+beforeEach(cleanup);
+
+afterEach(async () => {
+	try {
+		await cleanup();
+	} finally {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+	}
 });
 
-afterEach(() => {
-	vi.restoreAllMocks();
-	vi.unstubAllGlobals();
-});
-
-afterAll(async () => {
-	await env.db.prepare('DELETE FROM oauth').run();
-	await clearOtc(env.db);
-	await clearBindClaim(env.db);
-	await env.kv.delete('apple_jwks_v1');
-	await resetRateLimits();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_bind_claim').run();
-	await dropOtcTable(env.db);
-});
+afterAll(cleanup);
 
 describe('D1 single-use store: atomic compare-and-set', () => {
 	it('lets exactly one of 32 concurrent consumers win', async () => {
@@ -351,6 +348,15 @@ describe('OAuth state', () => {
 });
 
 describe('OAuth login exchange code', () => {
+	beforeEach(() => {
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
+			oauthProviders: {
+				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+			}
+		});
+	});
+
 	async function issueCode(marker = 'code') {
 		return oauthService.createLoginExchangeCode({ env }, {
 			token: `session-jwt-${marker}`,
@@ -446,6 +452,12 @@ describe('OAuth bind proof', () => {
 	}
 
 	beforeEach(() => {
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
+			oauthProviders: {
+				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+			}
+		});
 		vi.spyOn(loginService, 'validateRegistration').mockResolvedValue({});
 		vi.spyOn(loginService, 'register').mockResolvedValue({
 			userId: 5,
@@ -635,6 +647,7 @@ describe('OAuth callback end-to-end concurrency', () => {
 		const { pair, jwk } = await createSigningMaterial('atomicity-callback-kid');
 		await env.kv.put('apple_jwks_v1', JSON.stringify({ keys: [jwk] }), { expirationTtl: 3600 });
 		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
 			oauthProviders: {
 				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
 			}
@@ -701,6 +714,7 @@ describe('OAuth callback end-to-end concurrency', () => {
 		const { jwk } = await createSigningMaterial('atomicity-failure-kid');
 		await env.kv.put('apple_jwks_v1', JSON.stringify({ keys: [jwk] }), { expirationTtl: 3600 });
 		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
 			oauthProviders: {
 				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
 			}
@@ -765,6 +779,8 @@ describe('OAuth provider authorization code', () => {
 			email: 'provider@example.com',
 			name: 'Provider User',
 			status: 0,
+			isDel: 0,
+			authVersion: 1,
 			avatar: ''
 		});
 		await seedOtc(env.db, {
@@ -774,6 +790,7 @@ describe('OAuth provider authorization code', () => {
 			oauthUserId: '7',
 			payload: {
 				userId: 7,
+				authVersion: 1,
 				userEmail: 'provider@example.com',
 				clientId: 'client-1',
 				redirectUri: 'https://app.example/cb',
@@ -821,7 +838,7 @@ describe('OAuth provider authorization code', () => {
 			token: `epo_code_${'b'.repeat(32)}`,
 			provider: 'client-1',
 			oauthUserId: '7',
-			payload: { userId: 7, clientId: 'client-1', redirectUri: 'https://app.example/cb', scopes: 'openid email' },
+			payload: { userId: 7, authVersion: 1, clientId: 'client-1', redirectUri: 'https://app.example/cb', scopes: 'openid email' },
 			expiresAt: Math.floor(Date.now() / 1000) - 1
 		});
 		await expect(oauthProviderService.token(c, {

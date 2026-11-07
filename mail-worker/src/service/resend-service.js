@@ -1,6 +1,7 @@
 import emailService from './email-service';
 import { emailConst } from '../const/entity-const';
 import BizError from '../error/biz-error';
+import { getUserDb } from '../utils/db-accessor';
 
 const SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
@@ -9,6 +10,18 @@ function timingSafeEqual(a, b) {
 	let diff = 0;
 	for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
 	return diff === 0;
+}
+
+function noticeTaskReference(data) {
+	const headers = data?.headers;
+	const tags = data?.tags;
+	const header = Array.isArray(headers)
+		? headers.find(item => String(item?.name || '').toLowerCase() === 'x-entity-ref-id')?.value
+		: headers?.['X-Entity-Ref-ID'] || headers?.['x-entity-ref-id'];
+	const tag = Array.isArray(tags)
+		? tags.find(item => item?.name === 'notice_task_id')?.value
+		: tags?.notice_task_id;
+	return typeof (tag || header) === 'string' ? (tag || header) : null;
 }
 
 const resendService = {
@@ -87,7 +100,7 @@ const resendService = {
 		if (!body || !body.type || !body.data) return { ignored: true };
 
 		const eventId = svixId || body.id || (body.data?.email_id ? `${body.data.email_id}_${body.type}` : null);
-		const userDb = c?.env?.db || (c._mockOrm ? c._mockOrm : null);
+		const userDb = getUserDb(c);
 
 		// 0. KV 快速去重（best-effort 短路；权威去重始终以 webhook_event 台账主键为准）
 		if (eventId && c?.env?.kv) {
@@ -145,42 +158,28 @@ const resendService = {
 			`).bind(eventId, body.type || 'unknown', body.data?.email_id || null));
 
 			if (body.data?.email_id) {
-				const entityRefTaskId = body.data?.headers?.['X-Entity-Ref-ID'] || body.data?.headers?.['x-entity-ref-id'] || null;
-
-				if (body.type === 'email.delivered') {
-					stmts.push(userDb.prepare(`
-						UPDATE notification_outbox
-						SET status = 'delivered', provider_message_id = coalesce(provider_message_id, ?),
-						    delivered_at = datetime('now'), update_time = datetime('now')
-						WHERE (provider_message_id = ? OR (? IS NOT NULL AND task_id = ?))
-						  AND status IN ('pending', 'processing', 'sent', 'failed')
-					`).bind(body.data.email_id, body.data.email_id, entityRefTaskId, entityRefTaskId));
-				} else if (body.type === 'email.bounced') {
-					const lastError = 'Bounced: ' + (typeof body.data.bounce === 'object' ? JSON.stringify(body.data.bounce) : body.data.bounce);
-					stmts.push(userDb.prepare(`
-						UPDATE notification_outbox
-						SET status = 'dead_letter', provider_message_id = coalesce(provider_message_id, ?),
-						    last_error = ?, update_time = datetime('now')
-						WHERE (provider_message_id = ? OR (? IS NOT NULL AND task_id = ?))
-						  AND status != 'dead_letter' AND status != 'canceled'
-					`).bind(body.data.email_id, lastError, body.data.email_id, entityRefTaskId, entityRefTaskId));
-				} else if (body.type === 'email.complained') {
-					stmts.push(userDb.prepare(`
-						UPDATE notification_outbox
-						SET status = 'complained', provider_message_id = coalesce(provider_message_id, ?),
-						    last_error = 'Recipient marked notification as complained', update_time = datetime('now')
-						WHERE (provider_message_id = ? OR (? IS NOT NULL AND task_id = ?))
-						  AND status != 'canceled'
-					`).bind(body.data.email_id, body.data.email_id, entityRefTaskId, entityRefTaskId));
-				} else if (body.type === 'email.failed') {
-					const lastError = body.data?.failed?.reason || 'External delivery failed';
-					stmts.push(userDb.prepare(`
-						UPDATE notification_outbox
-						SET status = 'failed', provider_message_id = coalesce(provider_message_id, ?),
-						    last_error = ?, update_time = datetime('now')
-						WHERE (provider_message_id = ? OR (? IS NOT NULL AND task_id = ?))
-						  AND status IN ('pending', 'processing', 'sent')
-					`).bind(body.data.email_id, lastError, body.data.email_id, entityRefTaskId, entityRefTaskId));
+				const entityRefTaskId = noticeTaskReference(body.data);
+				const inFlight = ['pending', 'processing', 'sent', 'failed', 'unknown'];
+				const transitions = {
+					'email.sent': { status: 'sent', from: inFlight, error: null },
+					'email.delivery_delayed': { status: 'sent', from: inFlight, error: 'Provider delivery delayed' },
+					'email.delivered': { status: 'delivered', from: inFlight, error: null },
+					'email.bounced': { status: 'dead_letter', from: [...inFlight, 'delivered'], error: 'Provider reported a bounce' },
+					// A signed provider failure is a terminal fact, not permission to resend.
+					'email.failed': { status: 'dead_letter', from: inFlight, error: 'Provider reported delivery failure' },
+					'email.complained': { status: 'complained', from: [...inFlight, 'delivered', 'dead_letter'], error: 'Recipient reported a complaint' }
+				};
+				const transition = transitions[body.type];
+				if (transition) {
+					stmts.push(userDb.prepare(`UPDATE notification_outbox
+						SET status = ?, provider_message_id = COALESCE(provider_message_id, ?), last_error = ?,
+							delivered_at = CASE WHEN ? = 'delivered' THEN COALESCE(delivered_at, datetime('now')) ELSE delivered_at END,
+							claimant_id = NULL, lease_expires_at = NULL, next_retry_at = NULL, update_time = datetime('now')
+						WHERE channel IN ('external', 'resend')
+							AND (provider_message_id = ? OR (provider_message_id IS NULL AND task_id = ?))
+							AND status IN (${transition.from.map(() => '?').join(', ')})`)
+						.bind(transition.status, body.data.email_id, transition.error, transition.status,
+							body.data.email_id, entityRefTaskId, ...transition.from));
 				}
 			}
 

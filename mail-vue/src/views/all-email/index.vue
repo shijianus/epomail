@@ -97,7 +97,7 @@
 
         <el-scrollbar class="detail-body-scrollbar">
           <div class="email-body-content">
-            <ShadowHtml class="shadow-html" :html="formatImage(currentEmail.content)" v-if="currentEmail.content" />
+            <ShadowHtml class="shadow-html" :html="formatImage(currentEmail.content)" :message-key="currentEmail.emailId || currentEmail.hash" :trusted-image-urls="trustedImageUrls" v-if="currentEmail.content" />
             <pre v-else class="email-text">{{ currentEmail.text || $t('noContent') }}</pre>
           </div>
         </el-scrollbar>
@@ -148,7 +148,7 @@ import {getIconByName} from "@/utils/icon-utils.js";
 import {formatBytes} from "@/utils/file-utils.js";
 import {useAttachmentUrls} from "@/utils/attachment-urls.js";
 defineOptions({
-  name: 'all-email'
+  name: 'manage-mail'
 })
 
 const route = useRoute()
@@ -164,7 +164,7 @@ const clearLoading = ref(false)
 
 const showDetailDrawer = ref(false)
 const currentEmail = ref(null)
-const { formatImage, attachmentUrl } = useAttachmentUrls(() => currentEmail.value ? [currentEmail.value] : [])
+const { formatImage, attachmentUrl, trustedImageUrls } = useAttachmentUrls(() => currentEmail.value ? [currentEmail.value] : [])
 
 onMounted(() => {
   emailStore.emailScroll = sysEmailScroll.value;
@@ -417,7 +417,7 @@ function getEmailList(emailId, size) {
 }
 
 useEmailPolling({
-  routeName: 'all-email',
+  routeName: 'manage-mail',
   tick: async () => {
     const latestId = sysEmailScroll.value.latestEmail?.emailId
     if (!latestId && latestId !== 0) return

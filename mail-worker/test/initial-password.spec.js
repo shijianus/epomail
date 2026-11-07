@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS user (
 	type INTEGER DEFAULT 1 NOT NULL,
 	password TEXT NOT NULL,
 	salt TEXT NOT NULL,
+	initial_password_hash TEXT NOT NULL DEFAULT '',
 	status INTEGER DEFAULT 0 NOT NULL,
 	create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 	active_time DATETIME,
@@ -49,6 +50,8 @@ CREATE TABLE IF NOT EXISTS user (
 	totp_backup_codes TEXT DEFAULT '[]' NOT NULL,
 	totp_created_at TEXT DEFAULT '' NOT NULL,
 	security_keys TEXT DEFAULT '[]' NOT NULL,
+	auth_version INTEGER NOT NULL DEFAULT 0,
+	passkey_history INTEGER NOT NULL DEFAULT 0,
 	storage_quota_mb INTEGER DEFAULT 0 NOT NULL,
 	byo_storage_enabled INTEGER DEFAULT 0 NOT NULL,
 	byo_storage_config TEXT DEFAULT '{}' NOT NULL
@@ -69,10 +72,22 @@ CREATE TABLE IF NOT EXISTS oauth (
 	user_id INTEGER NOT NULL DEFAULT 0
 )`;
 
-const USER_ID = 7;
+const USER_ID = 970101;
 const EMAIL = 'oauth.user@example.com';
 const GENERATED_HASH = 'generated-hash-never-chosen';
 const GENERATED_SALT = 'generated-salt';
+
+async function ensureSecurityColumns() {
+	for (const column of [
+		{ name: 'auth_version', sql: 'ALTER TABLE user ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0' },
+		{ name: 'passkey_history', sql: 'ALTER TABLE user ADD COLUMN passkey_history INTEGER NOT NULL DEFAULT 0' }
+	]) {
+		const present = await env.db.prepare(
+			`SELECT 1 AS present FROM pragma_table_info('user') WHERE name = ? LIMIT 1`
+		).bind(column.name).first();
+		if (!present) await env.db.prepare(column.sql).run();
+	}
+}
 
 function createMockKv() {
 	const store = new Map();
@@ -155,8 +170,6 @@ afterEach(() => {
 afterAll(async () => {
 	await env.db.prepare('DELETE FROM user WHERE user_id = ?').bind(USER_ID).run();
 	await env.db.prepare('DELETE FROM oauth').run();
-	await env.db.prepare('DROP TABLE IF EXISTS user').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
 });
 
 describe('eligibility gates for the first password', () => {
@@ -166,6 +179,19 @@ describe('eligibility gates for the first password', () => {
 		const jwt = await issueSession(c, kv);
 		c.req.header = (name) => (String(name).toLowerCase() === 'authorization' ? jwt : null);
 		await kv.put(KvConst.INITIAL_PASSWORD + USER_ID, GENERATED_HASH);
+
+		const eligibility = await userService.evaluateInitialPassword(c, USER_ID);
+		expect(eligibility.canSet).toBe(true);
+		expect(eligibility.generatedHash).toBe(GENERATED_HASH);
+	});
+
+	it('uses the durable D1 marker even when KV has no copy', async () => {
+		const kv = createMockKv();
+		const c = context(kv, 'placeholder');
+		const jwt = await issueSession(c, kv);
+		c.req.header = (name) => (String(name).toLowerCase() === 'authorization' ? jwt : null);
+		await env.db.prepare('UPDATE user SET initial_password_hash = ? WHERE user_id = ?')
+			.bind(GENERATED_HASH, USER_ID).run();
 
 		const eligibility = await userService.evaluateInitialPassword(c, USER_ID);
 		expect(eligibility.canSet).toBe(true);
@@ -223,6 +249,8 @@ describe('setting the first password', () => {
 		const jwt = await issueSession(c, kv);
 		c.req.header = (name) => (String(name).toLowerCase() === 'authorization' ? jwt : null);
 		await kv.put(KvConst.INITIAL_PASSWORD + USER_ID, GENERATED_HASH);
+		await env.db.prepare('UPDATE user SET initial_password_hash = ? WHERE user_id = ?')
+			.bind(GENERATED_HASH, USER_ID).run();
 
 		const result = await userService.setInitialPassword(c, { password: 'new-user-password' }, USER_ID);
 		expect(result).toEqual({ success: true });
@@ -232,6 +260,9 @@ describe('setting the first password', () => {
 		const check = await cryptoUtils.verifyPasswordWithUpgrade('new-user-password', row.salt, row.password, c.env);
 		expect(check.isValid).toBe(true);
 
+		const durable = await env.db.prepare('SELECT initial_password_hash FROM user WHERE user_id = ?')
+			.bind(USER_ID).first();
+		expect(durable.initial_password_hash).toBe('');
 		expect(await kv.get(KvConst.INITIAL_PASSWORD + USER_ID)).toBeNull();
 		expect(await kv.get(KvConst.AUTH_INFO + USER_ID)).toBeNull();
 	});
@@ -279,7 +310,7 @@ describe('setting the first password', () => {
 
 		await expect(userService.setInitialPassword(c, { password: '12345' }, USER_ID))
 			.rejects.toMatchObject({ code: 400 });
-		await expect(userService.setInitialPassword(c, { password: 'x'.repeat(31) }, USER_ID))
+		await expect(userService.setInitialPassword(c, { password: 'x'.repeat(129) }, USER_ID))
 			.rejects.toMatchObject({ code: 400 });
 		expect((await reloadUser()).password).toBe(GENERATED_HASH);
 	});
@@ -302,10 +333,11 @@ describe('session provenance', () => {
 
 		await loginService.login(c, {
 			email: EMAIL,
-			password: null,
-			authMethod: 'oauth',
-			authProvider: 'apple'
-		}, true);
+			password: null
+		}, true, {
+			method: 'oauth',
+			provider: 'apple'
+		});
 
 		const authInfo = await kv.get(KvConst.AUTH_INFO + USER_ID, { type: 'json' });
 		expect(authInfo.tokens).toHaveLength(1);

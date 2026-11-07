@@ -346,7 +346,7 @@
           <el-tab-pane label="NextAuth.js (Auth.js)" name="nextauth">
             <div class="code-block-wrapper">
               <div class="code-header">
-                <span>pages/api/auth/[...nextauth].ts 或 auth.ts</span>
+                <span>{{ $t('nextAuthSampleCaption') }}</span>
                 <el-button link type="primary" size="small" @click="copyCode(nextAuthSnippet)">
                   <Icon icon="fluent:copy-16-regular" width="13" height="13" style="margin-right: 4px;" />
                   {{ $t('copyConfig') }}
@@ -449,6 +449,7 @@ import {
 } from '@/request/oauth-app.js'
 import { useSettingStore } from '@/store/setting.js'
 import { getOfficialLink } from '@/const/links-const.js'
+import { normalizeUiLocale, buildDocsPageUrl, formatUiDate } from '@/utils/ui-locale.js'
 
 defineOptions({
   name: 'oauth-app'
@@ -458,7 +459,8 @@ const settingStore = useSettingStore()
 
 const { t, locale } = useI18n()
 
-const SAMPLE_APP_SEED_DESC = 'EpoCanvas / shijianus 博客原生集成示例应用（官方内置示例，站长可随时修改或直接删除）';
+// Match the stored seed text independently of the active UI language.
+const SAMPLE_APP_SEED_DESC = t('sampleAppDesc', {}, { locale: 'zh' });
 function localizedAppDesc(desc) {
   if (!desc) return '';
   return desc.trim() === SAMPLE_APP_SEED_DESC ? t('sampleAppDesc') : desc;
@@ -528,7 +530,7 @@ export const authOptions = {
       wellKnown: "${origin}/.well-known/openid-configuration",
       authorization: { params: { scope: "openid profile email" } },
       clientId: "${app.clientId || 'YOUR_CLIENT_ID'}",
-      clientSecret: process.env.EPOMAIL_CLIENT_SECRET, // 填入生成的 Client Secret
+      clientSecret: process.env.EPOMAIL_CLIENT_SECRET, // ${t('oauthSampleClientSecretHint')}
       idToken: true,
       profile(profile) {
         return {
@@ -549,7 +551,7 @@ const nodeJsSnippet = computed(() => {
   const origin = currentOrigin.value
   const app = activeAppForGuide.value
   const cb = (app.redirectUris && app.redirectUris[0]) || 'https://example.com/api/auth/callback'
-  return `// 1. 发起授权跳转 (Redirect to Epomail)
+  return `// 1. ${t('oauthSampleRedirect')}
 const authUrl = "${origin}/oauth/authorize?" + new URLSearchParams({
   client_id: "${app.clientId || 'YOUR_CLIENT_ID'}",
   redirect_uri: "${cb}",
@@ -558,11 +560,11 @@ const authUrl = "${origin}/oauth/authorize?" + new URLSearchParams({
   state: "custom_random_state_string"
 });
 
-// 2. 回调换取 Token 与 UserInfo (Handle Callback)
+// 2. ${t('oauthSampleHandleCallback')}
 app.get("/api/auth/callback", async (req, res) => {
   const { code } = req.query;
   
-  // 兑换 Token
+  // ${t('oauthSampleExchangeToken')}
   const tokenRes = await fetch("${origin}/api/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -576,12 +578,12 @@ app.get("/api/auth/callback", async (req, res) => {
   });
   const tokenData = await tokenRes.json();
   
-  // 获取用户资料
+  // ${t('oauthSampleFetchUserInfo')}
   const userRes = await fetch("${origin}/api/oauth/userinfo", {
     headers: { Authorization: \`Bearer \${tokenData.access_token}\` }
   });
   const user = await userRes.json();
-  console.log("登录成功 Epomail 用户:", user);
+  console.log(${JSON.stringify(t('oauthSampleLoginSuccess'))}, user);
   res.json({ success: true, user });
 });`
 })
@@ -619,10 +621,10 @@ const curlSnippet = computed(() => {
   const origin = currentOrigin.value
   const app = activeAppForGuide.value
   const cb = (app.redirectUris && app.redirectUris[0]) || 'https://example.com/callback'
-  return `# 1. 引导用户访问授权地址
+  return `# 1. ${t('oauthSampleAuthorizeUrl')}
 ${origin}/oauth/authorize?client_id=${app.clientId || 'YOUR_CLIENT_ID'}&redirect_uri=${encodeURIComponent(cb)}&response_type=code&scope=openid%20profile%20email&state=xyz123
 
-# 2. 获取授权码后置换 Token
+# 2. ${t('oauthSampleExchangeAuthCode')}
 curl -X POST ${origin}/api/oauth/token \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -633,7 +635,7 @@ curl -X POST ${origin}/api/oauth/token \\
     "redirect_uri": "${cb}"
   }'
 
-# 3. 使用 Access Token 读取用户资料
+# 3. ${t('oauthSampleAccessUserInfo')}
 curl -X GET ${origin}/api/oauth/userinfo \\
   -H "Authorization: Bearer epo_access_token_here"`
 })
@@ -668,12 +670,11 @@ function openCreateDialog() {
   appDialogShow.value = true
 }
 
-// 开发接入教程：指向文档站《开放平台与 API 接入》（按界面语言选择文档目录，zh 为文档站根语言无前缀）
 function openBlogTutorial() {
-  const l = String(locale.value || 'zh')
-  const prefix = (l === 'zh' || l === 'zh-CN') ? '' : (l === 'zh-Hant' || l === 'zh-TW') ? 'zh-tw' : l
-  const base = getOfficialLink('docs', settingStore).replace(/\/$/, '')
-  window.open(`${base}/${prefix ? prefix + '/' : ''}mail/api/`, '_blank')
+  const lang = normalizeUiLocale(locale.value || settingStore.lang || 'zh')
+  const base = getOfficialLink('docs', settingStore)
+  const url = buildDocsPageUrl('mail/api/', lang, base)
+  window.open(url, '_blank')
 }
 
 function openEditDialog(app) {
@@ -752,7 +753,7 @@ async function handleResetSecret(app) {
   try {
     await ElMessageBox.confirm(
       t('resetSecretConfirm'),
-      '重置密钥确认',
+      t('secretResetConfirmTitle'),
       {
         confirmButtonText: t('confirmReset'),
         cancelButtonText: t('cancel'),
@@ -856,12 +857,12 @@ function handleLogoError(event, app) {
 
 function formatDate(isoStr) {
   if (!isoStr) return ''
-  try {
-    const d = new Date(isoStr)
-    return t('createdAtLabel', { date: d.toLocaleDateString() })
-  } catch (e) {
-    return isoStr
-  }
+  const formatted = formatUiDate(isoStr, normalizeUiLocale(locale.value || settingStore.lang || 'zh'), {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric'
+  })
+  return formatted === '-' ? isoStr : t('createdAtLabel', { date: formatted })
 }
 </script>
 

@@ -68,6 +68,18 @@ function websiteConfig(overrides = {}) {
       register: 0,
       regKey: 0,
       domainList: ['example.com'],
+      legalNotice: {
+        operatorName: 'Synthetic test operator',
+        operatorCountry: 'Test jurisdiction',
+        contactEmail: 'fixture@example.test',
+        contactAddress: '',
+        termsVersion: 'test-v1',
+        termsUrl: 'https://example.test/terms?lang=zh#v1',
+        privacyUrl: 'https://example.test/privacy',
+        recipientsUrl: '',
+        retentionUrl: ''
+      },
+      registrationReadiness: { ready: true, missing: [] },
       ...overrides
     }
   };
@@ -116,6 +128,17 @@ async function openPage(browser, { expectedState, config, bindResponse, bindResp
   return { context, page, requests };
 }
 
+function waitForSessionToken(page, expectedToken) {
+  return page.waitForFunction(
+    (token) => {
+      const rows = JSON.parse(localStorage.getItem('epo_sessions') || '[]');
+      return rows.some((row) => row.token === token);
+    },
+    expectedToken,
+    { timeout: 5000 }
+  );
+}
+
 const results = [];
 async function scenario(name, fn) {
   try {
@@ -145,6 +168,7 @@ try {
 
       await page.locator('#epo-bind-email').fill('bind@example.com');
       await page.locator('#epo-bind-code').fill('INVITE-1');
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create and link' }).click();
 
       const request = await bindRequest;
@@ -153,10 +177,14 @@ try {
         code: 'INVITE-1',
         oauthUserId: 'apple:user-1',
         provider: 'apple',
-        bindToken: PROOF
+        bindToken: PROOF,
+        acceptedTerms: true,
+        termsVersion: 'test-v1',
+        locale: 'en',
+        sourceUrl: 'https://example.test/terms?lang=zh#v1'
       });
 
-      await page.waitForFunction(() => localStorage.getItem('token') === 'bind-session-token', null, { timeout: 5000 });
+      await waitForSessionToken(page, 'bind-session-token');
       await page.waitForURL('**/mail/u/0/**', { timeout: 5000 });
       const sessions = await page.evaluate(() => JSON.parse(localStorage.getItem('epo_sessions') || '[]'));
       assert.equal(sessions.length, 1);
@@ -233,6 +261,7 @@ try {
       await page.getByRole('heading', { name: 'Link third-party account' }).waitFor({ timeout: 5000 });
       await page.locator('#epo-bind-email').fill('bind@example.com');
       await page.locator('#epo-bind-code').fill('INVITE-1');
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create and link' }).click();
       await page.getByText('Two-Factor Authentication').first().waitFor({ timeout: 5000 });
       const token = await page.evaluate(() => localStorage.getItem('token'));
@@ -256,6 +285,7 @@ try {
       await page.getByRole('heading', { name: 'Link third-party account' }).waitFor({ timeout: 5000 });
       await page.locator('#epo-bind-email').fill('bind@example.com');
       await page.locator('#epo-bind-code').fill('WRONG-CODE');
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create and link' }).click();
 
       // 400 means the server rejected the request before spending the proof.
@@ -266,7 +296,7 @@ try {
       // Correct the invite code and resubmit the SAME proof (kept in memory).
       await page.locator('#epo-bind-code').fill('INVITE-1');
       await page.getByRole('button', { name: 'Create and link' }).click();
-      await page.waitForFunction(() => localStorage.getItem('token') === 'retry-session-token', null, { timeout: 5000 });
+      await waitForSessionToken(page, 'retry-session-token');
 
       const bindRequests = requests.filter((request) => request.url.includes('/api/oauth/bindUser'));
       assert.equal(bindRequests.length, 2, 'the corrected retry must reuse the original proof in place');
@@ -289,6 +319,7 @@ try {
       await page.getByRole('heading', { name: 'Link third-party account' }).waitFor({ timeout: 5000 });
       await page.locator('#epo-bind-email').fill('bind@example.com');
       await page.locator('#epo-bind-code').fill('INVITE-1');
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create and link' }).click();
       await page.getByText('This linking proof has expired. Please restart third-party sign-in.').waitFor({ timeout: 5000 });
       await page.locator('#epo-bind-email').waitFor({ state: 'detached', timeout: 5000 });
@@ -315,6 +346,7 @@ try {
       await page.getByRole('heading', { name: 'Link third-party account' }).waitFor({ timeout: 5000 });
       await page.locator('#epo-bind-email').fill('bind@example.com');
       await page.locator('#epo-bind-code').fill('INVITE-1');
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create and link' }).click();
       await page.getByText('This third-party identity is now linked. Please sign in again.').waitFor({ timeout: 5000 });
       await page.locator('#epo-bind-email').waitFor({ state: 'detached', timeout: 5000 });
@@ -344,7 +376,7 @@ try {
       await page.goto(`${base}/login/?oauth_code=code-1&oauth_client_state=${CLIENT_STATE}`);
       const exchange = await exchangeRequest;
       assert.deepEqual(exchange.postDataJSON(), { code: 'code-1' });
-      await page.waitForFunction(() => localStorage.getItem('token') === 'oauth-session-token', null, { timeout: 5000 });
+      await waitForSessionToken(page, 'oauth-session-token');
       assert.equal(new URL(page.url()).searchParams.get('oauth_code'), null, 'exchange code must be scrubbed from the URL');
       const sessions = await page.evaluate(() => JSON.parse(localStorage.getItem('epo_sessions') || '[]'));
       assert.equal(sessions[0].email, 'oauth@example.com');
@@ -378,13 +410,15 @@ try {
       const username = page.getByLabel('Username');
       await username.fill('alice');
       await page.locator('#epo-bind-code').fill('INVITE-1');
+      await page.getByRole('checkbox').check();
       // Keyboard-only submission: the implicit form submit must work from the
       // username field, not just from clicking the button.
       await username.press('Enter');
 
       const request = await bindRequest;
       assert.equal(request.postDataJSON().email, 'alice@mail.example.com');
-      await page.waitForFunction(() => localStorage.getItem('token') === 'domain-session-token', null, { timeout: 5000 });
+      assert.equal(request.postDataJSON().acceptedTerms, true);
+      await waitForSessionToken(page, 'domain-session-token');
     } finally {
       await context.close();
     }
@@ -402,6 +436,7 @@ try {
 
       const username = page.getByLabel('Username');
       await username.fill('bad name');
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create and link' }).click();
 
       await page.getByText('Username may only contain letters, numbers and . _ - + symbols').waitFor({ timeout: 5000 });

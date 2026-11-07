@@ -1,18 +1,49 @@
 import { env, SELF } from 'cloudflare:test';
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import settingService from '../src/service/setting-service.js';
 import { buildSignedObjectUrl } from '../src/utils/object-token.js';
 import { ensureOtcTable, seedOtc } from './helpers/one-time-credential.js';
 
+const CREATE_USER = `CREATE TABLE IF NOT EXISTS user (
+	user_id INTEGER PRIMARY KEY,
+	status INTEGER NOT NULL DEFAULT 0,
+	is_del INTEGER NOT NULL DEFAULT 0,
+	byo_storage_enabled INTEGER NOT NULL DEFAULT 0,
+	byo_storage_config TEXT NOT NULL DEFAULT '{}'
+)`;
+
 beforeAll(async () => {
 	await ensureOtcTable(env.db);
+	await env.db.prepare(CREATE_USER).run();
 });
 
 describe('Public object storage isolation', () => {
+	async function cleanup() {
+		await env.db.prepare('DELETE FROM user WHERE user_id = 1').run();
+		for (const key of [
+			'auth-uid:1', 'setting:', 'public_key:', 'attachments/test-secret.txt',
+			'attachments/root-route.txt', 'attachments/root-unsigned.txt',
+			'static/avatar/1/avatar.png', 'static/avatar/1/root-public.png'
+		]) {
+			await env.kv.delete(key);
+		}
+	}
+
 	beforeEach(async () => {
-		await env.kv.delete('auth-uid:1');
-		await env.kv.delete('setting:');
-		await env.kv.delete('public_key:');
-		await env.kv.delete('attachments/test-secret.txt');
+		await cleanup();
+		await env.db.prepare('INSERT INTO user (user_id) VALUES (1)').run();
+		// Explicit settings fixture; keep real BYO lookup, signatures and KV bodies.
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			userByoStorage: 1, r2Domain: '', bucket: '', endpoint: '', s3AccessKey: '', s3SecretKey: ''
+		});
+	});
+
+	afterEach(async () => {
+		try {
+			await cleanup();
+		} finally {
+			vi.restoreAllMocks();
+		}
 	});
 
 	it('does not expose KV control keys through /api/oss', async () => {
@@ -200,6 +231,10 @@ describe('OAuth public callback boundary', () => {
 		await env.db.prepare('DELETE FROM oauth_one_time_credential').run();
 	});
 
+	afterEach(async () => {
+		await env.db.prepare('DELETE FROM oauth_one_time_credential').run();
+	});
+
 	it('rejects a callback without a server-issued state before contacting the provider', async () => {
 		const missingCode = await SELF.fetch('http://example.com/api/oauth/callback/apple', { redirect: 'manual' });
 		expect(missingCode.status).toBe(302);
@@ -211,73 +246,90 @@ describe('OAuth public callback boundary', () => {
 	});
 
 	it('exchanges a short-lived login code once and never via the callback URL', async () => {
-		const code = 'short-lived-login-code';
-		await seedOtc(env.db, {
-			purpose: 'oauth_login_code',
-			token: code,
-			provider: 'apple',
-			oauthUserId: 'apple:user-1',
-			payload: {
-				token: 'mailbox-jwt-value',
+		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
+			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
+		}));
+		try {
+			const code = 'short-lived-login-code';
+			await seedOtc(env.db, {
+				purpose: 'oauth_login_code',
+				token: code,
 				provider: 'apple',
-				userInfo: { oauthUserId: 'apple:user-1' },
-				createdAt: Date.now()
-			}
-		});
+				oauthUserId: 'apple:user-1',
+				payload: {
+					token: 'mailbox-jwt-value',
+					provider: 'apple',
+					userInfo: { oauthUserId: 'apple:user-1' },
+					createdAt: Date.now()
+				}
+			});
 
-		const first = await SELF.fetch('http://example.com/api/oauth/exchange', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ code })
-		});
-		const firstBody = await first.json();
-		expect(firstBody.code).toBe(200);
-		expect(firstBody.data.token).toBe('mailbox-jwt-value');
+			const first = await SELF.fetch('http://example.com/api/oauth/exchange', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ code })
+			});
+			const firstBody = await first.json();
+			expect(firstBody.code).toBe(200);
+			expect(firstBody.data.token).toBe('mailbox-jwt-value');
 
-		const second = await SELF.fetch('http://example.com/api/oauth/exchange', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ code })
-		});
-		expect((await second.json()).code).toBe(401);
+			const second = await SELF.fetch('http://example.com/api/oauth/exchange', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ code })
+			});
+			expect((await second.json()).code).toBe(401);
+		} finally {
+			await env.kv.delete('setting:');
+		}
 	});
 
 	it('propagates an MFA challenge instead of issuing a session token', async () => {
-		const code = 'oauth-mfa-code';
-		await seedOtc(env.db, {
-			purpose: 'oauth_login_code',
-			token: code,
-			provider: 'apple',
-			oauthUserId: 'apple:user-1',
-			payload: {
-				token: null,
-				mfa: {
-					mfaRequired: true,
-					tempToken: 'totp_tmp_oauth',
-					email: 'mfa@example.com',
-					hasTotp: true,
-					hasPasskeys: false
-				},
+		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
+			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
+		}));
+		try {
+			const code = 'oauth-mfa-code';
+			await seedOtc(env.db, {
+				purpose: 'oauth_login_code',
+				token: code,
 				provider: 'apple',
-				userInfo: { oauthUserId: 'apple:user-1' },
-				createdAt: Date.now()
-			}
-		});
+				oauthUserId: 'apple:user-1',
+				payload: {
+					token: null,
+					mfa: {
+						mfaRequired: true,
+						tempToken: 'totp_tmp_oauth',
+						email: 'mfa@example.com',
+						hasTotp: true,
+						hasPasskeys: false
+					},
+					provider: 'apple',
+					userInfo: { oauthUserId: 'apple:user-1' },
+					createdAt: Date.now()
+				}
+			});
 
-		const response = await SELF.fetch('http://example.com/api/oauth/exchange', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ code })
-		});
-		const body = await response.json();
-		expect(body.code).toBe(200);
-		expect(body.data.token).toBeUndefined();
-		expect(body.data.mfaRequired).toBe(true);
-		expect(body.data.tempToken).toBe('totp_tmp_oauth');
+			const response = await SELF.fetch('http://example.com/api/oauth/exchange', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ code })
+			});
+			const body = await response.json();
+			expect(body.code).toBe(200);
+			expect(body.data.token).toBeUndefined();
+			expect(body.data.mfaRequired).toBe(true);
+			expect(body.data.tempToken).toBe('totp_tmp_oauth');
+		} finally {
+			await env.kv.delete('setting:');
+		}
 	});
 
 	it('rejects an unregistered redirect_uri on the authorize endpoint', async () => {
 		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
 			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
 		}));
 		try {
@@ -292,6 +344,7 @@ describe('OAuth public callback boundary', () => {
 
 	it('rejects an authorize request without a client state', async () => {
 		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
 			oauthProviders: { apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 } }
 		}));
 		try {

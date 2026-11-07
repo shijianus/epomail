@@ -85,7 +85,7 @@ export function scanStaged() {
   console.log('🔍 Running offline secret scan on git staged changes...');
   let stagedDiff = '';
   try {
-    stagedDiff = execSync('git diff --cached --unified=0', { encoding: 'utf-8' });
+    stagedDiff = execSync('git diff --cached --unified=0', { encoding: 'utf-8', maxBuffer: 512 * 1024 * 1024 });
   } catch (err) {
     console.error('❌ Failed to get staged diff:', err.message);
     process.exit(1);

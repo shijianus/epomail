@@ -1,6 +1,7 @@
 import app from '../hono/hono';
 import result from '../model/result';
 import oauthProviderService from '../service/oauth-provider-service';
+import rateLimit from '../utils/rate-limit.js';
 
 // 1. 获取待授权应用信息与用户状态 (内部前端 /oauth/authorize 页面使用)
 app.get('/oauth/authorize/info', async (c) => {
@@ -53,6 +54,7 @@ async function parseTokenParams(c) {
 // 4. 标准 OAuth 2.0 / OIDC Token 交换端点 (同时支持 /oauth/token 与 /api/oauth/token)
 const handleToken = async (c) => {
 	try {
+		await rateLimit.check(c, { scope: 'oidc-token', limit: 60, windowSeconds: 900 });
 		const params = await parseTokenParams(c);
 		const tokenData = await oauthProviderService.token(c, params);
 		return c.json(tokenData);

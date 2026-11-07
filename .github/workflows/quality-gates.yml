@@ -12,11 +12,13 @@ on:
       - master
       - main
       - 'review/**'
+      - 'release/**'
   pull_request:
     branches:
       - master
       - main
       - 'review/**'
+      - 'release/**'
   workflow_dispatch:
 
 permissions:
@@ -76,6 +78,9 @@ jobs:
       - name: Scan working tree
         run: node scripts/secret-scan.mjs
 
+      - name: Staged metadata and secret-file regression tests
+        run: node --test tests/check-staged-files.test.mjs
+
   i18n:
     name: i18n gates (6-language dictionaries)
     runs-on: ubuntu-latest
@@ -99,6 +104,9 @@ jobs:
 
       - name: Login sub-app dictionary gate (symmetry / duplicates / missing / code refs)
         run: node scripts/i18n-auth-locale.mjs
+
+      - name: i18n gate regression tests (positive and negative fixtures)
+        run: node --test tests/test-i18n-gates.mjs
 
   login-ui:
     name: Login UI (typecheck + unit tests + build)
@@ -147,18 +155,23 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install Playwright runtime (frozen lockfile)
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Download built login bundle
         uses: actions/download-artifact@v4
@@ -196,11 +209,29 @@ jobs:
       - name: Worker test suite
         run: pnpm --dir mail-worker test
 
+      - name: Isolated stack and bounded load-runner tests
+        run: node --test tests/helpers/local-stack.test.mjs tests/helpers/load-runner.test.mjs
+
       # wrangler.toml 的 [build] 钩子会执行 scripts/build-prod.mjs（先 temp_login_ui 后 mail-vue），
       # 因此该步骤同时验证了真实部署路径的可构建性；dry-run 不连接 Cloudflare 账户、不上传任何产物。
       - name: Wrangler deploy dry-run
         working-directory: mail-worker
         run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-dry-run"
+
+      - name: Cold-start full-stack smoke (local D1/KV, disposable secrets)
+        run: node tests/fullstack-smoke.mjs
+
+      - name: Bounded local backend load and recovery
+        run: node tests/backend-stress.mjs --profile=limited-beta --soak=3m --out=tests/artifacts/backend-stress.json
+
+      - name: Save backend verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-stress-${{ github.sha }}
+          path: tests/artifacts/backend-stress.json
+          retention-days: 14
+          if-no-files-found: error
 
   mail-vue-build:
     name: mail-vue production build
@@ -234,3 +265,6 @@ jobs:
 
       - name: Vite production build
         run: pnpm --dir mail-vue run build
+
+      - name: UI localization and public audit display regression tests
+        run: node --test tests/ui-localization.test.mjs tests/audit-visitor-display.test.mjs

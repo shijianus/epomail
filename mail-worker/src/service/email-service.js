@@ -30,6 +30,57 @@ import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT, getWelcomeTemplate, g
 import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 import hashUtils from '../utils/hash-utils';
 import verifyUtils from '../utils/verify-utils';
+import storageQuotaService from './storage-quota-service';
+import { assertOutboundAllowed } from '../utils/outbound-policy.js';
+import { mailSha256, normalizeMailAddress, assertMailRowSize, buildBoundedInserts, prepareMailQuery } from '../utils/mail-pipeline.js';
+import { mailTransactionGuard } from '../utils/mail-transaction.js';
+import mailOutboundService from './mail-outbound-service.js';
+import { deliverLocalMail } from './mail-local-delivery-service.js';
+import mailLifecycleService from './mail-lifecycle-service.js';
+import { reserveInboundQuota } from './mail-reliability-service.js';
+import rateLimit from '../utils/rate-limit.js';
+import { RESERVED_SYSTEM_LABELS } from '../email/rule-engine.js';
+
+export function isOfficialEmailRow(item) {
+	if (!item || typeof item !== 'object') return false;
+	if (item.receiveClaimKey || item.receive_claim_key || item.outboundTaskId || item.outbound_task_id) {
+		return false;
+	}
+	const sender = String(item.sendEmail || item.send_email || '').trim().toLowerCase();
+	return sender === 'announcement@epocanvas.com' || sender === 'admin@epocanvas.com';
+}
+
+const ENCRYPTED_SEARCH_BATCH = 100;
+// The default mailbox quota is 5,000 messages. Keep the scan bounded well above
+// that while preventing an unbounded decrypt loop if a deployment raises it.
+const ENCRYPTED_SEARCH_MAX_ROWS = 10000;
+
+function includesNeedle(value, needle) {
+	return String(value || '').toLowerCase().includes(String(needle || '').toLowerCase());
+}
+
+/**
+ * Content matching for the encrypted-search path. SQLite cannot compare a
+ * LIKE pattern against AES-GCM ciphertext, so the visible fields are compared
+ * after decryption. All filters are combined with the same AND semantics as
+ * the plaintext SQL path.
+ */
+export function matchesContentSearch(row, terms) {
+	if (terms.subject && !includesNeedle(row.subject, terms.subject)) return false;
+	if (terms.subjectOrBody
+		&& !includesNeedle(row.subject, terms.subjectOrBody)
+		&& !includesNeedle(row.text, terms.subjectOrBody)) return false;
+	if (terms.body && !includesNeedle(row.text, terms.body)) return false;
+	if (terms.keyword) {
+		const keywordHit = ['subject', 'name', 'sendEmail', 'toEmail', 'text']
+			.some(field => includesNeedle(row[field], terms.keyword));
+		if (!keywordHit) return false;
+	}
+	const visibleSize = String(row.text || '').length + String(row.content || '').length;
+	if (Number.isFinite(terms.sizeAtLeast) && visibleSize < terms.sizeAtLeast) return false;
+	if (Number.isFinite(terms.sizeAtMost) && visibleSize > terms.sizeAtMost) return false;
+	return true;
+}
 
 const emailService = {
 
@@ -50,6 +101,9 @@ const emailService = {
 		accountId = Number(accountId);
 		allReceive = Number(allReceive);
 
+		// SQLite treats LIMIT -1 as "no limit". Clamp both ends so a crafted
+		// negative size cannot dump the whole mailbox in one response.
+		if (!Number.isInteger(size) || size < 1) size = 20;
 		if (size > 50) {
 			size = 50;
 		}
@@ -64,13 +118,16 @@ const emailService = {
 
 		}
 
-		if (isNaN(allReceive)) {
-			if (!accountId || isNaN(accountId)) {
-				allReceive = 1;
-			} else {
-				let accountRow = await accountService.selectById(c, accountId);
-				allReceive = accountRow ? accountRow.allReceive : 1;
+		if (accountId && !isNaN(accountId)) {
+			const accountRow = await accountService.selectById(c, accountId);
+			if (!accountRow || accountRow.userId !== userId) {
+				return { list: [], total: 0, latestEmail: null };
 			}
+			if (isNaN(allReceive)) {
+				allReceive = accountRow.allReceive;
+			}
+		} else if (isNaN(allReceive)) {
+			allReceive = 1;
 		}
 
 		const query = orm(c)
@@ -144,6 +201,20 @@ const emailService = {
 				.trim();
 		}
 
+		const settingData = await settingService.query(c);
+		const contentSearchRequested = Boolean(pSubject || pSubjectOrBody || pBody || pSizeAtLeast || pSizeAtMost || keyword);
+		const encryptedSearch = contentSearchRequested && Number(settingData.allMailMode) !== 1;
+		const parsedSizeAtLeast = pSizeAtLeast === null ? NaN : parseInt(pSizeAtLeast, 10);
+		const parsedSizeAtMost = pSizeAtMost === null ? NaN : parseInt(pSizeAtMost, 10);
+		const contentTerms = {
+			subject: pSubject,
+			subjectOrBody: pSubjectOrBody,
+			body: pBody,
+			keyword: keyword || null,
+			sizeAtLeast: Number.isFinite(parsedSizeAtLeast) ? parsedSizeAtLeast : null,
+			sizeAtMost: Number.isFinite(parsedSizeAtMost) ? parsedSizeAtMost : null
+		};
+
 		const commonConditions = [
 			allReceive ? eq(1,1) : eq(email.accountId, accountId),
 			eq(email.userId, userId),
@@ -155,7 +226,7 @@ const emailService = {
 		} else {
 			commonConditions.push(folder === 'trash' ? eq(email.isDel, 1) : (isTrash ? eq(email.isDel, 1) : eq(email.isDel, 0)));
 			commonConditions.push(folder === 'spam' ? eq(email.isSpam, 1) : (isSpam ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0))));
-			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com'))`));
+			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR (send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') AND receive_claim_key IS NULL AND outbound_task_id IS NULL))`));
 			
 			if (isSent) {
 				const currentType = (folder === 'all' ? emailConst.type.RECEIVE : (type !== undefined ? type : emailConst.type.RECEIVE));
@@ -175,22 +246,24 @@ const emailService = {
 				or(like(email.toEmail, '%'+ pTo + '%'), like(email.toName, '%'+ pTo + '%'))
 			);
 		}
-		if (pSubject) {
-			commonConditions.push(like(email.subject, '%'+ pSubject + '%'));
-		}
-		if (pSubjectOrBody) {
-			commonConditions.push(
-				or(like(email.subject, '%'+ pSubjectOrBody + '%'), like(email.text, '%'+ pSubjectOrBody + '%'))
-			);
-		}
-		if (pBody) {
-			commonConditions.push(like(email.text, '%'+ pBody + '%'));
-		}
-		if (pSizeAtLeast) {
-			commonConditions.push(sql`ifnull(length(text), 0) + ifnull(length(content), 0) >= ${parseInt(pSizeAtLeast)}`);
-		}
-		if (pSizeAtMost) {
-			commonConditions.push(sql`ifnull(length(text), 0) + ifnull(length(content), 0) <= ${parseInt(pSizeAtMost)}`);
+		if (!encryptedSearch) {
+			if (pSubject) {
+				commonConditions.push(like(email.subject, '%'+ pSubject + '%'));
+			}
+			if (pSubjectOrBody) {
+				commonConditions.push(
+					or(like(email.subject, '%'+ pSubjectOrBody + '%'), like(email.text, '%'+ pSubjectOrBody + '%'))
+				);
+			}
+			if (pBody) {
+				commonConditions.push(like(email.text, '%'+ pBody + '%'));
+			}
+			if (pSizeAtLeast) {
+				commonConditions.push(sql`ifnull(length(text), 0) + ifnull(length(content), 0) >= ${parseInt(pSizeAtLeast)}`);
+			}
+			if (pSizeAtMost) {
+				commonConditions.push(sql`ifnull(length(text), 0) + ifnull(length(content), 0) <= ${parseInt(pSizeAtMost)}`);
+			}
 		}
 		if (pBefore) {
 			commonConditions.push(lt(email.createTime, pBefore));
@@ -202,7 +275,7 @@ const emailService = {
 			commonConditions.push(like(email.labels, '%"' + pLabel + '"%'));
 		}
 
-		if (keyword) {
+		if (!encryptedSearch && keyword) {
 			commonConditions.push(
 				or(
 					like(email.subject, '%'+ keyword + '%'),
@@ -214,29 +287,33 @@ const emailService = {
 			);
 		}
 
-		query.where(
-			and(
-				...commonConditions,
-				timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId)
-			)
-		);
+		let listQuery = null;
+		let totalQuery = null;
+		if (!encryptedSearch) {
+			query.where(
+				and(
+					...commonConditions,
+					timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId)
+				)
+			);
 
-		if (timeSort) {
-			query.orderBy(asc(email.emailId));
-		} else {
-			query.orderBy(desc(email.emailId));
+			if (timeSort) {
+				query.orderBy(asc(email.emailId));
+			} else {
+				query.orderBy(desc(email.emailId));
+			}
+
+			listQuery = query.limit(size).all();
+
+			totalQuery = orm(c).select({ total: count() }).from(email)
+				.leftJoin(
+					account,
+					eq(account.accountId, email.accountId)
+				)
+				.where(
+					and(...commonConditions)
+				).get();
 		}
-
-		const listQuery = query.limit(size).all();
-
-		const totalQuery = orm(c).select({ total: count() }).from(email)
-			.leftJoin(
-				account,
-				eq(account.accountId, email.accountId)
-			)
-			.where(
-				and(...commonConditions)
-			).get();
 
 		const latestEmailQuery = orm(c).select().from(email).where(
 			and(
@@ -244,37 +321,49 @@ const emailService = {
 				eq(email.userId, userId),
 				folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
 				folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
-				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com'))`),
+				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR (send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') AND receive_claim_key IS NULL AND outbound_task_id IS NULL))`),
 				(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
 
-		const settingData = await settingService.query(c);
-
 		if (settingData.welcomeExpireDays > 0) {
 			// Auto-clean expired official welcome emails older than welcomeExpireDays
-			await c.env.db.prepare(`
+			await getMailDb(c).prepare(`
 				UPDATE email 
-				SET is_del = 1, snoozed_time = NULL, snoozed_end_time = NULL 
+				SET is_del = 1, trashed_at = COALESCE(trashed_at,CURRENT_TIMESTAMP), snoozed_time = NULL, snoozed_end_time = NULL
 				WHERE user_id = ? 
 				  AND send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') 
+				  AND receive_claim_key IS NULL
+				  AND outbound_task_id IS NULL
 				  AND is_del = 0 
 				  AND datetime(create_time, '+' || ? || ' days') < datetime('now')
 			`).bind(userId, settingData.welcomeExpireDays).run().catch(() => {});
 		}
 
-		let [list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
+		let list;
+		let totalRow;
+		let latestEmail;
+		if (encryptedSearch) {
+			const scanned = await this.searchEncryptedEmails(c, {
+				commonConditions, contentTerms, timeSort, emailId, size, userId
+			});
+			list = scanned.list;
+			totalRow = { total: scanned.total };
+			latestEmail = await latestEmailQuery;
+		} else {
+			[list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
+		}
 
 		if (userId) {
 			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
-			list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
+			if (!encryptedSearch) list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
 			if (latestEmail && latestEmail.emailId) {
 				latestEmail = await emailCryptoUtils.decryptEmailRecord(latestEmail, cryptoKey);
 			}
 		}
 
 		list = list.map(item => {
-			const isOfficial = item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
+			const isOfficial = isOfficialEmailRow(item);
 			return {
 				...item,
 				isStar: item.starId != null ? 1 : 0,
@@ -301,63 +390,56 @@ const emailService = {
 		return { list, total: totalRow.total, latestEmail };
 	},
 
-	async delete(c, params, userId) {
-		const { emailIds, physical } = params;
-		const emailIdList = emailIds.split(',').map(Number);
-		if (physical) {
-			await this.cascadeDeleteEmails(c, userId, emailIdList);
-		} else {
-			const quota = await userService.getUserQuota(c, userId);
-			if (quota.maxStorageBytes > 0 && quota.usedStorageBytes / quota.maxStorageBytes > 0.9) {
-				// Immediate physical delete if quota > 90%
-				await this.cascadeDeleteEmails(c, userId, emailIdList);
-			} else {
-				const settingRow = await settingService.query(c);
-				const mode = Number(settingRow?.allMailMode);
-
-				// In Mode 0 (Privacy Mail Mode): Trash emails must be stored in plaintext.
-				if (mode === 0 && userId) {
-					const targetEmails = await orm(c).select().from(email).where(
-						and(eq(email.userId, userId), inArray(email.emailId, emailIdList))
-					).all();
-					const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
-					for (const row of targetEmails) {
-						const decrypted = await emailCryptoUtils.decryptEmailRecord(row, cryptoKey);
-						await orm(c).update(email).set({
-							isDel: isDel.DELETE,
-							snoozedTime: null,
-							subject: decrypted.subject,
-							content: decrypted.content,
-							text: decrypted.text,
-							code: decrypted.code
-						}).where(eq(email.emailId, row.emailId)).run();
-					}
-				} else {
-					await orm(c).update(email).set({ isDel: isDel.DELETE, snoozedTime: null }).where(
-						and(
-							eq(email.userId, userId),
-							inArray(email.emailId, emailIdList)))
-						.run();
-				}
+	/**
+	 * Bounded decrypted search for encrypted mail modes. SQL LIKE cannot see
+	 * visible subject/text once AES-GCM is applied, so scan only the rows that
+	 * already satisfy every plaintext filter, decrypt them in batches, and
+	 * apply the same AND semantics to both the page and its total.
+	 */
+	async searchEncryptedEmails(c, { commonConditions, contentTerms, timeSort, emailId, size, userId }) {
+		const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+		let cursor = timeSort ? 0 : Number.MAX_SAFE_INTEGER;
+		let scanned = 0;
+		let total = 0;
+		const list = [];
+		while (scanned < ENCRYPTED_SEARCH_MAX_ROWS) {
+			const conditions = [
+				...commonConditions,
+				timeSort ? gt(email.emailId, cursor) : lt(email.emailId, cursor)
+			];
+			const rows = await orm(c)
+				.select({ ...email, starId: star.starId })
+				.from(email)
+				.leftJoin(star, and(eq(star.emailId, email.emailId), eq(star.userId, userId)))
+				.leftJoin(account, eq(account.accountId, email.accountId))
+				.where(and(...conditions))
+				.orderBy(timeSort ? asc(email.emailId) : desc(email.emailId))
+				.limit(ENCRYPTED_SEARCH_BATCH)
+				.all();
+			if (!rows.length) break;
+			const decrypted = await emailCryptoUtils.decryptEmailList(rows, cryptoKey);
+			for (const row of decrypted) {
+				scanned++;
+				cursor = row.emailId;
+				if (!matchesContentSearch(row, contentTerms)) continue;
+				total++;
+				const afterCursor = timeSort ? row.emailId > emailId : row.emailId < emailId;
+				if (afterCursor && list.length < size) list.push(row);
 			}
+			if (rows.length < ENCRYPTED_SEARCH_BATCH) break;
 		}
+		if (scanned >= ENCRYPTED_SEARCH_MAX_ROWS) {
+			throw new BizError('Search is too broad; narrow the filters', 400, 'search_too_broad');
+		}
+		return { list, total };
+	},
+
+	async delete(c, params, userId) {
+		return mailLifecycleService.moveToTrash(c, params, userId);
 	},
 
 	async reportNotSpam(c, params, userId) {
-		const { emailIds } = params;
-		const emailIdList = emailIds.split(',').map(Number);
-		
-		// 1. Move email back to inbox
-		const emailRows = await orm(c).update(email).set({ 
-			isSpam: 0, 
-			isDel: 0, 
-			snoozedTime: null 
-		}).where(
-			and(
-				eq(email.userId, userId),
-				inArray(email.emailId, emailIdList)
-			)
-		).returning().all();
+		const emailRows = await mailLifecycleService.restoreMail(c, params, userId);
 
 		if (emailRows.length === 0) return;
 
@@ -426,7 +508,7 @@ const emailService = {
 			whitelistLabel.actions = { priority: 1, stopProcessing: true };
 
 			// Save back
-			await orm(c).update(user).set({ customLabels: JSON.stringify(labelsObj) }).where(eq(user.userId, userId)).run();
+			await userOrm(c).update(user).set({ customLabels: JSON.stringify(labelsObj) }).where(eq(user.userId, userId)).run();
 			
 			const authInfo = await c.env.kv.get(kvConst.AUTH_INFO + userId, { type: 'json' });
 			if (authInfo && authInfo.user) {
@@ -453,29 +535,19 @@ const emailService = {
 	},
 
 	async setSpam(c, params, userId) {
-		const { emailIds, isSpam } = params;
-		const emailIdList = emailIds.split(',').map(Number);
-		await orm(c).update(email).set({ isSpam: isSpam ? 1 : 0, snoozedTime: null }).where(
-			and(
-				eq(email.userId, userId),
-				inArray(email.emailId, emailIdList)))
-			.run();
+		return mailLifecycleService.setMailSpam(c, params, userId);
 	},
 
 	async reportSpam(c, params, userId) {
-		const { emailIds, reportCategory, reportReason } = params;
+		const { emailIds } = params;
+		const reportCategory = (typeof params.reportCategory === 'string' ? params.reportCategory : 'spam').trim().slice(0, 64) || 'spam';
+		const reportReason = (typeof params.reportReason === 'string' ? params.reportReason : '').trim().slice(0, 2000);
 		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
 		if (emailIdList.length === 0) return;
 
-		// 1. Mark as spam, clear snooze
-		await orm(c).update(email).set({ isSpam: 1, snoozedTime: null, snoozedEndTime: null }).where(
-			and(eq(email.userId, userId), inArray(email.emailId, emailIdList))
-		).run();
+		await rateLimit.check(c, { scope: 'report-spam', limit: 30, windowSeconds: 3600, subject: `user:${userId}` });
 
-		// 2. Fetch sender info
-		const emailRows = await orm(c).select({ sendEmail: email.sendEmail }).from(email).where(
-			and(eq(email.userId, userId), inArray(email.emailId, emailIdList))
-		).all();
+		const emailRows = await mailLifecycleService.setMailSpam(c, { emailIds, isSpam: true }, userId);
 
 		const senders = [];
 		for (const row of emailRows) {
@@ -592,16 +664,23 @@ const emailService = {
 
 				const categoryLabel = reportCategory || 'spam';
 				const appendNote = `[${new Date().toISOString().slice(0, 16)}] 用户检举: ${categoryLabel}${reportReason ? ` (${reportReason})` : ''}`;
+				const dedupeKey = `report-spam:${userId}:${await mailSha256(cleanSender)}`;
+				let duplicate = false;
+				try { duplicate = (await c.env.kv.get(dedupeKey)) === '1'; } catch (_) {}
 
 				if (existingReport) {
-					// Aggregation within same active cycle: increment count and raise priority
-					const newCount = (existingReport.reportedByOthers || 0) + 1;
-					await userOrm(c).update(auditLog).set({
-						reportedByOthers: newCount,
-						priority: 'CRITICAL', // Higher weight
-						riskLevel: 'high',
-						detailText: (existingReport.detailText ? existingReport.detailText + '\n' : '') + appendNote
-					}).where(eq(auditLog.id, existingReport.id)).run();
+					// Aggregation within same active cycle: increment count and raise
+					// priority. A single user reporting the same sender repeatedly
+					// within the window must not keep inflating the risk score.
+					if (!duplicate) {
+						const newCount = (existingReport.reportedByOthers || 0) + 1;
+						await userOrm(c).update(auditLog).set({
+							reportedByOthers: newCount,
+							priority: 'CRITICAL', // Higher weight
+							riskLevel: 'high',
+							detailText: (existingReport.detailText ? existingReport.detailText + '\n' : '') + appendNote
+						}).where(eq(auditLog.id, existingReport.id)).run();
+					}
 				} else {
 					// Historical count across closed/expired/banned records
 					const histRow = await userOrm(c).select({ count: count() }).from(auditLog).where(
@@ -638,6 +717,11 @@ const emailService = {
 						recommendedAction: isInternal ? 'mute_account' : 'blacklist_sender'
 					}).run();
 				}
+				if (!duplicate) {
+					try {
+						await c.env.kv.put(dedupeKey, '1', { expirationTtl: 86400 });
+					} catch (_) {}
+				}
 			}
 		}
 		} catch (auditErr) {
@@ -647,7 +731,30 @@ const emailService = {
 
 	async updateLabels(c, params, userId) {
 		const { emailId, labels } = params;
-		const labelsStr = Array.isArray(labels) ? JSON.stringify(labels) : String(labels || '[]');
+		const existing = await orm(c).select({ labels: email.labels }).from(email).where(
+			and(eq(email.userId, userId), eq(email.emailId, Number(emailId)))
+		).get();
+		if (!existing) return;
+		let existingList = [];
+		try {
+			const parsed = JSON.parse(existing.labels || '[]');
+			if (Array.isArray(parsed)) existingList = parsed;
+		} catch (_) {}
+		const existingSet = new Set(existingList);
+		let incomingList = [];
+		if (Array.isArray(labels)) {
+			incomingList = labels;
+		} else if (typeof labels === 'string') {
+			try {
+				const parsed = JSON.parse(labels);
+				if (Array.isArray(parsed)) incomingList = parsed;
+			} catch (_) {}
+		}
+		const filtered = incomingList
+			.filter(lbl => typeof lbl === 'string' && lbl.trim())
+			.map(lbl => lbl.trim())
+			.filter(lbl => !RESERVED_SYSTEM_LABELS.has(lbl) || existingSet.has(lbl));
+		const labelsStr = JSON.stringify([...new Set(filtered)]);
 		await orm(c).update(email).set({ labels: labelsStr }).where(
 			and(eq(email.userId, userId), eq(email.emailId, Number(emailId)))
 		).run();
@@ -664,77 +771,14 @@ const emailService = {
 	},
 
 	async restore(c, params, userId) {
-		const { emailIds } = params;
-		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
-		const settingRow = await settingService.query(c);
-		const mode = Number(settingRow?.allMailMode);
-
-		if (mode === 0 && userId) {
-			const targetEmails = await orm(c).select().from(email).where(
-				and(eq(email.userId, userId), inArray(email.emailId, emailIdList))
-			).all();
-			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
-			for (const row of targetEmails) {
-				const encrypted = await emailCryptoUtils.encryptEmailRecord(row, cryptoKey);
-				await orm(c).update(email).set({
-					isDel: 0,
-					isSpam: 0,
-					snoozedTime: null,
-					snoozedEndTime: null,
-					subject: encrypted.subject,
-					content: encrypted.content,
-					text: encrypted.text,
-					code: encrypted.code
-				}).where(eq(email.emailId, row.emailId)).run();
-			}
-		} else {
-			await orm(c).update(email).set({ isDel: 0, isSpam: 0, snoozedTime: null, snoozedEndTime: null }).where(
-				and(
-					eq(email.userId, userId),
-					inArray(email.emailId, emailIdList)))
-				.run();
-		}
+		return mailLifecycleService.restoreMail(c, params, userId);
 	},
 
 	async clearTrashAndSpam(c) {
-		const settings = await settingService.query(c);
-		const spamRetentionDays = settings.spamRetentionDays || 7;
-		
-		// Move Spam to Trash after spamRetentionDays
-		await orm(c).update(email).set({ isDel: 1 }).where(
-			and(
-				eq(email.isSpam, 1),
-				eq(email.isDel, 0),
-				lt(email.createTime, sql`datetime('now', '-' || ${spamRetentionDays} || ' days')`)
-			)
-		).run();
-
-		// Physical Delete Trash after 7 days (attachments & stars cascade with the rows)
-		const trashRows = await orm(c).select({ emailId: email.emailId }).from(email).where(
-			and(
-				eq(email.isDel, 1),
-				lt(email.createTime, sql`datetime('now', '-7 days')`)
-			)
-		).all();
-		if (trashRows.length > 0) {
-			// 分块级联：D1 单语句绑定参数上限 100，全站回收站体量需按块处理
-			const trashEmailIds = trashRows.map(row => row.emailId);
-			const CHUNK = 50;
-			for (let i = 0; i < trashEmailIds.length; i += CHUNK) {
-				const chunk = trashEmailIds.slice(i, i + CHUNK);
-				await attService.removeByEmailIds(c, chunk);
-				await starService.removeByEmailIds(c, chunk);
-			}
-		}
-		await orm(c).delete(email).where(
-			and(
-				eq(email.isDel, 1),
-				lt(email.createTime, sql`datetime('now', '-7 days')`)
-			)
-		).run();
+		return mailLifecycleService.clearTrashAndSpam(c);
 	},
 
-	async receive(c, params, cidAttList, r2domain) {
+	async receive(c, params, cidAttList, r2domain, recovery = null) {
 		params.content = this.imgReplace(params.content, cidAttList, r2domain);
 		const settingRow = await settingService.query(c);
 		let dbParams = { ...params };
@@ -742,8 +786,94 @@ const emailService = {
 			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, params.userId);
 			dbParams = await emailCryptoUtils.encryptEmailRecord(dbParams, cryptoKey);
 		}
-		return orm(c).insert(email).values(dbParams).returning().get();
+		assertMailRowSize(dbParams);
+		if (!params.receiveClaimKey) return orm(c).insert(email).values(dbParams).returning().get();
+		if (!recovery?.leaseToken) throw new BizError('Inbound delivery requires a claim lease', 409, 'inbound_claim_lost');
+		const existing = await orm(c).select().from(email).where(eq(email.receiveClaimKey, params.receiveClaimKey)).get();
+		const stored = existing || dbParams;
+		if (params.userId) {
+			const quota = recovery.quota;
+			if (!quota || quota.dbFull) throw new BizError('Recipient storage is unavailable', 503, 'quota_unavailable');
+			const bodyBytes = ['subject', 'text', 'content', 'code'].reduce((sum, field) =>
+				sum + new TextEncoder().encode(String(stored[field] || '')).byteLength, 0);
+			await reserveInboundQuota(c, { claimKey: params.receiveClaimKey, leaseToken: recovery.leaseToken,
+				userId: params.userId, incomingBytes: bodyBytes + recovery.attachmentBytes,
+				maxStorageBytes: quota.maxStorageBytes, maxEmails: quota.maxEmails,
+				bypass: quota.bypassStorage === true || quota.byoStorageEnabled === 1,
+				quotaStorageBlocked: quota.quotaStorageBlocked === true });
+		}
+		if (existing) return existing;
+		const db = getMailDb(c);
+		const guard = mailTransactionGuard(c, `EXISTS(SELECT 1 FROM mail_receive_claim
+			WHERE claim_key=? AND lease_token=? AND state='SAVING' AND lease_until>unixepoch())`, [params.receiveClaimKey, recovery.leaseToken]);
+		const result = await db.batch([guard.before, prepareMailQuery(c, orm(c).insert(email).values(dbParams).returning()),
+			db.prepare(`UPDATE mail_receive_claim SET reserved_bytes=?,reserved_count=0
+				WHERE claim_key=? AND lease_token=? AND state='SAVING'`).bind(recovery.attachmentBytes, params.receiveClaimKey, recovery.leaseToken), guard.after]);
+		const id = result[1].results?.[0]?.email_id;
+		return orm(c).select().from(email).where(eq(email.emailId, id)).get();
 	},
+
+	async completeInboundReceive(c, { claimKey, leaseToken, emailId, status, isDel: delStatus, isSpam: spamStatus, attachmentRows = [] }) {
+		const mailDb = getMailDb(c);
+		const assertion = mailTransactionGuard(c, `EXISTS (
+			SELECT 1 FROM mail_receive_claim c JOIN email e ON e.email_id=?
+			WHERE c.claim_key=? AND c.lease_token=? AND c.state='SAVING' AND c.lease_until>unixepoch()
+			AND e.receive_claim_key=c.claim_key AND e.status=?)`, [emailId, claimKey, leaseToken, emailConst.status.SAVING]);
+		const statements = [assertion.before,
+			mailDb.prepare('DELETE FROM attachments WHERE email_id=?').bind(emailId)];
+
+		const rows = attachmentRows.map(row => ({
+			userId: row.userId,
+			emailId,
+			accountId: row.accountId,
+			key: row.key,
+			filename: row.filename,
+			mimeType: row.mimeType,
+			size: row.size,
+			type: row.type,
+			disposition: row.disposition,
+			related: row.related,
+			contentId: row.contentId,
+			encoding: row.encoding
+		}));
+		let chunk = [];
+		for (const row of rows) {
+			const candidate = [...chunk, row];
+			const query = orm(c).insert(att).values(candidate);
+			if (query.toSQL().params.length > 100) {
+				if (!chunk.length) throw new Error('One attachment row exceeds the D1 bind limit');
+				const compiled = orm(c).insert(att).values(chunk).toSQL();
+				statements.push(mailDb.prepare(compiled.sql).bind(...compiled.params));
+				chunk = [row];
+				if (orm(c).insert(att).values(chunk).toSQL().params.length > 100) throw new Error('One attachment row exceeds the D1 bind limit');
+			} else {
+				chunk = candidate;
+			}
+		}
+		if (chunk.length) {
+			const compiled = orm(c).insert(att).values(chunk).toSQL();
+			statements.push(mailDb.prepare(compiled.sql).bind(...compiled.params));
+		}
+		statements.push(mailDb.prepare(`
+			UPDATE email SET status = ?, is_del = ?, is_spam = ?,
+				trashed_at = CASE WHEN ? = 1 THEN COALESCE(trashed_at, CURRENT_TIMESTAMP) ELSE NULL END,
+				spam_at = CASE WHEN ? = 1 THEN COALESCE(spam_at, CURRENT_TIMESTAMP) ELSE NULL END
+			WHERE email_id = ? AND receive_claim_key = ? AND status = ?
+				AND EXISTS (SELECT 1 FROM mail_receive_claim WHERE claim_key = ? AND lease_token = ? AND state = 'SAVING')
+		`).bind(status, delStatus, spamStatus, delStatus, spamStatus, emailId, claimKey, emailConst.status.SAVING, claimKey, leaseToken));
+		statements.push(mailDb.prepare(`
+			UPDATE mail_receive_claim SET state = 'COMPLETE', email_id = ?, reserved_bytes = 0, reserved_count = 0,
+				lease_until = 0, last_error = NULL, updated_at = CURRENT_TIMESTAMP
+			WHERE claim_key = ? AND lease_token = ? AND state = 'SAVING'
+				AND EXISTS (SELECT 1 FROM email WHERE email_id = ? AND receive_claim_key = ? AND status = ?)
+		`).bind(emailId, claimKey, leaseToken, emailId, claimKey, status));
+
+		for (const row of rows) statements.push(mailDb.prepare('DELETE FROM object_deletion_queue WHERE object_key=? AND user_id=?').bind(row.key, row.userId));
+		statements.push(assertion.after);
+		await mailDb.batch(statements);
+		return await orm(c).select().from(email).where(eq(email.emailId, emailId)).get();
+	},
+
 
 	/**
 	 * Inbound delivery can be retried by the sending MTA (and the same message
@@ -784,8 +914,13 @@ const emailService = {
 			text, //邮件纯文本
 			content, //邮件内容
 			subject, //邮件标题
-			attachments = [] //附件
+			attachments = [],
+			forwarding = false,
+			idempotencyKey
 		} = params;
+
+		idempotencyKey ||= crypto.randomUUID();
+		receiveEmail = [...new Set((Array.isArray(receiveEmail) ? receiveEmail : []).map(normalizeMailAddress))];
 
 		if (!Array.isArray(receiveEmail) || receiveEmail.length === 0 || receiveEmail.length > 100) {
 			throw new BizError('收件人列表无效 / Invalid recipient list');
@@ -807,7 +942,8 @@ const emailService = {
 			throw new BizError('附件数量无效 / Invalid attachment count');
 		}
 
-		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
+		const settingRow = await settingService.query(c);
+		const { resendTokens, r2Domain, send, domainList } = settingRow;
 
 		let { imageDataList, html } = await attService.toImageUrlHtml(c, content, userId);
 
@@ -849,11 +985,10 @@ const emailService = {
 			throw new BizError(t('emailSizeLimit', { msg: maxLimitMB + 'MB' }));
 		}
 
-		//判断接收方是不是全部为站内邮箱
-		const allInternal = receiveEmail.every(email => {
-			const domain = '@' + emailUtils.getDomain(email);
-			return domainList.includes(domain);
-		});
+		const allDomainNames = (domainList || []).map(value => String(value).replace(/^@/, '').toLowerCase());
+		const allInternal = receiveEmail.every(address => allDomainNames.includes(emailUtils.getDomain(address).toLowerCase()));
+		assertOutboundAllowed(c, receiveEmail, { domains: allInternal ? allDomainNames : [] });
+
 
 		if (!isSuperAdmin) {
 
@@ -875,21 +1010,8 @@ const emailService = {
 
 		}
 
-		//如果不是管理员，权限设置了发送次数
-		if (!isSuperAdmin && roleRow.sendCount) {
-
-			if (userRow.sendCount >= roleRow.sendCount) {
-				if (roleRow.sendType === 'day') throw new BizError(t('daySendLimit'), 403);
-				if (roleRow.sendType === 'count') throw new BizError(t('totalSendLimit'), 403);
-			}
-
-			if (userRow.sendCount + receiveEmail.length > roleRow.sendCount) {
-				if (roleRow.sendType === 'day') throw new BizError(t('daySendLack'), 403);
-				if (roleRow.sendType === 'count') throw new BizError(t('totalSendLack'), 403);
-			}
-
-		}
-
+		// Send-count limits are enforced atomically by reserveSendCount after
+		// task replay, so ACCEPTED/UNKNOWN requests never consume quota again.
 		const accountRow = await accountService.selectById(c, accountId);
 
 		if (!accountRow) {
@@ -908,15 +1030,10 @@ const emailService = {
 		// 检查是否存在针对该邮箱或主账号的有效封禁管控案卷
 		let activeBan = null;
 		try {
-			activeBan = await orm(c).select().from(auditLog).where(
-				and(
-					eq(auditLog.email, accountRow.email),
-					eq(auditLog.warningType, 'ban'),
-					eq(auditLog.status, 'banned')
-				)
-			).get();
+			activeBan = await getUserDb(c).prepare(`SELECT 1 AS banned FROM audit_log
+				WHERE email=? AND warning_type='ban' AND status='banned' LIMIT 1`).bind(accountRow.email).first();
 		} catch (e) {
-			console.warn('Check active ban failed:', e?.message);
+			throw new BizError('Send safety checks are unavailable', 503, 'send_policy_unavailable');
 		}
 		if (activeBan) {
 			throw new BizError('该发信地址当前处于安全封禁状态，无法外发邮件', 403);
@@ -934,162 +1051,284 @@ const emailService = {
 		const resendToken = resendTokens[domain];
 		const useCloudflareEmail = !!c.env.email;
 
+		// 分级外发闸门：对站外收件人强制校验 EMAIL_OUTBOUND_ENABLED 与 staging OUTBOUND_WHITELIST
+		if (!allInternal) {
+			const outboundDisabled = String(c.env?.EMAIL_OUTBOUND_ENABLED || '').trim().toLowerCase() === 'false';
+			if (outboundDisabled) {
+				throw new BizError('External email outbound is disabled in this environment (EMAIL_OUTBOUND_ENABLED=false)', 403, 'outbound_disabled');
+			}
+
+			const externalRecipients = receiveEmail.filter(addr => !domainList.includes('@' + emailUtils.getDomain(addr)));
+			const customWhitelist = String(c.env?.OUTBOUND_WHITELIST || '')
+				.split(',')
+				.map(s => s.trim().toLowerCase())
+				.filter(Boolean);
+			const isStaging = c.env?.ENVIRONMENT === 'staging';
+
+			if (isStaging || String(c.env?.OUTBOUND_WHITELIST_ENFORCE || '').toLowerCase() === 'true') {
+				const officialResendSandbox = ['delivered@resend.dev', 'bounced@resend.dev', 'complained@resend.dev'];
+				const allowedSet = new Set([...officialResendSandbox, ...customWhitelist]);
+				const blockedRecipient = externalRecipients.find(addr => !allowedSet.has(String(addr || '').trim().toLowerCase()));
+				if (blockedRecipient) {
+					throw new BizError(`External recipient (${blockedRecipient}) is not in OUTBOUND_WHITELIST`, 403, 'outbound_recipient_blocked');
+				}
+			}
+		}
+
 		//如果接收方存在站外邮箱，又没有发信服务
 		if (!useCloudflareEmail && !resendToken && !allInternal) {
 			throw new BizError(t('noSendProvider'));
 		}
 
-		//没有发件人名字自动截取
-		if (!name) {
-			name = emailUtils.getName(accountRow.email);
-		}
+		// Validate and decode before any provider call or send-count reservation.
+		if (imageDataList.length > 10) throw new BizError(t('imageAttLimit'));
+		// Inline parts already discovered in the HTML are re-attached as CID
+		// images by toImageUrlHtml. Do not also send the original embed rows a
+		// second time when forwarding a stored message.
+		const embeddedKeys = new Set(imageDataList.map(item => item.key).filter(Boolean));
+		const regularAttachments = attachments.filter(item => !item.key || !embeddedKeys.has(item.key));
+		// Forwarding preserves the original MIME attachment set; user-authored
+		// mail keeps the tighter compose limit at ten.
+		if (regularAttachments.length > (forwarding ? 50 : 10)) throw new BizError(t('attLimit'));
+		if (!name) name = emailUtils.getName(accountRow.email);
 
-		let emailRow = {
-			messageId: null
-		};
-
-		//如果是回复邮件
+		let emailRow = { messageId: null };
 		if (sendType === 'reply') {
-
 			emailRow = await this.selectById(c, emailId, userId);
-
-			if (!emailRow) {
-				throw new BizError(t('notExistEmailReply'));
-			}
-
+			if (!emailRow) throw new BizError(t('notExistEmailReply'));
 		}
 
-		let sendResult = {};
-
-		//存在站外邮箱时，如果配置了 Cloudflare Email Service 就优先使用，否则使用 Resend
-		if (!allInternal) {
-
-			if (useCloudflareEmail) {
-				sendResult = await this.sendByCloudflareEmail(c, {
-					name,
-					accountEmail: accountRow.email,
-					receiveEmail,
-					subject,
-					text,
-					html,
-					attachments: [...imageDataList, ...attachments],
-					sendType,
-					messageId: emailRow.messageId
-				});
+		const providerHtml = html;
+		const attachmentItems = [...imageDataList, ...regularAttachments];
+		const attachmentMeta = [];
+		let attachmentBytes = 0;
+		for (const [index, item] of attachmentItems.entries()) {
+			const bytes = item.buff instanceof Uint8Array ? item.buff
+				: item.buff ? new Uint8Array(item.buff) : new Uint8Array(await this.toAttachmentArrayBuffer(item) || 0);
+			item.buff = bytes;
+			const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, bytes.byteLength);
+			if (!sizeCheck.allowed) throw new BizError(sizeCheck.reason);
+			attachmentBytes += bytes.byteLength;
+			// Inline image filenames and CIDs are generated anew on every request.
+			// The original HTML and image bytes identify the actual compose content.
+			attachmentMeta.push({ filename: index < imageDataList.length ? '' : item.filename || '',
+				mimeType: item.mimeType || item.contentType || (typeof item.type === 'string' ? item.type : ''),
+				size: bytes.byteLength, hash: await mailSha256(bytes) });
+		}
+		if (new Blob([text, providerHtml]).size + attachmentBytes > maxLimitBytes) {
+			throw new BizError(t('emailSizeLimit', { msg: maxLimitMB + 'MB' }));
+		}
+		const contentHash = await mailSha256(JSON.stringify({ accountId, receiveEmail, name, sendType,
+			emailId, subject: subject || '', text, content, attachments: attachmentMeta }));
+		for (const [index, item] of attachmentItems.entries()) {
+			item.key = `attachments/out-${await mailSha256(`${userId}\n${accountId}\n${idempotencyKey}\n${index}\n${attachmentMeta[index].hash}`)}${fileUtils.getExtFileName(item.filename)}`;
+		}
+		const imageRows = imageDataList.map(item => ({ ...item,
+			contentId: item.contentId ? `<${item.contentId.replace(/^<|>$/g, '')}>` : null }));
+		const storedHtml = this.imgReplace(providerHtml, imageRows, r2Domain);
+		const plainRecord = { sendEmail: accountRow.email, name, subject, content: storedHtml, text,
+			accountId, userId, status: emailConst.status.SAVING, type: emailConst.type.SEND,
+			recipient: JSON.stringify(receiveEmail.map(address => ({ address, name: '' }))),
+			inReplyTo: sendType === 'reply' ? emailRow.messageId : '', relation: sendType === 'reply' ? emailRow.messageId : '' };
+		let encryptedRecord = { ...plainRecord };
+		if (emailCryptoUtils.shouldEncryptEmail(settingRow.allMailMode, plainRecord)) {
+			encryptedRecord = await emailCryptoUtils.encryptEmailRecord(encryptedRecord, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
+		}
+		assertMailRowSize(encryptedRecord);
+		const bodyStorageBytes = ['subject', 'text', 'content', 'code'].reduce((total, field) =>
+			total + new TextEncoder().encode(String(encryptedRecord[field] || '')).byteLength, 0);
+		const reserveBytes = bodyStorageBytes + attachmentBytes;
+		const mailDb = getMailDb(c);
+		// A replay already owns its archive/reservation. Do not charge its bytes
+		// again or reject ACCEPTED/UNKNOWN just because that send filled storage.
+		const previousTask = typeof idempotencyKey === 'string' && idempotencyKey
+			? await mailDb.prepare('SELECT task_id FROM mail_outbound_task WHERE user_id=? AND account_id=? AND idempotency_key=?')
+				.bind(userId, accountId, idempotencyKey).first() : null;
+		const storageCheck = previousTask ? null : await storageQuotaService.checkQuotaAvailable(c, userId, reserveBytes);
+		if (storageCheck && !storageCheck.allowed) throw new BizError(storageCheck.reason);
+		const quota = previousTask ? null : await userService.getUserQuota(c, userId);
+		const providerName = allInternal
+			? 'local'
+			: (useCloudflareEmail ? 'cloudflare' : (String(resendToken || '').startsWith('mailjet:') ? 'mailjet' : 'resend'));
+		const prepared = await mailOutboundService.prepareOutboundTask(c, { userId, accountId, idempotencyKey,
+			contentHash, reservedBytes: reserveBytes, maxStorageBytes: quota?.maxStorageBytes, maxEmails: quota?.maxEmails,
+			bypassStorage: quota?.bypassStorage || storageCheck?.usage?.byoStorageEnabled === 1,
+			storageBlocked: quota?.quotaStorageBlocked || quota?.dbFull,
+			payload: { recipients: receiveEmail, attachmentCount: attachmentItems.length,
+				route: allInternal ? 'local' : 'external', providerName } });
+		const readArchived = async task => {
+			let row = await orm(c).select().from(email).where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
+			if (!row) throw new BizError('The accepted send record requires reconciliation', 503, 'outbound_archive_missing');
+			if (emailCryptoUtils.ENCRYPTED_FIELDS.some(field => String(row[field] || '').startsWith(emailCryptoUtils.CIPHER_PREFIX))) {
+				row = await emailCryptoUtils.decryptEmailRecord(row, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
+			}
+			const attList = await attService.selectByEmailIds(c, [row.emailId]);
+			return [{ ...row, attList }];
+		};
+		if (prepared.task.state === 'ACCEPTED') return readArchived(prepared.task);
+		if (prepared.task.provider !== (allInternal ? 'local' : 'external')) {
+			throw new BizError('This request was prepared under a different delivery route', 409, 'outbound_route_changed');
+		}
+		if (prepared.task.state === 'FAILED') {
+			await mailOutboundService.compensateSendCount(c, { taskId: prepared.task.task_id });
+		}
+		const owned = await mailOutboundService.claimPreparation(c, prepared.task.task_id);
+		if (!owned.leaseToken) return readArchived(owned.task);
+		const task = owned.task;
+		const leaseToken = owned.leaseToken;
+		let archived;
+		let staged = { rows: [], uploaded: [] };
+		const guard = () => mailTransactionGuard(c,
+			"EXISTS(SELECT 1 FROM mail_outbound_task WHERE task_id=? AND state='PREPARED' AND lease_token=? AND lease_until>unixepoch())",
+			[task.task_id, leaseToken]);
+		try {
+			archived = await orm(c).select().from(email).where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
+			if (!archived) {
+				const assertion = guard();
+				await mailDb.batch([assertion.before,
+					prepareMailQuery(c, orm(c).insert(email).values({ ...encryptedRecord, outboundTaskId: task.task_id })),
+					mailDb.prepare("UPDATE mail_outbound_task SET reserved_bytes=?,reserved_count=0 WHERE task_id=? AND state='PREPARED' AND lease_token=?")
+						.bind(attachmentBytes, task.task_id, leaseToken), assertion.after]);
+				archived = await orm(c).select().from(email).where(eq(email.outboundTaskId, task.task_id)).get();
+			}
+			if (!task.email_id) {
+				const sourceAttachments = attachmentItems.map((item, index) => ({ userId, accountId, emailId: archived.emailId,
+					content: item.buff, size: item.buff.byteLength, filename: item.filename,
+					mimeType: item.mimeType || item.type || 'application/octet-stream',
+					key: item.key || '', type: index < imageDataList.length ? attConst.type.EMBED : attConst.type.ATT,
+					contentId: index < imageDataList.length ? imageRows[index].contentId : null }));
+				for (const item of sourceAttachments) {
+					if (!item.key) item.key = 'attachments/' + await fileUtils.getBuffHash(item.content) + fileUtils.getExtFileName(item.filename);
+				}
+				for (const item of sourceAttachments) {
+					await mailDb.prepare(`INSERT OR IGNORE INTO object_deletion_queue(object_key,user_id,next_retry_at)
+						VALUES (?,?,datetime('now','+1 hour'))`).bind(item.key, userId).run();
+				}
+				staged = await attService.stageInboundAtt(c, sourceAttachments);
+				const assertion = guard();
+				const statements = [assertion.before,
+					mailDb.prepare('DELETE FROM attachments WHERE email_id=? AND user_id=?').bind(archived.emailId, userId),
+					...buildBoundedInserts(rows => orm(c).insert(att).values(rows), staged.rows.map(row => ({ ...row, emailId: archived.emailId })))
+						.map(query => prepareMailQuery(c, query)),
+						mailDb.prepare("UPDATE mail_outbound_task SET email_id=?,reserved_bytes=0,reserved_count=0,updated_at=CURRENT_TIMESTAMP WHERE task_id=? AND state='PREPARED' AND lease_token=?")
+							.bind(archived.emailId, task.task_id, leaseToken),
+						...sourceAttachments.map(item => mailDb.prepare('DELETE FROM object_deletion_queue WHERE object_key=? AND user_id=?').bind(item.key, userId)),
+						assertion.after];
+				await mailDb.batch(statements);
+			}
+		} catch (cause) {
+			await attService.cleanupUnreferencedObjects(c, staged.uploaded).catch(() => {});
+			await mailOutboundService.releasePreparation(c, task.task_id, leaseToken).catch(() => {});
+			throw cause;
+		}
+		try {
+			// This gate runs before quota/dispatch. A policy rejection is known
+			// not to have reached a provider and must leave a retryable PREPARED.
+			if (!allInternal) assertOutboundAllowed(c, receiveEmail);
+			await mailOutboundService.reserveSendCount(c, { taskId: task.task_id, userId, quantity: receiveEmail.length,
+				maxCount: isSuperAdmin || roleRow.sendType === 'internal' ? 0 : Number(roleRow.sendCount || 0),
+				daily: roleRow.sendType === 'day' });
+		} catch (cause) {
+			await mailOutboundService.releasePreparation(c, task.task_id, leaseToken).catch(() => {});
+			throw cause;
+		}
+		const currentSender = await getUserDb(c).prepare('SELECT status,is_del FROM user WHERE user_id=?').bind(userId).first();
+		if (!currentSender || Number(currentSender.status) !== 0 || Number(currentSender.is_del) !== 0) {
+			await mailOutboundService.releasePreparation(c, task.task_id, leaseToken);
+			throw new BizError('Sender is unavailable', 403, 'account_unavailable');
+		}
+		let dispatch;
+		try {
+			dispatch = await mailOutboundService.claimOutboundTask(c, task.task_id, leaseToken);
+		} catch (cause) {
+			// Compensate only while this lease still owns PREPARED. An ambiguous
+			// SENDING commit or a replacement lease must retain its reservation.
+			const failed = await mailDb.prepare("UPDATE mail_outbound_task SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,last_error='Dispatch was not started' WHERE task_id=? AND state='PREPARED' AND lease_token=? RETURNING task_id,email_id")
+				.bind(task.task_id, leaseToken).first();
+			if (failed) {
+				// The archive row was created as SAVING. Leaving it there makes it
+				// permanently invisible to retention and impossible for the user to
+				// delete, because MUTABLE excludes SAVING.
+				const emailId = failed.email_id || archived.emailId;
+				if (emailId) {
+					await mailDb.prepare('UPDATE email SET status=? WHERE email_id=? AND user_id=? AND status=?')
+						.bind(emailConst.status.FAILED, emailId, userId, emailConst.status.SAVING).run();
+				}
+				await mailOutboundService.compensateSendCount(c, { taskId: task.task_id });
+			}
+			throw cause;
+		}
+		let providerId = null;
+		try {
+			if (allInternal) {
+				const allAttachments = await orm(c).select().from(att).where(eq(att.emailId, archived.emailId)).all();
+				await this.HandleOnSiteEmail(c, receiveEmail, { ...plainRecord, emailId: archived.emailId }, allAttachments,
+					{ taskId: task.task_id, leaseToken });
 			} else {
-				sendResult = await this.sendByResend(resendToken, {
-					name,
-					accountEmail: accountRow.email,
-					receiveEmail,
-					subject,
-					text,
-					html,
-					attachments: [...imageDataList, ...attachments],
-					sendType,
-					messageId: emailRow.messageId
-				});
+				const providerParams = { name, accountEmail: accountRow.email, receiveEmail, subject, text, html: providerHtml,
+					attachments: attachmentItems, sendType, messageId: emailRow.messageId,
+					idempotencyKey: `mail-${task.task_id}` };
+				const result = useCloudflareEmail ? await this.sendByCloudflareEmail(c, providerParams) : await this.sendByResend(resendToken, providerParams);
+				if (result.error) {
+					// Preserve an acceptance identifier even when the response also
+					// reports an error/transport ambiguity. The catch path writes it
+					// to the UNKNOWN task so reconciliation can query the provider
+					// instead of leaving an unresolvable task behind.
+					if (result.data?.id) providerId = result.data.id;
+					const statusCode = Number(result.error.statusCode || result.error.status);
+					// Transport, timeout, conflict and 5xx results do not establish
+					// rejection. Keep UNKNOWN rather than inviting another send.
+					const rejected = statusCode >= 400 && statusCode < 500 && ![408, 409, 425].includes(statusCode);
+					if (!rejected || result.data?.id) throw new Error('Provider acceptance is unknown');
+					const assertion = mailTransactionGuard(c,
+						"EXISTS(SELECT 1 FROM mail_outbound_task WHERE task_id=? AND state='SENDING' AND lease_token=?)", [task.task_id, leaseToken]);
+					await mailDb.batch([assertion.before,
+						mailDb.prepare('UPDATE email SET status=? WHERE email_id=? AND user_id=? AND status=?')
+							.bind(emailConst.status.FAILED, archived.emailId, userId, emailConst.status.SAVING),
+						mailDb.prepare("UPDATE mail_outbound_task SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,last_error='Provider rejected request' WHERE task_id=? AND state='SENDING' AND lease_token=?")
+							.bind(task.task_id, leaseToken), assertion.after]);
+					await mailOutboundService.compensateSendCount(c, { taskId: task.task_id });
+					throw new BizError('The provider rejected this send request', 502, 'provider_rejected');
+				}
+				providerId = result.data?.id || null;
+				if (!providerId) throw new Error('Provider did not return an acceptance identifier');
 			}
-
+		} catch (cause) {
+			if (allInternal) {
+				await mailDb.prepare(`UPDATE mail_outbound_task SET state='PREPARED',lease_token=NULL,lease_until=0,
+					last_error='Local delivery will resume from receipts',updated_at=CURRENT_TIMESTAMP
+					WHERE task_id=? AND provider='local' AND state='SENDING' AND lease_token=?`).bind(task.task_id, leaseToken).run();
+				throw new BizError('Local delivery is pending; retry the same request to resume safely', 503, 'local_delivery_pending');
+			}
+			await mailOutboundService.markOutboundUnknown(c, { taskId: task.task_id, leaseToken, providerId }).catch(() => {});
+			if (cause.errorCode === 'provider_rejected') throw cause;
+			throw new BizError('Send result requires reconciliation; retrying this request will not dispatch again', 503, 'provider_unknown');
 		}
-
-		const { data, error } = sendResult;
-
-
-		if (error) {
-			throw new BizError(error.message);
-		}
-
-		imageDataList = imageDataList.map(item => ({...item, contentId: `<${item.contentId}>`}))
-
-		//把图片标签cid标签切换会通用url
-		html = this.imgReplace(html, imageDataList, r2Domain);
-
-		//封装数据保存到数据库
-		const emailData = {};
-		emailData.sendEmail = accountRow.email;
-		emailData.name = name;
-		emailData.subject = subject;
-		emailData.content = html;
-		emailData.text = text;
-		emailData.accountId = accountId;
-		emailData.status = useCloudflareEmail ? emailConst.status.DELIVERED : emailConst.status.SENT;
-		emailData.type = emailConst.type.SEND;
-		emailData.userId = userId;
-		emailData.resendEmailId = data?.id || null;
-		emailData.createTime = new Date().toISOString();
-
-		const recipient = [];
-
-		receiveEmail.forEach(item => {
-			recipient.push({ address: item, name: '' });
-		});
-
-		emailData.recipient = JSON.stringify(recipient);
-
-		if (sendType === 'reply') {
-			emailData.inReplyTo = emailRow.messageId;
-			emailData.relation = emailRow.messageId;
-		}
-
-		//如果权限有发送次数增加用户发送次数
-		if (roleRow.sendCount && roleRow.sendType !== 'internal') {
-			await userService.incrUserSendCount(c, receiveEmail.length, userId);
-		}
-
-		const settingRow = await settingService.query(c);
-		let dbEmailData = { ...emailData };
-		if (userId && emailCryptoUtils.shouldEncryptEmail(settingRow?.allMailMode, emailData)) {
-			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
-			dbEmailData = await emailCryptoUtils.encryptEmailRecord(dbEmailData, cryptoKey);
-		}
-
-		//保存到数据库并返回结果
-		const emailResult = await orm(c).insert(email).values(dbEmailData).returning().get();
-
-		// 第二轮修复：发送线程迟到写回保护 —— 若提供商事件已先于本次 INSERT 落账
-		// (webhook_event 台账已有该邮件的事件)，按台账事实重新投影，避免初始 SENT 覆盖已确认事实
-		if (emailResult?.resendEmailId && !useCloudflareEmail) {
+		if (!allInternal) {
 			try {
-				await this.replayProviderEventsFromLedger(c, emailResult.resendEmailId);
-			} catch (_) {}
-		}
-
-		//保存内嵌附件
-		if (imageDataList.length > 0) {
-			if (imageDataList.length > 10) {
-				throw new BizError(t('imageAttLimit'));
+				const assertion = mailTransactionGuard(c,
+					"EXISTS(SELECT 1 FROM mail_outbound_task WHERE task_id=? AND state='SENDING' AND lease_token=?)", [task.task_id, leaseToken]);
+				await mailDb.batch([assertion.before,
+					mailDb.prepare('UPDATE email SET status=CASE WHEN status=? THEN ? ELSE status END,resend_email_id=? WHERE email_id=? AND user_id=?')
+						.bind(emailConst.status.SAVING, emailConst.status.SENT, providerId, archived.emailId, userId),
+					mailDb.prepare("UPDATE mail_outbound_task SET state='ACCEPTED',provider_id=?,reserved_bytes=0,reserved_count=0,lease_until=0,updated_at=CURRENT_TIMESTAMP WHERE task_id=? AND state='SENDING' AND lease_token=?")
+						.bind(providerId, task.task_id, leaseToken), assertion.after]);
+			} catch (_) {
+				// Dispatch may already be accepted. A local commit failure must
+				// never invite a second message or return its send-count reservation.
+				await mailOutboundService.markOutboundUnknown(c, { taskId: task.task_id, leaseToken, providerId }).catch(() => {});
+				throw new BizError('Send was submitted but its archive needs reconciliation', 503, 'provider_unknown');
 			}
-			await attService.saveArticleAtt(c, imageDataList, userId, accountId, emailResult.emailId);
 		}
-
-		//保存普通附件
-		if (attachments?.length > 0) {
-			if (attachments.length > 10) {
-				throw new BizError(t('attLimit'));
-			}
-			await attService.saveSendAtt(c, attachments, userId, accountId, emailResult.emailId);
+		if (providerId && !useCloudflareEmail) {
+			await this.replayProviderEventsFromLedger(c, providerId).catch(() => {});
 		}
-
-		const attList = await attService.selectByEmailIds(c, [emailResult.emailId]);
-		emailResult.attList = attList;
-
-		//如果全是站内接收方，直接写入数据库（传入未加密明文数据由 HandleOnSiteEmail 统一使用收件人私钥加密）
-		if (allInternal) {
-			await this.HandleOnSiteEmail(c, receiveEmail, { ...emailData, emailId: emailResult.emailId }, attList);
-		}
-
-		const dateStr = dayjs().format('YYYY-MM-DD');
-		let daySendTotal = await c.env.kv.get(kvConst.SEND_DAY_COUNT + dateStr);
-
-		//记录每天发件次数统计
-		if (!daySendTotal) {
-			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(receiveEmail.length), { expirationTtl: 60 * 60 * 24 });
-		} else  {
-			daySendTotal = Number(daySendTotal) + receiveEmail.length
-			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(daySendTotal), { expirationTtl: 60 * 60 * 24 });
-		}
-
-		return [ { ...emailResult, subject, content: html, text } ];
+		try {
+			const dayKey = kvConst.SEND_DAY_COUNT + dayjs().format('YYYY-MM-DD');
+			const previous = Number(await c.env.kv.get(dayKey) || 0);
+			await c.env.kv.put(dayKey, String(previous + receiveEmail.length), { expirationTtl: 86400 });
+		} catch (_) { console.warn('Send statistics update failed'); }
+		return readArchived({ task_id: dispatch.task.task_id });
 	},
 
 	async sendByCloudflareEmail(c, params) {
@@ -1151,7 +1390,7 @@ const emailService = {
 			};
 		}
 
-		return await resend.emails.send(sendForm);
+		return await resend.emails.send(sendForm, params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : undefined);
 	},
 
 	async sendByMailjet(mailjetToken, params) {
@@ -1178,10 +1417,12 @@ const emailService = {
 
 		const attachments = await this.toResendAttachments(params.attachments);
 		if (attachments && attachments.length > 0) {
-			messages[0].Attachments = attachments.map(att => ({
-				ContentType: att.contentType,
-				Filename: att.filename,
-				Base64Content: att.content
+			messages[0].Attachments = attachments.filter(item => !item.contentId).map(item => ({
+				ContentType: item.contentType, Filename: item.filename, Base64Content: item.content
+			}));
+			messages[0].InlinedAttachments = attachments.filter(item => item.contentId).map(item => ({
+				ContentType: item.contentType, Filename: item.filename, Base64Content: item.content,
+				ContentID: item.contentId.replace(/^<|>$/g, '')
 			}));
 		}
 
@@ -1219,7 +1460,7 @@ const emailService = {
 		console.log(`Mailjet response status=${response.status} messages=${Array.isArray(result?.Messages) ? result.Messages.length : 0}`);
 
 		if (!response.ok) {
-			return { data: null, error: { message: `Mailjet 返回 HTTP ${response.status}` } };
+			return { data: null, error: { statusCode: response.status, message: `Mailjet returned HTTP ${response.status}` } };
 		}
 
 		const messageId = result?.Messages?.[0]?.To?.[0]?.MessageID;
@@ -1342,119 +1583,8 @@ const emailService = {
 		return content;
 	},
 
-	//处理站内邮件发送
-	async HandleOnSiteEmail(c, receiveEmail, sendEmailData, attList) {
-
-		const { noRecipient  } = await settingService.query(c);
-
-		//查询所有收件人账号信息
-		let accountList = await orm(c).select().from(account).where(inArray(account.email, receiveEmail)).all();
-
-		//查询所有收件人权限身份
-		const userIds = accountList.map(accountRow => accountRow.userId);
-		let roleList = await roleService.selectByUserIds(c, userIds);
-
-		//封装数据库准备保存到数据库
-		const emailDataList = [];
-
-		for (const email of receiveEmail) {
-
-			//把发件人邮件改成收件
-			const emailValues = {...sendEmailData}
-			emailValues.status = emailConst.status.RECEIVE;
-			emailValues.type = emailConst.type.RECEIVE;
-			emailValues.toEmail = email;
-			emailValues.toName = emailUtils.getName(email);
-			emailValues.emailId = null;
-
-			const accountRow = accountList.find(accountRow => accountRow.email === email);
-
-			//如果收件人存在就把邮件信息改成收件人的
-			if (accountRow) {
-
-				//设置给收件人保存
-				emailValues.userId = accountRow.userId;
-				emailValues.accountId = accountRow.accountId;
-				emailValues.type = emailConst.type.RECEIVE;
-				emailValues.status = emailConst.status.RECEIVE;
-
-				const roleRow = roleList.find(roleRow => roleRow.userId === accountRow.userId);
-
-				let { banEmail, availDomain } = roleRow;
-
-				//如果收件人没有这个域名的使用权限和有邮件拦截，就把邮件改为拒收状态
-				if (!isAdminEmail(c, email)) {
-
-					if (!roleService.hasAvailDomainPerm(availDomain, email)) {
-						emailValues.status = emailConst.status.BOUNCED;
-						emailValues.message = `The recipient <${email}> is not authorized to use this domain.`;
-					} else if(roleService.isBanEmail(banEmail, sendEmailData.sendEmail)) {
-						emailValues.status = emailConst.status.BOUNCED;
-						emailValues.message = `The recipient <${email}> is disabled from receiving emails.`;
-					}
-
-				}
-
-				emailDataList.push(emailValues);
-
-			} else {
-
-				//设置无收件人邮件信息
-				emailValues.userId = 0;
-				emailValues.accountId = 0;
-				emailValues.type = emailConst.type.RECEIVE;
-				emailValues.status = emailConst.status.NOONE;
-
-				//如果无人收件关闭改为拒收
-				if (noRecipient === settingConst.noRecipient.CLOSE) {
-					emailValues.status = emailConst.status.BOUNCED;
-					emailValues.message = `Recipient not found: <${email}>`;
-				}
-
-				emailDataList.push(emailValues);
-
-			}
-
-		}
-
-		const settingRow = await settingService.query(c);
-		//保存邮件
-		const receiveEmailList = emailDataList.filter(emailRow => emailRow.status === emailConst.status.RECEIVE || emailRow.status === emailConst.status.NOONE);
-
-		for (const emailData of receiveEmailList) {
-			let dbEmailData = { ...emailData };
-			if (emailData.userId && emailCryptoUtils.shouldEncryptEmail(settingRow?.allMailMode, emailData)) {
-				const recipientKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, emailData.userId);
-				dbEmailData = await emailCryptoUtils.encryptEmailRecord(dbEmailData, recipientKey);
-			}
-			const emailRow = await orm(c).insert(email).values(dbEmailData).returning().get();
-
-			//设置附件保存
-			for (const attRow of attList) {
-				const attValues = {...attRow};
-				attValues.emailId = emailRow.emailId;
-				attValues.accountId = emailRow.accountId;
-				attValues.userId = emailRow.userId;
-				attValues.attId = null;
-				await orm(c).insert(att).values(attValues).run();
-			}
-
-		}
-
-		const bouncedEmail = emailDataList.find(emailRow => emailRow.status === emailConst.status.BOUNCED);
-
-
-		let status = emailConst.status.DELIVERED;
-		let message = ''
-		//如果有拒收邮件，就把发件人的邮件改成拒收
-		if (bouncedEmail) {
-			const messageJson = { message: bouncedEmail.message };
-			message = JSON.stringify(messageJson);
-			status = emailConst.status.BOUNCED;
-		}
-
-		await orm(c).update(email).set({ status, message: message }).where(eq(email.emailId, sendEmailData.emailId)).run();
-
+	async HandleOnSiteEmail(c, receiveEmail, sendEmailData, attList, outbound) {
+		return deliverLocalMail(c, receiveEmail, sendEmailData, attList, outbound);
 	},
 
 	imgReplace(content, cidAttList, r2domain) {
@@ -1563,7 +1693,7 @@ const emailService = {
 		let userName = emailUtils.getName(userEmail) || (userEmail ? userEmail.split('@')[0] : getUserFallbackNameByLang(tplLang));
 		try {
 			const userEntity = (await import('../entity/user')).default;
-			const userRow = await orm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
+			const userRow = await userOrm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
 			if (userRow && userRow.nickname) {
 				userName = userRow.nickname;
 			}
@@ -1593,13 +1723,15 @@ const emailService = {
 			const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 				and(
 					eq(email.userId, userId),
-					inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com'])
+					inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
+					sql`${email.receiveClaimKey} IS NULL AND ${email.outboundTaskId} IS NULL`
 				)
 			).limit(1).get();
 
 			if (existing) {
 				try {
 					await c.env.kv.put('HAS_WELCOME_' + userId, '1');
+					await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
 				} catch (e) {}
 				return null;
 			}
@@ -1654,6 +1786,7 @@ const emailService = {
 
 		try {
 			await c.env.kv.put('HAS_WELCOME_' + userId, '1');
+			await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
 		} catch (e) {}
 
 		return emailRow;
@@ -1662,32 +1795,30 @@ const emailService = {
 	async ensureWelcomeEmailForUser(c, userId, userEmail = null) {
 		if (!userId) return null;
 		try {
-			const kvCached = await c.env.kv.get('HAS_WELCOME_' + userId);
-			if (kvCached === '1') {
-				// 双重验证：KV 说已发过，但需检查 DB 实际是否存在（防止账号恢复/迁移后 KV 残留阻塞欢迎邮件）
-				const dbCheck = await orm(c).select({ emailId: email.emailId }).from(email).where(
-					and(
-						eq(email.userId, userId),
-						inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
-						eq(email.isDel, isDel.NORMAL)
-					)
-				).limit(1).get();
-				if (dbCheck) return null; // 确实已有，正常跳过
-				// KV 为脏缓存（账号曾被删除再恢复），清除后重新发送
-				await c.env.kv.delete('HAS_WELCOME_' + userId).catch(() => {});
+			// Welcome mail is issued at most once per account. A separate marker
+			// survives the user permanently deleting the message, so a read-path
+			// ensure cannot recreate mail the user deliberately removed.
+			if (await c.env.kv.get('WELCOME_ISSUED_' + userId) === '1') return null;
+			// Migrate the legacy marker without re-sending: HAS_WELCOME_ was set
+			// only after a successful delivery in previous versions.
+			if (await c.env.kv.get('HAS_WELCOME_' + userId) === '1') {
+				await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
+				return null;
 			}
 		} catch (e) {}
 
 		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 			and(
 				eq(email.userId, userId),
-				inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com'])
+				inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
+				sql`${email.receiveClaimKey} IS NULL AND ${email.outboundTaskId} IS NULL`
 			)
 		).limit(1).get();
 
 		if (existing) {
 			try {
 				await c.env.kv.put('HAS_WELCOME_' + userId, '1');
+				await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
 			} catch (e) {}
 			await this.ensureGlobalEmailForUser(c, userId, userEmail).catch(() => {});
 			return null;
@@ -1696,7 +1827,7 @@ const emailService = {
 		let emailAddress = userEmail;
 		if (!emailAddress) {
 			const userEntity = (await import('../entity/user')).default;
-			const userRow = await orm(c).select({ email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
+			const userRow = await userOrm(c).select({ email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
 			if (userRow) {
 				emailAddress = userRow.email;
 			}
@@ -1757,7 +1888,7 @@ const emailService = {
 		let userName = emailUtils.getName(userEmail) || (userEmail ? userEmail.split('@')[0] : getUserFallbackNameByLang(tplLang));
 		try {
 			const userEntity = (await import('../entity/user')).default;
-			const userRow = await orm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
+			const userRow = await userOrm(c).select({ nickname: userEntity.nickname, email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
 			if (userRow && userRow.nickname) {
 				userName = userRow.nickname;
 			}
@@ -1849,7 +1980,7 @@ const emailService = {
 		}
 
 		const userEntity = (await import('../entity/user')).default;
-		const userRow = await orm(c).select().from(userEntity).where(eq(userEntity.userId, userId)).get();
+		const userRow = await userOrm(c).select().from(userEntity).where(eq(userEntity.userId, userId)).get();
 		if (!userRow) return null;
 
 		if (globalConfig.targetType === 'roles') {
@@ -1869,6 +2000,7 @@ const emailService = {
 			and(
 				eq(email.userId, userId),
 				inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
+				sql`${email.receiveClaimKey} IS NULL AND ${email.outboundTaskId} IS NULL`,
 				eq(email.subject, globalConfig.subject),
 				eq(email.isDel, isDel.NORMAL)
 			)
@@ -1956,23 +2088,26 @@ const emailService = {
 	async latest(c, params, userId) {
 		let { emailId, accountId, allReceive } = params;
 		emailId = Number(emailId) || 0;
+		accountId = Number(accountId);
 		allReceive = Number(allReceive);
 
-		if (isNaN(allReceive)) {
-			// 缺省 allReceive 时依据 accountId 判定；accountId 也缺失时回退用户首个信箱，避免 undefined 入参导致 D1 绑定报错
-			let accountRow = accountId ? await accountService.selectById(c, accountId) : null;
-			if (!accountRow) {
-				const myAccounts = await accountService.list(c, { size: 1 }, userId);
-				accountRow = Array.isArray(myAccounts) ? myAccounts[0] : null;
+		if (accountId && !isNaN(accountId)) {
+			const accountRow = await accountService.selectById(c, accountId);
+			if (!accountRow || accountRow.userId !== userId) {
+				return [];
 			}
+			if (isNaN(allReceive)) {
+				allReceive = accountRow.allReceive;
+			}
+		} else if (isNaN(allReceive)) {
+			const myAccounts = await accountService.list(c, { size: 1 }, userId);
+			const accountRow = Array.isArray(myAccounts) ? myAccounts[0] : null;
 			if (!accountRow) {
 				return [];
 			}
 			allReceive = accountRow.allReceive;
-			if (!accountId) {
-				accountId = accountRow.accountId;
-			}
-		} else if (!accountId) {
+			accountId = accountRow.accountId;
+		} else {
 			const myAccounts = await accountService.list(c, { size: 1 }, userId);
 			const firstAccount = Array.isArray(myAccounts) ? myAccounts[0] : null;
 			if (!firstAccount) {
@@ -2026,11 +2161,9 @@ const emailService = {
 	},
 
 	async physicsDelete(c, params) {
-		let { emailIds } = params;
-		emailIds = emailIds.split(',').map(Number);
-		await attService.removeByEmailIds(c, emailIds);
-		await starService.removeByEmailIds(c, emailIds);
-		await orm(c).delete(email).where(inArray(email.emailId, emailIds)).run();
+		const { emailIds } = params;
+		const ids = Array.isArray(emailIds) ? emailIds : String(emailIds || '').split(',');
+		return await mailLifecycleService.cascadeDeleteSystemEmails(c, ids);
 	},
 
 	async physicsDeleteUserIds(c, userIds) {
@@ -2039,19 +2172,8 @@ const emailService = {
 	},
 
 	// 实体删除用户本人的邮件并级联清理附件与星标（手动彻底删除、90% 配额清理共用）
-	// 分块 50：D1 单语句绑定参数上限 100，兼容「全选彻底删除」等大列表
 	async cascadeDeleteEmails(c, userId, emailIdList) {
-		const CHUNK = 50;
-		for (let i = 0; i < emailIdList.length; i += CHUNK) {
-			const chunk = emailIdList.slice(i, i + CHUNK);
-			await attService.removeByEmailIds(c, chunk);
-			await starService.removeByEmailIds(c, chunk);
-			await orm(c).delete(email).where(
-				and(
-					eq(email.userId, userId),
-					inArray(email.emailId, chunk)))
-				.run();
-		}
+		return mailLifecycleService.cascadeDeleteEmails(c, userId, emailIdList);
 	},
 
 	/**
@@ -2169,6 +2291,182 @@ const emailService = {
 		return eventRows.length;
 	},
 
+	/**
+	 * Reconcile UNKNOWN outbound tasks that have a durable provider id.
+	 *
+	 * A provider acceptance that could not be written back locally used to stay
+	 * UNKNOWN forever, keeping its send-count reservation and archive pending.
+	 * Resend exposes GET /emails/:id, so a bounded maintenance pass can turn a
+	 * confirmed provider fact into ACCEPTED/FAILED without ever re-dispatching.
+	 * Tasks without a provider id remain UNKNOWN for administrator review.
+	 */
+	async reconcileUnknownOutbound(c, { limit = 20 } = {}) {
+		const db = getMailDb(c);
+		const bound = Math.max(1, Math.min(Number(limit) || 20, 20));
+		// Provider queries are sequential; cap the total wall-clock budget so a
+		// slow/unreachable provider cannot delay the rest of the cron chain.
+		const deadline = Date.now() + 15000;
+		const candidates = await db.prepare(`SELECT task_id, user_id, account_id, provider_id, payload_json
+			FROM mail_outbound_task
+			WHERE state='UNKNOWN' AND provider='external' AND provider_id IS NOT NULL
+				AND updated_at < datetime('now','-30 seconds')
+			ORDER BY updated_at ASC LIMIT ?`).bind(bound).all();
+		const rows = candidates.results || [];
+		if (rows.length === 0) return { checked: 0, accepted: 0, failed: 0, stoppedEarly: false };
+
+		const settings = await settingService.query(c);
+		let checked = 0;
+		let accepted = 0;
+		let failed = 0;
+		let stoppedEarly = false;
+		for (const row of rows) {
+			if (Date.now() >= deadline) {
+				stoppedEarly = true;
+				break;
+			}
+			const account = await accountService.selectById(c, row.account_id);
+			const domain = emailUtils.getDomain(account?.email || '');
+			const token = settings?.resendTokens?.[domain];
+			if (!token) continue;
+			let providerName = '';
+			try {
+				providerName = String(JSON.parse(row.payload_json || '{}')?.providerName || '');
+			} catch (_) {}
+			if (!providerName) providerName = String(token).startsWith('mailjet:') ? 'mailjet' : 'resend';
+			// Cloudflare Email exposes no status lookup API; those tasks stay in
+			// the administrator queue rather than being queried against Resend.
+			if (providerName === 'cloudflare') continue;
+
+			const accept = async (providerId, event) => {
+				const updated = await db.prepare(`UPDATE mail_outbound_task
+					SET state='ACCEPTED',reserved_bytes=0,reserved_count=0,lease_until=0,
+						last_error='Reconciled from provider acceptance',updated_at=CURRENT_TIMESTAMP
+					WHERE task_id=? AND state='UNKNOWN' AND provider_id=?
+					RETURNING email_id`).bind(row.task_id, providerId).first();
+				if (!updated) return;
+				accepted++;
+				if (updated.email_id) {
+					const emailStatus = event === 'delivered' || event === 'opened' || event === 'clicked'
+						? emailConst.status.DELIVERED : emailConst.status.SENT;
+					await db.prepare(`UPDATE email SET status=CASE WHEN status=? THEN ? ELSE status END,
+						resend_email_id=COALESCE(resend_email_id,?) WHERE email_id=? AND user_id=?`)
+						.bind(emailConst.status.SAVING, emailStatus, providerId, updated.email_id, row.user_id).run();
+				}
+				if (event !== 'delivered') {
+					await this.replayProviderEventsFromLedger(c, providerId).catch(() => {});
+				}
+			};
+			const fail = async (providerId, emailStatus, reason) => {
+				const updated = await db.prepare(`UPDATE mail_outbound_task
+					SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,
+						last_error=?,updated_at=CURRENT_TIMESTAMP
+					WHERE task_id=? AND state='UNKNOWN' AND provider_id=?
+					RETURNING email_id`).bind(String(reason).slice(0, 500), row.task_id, providerId).first();
+				if (!updated) return;
+				failed++;
+				if (updated.email_id) {
+					await db.prepare('UPDATE email SET status=? WHERE email_id=? AND user_id=? AND status IN (?,?,?)')
+						.bind(emailStatus, updated.email_id, row.user_id, emailConst.status.SAVING,
+							emailConst.status.SENT, emailConst.status.DELAYED).run();
+				}
+				await mailOutboundService.compensateSendCount(c, { taskId: row.task_id }).catch(() => {});
+			};
+
+			if (providerName === 'mailjet') {
+				const parts = String(token).split(':');
+				if (parts.length !== 3 || !parts[1] || !parts[2]) continue;
+				checked++;
+				let response;
+				try {
+					response = await fetch(`https://api.mailjet.com/v3/REST/message/${encodeURIComponent(row.provider_id)}`, {
+						headers: { Authorization: 'Basic ' + btoa(`${parts[1]}:${parts[2]}`) },
+						signal: AbortSignal.timeout(5000)
+					});
+				} catch (_) {
+					continue;
+				}
+				if (!response.ok) continue;
+				const data = await response.json().catch(() => null);
+				const status = String(data?.Data?.[0]?.Status || '').toLowerCase();
+				if (['sent', 'queued', 'opened', 'clicked', 'delivered'].includes(status)) {
+					await accept(row.provider_id, status);
+				} else if (['bounced', 'hardbounced', 'blocked', 'spam', 'error'].includes(status)) {
+					const emailStatus = status === 'bounced' || status === 'hardbounced'
+						? emailConst.status.BOUNCED
+						: status === 'spam' ? emailConst.status.COMPLAINED : emailConst.status.FAILED;
+					await fail(row.provider_id, emailStatus, `Mailjet reported ${status}`);
+				}
+				continue;
+			}
+
+			checked++;
+			let response;
+			try {
+				response = await fetch(`https://api.resend.com/emails/${encodeURIComponent(row.provider_id)}`, {
+					headers: { Authorization: `Bearer ${String(token)}` },
+					signal: AbortSignal.timeout(5000)
+				});
+			} catch (_) {
+				continue;
+			}
+			if (!response.ok) continue;
+			const data = await response.json().catch(() => null);
+			const event = String(data?.last_event || data?.status || '').toLowerCase();
+			if (!event) continue;
+
+			if (['sent', 'delivery_delayed', 'delivered'].includes(event)) {
+				await accept(row.provider_id, event);
+				continue;
+			}
+
+			if (['bounced', 'complained', 'failed'].includes(event)) {
+				const emailStatus = event === 'bounced' ? emailConst.status.BOUNCED
+					: event === 'complained' ? emailConst.status.COMPLAINED : emailConst.status.FAILED;
+				await fail(row.provider_id, emailStatus, `Provider reported ${event}`);
+			}
+		}
+		return { checked, accepted, failed, stoppedEarly };
+	},
+
+	async listUnknownOutbound(c, { limit = 50 } = {}) {
+		const bound = Math.max(1, Math.min(Number(limit) || 50, 100));
+		const result = await getMailDb(c).prepare(`SELECT task_id, user_id, account_id, provider_id,
+			reserved_bytes, reserved_count, last_error, create_time, updated_at
+			FROM mail_outbound_task WHERE state='UNKNOWN' ORDER BY updated_at ASC LIMIT ?`).bind(bound).all();
+		return result.results || [];
+	},
+
+	/**
+	 * Administrator resolution of an UNKNOWN task after checking the provider.
+	 * ACCEPTED confirms delivery and keeps the consumed send-count reservation;
+	 * FAILED is only valid for a confirmed provider rejection and compensates it.
+	 */
+	async resolveUnknownOutbound(c, { taskId, state, note = '' } = {}) {
+		const target = String(state || '').toUpperCase();
+		if (!['ACCEPTED', 'FAILED'].includes(target)) {
+			throw new BizError('Unknown resolution state', 400, 'invalid_outbound_resolution');
+		}
+		if (typeof taskId !== 'string' || !taskId.trim()) {
+			throw new BizError('Missing outbound task id', 400, 'invalid_outbound_resolution');
+		}
+		const db = getMailDb(c);
+		const reason = `Administrator resolved ${target}${note ? `: ${String(note).slice(0, 300)}` : ''}`;
+		const updated = await db.prepare(`UPDATE mail_outbound_task
+			SET state=?,reserved_bytes=0,reserved_count=0,lease_until=0,last_error=?,updated_at=CURRENT_TIMESTAMP
+			WHERE task_id=? AND state='UNKNOWN' RETURNING email_id,user_id`)
+			.bind(target, reason, taskId.trim()).first();
+		if (!updated) throw new BizError('Outbound task is not UNKNOWN or was already resolved', 409, 'outbound_task_state_changed');
+		if (updated.email_id) {
+			const emailStatus = target === 'ACCEPTED' ? emailConst.status.SENT : emailConst.status.FAILED;
+			await db.prepare('UPDATE email SET status=CASE WHEN status=? THEN ? ELSE status END WHERE email_id=? AND user_id=?')
+				.bind(emailConst.status.SAVING, emailStatus, updated.email_id, updated.user_id).run();
+		}
+		if (target === 'FAILED') {
+			await mailOutboundService.compensateSendCount(c, { taskId: taskId.trim() });
+		}
+		return { taskId: taskId.trim(), state: target, emailId: updated.email_id || null };
+	},
+
 	async selectUserEmailCountList(c, userIds, type, del = isDel.NORMAL) {
 		if (!userIds || userIds.length === 0) {
 			return [];
@@ -2198,6 +2496,7 @@ const emailService = {
 		emailId = Number(emailId);
 		timeSort = Number(timeSort);
 
+		if (!Number.isInteger(size) || size < 1) size = 20;
 		if (size > 50) {
 			size = 50;
 		}
@@ -2439,7 +2738,14 @@ const emailService = {
 	},
 
 	async restoreByUserId(c, userId) {
-		await orm(c).update(email).set({ isDel: isDel.NORMAL }).where(eq(email.userId, userId)).run();
+		let after = 0;
+		while (true) {
+			const rows = await getMailDb(c).prepare(`SELECT email_id FROM email
+				WHERE user_id=? AND is_del=1 AND email_id>? ORDER BY email_id LIMIT 100`).bind(userId, after).all();
+			if (!rows.results?.length) return;
+			await mailLifecycleService.restoreMail(c, { emailIds: rows.results.map(row => row.email_id) }, userId);
+			after = rows.results.at(-1).email_id;
+		}
 	},
 
 	async completeReceive(c, status, emailId, delStatus) {
@@ -2451,8 +2757,12 @@ const emailService = {
 
 	async completeReceiveAll(c) {
 		const mailDb = getMailDb(c);
-		await mailDb.prepare(`UPDATE email as e SET status = ${emailConst.status.RECEIVE} WHERE status = ${emailConst.status.SAVING} AND EXISTS (SELECT 1 FROM account WHERE account_id = e.account_id)`).run();
-		await mailDb.prepare(`UPDATE email as e SET status = ${emailConst.status.NOONE} WHERE status = ${emailConst.status.SAVING} AND NOT EXISTS (SELECT 1 FROM account WHERE account_id = e.account_id)`).run();
+		await mailDb.prepare(`UPDATE email as e SET status = ${emailConst.status.RECEIVE} WHERE status = ${emailConst.status.SAVING}
+			AND receive_claim_key IS NULL AND outbound_task_id IS NULL
+			AND EXISTS (SELECT 1 FROM account WHERE account_id = e.account_id)`).run();
+		await mailDb.prepare(`UPDATE email as e SET status = ${emailConst.status.NOONE} WHERE status = ${emailConst.status.SAVING}
+			AND receive_claim_key IS NULL AND outbound_task_id IS NULL
+			AND NOT EXISTS (SELECT 1 FROM account WHERE account_id = e.account_id)`).run();
 	},
 
 	async batchDelete(c, params) {
@@ -2496,9 +2806,11 @@ const emailService = {
 			return;
 		}
 
-		await attService.removeByEmailIds(c, emailIds);
-
-		await orm(c).delete(email).where(conditions.length > 1 ? and(...conditions) : conditions[0]).run();
+		// Delete exactly this snapshot through the lifecycle transaction. Never
+		// re-evaluate the dynamic filter after the attachment snapshot: a message
+		// that arrived in between would otherwise lose its parent row without its
+		// attachment/object cleanup.
+		return await mailLifecycleService.cascadeDeleteSystemEmails(c, emailIds);
 	},
 
 	async physicsDeleteByAccountId(c, accountId) {
@@ -2509,8 +2821,10 @@ const emailService = {
 	async read(c, params, userId) {
 		const { emailIds, unread } = params;
 		const unreadValue = unread !== undefined ? Number(unread) : emailConst.unread.READ;
-		const emailIdList = Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds).split(',').map(Number);
-		await orm(c).update(email).set({ unread: unreadValue }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIdList)));
+		const emailIdList = (Array.isArray(emailIds) ? emailIds.map(Number) : String(emailIds || '').split(',').map(Number))
+			.filter(id => Number.isInteger(id) && id > 0);
+		if (emailIdList.length === 0) return;
+		await orm(c).update(email).set({ unread: unreadValue }).where(and(eq(email.userId, userId), inArray(email.emailId, emailIdList))).run();
 	},
 
 	async searchSuggestions(c, params, userId) {
@@ -2590,9 +2904,10 @@ const emailService = {
 	},
 
 	async getSidebarStats(c, userId) {
-		const stats = await c.env.db.prepare(`
+		const mailDb = getMailDb(c);
+		const stats = await mailDb.prepare(`
 			SELECT 
-				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com')) AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
+				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR (send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') AND receive_claim_key IS NULL AND outbound_task_id IS NULL)) AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status = 6 AND unread = 0 THEN 1 ELSE 0 END) as draftUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status != 6 AND unread = 0 THEN 1 ELSE 0 END) as sentUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 1 AND unread = 0 THEN 1 ELSE 0 END) as spamUnread,
@@ -2606,7 +2921,7 @@ const emailService = {
 			WHERE user_id = ?
 		`).bind(userId).first();
 
-		const labelEmails = await c.env.db.prepare(`
+		const labelEmails = await mailDb.prepare(`
 			SELECT labels, unread FROM email WHERE user_id = ? AND is_del = 0 AND labels != '[]' AND labels IS NOT NULL
 		`).bind(userId).all();
 

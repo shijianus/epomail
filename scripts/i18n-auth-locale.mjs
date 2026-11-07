@@ -11,6 +11,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { duplicateProperties, literalObjects } from './i18n-source.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const appDir = join(root, 'temp_login_ui');
@@ -88,35 +89,20 @@ if (!baseline) {
 
 // ------------------------------------------------ 3. 源码层：重复键 / 登记遗漏
 const source = readFileSync(localeFile, 'utf8').replace(/\r\n?/g, '\n');
-const sourceLines = source.split('\n');
+const objects = literalObjects(source);
 const blocks = [];
-let currentBlock = null;
-for (const [index, line] of sourceLines.entries()) {
-  const head = /^const ([A-Za-z_$][\w$]*): Dict = \{\s*$/.exec(line);
-  if (head) {
-    currentBlock = { name: head[1], line: index + 1, seen: new Map() };
-    continue;
-  }
-  if (currentBlock && line.trim() === '};') {
-    blocks.push(currentBlock);
-    currentBlock = null;
-    continue;
-  }
-  if (!currentBlock) continue;
-  const entry = /^\s+([A-Za-z_$][\w$]*):/.exec(line);
-  if (!entry) continue;
-  if (!currentBlock.seen.has(entry[1])) currentBlock.seen.set(entry[1], []);
-  currentBlock.seen.get(entry[1]).push(index + 1);
+for (const match of source.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*:\s*Dict\s*=\s*\{/g)) {
+  const object = objects.find((entry) => entry.start === match.index + match[0].length - 1);
+  // A declaration inside a comment/string is deliberately not in objects.
+  if (object) blocks.push({ ...object, name: match[1] });
 }
 
 if (blocks.length !== LANGS.length) {
   fail(`源码中解析到 ${blocks.length} 个字典常量，预期 ${LANGS.length} 个（${LANGS.join(' / ')}）`);
 }
 for (const block of blocks) {
-  for (const [key, lines] of block.seen) {
-    if (lines.length > 1) {
-      fail(`字典 ${block.name} 重复定义 ${key}：第 ${lines.join('、')} 行（后者会静默覆盖前者）`);
-    }
+  for (const [key, lines] of duplicateProperties(block)) {
+    fail(`字典 ${block.name} 重复定义 ${key}：第 ${lines.join('、')} 行（后者会静默覆盖前者）`);
   }
 }
 
@@ -163,6 +149,7 @@ function walk(dir, files = []) {
 }
 
 const callSites = [];
+const mapRefs = [];
 for (const file of walk(srcDir).filter((file) => !/[\\/]i18n[\\/]/.test(file))) {
   const text = readFileSync(file, 'utf8');
   const pattern = /(?:^|[^\w$.])(t|tr)\(\s*(['"])((?:\\.|(?!\2)[^\\])*)\2/g;
@@ -180,15 +167,24 @@ for (const file of walk(srcDir).filter((file) => !/[\\/]i18n[\\/]/.test(file))) 
       location: `${rel(file)}:${line}`
     });
   }
+  // 间接引用：映射对象的 key 保存稍后传入 t()/tr() 的词条。
+  // 当前 OAuth 元数据的 { key, name, icon } 是协议标识；只排除此结构，
+  // 不能按 key 的值（如 google）豁免，否则同名缺失翻译也会逃过检查。
+  for (const object of literalObjects(text)) {
+    const fields = new Set(object.properties.map((property) => property.name));
+    if (fields.has('name') && fields.has('icon') && !fields.has('field')) continue;
+    for (const property of object.properties) {
+      if (property.name !== 'key' || !property.value) continue;
+      mapRefs.push({ key: property.value, location: `${rel(file)}:${property.line}`, indirect: true });
+    }
+  }
 }
 
 const missingRefs = new Map();
-for (const site of callSites) {
-  for (const lang of LANGS) {
-    const table = tables[lang];
-    if (table && !(site.key in table) && !missingRefs.has(site.key)) {
-      missingRefs.set(site.key, `${site.location} (${lang})`);
-    }
+for (const site of [...callSites, ...mapRefs]) {
+  const missing = LANGS.filter((lang) => tables[lang] && !Object.hasOwn(tables[lang], site.key));
+  if (missing.length && !missingRefs.has(site.key)) {
+    missingRefs.set(site.key, `${site.location} (${missing.join(' / ')})${site.indirect ? ' [间接 key: 引用]' : ''}`);
   }
 }
 for (const [key, where] of missingRefs) fail(`界面引用但字典缺少词条 ${key}，首次出现于 ${where}`);
@@ -200,7 +196,10 @@ for (const site of callSites) {
   }
 }
 
-const referencedKeys = new Set(callSites.flatMap((site) => [site.key, site.adminKey]).filter(Boolean));
+const referencedKeys = new Set([
+  ...callSites.flatMap((site) => [site.key, site.adminKey]).filter(Boolean),
+  ...mapRefs.map((ref) => ref.key)
+]);
 const unused = baseline ? Object.keys(baseline).filter((key) => !referencedKeys.has(key)) : [];
 if (unused.length) {
   warn(`字典中存在 ${unused.length} 个代码未引用的词条（可能是历史残留）：${unused.join(', ')}`);
@@ -211,11 +210,11 @@ for (const warning of warnings) console.log(`WARN ${warning}`);
 if (failures.length) {
   for (const failure of failures) console.log(`FAIL ${failure}`);
   console.log(`\n[i18n-auth-locale] ${failures.length} 项失败`);
-  process.exit(1);
+} else {
+  const keyCount = baseline ? Object.keys(baseline).length : 0;
+  console.log(`[i18n-auth-locale] ${LANGS.join(' / ')}：各 ${keyCount} 个词条，键集合一致；`);
+  console.log(`[i18n-auth-locale] 无重复键、无空词条、占位符对齐；`);
+  console.log(`[i18n-auth-locale] ${callSites.length} 处界面字面量引用、${mapRefs.length} 处间接 key: 引用全部命中字典。`);
+  console.log('[i18n-auth-locale] PASS');
 }
-
-const keyCount = baseline ? Object.keys(baseline).length : 0;
-console.log(`[i18n-auth-locale] ${LANGS.join(' / ')}：各 ${keyCount} 个词条，键集合一致；`);
-console.log(`[i18n-auth-locale] 无重复键、无空词条、占位符对齐；`);
-console.log(`[i18n-auth-locale] ${callSites.length} 处界面字面量引用全部命中字典。`);
-console.log('[i18n-auth-locale] PASS');
+process.exitCode = failures.length ? 1 : 0;

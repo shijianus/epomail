@@ -89,9 +89,9 @@
           <el-input 
             v-if="requireTotp"
             v-model="loginForm.code" 
-            :placeholder="$t('totpCodePlaceholder')" 
+            :placeholder="$t('totpCodeOrBackupPlaceholder')"
             size="large"
-            maxlength="6"
+            maxlength="12"
             @keyup.enter="handleInlineLogin"
           >
             <template #prefix>
@@ -261,7 +261,8 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Icon } from '@iconify/vue'
 import { getOAuthAuthorizeInfo, confirmOAuthAuthorize } from '@/request/oauth-app.js'
-import { login } from '@/request/login.js'
+import { login, loginTotp } from '@/request/login.js'
+import { tabSession } from '@/utils/tab-session.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -272,6 +273,7 @@ const errorMessage = ref('')
 const authorizing = ref(false)
 const loggingIn = ref(false)
 const requireTotp = ref(false)
+const tempToken = ref('')
 const logoLoadFailed = ref(false)
 
 const authInfo = reactive({
@@ -531,22 +533,52 @@ async function handleInlineLogin() {
     return
   }
 
+  if (requireTotp.value && !loginForm.code.trim()) {
+    ElMessage.warning(t('totpCodeOrBackupPlaceholder'))
+    return
+  }
+
   loggingIn.value = true
   try {
-    const res = await login({
-      email: loginForm.email.trim(),
-      password: loginForm.password.trim(),
-      code: loginForm.code.trim()
-    })
+    let res
+    if (requireTotp.value) {
+      // The /login response carries a server-issued tempToken. Complete the
+      // same MFA contract as the main login page instead of asking /login for
+      // a code it never reads.
+      res = await loginTotp({
+        tempToken: tempToken.value,
+        code: loginForm.code.trim(),
+        isBackupCode: !/^\d{6}$/.test(loginForm.code.trim()),
+        rememberDevice: false
+      })
+    } else {
+      res = await login(loginForm.email.trim(), loginForm.password.trim())
+    }
 
     if (res && res.token) {
-      localStorage.setItem('token', res.token)
+      tabSession.signIn({ token: res.token, email: loginForm.email.trim().toLowerCase() });
       await fetchAuthorizeDetails()
+      return
     }
-  } catch (err) {
-    if (err.message && err.message.includes('TOTP')) {
+    if (res && res.mfaRequired) {
+      tempToken.value = res.tempToken
       requireTotp.value = true
+      loginForm.code = ''
+      ElMessage.info(t('totpCodeOrBackupPlaceholder'))
+      return
     }
+    if (res && res.stepUpRequired) {
+      tempToken.value = res.tempToken || tempToken.value
+      loginForm.code = ''
+      ElMessage.warning(res.message || t('totpCodeInvalid'))
+      return
+    }
+    if (res && res.isRestricted) {
+      ElMessage.error(res.message || t('accountLocked'))
+      return
+    }
+    ElMessage.error(t('loginFailedCheckCreds'))
+  } catch (err) {
     ElMessage.error(err.message || t('loginFailedCheckCreds'))
   } finally {
     loggingIn.value = false
@@ -554,7 +586,7 @@ async function handleInlineLogin() {
 }
 
 function handleSwitchAccount() {
-  localStorage.removeItem('token')
+  tabSession.detach();
   authInfo.isLoggedIn = false
   authInfo.user = null
 }

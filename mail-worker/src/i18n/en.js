@@ -1,4 +1,5 @@
 const en = {
+    forwardingNotSupported: 'Choose all mail or a non-empty alias prefix and keep the original. Smart rules and deletion after forwarding are unavailable.',
     dynamicUi: 'Dynamic UI',
     staticUi: 'Static UI',
     dynamicUiDesc: 'Applies to default dynamic particle canvas interface',
@@ -1914,6 +1915,12 @@ const en = {
     updateTotpBtn: "Update Authenticator",
     deleteTotpBtn: "Disable Authenticator",
     passkeyNotFound: "Specified passkey not found",
+
+    privacyProcessing: {
+        disabled: 'Optional content processing is disabled or its public notice is unavailable.',
+        confirmationRequired: 'Confirm that you reviewed the current content-processing notice before translating.',
+        noticeChanged: 'The content-processing notice changed. Review the current notice and try again.'
+    },
 
     // ===== 权限树本地化（perm-service.tree：按钮按 perm_key，分组按库内名称）=====
     perms: {

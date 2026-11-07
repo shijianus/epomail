@@ -54,6 +54,26 @@ function storage(c) {
 	return db;
 }
 
+async function ensureTable(db) {
+	try {
+		await db.prepare(`
+			CREATE TABLE IF NOT EXISTS oauth_one_time_credential (
+				token_hash TEXT PRIMARY KEY,
+				purpose TEXT NOT NULL,
+				provider TEXT NOT NULL DEFAULT '',
+				oauth_user_id TEXT NOT NULL DEFAULT '',
+				payload TEXT NOT NULL,
+				consumed INTEGER NOT NULL DEFAULT 0,
+				expires_at INTEGER NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+			)
+		`).run();
+		await db.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_otc_expires ON oauth_one_time_credential(expires_at)`).run().catch(() => {});
+	} catch (e) {
+		console.warn('ensureTable oauth_one_time_credential warning:', e.message);
+	}
+}
+
 async function sha256Hex(value) {
 	const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value));
 	return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
@@ -123,11 +143,24 @@ const oneTimeCredential = {
 		const tokenHash = await sha256Hex(rawToken);
 		const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds;
 
-		await db.prepare(`
-			INSERT INTO oauth_one_time_credential
-				(token_hash, purpose, provider, oauth_user_id, payload, consumed, expires_at)
-			VALUES (?, ?, ?, ?, ?, 0, ?)
-		`).bind(tokenHash, purpose, boundProvider, boundIdentity, serialized, expiresAt).run();
+		try {
+			await db.prepare(`
+				INSERT INTO oauth_one_time_credential
+					(token_hash, purpose, provider, oauth_user_id, payload, consumed, expires_at)
+				VALUES (?, ?, ?, ?, ?, 0, ?)
+			`).bind(tokenHash, purpose, boundProvider, boundIdentity, serialized, expiresAt).run();
+		} catch (err) {
+			if (String(err?.message || '').includes('no such table')) {
+				await ensureTable(db);
+				await db.prepare(`
+					INSERT INTO oauth_one_time_credential
+						(token_hash, purpose, provider, oauth_user_id, payload, consumed, expires_at)
+					VALUES (?, ?, ?, ?, ?, 0, ?)
+				`).bind(tokenHash, purpose, boundProvider, boundIdentity, serialized, expiresAt).run();
+			} else {
+				throw err;
+			}
+		}
 
 		// Opportunistic, bounded housekeeping. Failure here must never block
 		// credential issuance.
@@ -168,12 +201,21 @@ const oneTimeCredential = {
 			binds.push(assertBinding(oauthUserId, { field: 'identity', maxLength: MAX_IDENTITY_LENGTH }));
 		}
 
-		const row = await db.prepare(`
-			SELECT provider, oauth_user_id, payload, consumed, expires_at
-			FROM oauth_one_time_credential
-			WHERE ${filters.join(' AND ')}
-			LIMIT 1
-		`).bind(...binds).first();
+		let row;
+		try {
+			row = await db.prepare(`
+				SELECT provider, oauth_user_id, payload, consumed, expires_at
+				FROM oauth_one_time_credential
+				WHERE ${filters.join(' AND ')}
+				LIMIT 1
+			`).bind(...binds).first();
+		} catch (err) {
+			if (String(err?.message || '').includes('no such table')) {
+				await ensureTable(db);
+				return null;
+			}
+			throw err;
+		}
 
 		if (!row) return null;
 
@@ -227,12 +269,21 @@ const oneTimeCredential = {
 			binds.push(boundIdentity);
 		}
 
-		const row = await db.prepare(`
-			UPDATE oauth_one_time_credential
-			SET consumed = 1
-			WHERE ${filters.join(' AND ')}
-			RETURNING provider, oauth_user_id, payload
-		`).bind(...binds).first();
+		let row;
+		try {
+			row = await db.prepare(`
+				UPDATE oauth_one_time_credential
+				SET consumed = 1
+				WHERE ${filters.join(' AND ')}
+				RETURNING provider, oauth_user_id, payload
+			`).bind(...binds).first();
+		} catch (err) {
+			if (String(err?.message || '').includes('no such table')) {
+				await ensureTable(db);
+				return null;
+			}
+			throw err;
+		}
 
 		if (!row) return null;
 
@@ -266,7 +317,51 @@ const oneTimeCredential = {
 				LIMIT ?
 			)
 		`).bind(nowSec, limit).run();
+	},
+
+	/**
+	 * Immediately invalidate unconsumed third-party OAuth client credentials
+	 * (states, callback exchange codes, unbound bind proofs, and signed-in bind
+	 * claims) when global OAuth or a specific provider is disabled.
+	 */
+	async revokeClientFlows(c, { provider = null } = {}) {
+		const db = getUserDb(c);
+		if (!db || typeof db.prepare !== 'function') return 0;
+
+		const purposes = [
+			OTC_PURPOSE.STATE,
+			OTC_PURPOSE.LOGIN_CODE,
+			OTC_PURPOSE.BIND,
+			OTC_PURPOSE.BIND_LINK
+		];
+		const placeholders = purposes.map(() => '?').join(', ');
+
+		if (provider !== null && provider !== undefined && provider !== '') {
+			const boundProvider = assertBinding(String(provider).trim().toLowerCase(), {
+				field: 'provider',
+				maxLength: MAX_PROVIDER_LENGTH
+			});
+			const res = await db.prepare(`
+				UPDATE oauth_one_time_credential
+				SET consumed = 1
+				WHERE consumed = 0 AND provider = ? AND purpose IN (${placeholders})
+			`).bind(boundProvider, ...purposes).run();
+			return Number(res?.meta?.changes ?? res?.changes ?? 0);
+		}
+
+		const res = await db.prepare(`
+			UPDATE oauth_one_time_credential
+			SET consumed = 1
+			WHERE consumed = 0 AND purpose IN (${placeholders})
+		`).bind(...purposes).run();
+		return Number(res?.meta?.changes ?? res?.changes ?? 0);
 	}
 };
 
 export default oneTimeCredential;
+
+export function authVersionOf(row) {
+	const version = row?.authVersion ?? row?.auth_version ?? 0;
+	if (!Number.isSafeInteger(version) || version < 0) throw new BizError('Invalid authentication version', 401);
+	return version;
+}

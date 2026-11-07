@@ -1,3 +1,5 @@
+import fileUtils from './file-utils.js';
+
 const SAFE_INLINE_IMAGE_TYPES = [
 	'image/png', 'image/jpeg', 'image/jpg', 'image/gif',
 	'image/webp', 'image/avif', 'image/bmp', 'image/x-icon'
@@ -12,14 +14,19 @@ const SAFE_INLINE_IMAGE_TYPES = [
  * the response must not be shared by intermediary caches. Only public static
  * assets (avatars/backgrounds) may opt into long-lived public caching.
  */
-export function safeObjectHeaders({ contentType, contentDisposition, cacheControl, isPublic = false } = {}) {
+export function safeObjectHeaders({ contentType, contentDisposition, cacheControl, isPublic = false, filename = null } = {}) {
 	const rawType = String(contentType || '').toLowerCase().split(';')[0].trim();
 	const isSafeImage = SAFE_INLINE_IMAGE_TYPES.includes(rawType);
 	const wantsInline = String(contentDisposition || '').toLowerCase().trim().startsWith('inline');
+	const disposition = isSafeImage && wantsInline
+		? 'inline'
+		: (typeof filename === 'string' && filename.trim()
+			? fileUtils.encodeContentDisposition(filename, 'attachment')
+			: 'attachment');
 
 	return {
 		'Content-Type': isSafeImage ? rawType : 'application/octet-stream',
-		'Content-Disposition': isSafeImage && wantsInline ? 'inline' : 'attachment',
+		'Content-Disposition': disposition,
 		'Cache-Control': isPublic ? (cacheControl || 'public, max-age=86400') : 'private, no-store',
 		'X-Content-Type-Options': 'nosniff',
 		'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",

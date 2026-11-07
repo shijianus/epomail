@@ -61,6 +61,8 @@ const SYSTEM_CATEGORIES = {
   '系统设置': () => false,
 };
 
+export const RESERVED_SYSTEM_LABELS = new Set(['官方', '全域公告', '安全', '裁决留痕']);
+
 export function applyRules(emailParams, userLabelsJson, blackFromStr = '') {
   if (!userLabelsJson) return { labelsStr: '[]', actions: {} };
 
@@ -253,7 +255,7 @@ export function applyRules(emailParams, userLabelsJson, blackFromStr = '') {
       }
 
       if (matched && !vetoed && label.name) {
-        if (!label.name.startsWith('__')) {
+        if (!label.name.startsWith('__') && !RESERVED_SYSTEM_LABELS.has(label.name)) {
             matchedLabels.push(label.name);
         }
         

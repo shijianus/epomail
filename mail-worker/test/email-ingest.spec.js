@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { readRawEmail } from '../src/email/email.js';
+import { readRawEmail, senderPatternMatches, isAuthenticatedInternalSender, checkBlock } from '../src/email/email.js';
 
 function streamFromBytes(bytes) {
 	return new ReadableStream({
@@ -39,5 +39,118 @@ describe('Inbound email stream decoding', () => {
 		expect(result.tooLarge).toBe(true);
 		expect(result.content).toBe('');
 		expect(message.setReject).toHaveBeenCalledWith(expect.stringContaining('1MB'));
+	});
+});
+
+describe('Sender wildcard patterns', () => {
+	it('matches supported wildcards without throwing', () => {
+		expect(senderPatternMatches('*@spam.example', 'anyone@spam.example', 'spam.example')).toBe(true);
+		expect(senderPatternMatches('*@spam.example', 'user@example.com', 'example.com')).toBe(false);
+		expect(senderPatternMatches('alerts-*@example.com', 'alerts-1@example.com', 'example.com')).toBe(true);
+		expect(senderPatternMatches('*.example.com', 'user@mail.example.com', 'mail.example.com')).toBe(true);
+	});
+
+	it('matches exact addresses, domains and subdomains as before', () => {
+		expect(senderPatternMatches('user@example.com', 'user@example.com', 'example.com')).toBe(true);
+		expect(senderPatternMatches('example.com', 'user@mail.example.com', 'mail.example.com')).toBe(true);
+		expect(senderPatternMatches('other.com', 'user@example.com', 'example.com')).toBe(false);
+	});
+
+	it('fails a malformed pattern closed instead of breaking delivery', () => {
+		expect(senderPatternMatches('[unterminated', 'user@example.com', 'example.com')).toBe(false);
+		expect(senderPatternMatches('*[', 'user@example.com', 'example.com')).toBe(false);
+	});
+});
+
+describe('Authenticated internal sender detection', () => {
+	const local = { from: { address: 'user@example.com' }, headers: [] };
+
+	it('does not trust a local From domain without an authenticated result', () => {
+		expect(isAuthenticatedInternalSender(local, ['example.com'])).toBe(false);
+	});
+
+	it('accepts a DKIM/DMARC pass bound to the local domain', () => {
+		const email = { ...local, headers: [
+			{ key: 'Authentication-Results', value: 'mx.example; dkim=pass header.d=example.com' }
+		] };
+		expect(isAuthenticatedInternalSender(email, ['example.com'])).toBe(true);
+	});
+
+	it('rejects a spoofed local From when authentication belongs to another domain', () => {
+		const email = { ...local, headers: [
+			{ key: 'Authentication-Results', value: 'mx.example; dkim=pass header.d=evil.example' }
+		] };
+		expect(isAuthenticatedInternalSender(email, ['example.com'])).toBe(false);
+	});
+
+	it('rejects a non-local domain even with a pass', () => {
+		const email = { from: { address: 'user@evil.example' }, headers: [
+			{ key: 'Authentication-Results', value: 'mx.example; dkim=pass header.d=evil.example' }
+		] };
+		expect(isAuthenticatedInternalSender(email, ['example.com'])).toBe(false);
+	});
+
+	it('trusts only transport headers from the configured receiving MTA', () => {
+		const spoofedRaw = { from: { address: 'user@example.com' }, headers: [
+			{ key: 'Authentication-Results', value: 'mx.cloudflare.net; dkim=pass header.d=example.com' }
+		] };
+		expect(isAuthenticatedInternalSender(spoofedRaw, ['example.com'], {
+			trustedAuthservId: 'mx.cloudflare.net', requireTransport: true
+		})).toBe(false);
+		const transport = new Map([
+			['authentication-results', 'mx.cloudflare.net; dkim=pass header.d=example.com']
+		]);
+		expect(isAuthenticatedInternalSender(spoofedRaw, ['example.com'], {
+			transportHeaders: transport, trustedAuthservId: 'mx.cloudflare.net', requireTransport: true
+		})).toBe(true);
+		expect(isAuthenticatedInternalSender(spoofedRaw, ['example.com'], {
+			transportHeaders: new Map([['authentication-results', 'mx.example; dkim=pass header.d=example.com']]),
+			trustedAuthservId: 'mx.cloudflare.net', requireTransport: true
+		})).toBe(false);
+	});
+
+	it('rejects ARC-Authentication-Results, comma-joined multi-header injection, and domain prefix spoofing', () => {
+		const arcOnly = {
+			from: { address: 'user@example.com' },
+			headers: []
+		};
+		expect(isAuthenticatedInternalSender(arcOnly, ['example.com'], {
+			transportHeaders: new Map([
+				['authentication-results', 'mx.cloudflare.net; spf=fail'],
+				['arc-authentication-results', 'i=1; attacker.mx; dkim=pass header.d=example.com']
+			]),
+			trustedAuthservId: 'mx.cloudflare.net',
+			requireTransport: true
+		})).toBe(false);
+
+		expect(isAuthenticatedInternalSender(arcOnly, ['example.com'], {
+			transportHeaders: new Map([
+				['authentication-results', 'mx.cloudflare.net; spf=fail, attacker.mx; dkim=pass header.d=example.com']
+			]),
+			trustedAuthservId: 'mx.cloudflare.net',
+			requireTransport: true
+		})).toBe(false);
+
+		expect(isAuthenticatedInternalSender(arcOnly, ['example.com'], {
+			transportHeaders: new Map([
+				['authentication-results', 'mx.cloudflare.net; dkim=pass header.d=example.com.attacker.com']
+			]),
+			trustedAuthservId: 'mx.cloudflare.net',
+			requireTransport: true
+		})).toBe(false);
+	});
+
+	it('marks unauthenticated external mail spoofing reserved official system addresses as spam', () => {
+		const spoofedOfficial = {
+			from: { address: 'announcement@epocanvas.com' },
+			subject: 'Urgent Notice',
+			html: '<p>Spoof</p>',
+			text: 'Spoof'
+		};
+		const transport = new Map([
+			['authentication-results', 'mx.cloudflare.net; spf=fail; dmarc=fail']
+		]);
+		const res = checkBlock('', '', '', spoofedOfficial, { domain: ['epocanvas.com'] }, 'victim@epocanvas.com', transport);
+		expect(res).toEqual({ block: true, hardBlock: false });
 	});
 });

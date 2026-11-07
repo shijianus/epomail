@@ -1,6 +1,6 @@
 import BizError from '../error/biz-error.js';
 import userService from './user-service.js';
-import emailUtils from '../utils/email-utils.js';
+import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES } from '../utils/email-utils.js';
 import { isDel, settingConst, userConst } from '../const/entity-const.js';
 import JwtUtils from '../utils/jwt-utils.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,8 +15,11 @@ import cryptoUtils from '../utils/crypto-utils.js';
 import turnstileService from './turnstile-service.js';
 import roleService from './role-service.js';
 import regKeyService from './reg-key-service.js';
+import rbacGuard from './rbac-guard-service.js';
+import permService from './perm-service.js';
 import dayjs from 'dayjs';
 import { toUtc } from '../utils/date-uitil.js';
+import { isAdminUser } from '../utils/admin-utils.js';
 import { t } from '../i18n/i18n.js';
 import verifyRecordService from './verify-record-service.js';
 import totpUtils from '../utils/totp-utils.js';
@@ -30,6 +33,10 @@ import deviceTrustService from './device-trust-service.js';
 import rateLimit from '../utils/rate-limit.js';
 import decisionNoticeService from './decision-notice-service.js';
 import totpService from './totp-service.js';
+import authOperation from '../utils/auth-security-operation.js';
+import { authVersionOf, hashToken } from '../utils/one-time-credential.js';
+import { getUserDb } from '../utils/db-accessor.js';
+import legalPolicyService from './legal-policy-service.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -43,6 +50,18 @@ function getSafeSessionUser(userRow) {
 	return safe;
 }
 
+function unusedBackupCodeCount(value) {
+	if (!value) return 0;
+	try {
+		const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+		if (Array.isArray(parsed)) return parsed.filter(item => item.used === 0).length;
+		if (parsed && Array.isArray(parsed.hashedCodes)) {
+			return parsed.hashedCodes.filter(item => item.used === 0).length;
+		}
+	} catch (_) {}
+	return 0;
+}
+
 /**
  * Per-session authentication provenance. Only the issuing server (OAuth
  * service) can set it, and it is stored next to the token list so a stale or
@@ -51,12 +70,22 @@ function getSafeSessionUser(userRow) {
  * The initial-password flow uses this to prove the caller just completed a
  * provider authentication; a plain password session never carries it.
  */
-function buildSessionMeta(method, provider) {
+function buildSessionMeta(method, provider, authVersion, mfaCompleted = false) {
 	if (method !== 'oauth') return null;
 	return {
 		method: 'oauth',
+		authVersion, mfaCompleted,
 		provider: typeof provider === 'string' && provider ? provider.slice(0, 64) : null,
 		at: Date.now()
+	};
+}
+
+function normalizeAuthContext(authContext) {
+	if (!authContext || authContext.method !== 'oauth') return null;
+	const provider = typeof authContext.provider === 'string' ? authContext.provider.trim() : '';
+	return {
+		method: 'oauth',
+		provider: provider || null
 	};
 }
 
@@ -71,6 +100,63 @@ function attachSessionMeta(authInfo, token, meta) {
 			delete authInfo.tokenMeta[key];
 		}
 	}
+}
+
+const LOGIN_FAIL_WINDOW_SECONDS = 12 * 60 * 60;
+
+function loginFailWindow() {
+	const now = Math.floor(Date.now() / 1000);
+	const start = Math.floor(now / LOGIN_FAIL_WINDOW_SECONDS) * LOGIN_FAIL_WINDOW_SECONDS;
+	return { start, expires: start + LOGIN_FAIL_WINDOW_SECONDS };
+}
+
+async function readLoginFail(c, email) {
+	if (String(c?.env?.ENVIRONMENT || '').toLowerCase() === 'test') return null;
+	try {
+		const db = getUserDb(c);
+		if (!db?.prepare) return null;
+		const window = loginFailWindow();
+		const row = await db.prepare(`SELECT count FROM rate_limit_counter
+			WHERE scope = 'login-fail' AND subject = ? AND window_start = ?`)
+			.bind(`email:${email}`, window.start).first();
+		return Number(row?.count) || 0;
+	} catch (_) {
+		return null;
+	}
+}
+
+async function incrementLoginFail(c, email) {
+	if (String(c?.env?.ENVIRONMENT || '').toLowerCase() === 'test') return null;
+	try {
+		const db = getUserDb(c);
+		if (!db?.prepare) return null;
+		const window = loginFailWindow();
+		const row = await db.prepare(`
+			INSERT INTO rate_limit_counter (scope, subject, window_start, count, expires_at)
+			VALUES ('login-fail', ?, ?, 1, ?)
+			ON CONFLICT(scope, subject, window_start)
+			DO UPDATE SET count = count + 1
+			RETURNING count
+		`).bind(`email:${email}`, window.start, window.expires).first();
+		return Number(row?.count) || 0;
+	} catch (_) {
+		return null;
+	}
+}
+
+async function clearLoginFail(c, email) {
+	if (String(c?.env?.ENVIRONMENT || '').toLowerCase() !== 'test') {
+		try {
+			const db = getUserDb(c);
+			if (db?.prepare) {
+				await db.prepare(`DELETE FROM rate_limit_counter
+					WHERE scope = 'login-fail' AND subject = ?`).bind(`email:${email}`).run();
+			}
+		} catch (_) {}
+	}
+	try {
+		await c.env.kv.delete(KvConst.LOGIN_FAIL + email);
+	} catch (_) {}
 }
 
 const loginService = {
@@ -88,13 +174,16 @@ const loginService = {
 	 * function inside the write path, and the invite slot is still reserved
 	 * with an atomic decrement afterwards.
 	 */
-	async validateRegistration(c, params, oauth = false) {
-		const { email, password } = params;
-		// A non-string invite code is treated as absent instead of being handed
-		// to SQL as a binding parameter.
-		const code = typeof params.code === 'string' ? params.code : '';
+		async validateRegistration(c, params, oauth = false) {
+			const { email, password } = params;
+			// A non-string invite code is treated as absent instead of being handed
+			// to SQL as a binding parameter.
+			const code = typeof params.code === 'string' ? params.code : '';
 
-		let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = await settingService.query(c)
+			const settingData = await settingService.query(c);
+			const acceptance = await legalPolicyService.validateRegistrationAcceptanceAuthoritative(c, params, settingData);
+			let { regKey, register, registerVerify, regVerifyCount, minEmailPrefix, emailPrefixFilter } = settingData;
+
 
 		if (oauth) {
 			// The provider already verified the identity, so the local captcha
@@ -111,11 +200,21 @@ const loginService = {
 			throw new BizError(t('notEmail'), undefined, 'invalid_email');
 		}
 
+		// RFC 5321 邮箱总长上限：拦截超长地址在 account/audit/rate-limit 等键位上的存储滥用
+		if (email.length > 254) {
+			throw new BizError(t('emailLengthLimit'), undefined, 'email_too_long');
+		}
+
 		if (emailUtils.getName(email).length < minEmailPrefix) {
 			throw new BizError(t('minEmailPrefix', { msg: minEmailPrefix } ), undefined, 'prefix_too_short');
 		}
 
-		if (emailPrefixFilter.some(content => emailUtils.getName(email).includes(content)))  {
+		// 大小写归一后再匹配：否则 "Support@" 可绕过 "support" 过滤；同时空过滤条目不再全量拦截
+		const registerLocalName = emailUtils.getName(email);
+		if (emailPrefixFilter.some(content => {
+			const needle = String(content || '').trim().toLowerCase();
+			return needle && registerLocalName.toLowerCase().includes(needle);
+		}))  {
 			throw new BizError(t('banEmailPrefix'), undefined, 'invalid_local');
 		}
 
@@ -123,7 +222,7 @@ const loginService = {
 			throw new BizError(t('emailLengthLimit'), undefined, 'prefix_too_long');
 		}
 
-		if (typeof password !== 'string' || password.length > 30) {
+		if (typeof password !== 'string' || password.length > 128) {
 			throw new BizError(t('pwdLengthLimit'), undefined, 'password_too_long');
 		}
 
@@ -153,6 +252,11 @@ const loginService = {
 		const localName = emailUtils.getName(email);
 		const adminName = c.env.admin ? emailUtils.getName(c.env.admin) : '';
 		if (adminName && localName.toLowerCase() === adminName.toLowerCase()) {
+			throw new BizError(t('adminReserved'), undefined, 'email_reserved');
+		}
+
+		// RFC 2142 合规保留地址：严禁新注册/新别名占用 postmaster、abuse、security 等官方身份
+		if (RESERVED_EMAIL_LOCAL_NAMES.has(localName.toLowerCase())) {
 			throw new BizError(t('adminReserved'), undefined, 'email_reserved');
 		}
 
@@ -216,7 +320,8 @@ const loginService = {
 			regKeyId,
 			defType,
 			assignedName,
-			regVerifyOpen
+			regVerifyOpen,
+			acceptance
 		};
 	},
 
@@ -229,6 +334,12 @@ const loginService = {
 		const id = Number(userId);
 		if (!Number.isInteger(id) || id <= 0) return;
 
+		try {
+			await (await import('../utils/db-accessor.js')).getUserDb(c)
+				.prepare('DELETE FROM legal_acceptance WHERE user_id = ?').bind(id).run();
+		} catch (error) {
+			console.error('Failed to roll back registration acceptance:', error);
+		}
 		try {
 			await accountService.physicsDeleteByUserIds(c, [id]);
 		} catch (err) {
@@ -266,7 +377,7 @@ const loginService = {
 			type,
 			regKeyId,
 			defType,
-			assignedName,
+				assignedName,
 			regVerifyOpen: precomputedRegVerifyOpen
 		} = policy;
 
@@ -296,8 +407,10 @@ const loginService = {
 		let userId;
 		let acc;
 		try {
+			const acceptance = await legalPolicyService.validateRegistrationAcceptanceAuthoritative(c, params);
 			userId = await userService.insert(c, { email, regKeyId, password: hash, salt, type: type || defType });
 			acc = await accountService.insert(c, { userId: userId, email, name: assignedName });
+			await legalPolicyService.recordAcceptance(c, userId, acceptance);
 			await userService.updateUserInfo(c, userId, true);
 		} catch (err) {
 			if (reservedRegKey) {
@@ -335,6 +448,49 @@ const loginService = {
 
 	},
 
+	/**
+	 * A legacy or delegated invite code must not be able to grant a privileged
+	 * role on redemption. Creation is already guarded by
+	 * rbacGuard.assertCanAssignRole; this is the defence-in-depth check for
+	 * codes created before that guard existed or by a since-demoted operator.
+	 * It covers master and every role carrying PRIVILEGED_PERMS (for example a
+	 * legacy moderator code), not only master.
+	 */
+	async assertInviteRoleBoundary(c, regKeyRow) {
+		let role;
+		try {
+			role = await roleService.selectById(c, regKeyRow.roleId);
+		} catch (err) {
+			// A failed role lookup cannot prove the invite is harmless. Fail
+			// closed for legacy/privileged codes instead of granting a role.
+			console.warn('Invite role lookup unavailable:', err?.message || err);
+			return false;
+		}
+		if (!role) return false;
+		const isMasterRole = role.roleCode === 'master' || role.key === 'master';
+		const roleKey = String(role.roleCode || role.key || '').toLowerCase();
+		let roleKeys = [];
+		let permLookupFailed = false;
+		try {
+			roleKeys = await permService.rolePermKeys(c, role.roleId);
+		} catch (err) {
+			// Lightweight/legacy schemas may not expose role_perm. Normal roles
+			// may continue for compatibility, but a code that is known to map to
+			// a privileged seed role must not silently bypass the owner check.
+			permLookupFailed = true;
+			console.warn('Invite role permission lookup unavailable:', err?.message || err);
+		}
+		if (permLookupFailed && (isMasterRole || roleKey === 'moderator')) return false;
+		const hasPrivilegedPerm = roleKeys.some(key => rbacGuard.PRIVILEGED_PERMS.has(key));
+		if (!isMasterRole && !hasPrivilegedPerm) return true;
+		const creatorId = Number(regKeyRow.userId) || 0;
+		const creator = creatorId > 0 ? await userService.selectByIdIncludeDel(c, creatorId) : null;
+		const creatorActive = Boolean(creator)
+			&& Number(creator.isDel ?? creator.is_del ?? 0) === 0
+			&& Number(creator.status ?? 0) === 0;
+		return creatorActive && isAdminUser(c, creator);
+	},
+
 	async handleOpenRegKey(c, regKey, code) {
 
 		if (!code) {
@@ -344,6 +500,10 @@ const loginService = {
 		const regKeyRow = await regKeyService.selectByCode(c, code);
 
 		if (!regKeyRow) {
+			throw new BizError(t('notExistRegKey'), undefined, 'invite_code_invalid');
+		}
+
+		if (!await this.assertInviteRoleBoundary(c, regKeyRow)) {
 			throw new BizError(t('notExistRegKey'), undefined, 'invite_code_invalid');
 		}
 
@@ -373,6 +533,10 @@ const loginService = {
 			return null
 		}
 
+		if (!await this.assertInviteRoleBoundary(c, regKeyRow)) {
+			return null
+		}
+
 		const today = toUtc().tz('Asia/Shanghai').startOf('day')
 		const expireTime = toUtc(regKeyRow.expireTime).tz('Asia/Shanghai').startOf('day');
 
@@ -383,53 +547,90 @@ const loginService = {
 		return { type: regKeyRow.roleId, regKeyId: regKeyRow.regKeyId };
 	},
 
-	async lazyMigratePassword(c, userId, plainPassword) {
+	async lazyMigratePassword(c, row, plainPassword) {
 		try {
 			const { salt, hash } = await cryptoUtils.hashPassword(plainPassword, c.env);
-			await orm(c).update(user).set({ password: hash, salt }).where(eq(user.userId, userId)).run();
+			await orm(c).update(user).set({ password: hash, salt }).where(and(eq(user.userId, row.userId), eq(user.password, row.password), eq(user.salt, row.salt), eq(user.authVersion, authVersionOf(row)))).run();
 		} catch (err) {
 			console.error('Lazy password migration failed:', err);
 		}
 	},
 
-	async login(c, params, noVerifyPwd = false) {
+	async login(c, params, noVerifyPwd = false, authContext = null) {
 
 		await rateLimit.check(c, { scope: 'login', limit: 30, windowSeconds: 900 });
 
 		const { email, password } = params;
+		const trustedAuthContext = normalizeAuthContext(authContext);
 
 		const inputEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 		const inputPassword = typeof password === 'string' ? password : '';
+		// 输入上限必须先于任何 PBKDF2 派生与 D1/KV 查询执行：超长凭据曾是
+		// 冷 isolate CPU 耗尽 (1102) 与 rate_limit_counter 行膨胀的攻击入口。
+		if (inputEmail.length > 254 || /[\r\n\0]/.test(inputEmail)) {
+			throw new BizError(t('notEmail'), undefined, 'invalid_email');
+		}
+		if (inputPassword.length > 128) {
+			throw new BizError(t('pwdLengthLimit'), undefined, 'password_too_long');
+		}
 		if ((!inputEmail || !inputPassword) && !noVerifyPwd) {
 			throw new BizError(t('emailAndPwdEmpty'));
 		}
 
-		const failKey = KvConst.LOGIN_FAIL + inputEmail;
-		let failCountStr = await c.env.kv.get(failKey);
-		let failCount = failCountStr ? parseInt(failCountStr) : 0;
+		const readFailForIdentifier = async (identifier) => {
+			if (!identifier) return 0;
+			const durable = await readLoginFail(c, identifier);
+			if (durable !== null) return durable;
+			const str = await c.env.kv.get(KvConst.LOGIN_FAIL + identifier);
+			return str ? parseInt(str) : 0;
+		};
 
+		const incrementFailForIdentifier = async (identifier) => {
+			if (!identifier) return 0;
+			const durableCount = await incrementLoginFail(c, identifier);
+			if (durableCount !== null) return durableCount;
+			// Pre-migration / test fallback. The D1 counter is authoritative when
+			// the rate_limit_counter table is present.
+			try {
+				const key = KvConst.LOGIN_FAIL + identifier;
+				const latest = await c.env.kv.get(key);
+				const current = latest ? parseInt(latest) : 0;
+				const nextCount = current + 1;
+				await c.env.kv.put(key, nextCount.toString(), { expirationTtl: 12 * 60 * 60 });
+				return nextCount;
+			} catch {
+				return 0;
+			}
+		};
+
+		const failCount = await readFailForIdentifier(inputEmail);
 		if (failCount >= 5) {
 			throw new BizError(t('accountLocked'));
 		}
 
-		const incrementFail = async () => {
+		let canonicalEmail = '';
+		const notifyLocked = async () => {
+			if (!userRow || !userRow.userId) return;
 			try {
-				let latest = await c.env.kv.get(failKey);
-				let current = latest ? parseInt(latest) : 0;
-				const nextCount = current + 1;
-				await c.env.kv.put(failKey, nextCount.toString(), { expirationTtl: 12 * 60 * 60 });
-				if (nextCount >= 5 && userRow && userRow.userId) {
-					try {
-						const securityNoticeService = (await import('./security-notice-service.js')).default;
-						const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
-						await securityNoticeService.sendNotice(c, userRow.userId, SECURITY_EVENT_TYPES.ACCOUNT_LOCKED, {
-							detail: '12 hours lockdown (5 consecutive failed attempts)'
-						});
-					} catch (e) {
-						console.error('Failed to send account locked notice:', e);
-					}
-				}
-			} catch {}
+				const securityNoticeService = (await import('./security-notice-service.js')).default;
+				const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
+				await securityNoticeService.sendNotice(c, userRow.userId, SECURITY_EVENT_TYPES.ACCOUNT_LOCKED, {
+					detail: '12 hours lockdown (5 consecutive failed attempts)'
+				});
+			} catch (e) {
+				console.error('Failed to send account locked notice:', e);
+			}
+		};
+
+		const incrementFail = async () => {
+			const inputCount = await incrementFailForIdentifier(inputEmail);
+			let canonicalCount = 0;
+			if (canonicalEmail && canonicalEmail !== inputEmail) {
+				canonicalCount = await incrementFailForIdentifier(canonicalEmail);
+			}
+			if (inputCount >= 5 || canonicalCount >= 5) {
+				await notifyLocked();
+			}
 		};
 
 		let userRow = await userService.selectByEmailIncludeDel(c, inputEmail);
@@ -453,6 +654,16 @@ const loginService = {
 					if (accountRow && accountRow.userId) {
 						userRow = await userService.selectByIdIncludeDel(c, accountRow.userId);
 					}
+				}
+			}
+		}
+
+		if (userRow?.email) {
+			canonicalEmail = String(userRow.email).trim().toLowerCase();
+			if (canonicalEmail && canonicalEmail !== inputEmail) {
+				const canonicalFailCount = await readFailForIdentifier(canonicalEmail);
+				if (canonicalFailCount >= 5) {
+					throw new BizError(t('accountLocked'));
 				}
 			}
 		}
@@ -528,7 +739,7 @@ const loginService = {
 				sessionTrustEpoch = trustEval.trustEpoch;
 				sessionMaxEpoch = trustEval.maxSessionEpoch;
 			} else {
-				const tempToken = 'totp_tmp_' + uuidv4().replace(/-/g, '');
+				let tempToken;
 				const passkeyChallenge = webauthnUtils.generateChallenge();
 
 				// Evaluate black-box risk model
@@ -546,27 +757,12 @@ const loginService = {
 					} catch (e) {}
 				}
 
-				await c.env.kv.put(
-					KvConst.TOTP_PENDING + tempToken,
-					JSON.stringify({
-						userId: userRow.userId,
-						email: userRow.email,
-						attempts: 0,
-						passkeyChallenge,
-						needsPasswordUpgrade: isLegacy ? inputPassword : null,
-						stepUpRequired: riskAssessment.stepUpRequired,
-						riskScore: riskAssessment.riskScore,
-					step: 1,
-					verifiedFactors: [],
-					deviceTag,
-					// Provenance survives the MFA challenge so the session that
-					// is finally issued can still prove a provider login.
-					authMethod: params.authMethod || null,
-					authProvider: params.authProvider || null,
-					createdAt: Date.now()
-					}),
-					{ expirationTtl: 300 } // 5 minutes TTL
-				);
+				const loginBinding = { userId:userRow.userId, authVersion:authVersionOf(userRow), purpose:'login_mfa',
+					target:'login', sessionHash:await hashToken('login:' + uuidv4()) };
+				const pendingData = { email:userRow.email, passkeyChallenge, ...webauthnUtils.ceremonyContext(c),
+					stepUpRequired:riskAssessment.stepUpRequired, step:1, verifiedFactors:[], deviceTag,
+					authContext:trustedAuthContext, createdAt:Date.now() };
+				tempToken = await authOperation.issue(c,{...loginBinding,payload:pendingData,ttlSeconds:300});
 
 				return {
 					mfaRequired: true,
@@ -625,16 +821,14 @@ const loginService = {
 		}
 
 		// Clear fail count on success
-		if (failCount > 0) {
-			await c.env.kv.delete(failKey);
-		}
-		if (userRow.email && (KvConst.LOGIN_FAIL + userRow.email) !== failKey) {
-			await c.env.kv.delete(KvConst.LOGIN_FAIL + userRow.email);
+		await clearLoginFail(c, inputEmail);
+		if (userRow.email && userRow.email.toLowerCase() !== inputEmail) {
+			await clearLoginFail(c, userRow.email.toLowerCase());
 		}
 
 		// If legacy single-round SHA-256 hash was detected, upgrade to PBKDF2 lazily
 		if (isLegacy && inputPassword) {
-			await this.lazyMigratePassword(c, userRow.userId, inputPassword);
+			await this.lazyMigratePassword(c, userRow, inputPassword);
 		}
 
 		const activeLoginEmail = inputEmail.includes('@') ? inputEmail : userRow.email;
@@ -642,7 +836,8 @@ const loginService = {
 		const jwt = await JwtUtils.generateToken(c, { 
 			userId: userRow.userId, 
 			loginEmail: activeLoginEmail,
-			token: uuid 
+			token: uuid,
+			authVersion: authVersionOf(userRow)
 		});
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
@@ -667,7 +862,7 @@ const loginService = {
 
 		}
 
-		attachSessionMeta(authInfo, uuid, buildSessionMeta(params.authMethod, params.authProvider));
+		attachSessionMeta(authInfo, uuid, trustedAuthContext && buildSessionMeta(trustedAuthContext.method, trustedAuthContext.provider, authVersionOf(userRow)));
 
 		if (sessionMaxEpoch) {
 			authInfo.trustEpoch = sessionTrustEpoch;
@@ -691,7 +886,8 @@ const loginService = {
 		}
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		return { token: jwt, email: activeLoginEmail, userId: userRow.userId };
+		const legalAcceptance = await legalPolicyService.getLegalAcceptanceStatus(c, userRow.userId);
+		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, legalAcceptance };
 	},
 
 	async verifyTotpLogin(c, params) {
@@ -718,146 +914,55 @@ const loginService = {
 			throw new BizError(t('totpCodeEmpty'));
 		}
 
-		const pendingKey = KvConst.TOTP_PENDING + tempToken;
-		const pendingData = await c.env.kv.get(pendingKey, { type: 'json' });
-
-		if (!pendingData || !pendingData.userId) {
-			throw new BizError(t('totpSessionExpired'));
-		}
-
+		// The pending token itself is the pre-login session capability. Its immutable
+		// D1 binding is recovered by digest; no client may supply a user/version.
+		const stored = /^[a-f0-9]{64}$/.test(tempToken) ? await getUserDb(c).prepare(
+			'SELECT user_id,auth_version,session_hash FROM auth_security_operation WHERE token_hash=? AND purpose=?'
+		).bind(await hashToken(tempToken),'login_mfa').first() : null;
+		if (!stored) throw new BizError(t('totpSessionExpired'));
+		const binding={token:tempToken,userId:stored.user_id,authVersion:stored.auth_version,sessionHash:stored.session_hash,purpose:'login_mfa',target:'login'};
+		const attempt=await authOperation.incrementAttempt(c,binding);
+		if (!attempt) throw new BizError(t('totpSessionExpired'));
+		const operation=await authOperation.inspect(c,binding);
+		const pendingData=operation.payload;
 		const targetEmail = pendingData.email;
-		const failKey = targetEmail ? KvConst.LOGIN_FAIL + targetEmail : null;
+		const failKey = targetEmail ? KvConst.LOGIN_FAIL + targetEmail.toLowerCase() : null;
 		let failCount = 0;
 		if (failKey) {
-			const failCountStr = await c.env.kv.get(failKey);
-			failCount = failCountStr ? parseInt(failCountStr) : 0;
+			const durable = await readLoginFail(c, targetEmail.toLowerCase());
+			if (durable === null) {
+				const failCountStr = await c.env.kv.get(failKey);
+				failCount = failCountStr ? parseInt(failCountStr) : 0;
+			} else {
+				failCount = durable;
+			}
 			if (failCount >= 5) {
 				throw new BizError(t('accountLocked'));
 			}
 		}
 
 		const incrementAccountFail = async () => {
-			if (failKey) {
-				const currentFailStr = await c.env.kv.get(failKey);
-				const currentFail = currentFailStr ? parseInt(currentFailStr) : 0;
-				await c.env.kv.put(failKey, (currentFail + 1).toString(), { expirationTtl: 12 * 60 * 60 });
-			}
+			if (!failKey) return;
+			const durable = await incrementLoginFail(c, targetEmail.toLowerCase());
+			if (durable !== null) return;
+			const currentFailStr = await c.env.kv.get(failKey);
+			const currentFail = currentFailStr ? parseInt(currentFailStr) : 0;
+			await c.env.kv.put(failKey, (currentFail + 1).toString(), { expirationTtl: 12 * 60 * 60 });
 		};
 
-		if (pendingData.attempts >= 5) {
-			await c.env.kv.delete(pendingKey);
-			await incrementAccountFail();
-			throw new BizError(t('totpTooManyAttempts'));
-		}
-
-		pendingData.attempts += 1;
-		await c.env.kv.put(pendingKey, JSON.stringify(pendingData), { expirationTtl: 300 });
-
-		let userRow = await userService.selectById(c, pendingData.userId);
-		if (!userRow || userRow.isDel === isDel.DELETE) {
-			throw new BizError(t('isDelUser'));
-		}
-
-		const factorType = isPasskey ? 'passkey' : (isBackupCode ? 'backup_code' : 'totp');
+		let userRow = await userService.selectById(c, binding.userId);
+		if (!userRow || authVersionOf(userRow)!==binding.authVersion) throw new BizError(t('totpSessionExpired'));
+		const factorType = isPasskey ? 'passkey' : ((isBackupCode || !/^\d{6}$/.test(String(code).trim())) ? 'backup_code' : 'totp');
 
 		if (pendingData.step === 2 && Array.isArray(pendingData.verifiedFactors) && pendingData.verifiedFactors.includes(factorType)) {
 			throw new BizError(t('stepUpDifferentFactorRequired'));
 		}
 
-		if (isPasskey) {
-			// Verify WebAuthn / Passkey signature
-			if (!credentialId || !clientDataJSON || !authenticatorData || !signature) {
-				throw new BizError('Missing passkey authentication credentials');
-			}
-
-			const clientData = webauthnUtils.parseClientData(clientDataJSON);
-			if (clientData.challenge !== pendingData.passkeyChallenge) {
-				await incrementAccountFail();
-				throw new BizError('Passkey challenge mismatch or expired');
-			}
-
-			let keys = [];
-			if (userRow.securityKeys) {
-				try {
-					keys = typeof userRow.securityKeys === 'string' ? JSON.parse(userRow.securityKeys) : userRow.securityKeys;
-					if (!Array.isArray(keys)) keys = [];
-				} catch (e) {
-					keys = [];
-				}
-			}
-
-			const targetKey = keys.find(k => k.credentialId === credentialId);
-			if (!targetKey) {
-				await incrementAccountFail();
-				throw new BizError('Unrecognized security key');
-			}
-
-			if (targetKey.status === 'pending_verification') {
-				await incrementAccountFail();
-				throw new BizError(t('passkeyTimelockedNotice') || '该通行密钥处于安全观察期中，尚未激活生效，暂无法用于登录');
-			}
-
-			const isValidSig = await webauthnUtils.verifyAuthenticationSignature({
-				clientDataJSONBase64: clientDataJSON,
-				authenticatorDataBase64: authenticatorData,
-				signatureBase64: signature,
-				publicKeyJwk: targetKey.publicKeyJwk,
-				publicKeyRaw: targetKey.publicKeyRaw
-			});
-
-			if (!isValidSig) {
-				await incrementAccountFail();
-				throw new BizError('Security key authentication signature invalid');
-			}
-		} else if (isBackupCode) {
-			// Verify backup recovery code
-			const backupResult = await totpUtils.verifyAndConsumeBackupCode(code, userRow.totpBackupCodes);
-			if (!backupResult.isValid) {
-				await incrementAccountFail();
-				throw new BizError(t('backupCodeInvalid'));
-			}
-			await orm(c).update(user).set({
-				totpBackupCodes: backupResult.updatedCodesJson
-			}).where(eq(user.userId, userRow.userId)).run();
-		} else {
-			// Verify 6-digit TOTP code
-			if (!userRow.totpSecret) {
-				throw new BizError(t('totpNotEnabled'));
-			}
-
-			// 显式迁移（收尾轮）：历史 jwt_secret 回退 era 加密数据先解封重加密；
-			// 阻断时给出准确原因，绝不静默回退到 jwt_secret 解密。
-			const migration = await totpService.migrateLegacyTotpEncryption(c, userRow);
-			if (!migration.ok) {
-				if (migration.reason === 'missing_totp_enc_key') {
-					throw new BizError('系统 TOTP 加密密钥未配置 (totp_enc_key missing)，2FA 验证暂时不可用，请联系管理员配置密钥', 500);
-				}
-				throw new BizError('2FA 凭据数据无法解密（历史密钥 era 数据损坏或不匹配），请联系管理员重置两步验证', 500);
-			}
-			if (migration.migrated) {
-				// 迁移可能重加密了数据：以最新持久化行继续验证（不改动原行对象，避免污染共享引用）
-				const freshRow = await userService.selectById(c, userRow.userId);
-				if (freshRow) userRow = freshRow;
-			}
-
-			const plainSecret = await totpUtils.decryptSecret(userRow.totpSecret, c.env);
-			const totpCheck = await totpUtils.verifyTOTP(plainSecret, code, 1);
-
-			if (!totpCheck.isValid) {
-				await incrementAccountFail();
-				throw new BizError(t('totpCodeInvalid'));
-			}
-
-			// Anti-replay: prevent OTP reuse in the same 60-second time window
-			const replayKey = KvConst.TOTP_REPLAY + userRow.userId + ':' + totpCheck.timeStep;
-			const alreadyUsed = await c.env.kv.get(replayKey);
-			if (alreadyUsed) {
-				await incrementAccountFail();
-				throw new BizError(t('totpCodeReplay'));
-			}
-			await c.env.kv.put(replayKey, '1', { expirationTtl: 60 });
-		}
-
+		try {
+			await totpService.verifyExistingFactor(c,userRow,params,{challenge:pendingData.passkeyChallenge,origin:pendingData.origin,rpId:pendingData.rpId});
+		} catch (err) { await incrementAccountFail(); throw err; }
+		userRow=await userService.selectById(c,binding.userId);
+		if (!userRow || authVersionOf(userRow)!==binding.authVersion) throw new BizError(t('totpSessionExpired'));
 		// Check Step-Up (二验) decision: If step-up required and step 1 just completed
 		if (pendingData.stepUpRequired && (!pendingData.step || pendingData.step === 1)) {
 			let remainingBackupCount = 0;
@@ -893,18 +998,24 @@ const loginService = {
 				const nextPasskeyChallenge = webauthnUtils.generateChallenge();
 				pendingData.passkeyChallenge = nextPasskeyChallenge;
 
-				await c.env.kv.put(pendingKey, JSON.stringify(pendingData), { expirationTtl: 300 });
+				// Transition the same row: never reset attempts or extend its deadline.
+				const transitioned = await getUserDb(c).prepare(`UPDATE auth_security_operation SET payload=?
+					WHERE token_hash=? AND purpose='login_mfa' AND consumed=0 AND attempts=? AND expires_at>unixepoch()
+					AND EXISTS (SELECT 1 FROM user WHERE user_id=? AND auth_version=? AND is_del=0)
+					RETURNING token_hash`).bind(JSON.stringify(pendingData),await hashToken(tempToken),attempt,binding.userId,binding.authVersion).first();
+				if (!transitioned) throw new BizError(t('totpSessionExpired'));
+				const nextToken=tempToken;
 
 				return {
 					stepUpRequired: true,
 					step: 2,
-					tempToken,
+					tempToken: nextToken,
 					verifiedFactor: factorType,
 					remainingFactors,
 					hasTotp: !!userRow.totpSecret,
-					hasPasskeys: userKeys.length > 0,
+					hasPasskeys: activeUserKeys.length > 0,
 					hasBackupCodes: remainingBackupCount > 0,
-					passkeys: userKeys.map(k => ({ id: k.credentialId, type: 'public-key' })),
+					passkeys: activeUserKeys.map(k => ({ id: k.credentialId, type: 'public-key' })),
 					passkeyChallenge: nextPasskeyChallenge,
 					email: userRow.email,
 					message: t('stepUpAbnormalNotice')
@@ -913,17 +1024,13 @@ const loginService = {
 		}
 
 		// Verification fully passed: consume temporary token
-		await c.env.kv.delete(pendingKey);
+		if (!await authOperation.consume(c,{...binding,attempt})) throw new BizError(t('totpSessionExpired'));
 
 		// Clear login fail rate limit
-		if (failKey) {
-			await c.env.kv.delete(failKey);
+		if (targetEmail) {
+			await clearLoginFail(c, targetEmail.toLowerCase());
 		}
 
-		// Lazy migration of legacy password if needed
-		if (pendingData.needsPasswordUpgrade) {
-			await this.lazyMigratePassword(c, userRow.userId, pendingData.needsPasswordUpgrade);
-		}
 
 		// 受限用户安全通道：2FA 核验通过后，若账号已被封禁管控，阻断常规发信与读信会话，签发专用受限通知凭证
 		if (userRow.status === userConst.status.BAN) {
@@ -965,12 +1072,29 @@ const loginService = {
 		}
 
 		// Generate formal session JWT
+		let recoveredBackupCodes = null;
+		if (factorType === 'backup_code' && unusedBackupCodeCount(userRow.totpBackupCodes) === 0) {
+			// The last recovery code was the only remaining factor. Issue a new
+			// set without bumping authVersion: the just-verified login must remain
+			// usable, while losing the device can no longer strand the account.
+			const backup = await totpUtils.generateBackupCodes(10, c.env);
+			const serialized = JSON.stringify({
+				hashedCodes: backup.hashedCodes,
+				encryptedRaw: backup.encryptedRaw
+			});
+			const updated = await getUserDb(c).prepare(`UPDATE user
+				SET totp_backup_codes=?, update_time=CURRENT_TIMESTAMP
+				WHERE user_id=? AND auth_version=? AND totp_backup_codes=? AND is_del=0`)
+				.bind(serialized, userRow.userId, authVersionOf(userRow), userRow.totpBackupCodes).run();
+			if (Number(updated?.meta?.changes ?? 0) === 1) recoveredBackupCodes = backup.rawCodes;
+		}
 		const activeLoginEmail = targetEmail && targetEmail.includes('@') ? targetEmail : userRow.email;
 		const uuid = uuidv4();
 		const jwt = await JwtUtils.generateToken(c, { 
 			userId: userRow.userId, 
 			loginEmail: activeLoginEmail,
-			token: uuid 
+			token: uuid,
+			authVersion: authVersionOf(userRow)
 		});
 
 		// Issue trusted device token if rememberDevice was requested
@@ -979,8 +1103,10 @@ const loginService = {
 		let sessionMaxEpoch = null;
 
 		const effectiveDeviceTag = deviceTag || pendingData.deviceTag || (typeof c.req.header === 'function' ? c.req.header('x-device-tag') : '') || '';
-		if (rememberDevice && effectiveDeviceTag) {
-			const trustResult = await deviceTrustService.issueTrust(c, userRow.userId, effectiveDeviceTag);
+		// 严格布尔判定：字符串 "false" 曾按 truthy 处理，意外签发 30 天可信设备令牌
+		const wantsRememberDevice = rememberDevice === true || rememberDevice === 'true';
+		if (wantsRememberDevice && effectiveDeviceTag) {
+			const trustResult = await deviceTrustService.issueTrust(c, userRow.userId, effectiveDeviceTag, authVersionOf(userRow));
 			if (trustResult) {
 				issuedTrustToken = trustResult.trustedDeviceToken;
 				sessionTrustEpoch = trustResult.trustEpoch;
@@ -1005,7 +1131,7 @@ const loginService = {
 
 		// The challenge may have started from a provider login; carry that
 		// provenance (never the client's claim) onto the issued session.
-		attachSessionMeta(authInfo, uuid, buildSessionMeta(pendingData.authMethod, pendingData.authProvider));
+		attachSessionMeta(authInfo, uuid, pendingData.authContext && buildSessionMeta(pendingData.authContext.method, pendingData.authContext.provider, authVersionOf(userRow), true));
 
 		if (sessionMaxEpoch) {
 			authInfo.trustEpoch = sessionTrustEpoch;
@@ -1029,7 +1155,9 @@ const loginService = {
 		}
 
 		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, trustedDeviceToken: issuedTrustToken };
+		const legalAcceptance = await legalPolicyService.getLegalAcceptanceStatus(c, userRow.userId);
+		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, trustedDeviceToken: issuedTrustToken,
+			legalAcceptance, ...(recoveredBackupCodes ? { backupCodes: recoveredBackupCodes } : {}) };
 	},
 
 	async logout(c, userId) {

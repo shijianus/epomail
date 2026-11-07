@@ -1,4 +1,5 @@
 import http from '@/axios/index.js';
+import { clearComposeIdempotencyKey, idempotencyKeyForCompose } from '@/utils/tab-session.js';
 
 export function emailList(accountId, allReceive, emailId, timeSort, size, type, folder, keyword) {
     return http.get('/email/list', {params: {accountId, allReceive, emailId, timeSort, size, type, folder, keyword}})
@@ -48,12 +49,22 @@ export function emailRead(emailIds, unread) {
     return http.put('/email/read', {emailIds, unread})
 }
 
-export function emailSend(form,progress) {
-    return http.post('/email/send', form,{
+const composeKeyState = new WeakMap();
+
+export function emailSend(form,progress, options = {}) {
+    const idempotencyKey = options.idempotencyKey || idempotencyKeyForCompose(form, composeKeyState);
+    return http.post('/email/send', { ...form, idempotencyKey },{
+        headers: { 'Idempotency-Key': idempotencyKey },
         onUploadProgress: (e) => {
-            progress(e)
+            progress?.(e)
         },
         noMsg: true
+    }).then(result => {
+        // A successful response closes this compose attempt. If the caller
+        // retries after an exception, the WeakMap entry remains and reuses the
+        // same key; after success, the next send receives a fresh key.
+        clearComposeIdempotencyKey(form, composeKeyState);
+        return result;
     })
 }
 export function emailSearchSuggestions(params) {

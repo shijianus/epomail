@@ -1,9 +1,4 @@
-import orm, { mailOrm } from '../entity/orm.js';
-import user from '../entity/user.js';
-import account from '../entity/account.js';
 import email from '../entity/email.js';
-import { notificationOutbox } from '../entity/notification-outbox.js';
-import { eq, and, sql } from 'drizzle-orm';
 import { emailConst, isDel } from '../const/entity-const.js';
 import emailCryptoUtils from '../utils/email-crypto-utils.js';
 import KvConst from '../const/kv-const.js';
@@ -11,7 +6,81 @@ import jwtUtils from '../utils/jwt-utils.js';
 import BizError from '../error/biz-error.js';
 import { isAdminUser } from '../utils/admin-utils.js';
 import permService from './perm-service.js';
-import { getUserDb } from '../utils/db-accessor.js';
+import { getUserDb, getMailDb } from '../utils/db-accessor.js';
+import { assertOutboundAllowed } from '../utils/outbound-policy.js';
+
+const PUNITIVE_ACCOUNT_TEMPLATES = new Set(['FIRST_BAN', 'MAINTAIN_BAN', 'REJECT_APPEAL']);
+// Resend retains keys for 24h. Leave a one-hour margin; the FIRST attempt is
+// immutable, including manual retries. Unknown outcomes outside this window
+// require provider reconciliation, never a fresh send with an expired key.
+const RETRY_WINDOW_SQL = "datetime(provider_attempted_at) > datetime('now', '-23 hours')";
+const ELIGIBLE_SQL = `(status = 'pending'
+	OR (status = 'failed' AND retry_count < max_retries AND (next_retry_at IS NULL OR next_retry_at <= datetime('now')))
+	OR (status = 'unknown' AND retry_count < max_retries AND ${RETRY_WINDOW_SQL}
+		AND (next_retry_at IS NULL OR next_retry_at <= datetime('now')))
+	OR (status = 'processing' AND lease_expires_at < datetime('now')))`;
+const OWNED_SQL = "task_id = ? AND status = 'processing' AND claimant_id = ? AND lease_version = ? AND lease_expires_at > datetime('now')";
+const OWNED = (task, claimantId, version) => [task.task_id, claimantId, version];
+const changedOne = result => result?.meta?.changes === 1;
+function boundedLimit(value, fallback = 10) {
+	const n = Number(value);
+	return Number.isFinite(n) ? Math.max(0, Math.min(50, Math.floor(n))) : fallback;
+}
+function safeNoticeError(error) {
+	const messages = {
+		outbound_disabled: 'External email outbound is disabled in this environment',
+		outbound_recipient_blocked: 'External recipient is not in the outbound whitelist',
+		invalid_recipient: 'Invalid outbound recipient',
+		notice_provider_unavailable: 'External email provider is not configured',
+		notice_case_unavailable: 'Notice case state could not be verified',
+		notice_user_unavailable: 'Notice user state could not be verified',
+		notice_channel_invalid: 'Unsupported notification channel'
+	};
+	return messages[error?.errorCode || error?.code] || 'Notice delivery failed; retry or reconciliation required';
+}
+function noticeError(code) {
+	return Object.assign(new Error('Notice delivery failed'), { code });
+}
+
+async function readReceipt(mailDb, taskId, userId) {
+	const row = await mailDb.prepare(`SELECT r.email_id AS emailId, r.message_id AS messageId,
+		r.user_id AS userId, e.email_id AS persistedEmailId
+		FROM notice_delivery_receipt r LEFT JOIN email e
+		ON e.email_id = r.email_id AND e.user_id = r.user_id AND e.message_id = r.message_id
+		WHERE r.task_id = ?`).bind(taskId).first();
+	if (!row) return null;
+	if (row.userId !== userId || !row.persistedEmailId) throw new Error('Notice receipt cannot be verified');
+	return { emailId: row.emailId, messageId: row.messageId, userId: row.userId };
+}
+
+async function isSuperseded(userDb, task) {
+	if (!PUNITIVE_ACCOUNT_TEMPLATES.has(task.template_code)) return false;
+	if (task.case_id) {
+		const row = await userDb.prepare('SELECT status FROM audit_log WHERE id = ?').bind(task.case_id).first();
+		if (!row || !['active', 'pending', 'banned', 'unbanned', 'resolved', 'rejected', 'expired'].includes(row.status)) {
+			throw noticeError('notice_case_unavailable');
+		}
+		if (row.status === 'unbanned') return true;
+	}
+	if (task.user_id) {
+		const row = await userDb.prepare('SELECT status, is_del FROM user WHERE user_id = ?').bind(task.user_id).first();
+		if (!row || row.is_del !== 0 || ![0, 1].includes(row.status)) throw noticeError('notice_user_unavailable');
+		if (row.status === 0) return true;
+	}
+	return false;
+}
+
+async function recordFailure(userDb, task, claimantId, version, error, uncertain) {
+	const count = Number(task.retry_count || 0) + 1;
+	const status = uncertain ? 'unknown' : count >= Number(task.max_retries || 5) ? 'dead_letter' : 'failed';
+	const result = await userDb.prepare(`UPDATE notification_outbox
+		SET status = ?, retry_count = ?, last_error = ?,
+			next_retry_at = datetime('now', '+' || ? || ' seconds'),
+			claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
+		WHERE ${OWNED_SQL}`).bind(status, count, safeNoticeError(error),
+		Math.min(count * count * 60, 86400), ...OWNED(task, claimantId, version)).run();
+	return changedOne(result);
+}
 
 export const DECISION_TEMPLATES = {
 	FIRST_BAN: {
@@ -218,13 +287,13 @@ const decisionNoticeService = {
 	/**
 	 * Prepare D1 statement to insert task into notification_outbox
 	 */
-	buildOutboxInsertStmt(userDb, { taskId, caseId, ticketId, userId, recipient, templateCode, subject, content, reasonCode, channel = 'internal' }) {
+	buildOutboxInsertStmt(userDb, { taskId, caseId, ticketId, userId, recipient, templateCode, subject, content, textContent = null, reasonCode, channel = 'internal' }) {
 		return userDb.prepare(`
 			INSERT INTO notification_outbox (
 				task_id, case_id, ticket_id, user_id, recipient, channel,
-				template_code, subject, content, reason_code, status,
+				template_code, subject, content, text_content, reason_code, status,
 				retry_count, max_retries, create_time, update_time
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, 5, datetime('now'), datetime('now'))
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, 5, datetime('now'), datetime('now'))
 		`).bind(
 			taskId,
 			caseId || null,
@@ -235,6 +304,7 @@ const decisionNoticeService = {
 			templateCode,
 			subject,
 			content,
+			textContent,
 			reasonCode || null
 		);
 	},
@@ -242,73 +312,67 @@ const decisionNoticeService = {
 	/**
 	 * Directly persists official security notice email into the internal user's mailbox (Mail DB)
 	 */
-	async persistInternalNotice(c, { targetUser, recipient, subject, htmlContent, textContent }) {
-		if (!c || !targetUser) return null;
+	async persistInternalNotice(c, { taskId, targetUser, recipient, subject, htmlContent, textContent }) {
+		const mailDb = getMailDb(c);
+		const userId = targetUser?.userId;
+		if (!mailDb?.batch || !taskId || !Number.isSafeInteger(userId) || userId <= 0) {
+			throw new Error('Internal notice delivery is not configured');
+		}
 		try {
-			const mailDb = c._mockOrm || (c.env?.mail_db ? mailOrm(c) : orm(c));
-			const userId = targetUser.userId;
-
-			// Fetch recipient's account row
-			let accRow = null;
-			try {
-				accRow = await mailDb.select().from(account).where(
-					and(eq(account.userId, userId), eq(account.isDel, isDel.NORMAL))
-				).orderBy(account.accountId).limit(1).get();
-			} catch (_) {}
-
-			const accountId = accRow ? accRow.accountId : 0;
+			const existing = await readReceipt(mailDb, taskId, userId);
+			if (existing) return existing;
 			const targetEmail = recipient || targetUser.email;
-			const userName = targetUser.nickname || (targetEmail ? targetEmail.split('@')[0] : 'User');
-			const now = new Date().toISOString();
-
-			let emailPayload = {
-				userId,
-				accountId,
-				sendEmail: 'announcement@epocanvas.com',
-				name: 'Epocanvas Mail 官方安全中心',
-				subject,
-				content: htmlContent,
-				text: textContent,
-				toEmail: targetEmail,
-				toName: userName,
+			const accRow = await mailDb.prepare(`SELECT account_id FROM account
+				WHERE user_id = ? AND is_del = ? ORDER BY CASE WHEN email = ? THEN 0 ELSE 1 END, account_id LIMIT 1`)
+				.bind(userId, isDel.NORMAL, targetEmail).first();
+			if (!accRow) throw new Error('Notice mailbox is unavailable');
+			const userName = targetUser.nickname || targetEmail?.split('@')[0] || 'User';
+			const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(taskId));
+			const key = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+			const messageId = `<notice-${key}@epocanvas.com>`;
+			let payload = {
+				userId, accountId: accRow.account_id,
+				sendEmail: 'announcement@epocanvas.com', name: 'Epocanvas Mail 官方安全中心',
+				subject, content: htmlContent, text: textContent || '',
+				toEmail: targetEmail, toName: userName,
 				recipient: JSON.stringify([{ address: targetEmail, name: userName }]),
-				cc: '[]',
-				bcc: '[]',
-				inReplyTo: '',
-				relation: '',
-				messageId: '',
-				type: emailConst.type.RECEIVE,
-				status: 0,
-				unread: emailConst.unread.UNREAD,
-				isDel: isDel.NORMAL,
-				isSpam: 0,
-				snoozedTime: null,
-				snoozedEndTime: null,
-				labels: JSON.stringify(['官方', '安全', '裁决留痕']),
-				isOfficial: 1,
-				code: '',
-				createTime: now
+				cc: '[]', bcc: '[]', inReplyTo: '', relation: '', messageId,
+				type: emailConst.type.RECEIVE, status: 0, unread: emailConst.unread.UNREAD,
+				isDel: isDel.NORMAL, isSpam: 0, snoozedTime: null, snoozedEndTime: null,
+				labels: JSON.stringify(['官方', '安全', '裁决留痕']), code: '',
+				createTime: new Date().toISOString()
 			};
-
-			// Encrypt if user has E2E mailbox encryption active
-			let allMailMode = 1;
-			try {
-				const cachedSetting = await c.env?.kv?.get?.(KvConst.SETTING, { type: 'json' });
-				if (cachedSetting && cachedSetting.allMailMode !== undefined) {
-					allMailMode = Number(cachedSetting.allMailMode);
-				}
-			} catch (_) {}
-
-			if (emailCryptoUtils.shouldEncryptEmail(allMailMode, emailPayload)) {
-				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
-				emailPayload = await emailCryptoUtils.encryptEmailRecord(emailPayload, cryptoKey);
+			// A settings read failure must not silently fall back to plaintext.
+			const settings = await c.env?.kv?.get?.(KvConst.SETTING, { type: 'json' });
+			const allMailMode = settings?.allMailMode === undefined ? 1 : Number(settings.allMailMode);
+			if (emailCryptoUtils.shouldEncryptEmail(allMailMode, payload)) {
+				payload = await emailCryptoUtils.encryptEmailRecord(payload,
+					await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
 			}
-
-			const inserted = await mailDb.insert(email).values(emailPayload).returning().get();
-			return inserted;
-		} catch (err) {
-			console.warn('[decisionNoticeService] persistInternalNotice warning:', err.message);
-			return null;
+			const entries = Object.entries(payload);
+			// Only this MAIL_DB batch is atomic. A receipt conflict rolls back the
+			// entire batch, including the email insert. USER_DB can then converge
+			// by re-reading this task's receipt after a crash or lost writeback.
+			try {
+				await mailDb.batch([
+					mailDb.prepare(`INSERT INTO email (${entries.map(([key]) => email[key].name).join(', ')})
+						SELECT ${entries.map(() => '?').join(', ')}
+						WHERE NOT EXISTS (SELECT 1 FROM notice_delivery_receipt WHERE task_id = ?)`)
+						.bind(...entries.map(([, value]) => value), taskId),
+					mailDb.prepare(`INSERT INTO notice_delivery_receipt (task_id, message_id, email_id, user_id)
+						VALUES (?, ?, last_insert_rowid(), ?)`)
+						.bind(taskId, messageId, userId)
+				]);
+			} catch (_) {
+				const committed = await readReceipt(mailDb, taskId, userId);
+				if (committed) return committed;
+				throw new Error('Internal notice persistence failed');
+			}
+			const committed = await readReceipt(mailDb, taskId, userId);
+			if (!committed) throw new Error('Internal notice receipt is missing');
+			return committed;
+		} catch (_) {
+			throw new Error('Internal notice persistence failed');
 		}
 	},
 
@@ -346,7 +410,7 @@ const decisionNoticeService = {
 		const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawCode));
 		const codeHash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 		
-		const userDb = getUserDb(c) || c?.env?.db;
+		const userDb = getUserDb(c);
 		const nowSec = Math.floor(Date.now() / 1000);
 		const expiresAt = nowSec + ttlSeconds;
 		const payloadStr = JSON.stringify({ restrictedToken, user: user || null, caseId: caseId || null });
@@ -364,8 +428,8 @@ const decisionNoticeService = {
 					payloadStr,
 					expiresAt
 				).run();
-			} catch (e) {
-				console.warn('Failed to persist one_time_exchange_code to D1:', e.message);
+			} catch (_) {
+				console.warn('Restricted exchange code persistence failed');
 			}
 		}
 
@@ -400,7 +464,7 @@ const decisionNoticeService = {
 			}
 
 			// Object status check: 若用户已被正式解封恢复正常，受限通道自动失效
-			const userDb = getUserDb(c) || c?.env?.db;
+			const userDb = getUserDb(c);
 			if (userDb && decoded.userId) {
 				const uRow = await userDb.prepare('SELECT status FROM user WHERE user_id = ?').bind(decoded.userId).first().catch(() => null);
 				if (uRow && Number(uRow.status) !== 1) {
@@ -419,184 +483,145 @@ const decisionNoticeService = {
 	 * Uses true distributed optimistic lease locks (claimant, lease_expires_at, lease_version)
 	 * to prevent multiple worker instances from duplicate deliveries or stale overwrites.
 	 */
-	async processOutboxBatch(c, limit = 10, customClaimantId = null) {
-		const userDb = c?.env?.db || (c._mockOrm ? c._mockOrm : null);
-		if (!userDb) return { processed: 0, delivered: 0, failed: 0 };
-
-		const claimantId = customClaimantId || ('wrk_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8));
-
-		let eligibleTasks = [];
+	async processOutboxBatch(c, limit = 10, customClaimantId = null, onlyTaskId = null) {
+		const userDb = getUserDb(c);
+		if (!userDb?.prepare) throw new Error('Notice database unavailable');
+		const summary = { processed: 0, delivered: 0, sent: 0, failed: 0 };
+		const batchLimit = boundedLimit(limit);
+		if (!batchLimit) return summary;
+		const claimantId = customClaimantId || `notice_${crypto.randomUUID()}`;
+		let candidates;
 		try {
-			eligibleTasks = await userDb.prepare(`
-				SELECT * FROM notification_outbox
-				WHERE status = 'pending'
-				   OR (status = 'failed' AND retry_count < max_retries AND (next_retry_at IS NULL OR next_retry_at <= datetime('now')))
-				   OR (status = 'processing' AND lease_expires_at IS NOT NULL AND lease_expires_at < datetime('now'))
-				ORDER BY id ASC
-				LIMIT ?
-			`).bind(limit).all();
-			eligibleTasks = eligibleTasks?.results || eligibleTasks || [];
-		} catch (err) {
-			console.warn('[decisionNoticeService] Failed to query outbox:', err.message);
-			return { processed: 0, delivered: 0, failed: 0 };
+			const query = userDb.prepare(`SELECT * FROM notification_outbox
+				WHERE ${ELIGIBLE_SQL} ${onlyTaskId ? 'AND task_id = ?' : ''} ORDER BY id LIMIT ?`);
+			candidates = (await query.bind(...(onlyTaskId ? [onlyTaskId, batchLimit] : [batchLimit])).all()).results;
+			if (!Array.isArray(candidates)) throw new Error('Missing query result');
+		} catch (_) {
+			throw new Error('Notice queue could not be read');
 		}
-
-		let deliveredCount = 0;
-		let failedCount = 0;
-
-		for (const task of eligibleTasks) {
-			// Optimistic locking lease: claim task with worker identifier and 300-second lease expiry
-			const currentLeaseVersion = (Number(task.lease_version) || 0) + 1;
-			const leaseRes = await userDb.prepare(`
-				UPDATE notification_outbox
-				SET status = 'processing', claimant_id = ?, lease_expires_at = datetime('now', '+300 seconds'),
-				    lease_version = ?, update_time = datetime('now')
-				WHERE task_id = ?
-				  AND (
-				       status IN ('pending', 'failed')
-				       OR (status = 'processing' AND lease_expires_at IS NOT NULL AND lease_expires_at < datetime('now'))
-				  )
-			`).bind(claimantId, currentLeaseVersion, task.task_id).run();
-
-			const meta = leaseRes?.meta || leaseRes;
-			if (meta?.changes === 0) {
-				continue; // Lease acquired by another concurrent worker
-			}
-
-			// 检查案卷与用户最新状态：若已有更新的解封生效裁决（例如原案已解封恢复正常），旧封禁通知不得覆盖新裁决
-			if (task.case_id) {
-				const latestCase = await userDb.prepare('SELECT status, warning_type FROM audit_log WHERE id = ?').bind(task.case_id).first().catch(() => null);
-				if (latestCase) {
-					const isBanNotice = task.template_code && (task.template_code.includes('BAN') || task.template_code.includes('SUSPEND'));
-					if (isBanNotice) {
-						let isAlreadyUnbanned = latestCase.status === 'unbanned';
-						if (!isAlreadyUnbanned && task.user_id) {
-							const uRow = await userDb.prepare('SELECT status FROM user WHERE user_id = ?').bind(task.user_id).first().catch(() => null);
-							if (uRow && Number(uRow.status) === 0) {
-								isAlreadyUnbanned = true;
-							}
-						}
-						if (isAlreadyUnbanned) {
-							await userDb.prepare(`
-								UPDATE notification_outbox
-								SET status = 'cancelled', last_error = 'Superseded by newer case adjudication',
-								    claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
-								WHERE task_id = ? AND claimant_id = ? AND lease_version = ?
-							`).bind(task.task_id, claimantId, currentLeaseVersion).run();
-							continue;
-						}
-					}
-				}
-			}
-
+		for (const candidate of candidates) {
+			const previousVersion = Number(candidate.lease_version ?? 0);
+			if (!Number.isSafeInteger(previousVersion) || previousVersion < 0) continue;
+			const version = previousVersion + 1;
+			let claimed;
 			try {
-				if (task.channel === 'internal') {
-					await userDb.prepare(`
-						UPDATE notification_outbox
-						SET status = 'delivered', delivered_at = datetime('now'),
-						    claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
-						WHERE task_id = ? AND claimant_id = ? AND lease_version = ?
-					`).bind(task.task_id, claimantId, currentLeaseVersion).run();
-					deliveredCount++;
-				} else {
-					let sendSuccess = false;
-					let providerMsgId = null;
-					let sendError = null;
-
-					// 分级外发控制：默认关闭外发或严格白名单限制
-					const outboundEnabled = c?.env?.EMAIL_OUTBOUND_ENABLED !== 'false';
-					const isStaging = c?.env?.ENVIRONMENT === 'staging';
-
-					if (!outboundEnabled) {
-						sendError = 'External email outbound is disabled in this environment (EMAIL_OUTBOUND_ENABLED=false)';
-					} else if (isStaging) {
-						const officialResendSandbox = ['delivered@resend.dev', 'bounced@resend.dev', 'complained@resend.dev'];
-						const customWhitelist = (c?.env?.OUTBOUND_WHITELIST || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-						const allowedRecipients = new Set([...officialResendSandbox, ...customWhitelist]);
-						if (!allowedRecipients.has((task.recipient || '').toLowerCase())) {
-							sendError = `Staging recipient (${task.recipient}) not in outbound whitelist; external sending blocked.`;
-						}
-					}
-
-					const resendToken = c?.env?.resend_token;
-					if (!sendError && resendToken) {
-						try {
-							const { Resend } = await import('resend');
-							const resend = new Resend(resendToken);
-							const resp = await resend.emails.send({
-								from: 'EpoCanvas Mail Security <security@epocanvas.com>',
-								to: task.recipient,
-								subject: task.subject,
-								html: task.content,
-								headers: {
-									'X-Entity-Ref-ID': task.task_id
-								}
-							});
-							if (resp?.data?.id) {
-								sendSuccess = true;
-								providerMsgId = resp.data.id;
-							} else if (resp?.error) {
-								sendError = resp.error.message;
-							}
-						} catch (e) {
-							sendError = e.message;
-						}
-					} else if (!sendError && !resendToken) {
-						// 严禁在提供商未配置时伪造发送成功！
-						sendError = 'External email provider not configured (missing resend_token)';
-					}
-
-					if (sendSuccess) {
-						await userDb.prepare(`
-							UPDATE notification_outbox
-							SET status = 'delivered', provider_message_id = ?, delivered_at = datetime('now'),
-							    claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
-							WHERE task_id = ? AND claimant_id = ? AND lease_version = ?
-						`).bind(providerMsgId, task.task_id, claimantId, currentLeaseVersion).run();
-						deliveredCount++;
-					} else {
-						const nextRetryCount = (task.retry_count || 0) + 1;
-						const isDeadLetter = nextRetryCount >= (task.max_retries || 5);
-						const backoffSec = Math.min(nextRetryCount * nextRetryCount * 60, 86400);
-						const newStatus = isDeadLetter ? 'dead_letter' : 'failed';
-
-						await userDb.prepare(`
-							UPDATE notification_outbox
-							SET status = ?, retry_count = ?, last_error = ?,
-							    next_retry_at = datetime('now', '+' || ? || ' seconds'),
-							    claimant_id = NULL, lease_expires_at = NULL,
-							    update_time = datetime('now')
-							WHERE task_id = ? AND claimant_id = ? AND lease_version = ?
-							  AND status NOT IN ('delivered', 'complained', 'canceled')
-						`).bind(newStatus, nextRetryCount, sendError || 'Unknown external delivery error', backoffSec, task.task_id, claimantId, currentLeaseVersion).run();
-						failedCount++;
-					}
+				claimed = await userDb.prepare(`UPDATE notification_outbox
+					SET status = 'processing', claimant_id = ?, lease_expires_at = datetime('now', '+300 seconds'),
+						lease_version = ?, update_time = datetime('now')
+					WHERE task_id = ? AND COALESCE(lease_version, 0) = ? AND ${ELIGIBLE_SQL}`)
+					.bind(claimantId, version, candidate.task_id, previousVersion).run();
+			} catch (_) {
+				console.warn('[decisionNoticeService] Notice lease could not be acquired');
+				continue;
+			}
+			// Missing metadata is NOT evidence of ownership. Never send on ambiguity.
+			if (!changedOne(claimed)) continue;
+			summary.processed++;
+			let task = candidate;
+			let uncertain = candidate.channel !== 'internal' && !!candidate.provider_attempted_at;
+			try {
+				task = await userDb.prepare(`SELECT * FROM notification_outbox WHERE ${OWNED_SQL}`)
+					.bind(...OWNED(candidate, claimantId, version)).first();
+				if (!task) continue;
+				const owned = OWNED(task, claimantId, version);
+				// Recover an already committed MAIL_DB write before considering a
+				// newer case state. This does not send a second notice.
+				let receipt = task.channel === 'internal' && task.user_id
+					? await readReceipt(getMailDb(c), task.task_id, task.user_id) : null;
+				// A previous external attempt may already have been accepted. Keep
+				// it reconcilable by webhook when a newer adjudication supersedes it.
+				if (!receipt && await isSuperseded(userDb, task)) {
+					const status = task.provider_message_id ? 'sent' : task.provider_attempted_at ? 'unknown' : 'cancelled';
+					await userDb.prepare(`UPDATE notification_outbox SET status = ?,
+						last_error = 'Superseded by newer case adjudication', claimant_id = NULL,
+						retry_count = CASE WHEN ? = 'unknown' THEN max_retries ELSE retry_count END,
+						next_retry_at = NULL, lease_expires_at = NULL, update_time = datetime('now') WHERE ${OWNED_SQL}`)
+						.bind(status, status, ...owned).run();
+					continue;
 				}
-			} catch (taskErr) {
-				console.warn(`[decisionNoticeService] Outbox task ${task.task_id} failed:`, taskErr.message);
-				const nextRetryCount = (task.retry_count || 0) + 1;
-				const isDeadLetter = nextRetryCount >= (task.max_retries || 5);
-				const backoffSec = Math.min(nextRetryCount * nextRetryCount * 60, 86400);
-				const newStatus = isDeadLetter ? 'dead_letter' : 'failed';
-
-				await userDb.prepare(`
-					UPDATE notification_outbox
-					SET status = ?, retry_count = ?, last_error = ?,
-					    next_retry_at = datetime('now', '+' || ? || ' seconds'),
-					    claimant_id = NULL, lease_expires_at = NULL,
-					    update_time = datetime('now')
-					WHERE task_id = ? AND claimant_id = ? AND lease_version = ?
-					  AND status NOT IN ('delivered', 'complained', 'canceled')
-				`).bind(newStatus, nextRetryCount, taskErr.message, backoffSec, task.task_id, claimantId, currentLeaseVersion).run();
-				failedCount++;
+				if (task.channel === 'internal') {
+					if (!receipt) {
+						const target = task.user_id
+							? await userDb.prepare('SELECT user_id AS userId, email FROM user WHERE user_id = ? AND is_del = 0').bind(task.user_id).first()
+							: await userDb.prepare('SELECT user_id AS userId, email FROM user WHERE email = ? AND is_del = 0').bind(task.recipient).first();
+						if (!target) throw noticeError('notice_user_unavailable');
+						receipt = await this.persistInternalNotice(c, {
+							taskId: task.task_id, targetUser: target, recipient: task.recipient,
+							subject: task.subject, htmlContent: task.content, textContent: task.text_content
+						});
+					}
+					if (!receipt?.emailId) throw new Error('Notice receipt missing');
+					const result = await userDb.prepare(`UPDATE notification_outbox
+						SET status = 'delivered', delivered_at = datetime('now'), last_error = NULL,
+							claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
+						WHERE ${OWNED_SQL}`).bind(...owned).run();
+					if (changedOne(result)) summary.delivered++;
+					continue;
+				}
+				if (!['resend', 'external'].includes(task.channel)) throw noticeError('notice_channel_invalid');
+				if (task.provider_message_id) {
+					await userDb.prepare(`UPDATE notification_outbox SET status = 'sent',
+						claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
+						WHERE ${OWNED_SQL}`).bind(...owned).run();
+					continue;
+				}
+				await assertOutboundAllowed(c, [task.recipient]);
+				if (!c.env?.resend_token) throw noticeError('notice_provider_unavailable');
+				const { Resend } = await import('resend');
+				const resend = new Resend(c.env.resend_token);
+				const attempt = await userDb.prepare(`UPDATE notification_outbox
+					SET provider_attempted_at = COALESCE(provider_attempted_at, datetime('now')), update_time = datetime('now')
+					WHERE ${OWNED_SQL} AND provider_message_id IS NULL
+						AND (provider_attempted_at IS NULL OR ${RETRY_WINDOW_SQL})`)
+					.bind(...owned).run();
+				if (!changedOne(attempt)) {
+					await userDb.prepare(`UPDATE notification_outbox SET status = 'unknown',
+						last_error = 'Provider idempotency window expired; reconciliation required',
+						next_retry_at = NULL, claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
+						WHERE ${OWNED_SQL}`).bind(...owned).run();
+					continue;
+				}
+				uncertain = true; // durable before any network I/O, including lost responses
+				const response = await resend.emails.send({
+					from: 'EpoCanvas Mail Security <security@epocanvas.com>',
+					to: task.recipient, subject: task.subject, html: task.content,
+					headers: { 'X-Entity-Ref-ID': task.task_id },
+					tags: [{ name: 'notice_task_id', value: task.task_id }]
+				}, { idempotencyKey: `notice/${task.task_id}` });
+				if (!response?.data?.id) throw new Error('Provider did not confirm acceptance');
+				// A webhook may already have cleared our lease and set a terminal
+				// state. Acceptance is only sent; it must never overwrite that fact.
+				const result = await userDb.prepare(`UPDATE notification_outbox
+					SET status = COALESCE((SELECT CASE event_type
+							WHEN 'email.complained' THEN 'complained' WHEN 'email.bounced' THEN 'dead_letter'
+							WHEN 'email.failed' THEN 'dead_letter' WHEN 'email.delivered' THEN 'delivered' END
+						FROM webhook_event WHERE provider = 'resend' AND resource_id = ?
+							AND event_type IN ('email.complained', 'email.bounced', 'email.failed', 'email.delivered')
+						ORDER BY CASE event_type WHEN 'email.complained' THEN 4 WHEN 'email.bounced' THEN 3
+							WHEN 'email.failed' THEN 2 ELSE 1 END DESC LIMIT 1), 'sent'),
+						provider_message_id = ?, last_error = NULL,
+						delivered_at = CASE WHEN EXISTS (SELECT 1 FROM webhook_event WHERE provider = 'resend'
+							AND resource_id = ? AND event_type = 'email.delivered') THEN COALESCE(delivered_at, datetime('now')) ELSE delivered_at END,
+						next_retry_at = NULL, claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
+					WHERE ${OWNED_SQL}`).bind(response.data.id, response.data.id, response.data.id, ...owned).run();
+				// The atomic ledger lookup also recovers a webhook that arrived
+				// before the reply without the task tag/header. No sent overwrite.
+				if (changedOne(result)) summary.sent++;
+			} catch (error) {
+				try {
+					if (await recordFailure(userDb, task || candidate, claimantId, version, error, uncertain)) summary.failed++;
+				} catch (_) {
+					// Keep processing+lease for recovery. Never leak SQL, bodies or provider errors.
+					console.warn('[decisionNoticeService] Notice retry state could not be persisted');
+				}
 			}
 		}
+		return summary;
+	},
 
-		return {
-			processed: eligibleTasks.length,
-			delivered: deliveredCount,
-			failed: failedCount
-		};
+	/** Immediate adjudication delivery and the cron worker share the same key/lease. */
+	async deliverOutboxTask(c, taskId) {
+		return this.processOutboxBatch(c, 1, null, taskId);
 	},
 
 	/**
@@ -604,7 +629,8 @@ const decisionNoticeService = {
 	 */
 	async retryOutboxTask(c, taskId) {
 		const currentUser = c?.get?.('user');
-		if (currentUser && !isAdminUser(c, currentUser)) {
+		if (!currentUser) throw new BizError('Authentication required', 401);
+		if (!isAdminUser(c, currentUser)) {
 			let permKeys = [];
 			try { permKeys = await permService.userPermKeys(c, currentUser.userId); } catch (_) {}
 			if (!permKeys.includes('*') && !permKeys.includes('audit:adjudicate') && !permKeys.includes('audit:*')) {
@@ -612,19 +638,22 @@ const decisionNoticeService = {
 			}
 		}
 
-		const userDb = c?.env?.db || (c._mockOrm ? c._mockOrm : null);
+		const userDb = getUserDb(c);
 		if (!userDb) throw new BizError('Database unavailable', 500);
 
 		const task = await userDb.prepare(`SELECT * FROM notification_outbox WHERE task_id = ?`).bind(taskId).first();
 		if (!task) throw new BizError('通知任务不存在', 404);
 
-		await userDb.prepare(`
+		const result = await userDb.prepare(`
 			UPDATE notification_outbox
 			SET status = 'pending', retry_count = 0, last_error = NULL, next_retry_at = NULL,
-			    claimant_id = NULL, lease_expires_at = NULL, update_time = datetime('now')
-			WHERE task_id = ?
-		`).bind(taskId).run();
-
+			    claimant_id = NULL, lease_expires_at = NULL, lease_version = COALESCE(lease_version, 0) + 1,
+			    update_time = datetime('now')
+			WHERE task_id = ? AND status IN ('failed', 'dead_letter', 'unknown')
+				AND COALESCE(lease_version, 0) = ? AND provider_message_id IS NULL
+				AND (channel = 'internal' OR (provider_attempted_at IS NULL AND status != 'unknown') OR ${RETRY_WINDOW_SQL})
+		`).bind(taskId, task.lease_version || 0).run();
+		if (!changedOne(result)) throw new BizError('Notice cannot be retried; reconcile delivery state first', 409);
 		return { success: true, taskId };
 	},
 
@@ -632,7 +661,7 @@ const decisionNoticeService = {
 	 * List outbox tasks for administrative auditing
 	 */
 	async listOutboxTasks(c, { caseId, recipient, status, limit = 20, offset = 0 } = {}) {
-		const userDb = c?.env?.db || (c._mockOrm ? c._mockOrm : null);
+		const userDb = getUserDb(c);
 		if (!userDb) return { list: [], total: 0 };
 
 		let whereClauses = [];
@@ -659,7 +688,7 @@ const decisionNoticeService = {
 			SELECT * FROM notification_outbox ${whereSql}
 			ORDER BY id DESC
 			LIMIT ? OFFSET ?
-		`).bind(...bindings, Number(limit), Number(offset)).all();
+		`).bind(...bindings, boundedLimit(limit, 20), Math.max(0, Math.floor(Number(offset) || 0))).all();
 
 		return {
 			list: listRows?.results || listRows || [],

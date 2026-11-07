@@ -13,35 +13,66 @@ import telegramService from '../service/telegram-service';
 import aiService from '../service/ai-service';
 import { applyRules } from './rule-engine';
 import kvConst from '../const/kv-const';
+import mailReliabilityService, { failInboundClaim } from '../service/mail-reliability-service.js';
+import { getMailDb } from '../utils/db-accessor.js';
+import forwardService from '../service/mail-forward-service.js';
 
-/**
- * Read and decode the raw SMTP payload incrementally. TextDecoder with
- * { stream: true } preserves multi-byte characters split across chunks.
- */
-export async function readRawEmail(message, maxLimitBytes, maxLimitMB) {
+/** Read bounded raw bytes; decode only for callers that explicitly need text. */
+export async function readRawEmail(message, maxLimitBytes, maxLimitMB, { decode = true } = {}) {
 	const reader = message.raw.getReader();
-	const decoder = new TextDecoder();
-	let content = '';
+	const chunks = [];
 	let totalBytes = 0;
-
-	while (true) {
-		const { done, value } = await reader.read();
-		if (done) break;
-		totalBytes += value ? value.byteLength : 0;
-		if (totalBytes > maxLimitBytes) {
-			try { await reader.cancel(); } catch (_) {}
-			message.setReject(`Email exceeds the maximum allowed size of ${maxLimitMB}MB`);
-			return { content: '', totalBytes, tooLarge: true };
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			if (!value) continue;
+			totalBytes += value.byteLength;
+			if (totalBytes > maxLimitBytes) {
+				try { await reader.cancel(); } catch (_) {}
+				message.setReject(`Email exceeds the maximum allowed size of ${maxLimitMB}MB`);
+				return { content: '', rawBytes: new Uint8Array(), totalBytes, tooLarge: true };
+			}
+			chunks.push(value);
 		}
-		content += decoder.decode(value, { stream: true });
+	} finally {
+		reader.releaseLock();
 	}
-	content += decoder.decode();
-	return { content, totalBytes, tooLarge: false };
+	const rawBytes = new Uint8Array(totalBytes);
+	let offset = 0;
+	for (const chunk of chunks) {
+		rawBytes.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return { content: decode ? new TextDecoder().decode(rawBytes) : '', rawBytes, totalBytes, tooLarge: false };
+}
+
+export function isInboundOwnerActive(account, userRow) {
+	return Boolean(
+		account &&
+		Number(account.isDel) === 0 &&
+		Number(account.status) === 0 &&
+		userRow &&
+		Number(userRow.isDel) === 0 &&
+		Number(userRow.status) === 0
+	);
+}
+
+export function shouldForwardPersonalMode(mode, aliasPrefixes, recipientLocal) {
+	if (mode === 'all') return true;
+	if (mode !== 'alias') return false;
+	const prefixes = Array.isArray(aliasPrefixes)
+		? aliasPrefixes.map(value => String(value).trim().toLowerCase()).filter(Boolean)
+		: [];
+	const local = String(recipientLocal || '').trim().toLowerCase();
+	return prefixes.length > 0 && prefixes.some(prefix => local.startsWith(prefix) || local === prefix);
 }
 
 export async function email(message, env, ctx) {
-
+	let activeInboundClaim = null;
+	let emailRow = null;
 	try {
+
 
 		const {
 			receive,
@@ -68,19 +99,39 @@ export async function email(message, env, ctx) {
 			return;
 		}
 
-		// 收件大小限制
-		const maxLimitMB = (env.admin === message.to) ? 100 : 25;
-		const maxLimitBytes = maxLimitMB * 1024 * 1024;
-		const raw = await readRawEmail(message, maxLimitBytes, maxLimitMB);
-		if (raw.tooLarge) {
+		const account = await accountService.selectByEmailIncludeDel({ env }, message.to);
+		let userRow = {};
+		let userProfile = null;
+		if (account) {
+			userRow = await userService.selectByIdIncludeDel({ env }, account.userId);
+			if (!isInboundOwnerActive(account, userRow)) {
+				message.setReject('The recipient account is unavailable.');
+				return;
+			}
+			try {
+				const profileValue = await env.kv.get('USER_PROFILE_' + account.userId, { type: 'json' });
+				userProfile = profileValue && typeof profileValue === 'object' ? profileValue : null;
+			} catch (_) {
+				userProfile = null;
+			}
+		}
+		if (!account && noRecipient === settingConst.noRecipient.CLOSE) {
+			message.setReject('Recipient not found');
 			return;
 		}
-		const content = raw.content;
 
+		// Bound the stream before parsing or encrypting. KV must accommodate the
+		// binary AEAD envelope inside its 25 MiB value limit, including for admin.
+		const maxLimitBytes = await mailReliabilityService.getInboundRawMaxBytes({ env }, account?.userId || null);
+		const maxLimitMB = Math.floor(maxLimitBytes / (1024 * 1024) * 1000000) / 1000000;
+		const raw = await readRawEmail(message, maxLimitBytes, maxLimitMB, { decode: false });
+		if (raw.tooLarge) return;
 
 		let email;
 		try {
-			email = await PostalMime.parse(content);
+			// PostalMime accepts bytes and performs charset decoding itself. A
+			// UTF-8 round trip would corrupt binary/legacy-charset MIME parts.
+			email = await PostalMime.parse(raw.rawBytes);
 		} catch (parseError) {
 			// A malformed MIME payload will never become parseable on retry.
 			// Reject it permanently instead of returning a transient failure.
@@ -89,7 +140,7 @@ export async function email(message, env, ctx) {
 			return;
 		}
 
-		if (!email) {
+		if (!email || !email.from?.address) {
 			message.setReject('Malformed message');
 			return;
 		}
@@ -103,7 +154,7 @@ export async function email(message, env, ctx) {
 		}
 
 
-		const { block: blockFlag, hardBlock: hardBlockFlag } = checkBlock(blackSubject, blackContent, blackFrom, email, env, message.to);
+		const { block: blockFlag, hardBlock: hardBlockFlag } = checkBlock(blackSubject, blackContent, blackFrom, email, env, message.to, message.headers);
 
 		if (hardBlockFlag) {
 			try {
@@ -116,73 +167,38 @@ export async function email(message, env, ctx) {
 			return;
 		}
 
-		const account = await accountService.selectByEmailIncludeDel({ env: env }, message.to);
 
-		if (!account && noRecipient === settingConst.noRecipient.CLOSE) {
-			message.setReject('Recipient not found');
-			return;
-		}
-
-		const duplicate = await emailService.findRecentDuplicate(
-			{ env },
-			email.messageId,
-			account ? account.accountId : 0
-		);
-		if (duplicate) {
-			console.warn(`[inbound-dedupe] duplicate message ${email.messageId} for ${message.to} (emailId=${duplicate.emailId})`);
-			return;
-		}
-
-		let userRow = {}
-
-		if (account) {
-			 userRow = await userService.selectByIdIncludeDel({ env: env }, account.userId);
-		}
-
-		if (account && userRow.email !== env.admin) {
-
-			// 封禁账号入站拦截：被管控限制账号阻断接收普通外部/站内来信，防止滥用积压
-			if (Number(userRow.status) === 1) {
-				message.setReject('The recipient account has been suspended.');
-				return;
+			if (account && userRow.email !== env.admin) {
+				const { banEmail, availDomain } = await roleService.selectByUserId({ env }, account.userId);
+				if (!roleService.hasAvailDomainPerm(availDomain, message.to)) {
+					message.setReject('The recipient is not authorized to use this domain.');
+					return;
+				}
+				if (roleService.isBanEmail(banEmail, email.from.address)) {
+					message.setReject('The recipient is disabled from receiving emails.');
+					return;
+				}
 			}
 
-			let { banEmail, availDomain } = await roleService.selectByUserId({ env: env }, account.userId);
+			activeInboundClaim = await mailReliabilityService.acquireInboundClaim({ env }, {
+				recipient: message.to,
+				messageId: email.messageId,
+				rawBytes: raw.rawBytes,
+				accountId: account?.accountId || 0,
+				userId: account?.userId || 0,
+				storeRaw: Boolean(account)
+			});
+			if (activeInboundClaim.complete) return;
 
-			if (!roleService.hasAvailDomainPerm(availDomain, message.to)) {
-				message.setReject('The recipient is not authorized to use this domain.');
-				return;
-			}
-
-			if(roleService.isBanEmail(banEmail, email.from.address)) {
-				message.setReject('The recipient is disabled from receiving emails.');
-				return;
-			}
-
-			// 检查用户配额
-			const quota = await userService.getUserQuota({ env: env }, account.userId);
-			if (quota.maxStorageMB === 0) {
-				message.setReject('The recipient has no storage space allocated (0MB).');
-				return;
-			}
-			if (quota.usedEmails >= quota.maxEmails * 0.95) {
-				message.setReject(`Recipient mailbox is full (email count limit reached 95%).`);
-				return;
-			}
-			if (quota.usedStorageBytes + content.length > quota.maxStorageBytes * 0.95) {
-				message.setReject(`Recipient mailbox is full (storage limit reached 95%).`);
-				return;
-			}
-
-		}
 
 
 		if (!email.to) {
 			email.to = [{ address: message.to, name: emailUtils.getName(message.to)}]
 		}
 
-		const toName = email.to.find(item => item.address === message.to)?.name || '';
-		const code = await aiService.extractCode({ env }, email, { aiCode, aiCodeFilter });
+			const toName = email.to.find(item => item.address === message.to)?.name || '';
+			const code = await aiService.extractCode({ env }, email, { aiCode, aiCodeFilter, userProfile });
+
 
 		const ruleResult = applyRules({
 			sendEmail: email.from.address,
@@ -237,43 +253,95 @@ export async function email(message, env, ctx) {
 			isDel: isDelVal,
 			isSpam: isSpamVal,
 			unread: unreadVal,
-			status: emailConst.status.SAVING,
-			labels: finalLabelsStr
+				status: emailConst.status.SAVING,
+				labels: finalLabelsStr,
+				receiveClaimKey: activeInboundClaim.claimKey
+
 		};
 
-		const attachments = [];
-		const cidAttachments = [];
+			const attachments = [];
+			const cidAttachments = [];
+			let inboundAttachmentBytes = 0;
 
-		for (let item of attachmentsIn) {
-			let attachment = { ...item };
-			attachment.key = constant.ATTACHMENT_PREFIX + await fileUtils.getBuffHash(attachment.content) + fileUtils.getExtFileName(item.filename);
-			attachment.size = item.content.length ?? item.content.byteLength;
-			attachments.push(attachment);
-			if (attachment.contentId) {
-				cidAttachments.push(attachment);
+			for (let item of attachmentsIn) {
+				const attachment = { ...item };
+				const attachmentBytes = attachment.content instanceof ArrayBuffer
+					? new Uint8Array(attachment.content)
+					: attachment.content instanceof Uint8Array
+						? attachment.content
+						: new Uint8Array(attachment.content || []);
+				attachment.content = attachmentBytes;
+				// Isolate deliveries while keeping CID URLs stable across recovery
+				// of this claim's already-persisted SAVING email row.
+				attachment.key = constant.ATTACHMENT_PREFIX + activeInboundClaim.claimKey + '-' + attachments.length + '-' + await fileUtils.getBuffHash(attachmentBytes) + fileUtils.getExtFileName(item.filename);
+				attachment.size = attachmentBytes.byteLength;
+				inboundAttachmentBytes += attachment.size;
+				attachments.push(attachment);
+				if (attachment.contentId) cidAttachments.push(attachment);
 			}
-		}
 
-		let emailRow = await emailService.receive({ env }, params, cidAttachments, r2Domain);
-
-		attachments.forEach(attachment => {
-			attachment.emailId = emailRow.emailId;
-			attachment.userId = emailRow.userId;
-			attachment.accountId = emailRow.accountId;
-		});
-
-		try {
-			if (attachments.length > 0) {
-				await attService.addAtt({ env }, attachments);
+			let stagedAttachments = { rows: [], uploaded: [] };
+			try {
+				const quota = account ? await userService.getUserQuota({ env }, account.userId) : null;
+				emailRow = await emailService.receive({ env }, params, cidAttachments, r2Domain, {
+					leaseToken: activeInboundClaim.leaseToken, quota, attachmentBytes: inboundAttachmentBytes
+				});
+				if (!emailRow) throw new Error('Inbound email row was not created');
+				if (account) {
+					if (!quota) throw new Error('Recipient storage quota is unknown');
+					const bypassStorage = quota.bypassStorage === true || Number(quota.byoStorageEnabled) === 1;
+					const storedBodyBytes = ['subject', 'text', 'content', 'code'].reduce((sum, field) =>
+						sum + new TextEncoder().encode(String(emailRow[field] ?? '')).byteLength, 0);
+					await mailReliabilityService.reserveInboundQuota({ env }, {
+						claimKey: activeInboundClaim.claimKey,
+						leaseToken: activeInboundClaim.leaseToken,
+						userId: account.userId,
+						incomingBytes: storedBodyBytes + inboundAttachmentBytes,
+						maxStorageBytes: quota.maxStorageBytes,
+						maxEmails: quota.maxEmails,
+						bypass: bypassStorage,
+						quotaStorageBlocked: quota.quotaStorageBlocked === true || (quota.isVisitor === true && !bypassStorage)
+					});
+				}
+				if (attachments.length > 0) {
+					for (const attachment of attachments) {
+						attachment.userId = account?.userId || 0;
+						attachment.accountId = account?.accountId || 0;
+					}
+					const mailDb = getMailDb({ env });
+					await mailDb.batch(attachments.map(attachment => mailDb.prepare(`INSERT INTO object_deletion_queue
+						(object_key,user_id,next_retry_at,status,attempts,last_error) VALUES (?,?,datetime('now','+1 hour'),'pending',0,NULL)
+						ON CONFLICT(object_key,user_id) DO UPDATE SET status='pending',
+							next_retry_at=datetime('now','+1 hour'), attempts=0, last_error=NULL`).bind(attachment.key, attachment.userId)));
+					stagedAttachments = await attService.stageInboundAtt({ env }, attachments);
+				}
+				if (stagedAttachments.rows.length > 0) {
+					stagedAttachments.rows = stagedAttachments.rows.map(row => ({ ...row, emailId: emailRow.emailId }));
+				}
+					emailRow = await emailService.completeInboundReceive({ env }, {
+					claimKey: activeInboundClaim.claimKey,
+					leaseToken: activeInboundClaim.leaseToken,
+					emailId: emailRow.emailId,
+					status: account ? emailConst.status.RECEIVE : emailConst.status.NOONE,
+					isDel: isDelVal,
+					isSpam: isSpamVal,
+					attachmentRows: stagedAttachments.rows
+				});
+				activeInboundClaim.complete = true;
+			} catch (error) {
+				await attService.cleanupUnreferencedObjects({ env }, stagedAttachments.uploaded).catch(() => {});
+				// Quota rejection is terminal for this raw copy. Keeping it would
+				// let an over-quota sender park a 25 MiB recovery object per attempt
+				// outside every quota calculation. Transient failures keep the copy
+				// so a retry does not re-upload it.
+				const discardRaw = error?.code === 'inbound_quota_exceeded';
+				await failInboundClaim({ env }, activeInboundClaim.claimKey, activeInboundClaim.leaseToken, error,
+					{ deleteRaw: discardRaw }).catch(() => {});
+				throw error;
 			}
-		} catch (e) {
-			console.error(e);
-		}
 
-		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId, isDelVal);
+			const sysMailMode = Number(allMailMode ?? 0);
 
-
-		const sysMailMode = Number(allMailMode ?? 0);
 
 		// 系统转发规则过滤 (只在非加密模式下生效，加密模式下转发规则直接失效/被删除，不起任何作用)
 		if (sysMailMode !== 2 && ruleType === settingConst.ruleType.RULE) {
@@ -358,11 +426,14 @@ export async function email(message, env, ctx) {
 								.map(p => p.trim().toLowerCase())
 								.filter(Boolean);
 							const toLocal = (message.to || '').split('@')[0].toLowerCase();
-							if (prefixes.length === 0 || prefixes.some(p => toLocal.startsWith(p) || toLocal === p)) {
-								shouldForward = true;
-							}
-						} else if (fwMode === 'rules') {
-							shouldForward = true;
+								if (prefixes.length > 0 && prefixes.some(p => toLocal.startsWith(p) || toLocal === p)) {
+									shouldForward = true;
+								}
+
+					} else if (fwMode === 'rules') {
+						// Rule-based forwarding has no backend evaluator yet. Fail closed
+						// instead of treating an unimplemented mode as "all".
+						shouldForward = false;
 						}
 
 						if (shouldForward) {
@@ -387,17 +458,34 @@ export async function email(message, env, ctx) {
 
 								// 若未在 CF 验证，则通过系统邮件发送能力执行自动抄送转发（占用个人发送配额）
 								if (!cfForwardSuccess) {
-									try {
-										const forwardSubject = pfw.addPrefix ? `[Fwd] ${email.subject || emailRow.subject || ''}` : (email.subject || emailRow.subject || '');
-										await emailService.send({ env }, {
-											receiveEmail: [target],
-											subject: forwardSubject,
-											content: email.html || email.text || emailRow.content || '',
-											text: email.text || emailRow.text || '',
-											accountId: emailRow.accountId
-										}, emailRow.userId);
-									} catch (sendErr) {
-										console.error(`Personal CC Forwarding to ${target} failed:`, sendErr.message);
+									const forwardTask = await forwardService.enqueueForwardTask({ env }, {
+										userId: emailRow.userId,
+										accountId: emailRow.accountId,
+										emailId: emailRow.emailId,
+										target: cleanTarget,
+										addPrefix: !!pfw.addPrefix
+									}).catch((err) => {
+										console.warn(`Personal forwarding task enqueue failed: ${err.message}`);
+										return null;
+									});
+									if (forwardTask) {
+										await forwardService.processForwardTask({ env }, forwardTask.task_id)
+											.catch((err) => console.warn(`Personal forwarding task failed: ${err.message}`));
+									} else {
+										try {
+											const forwardSubject = pfw.addPrefix ? `[Fwd] ${email.subject || emailRow.subject || ''}` : (email.subject || emailRow.subject || '');
+											await emailService.send({ env }, {
+												receiveEmail: [target],
+												subject: forwardSubject,
+												content: email.html || email.text || emailRow.content || '',
+												text: email.text || emailRow.text || '',
+												attachments: attachmentsIn,
+												forwarding: true,
+												accountId: emailRow.accountId
+											}, emailRow.userId);
+										} catch (sendErr) {
+											console.error(`Personal CC Forwarding to ${target} failed:`, sendErr.message);
+										}
 									}
 								}
 							}
@@ -409,31 +497,127 @@ export async function email(message, env, ctx) {
 			}
 		}
 
-	} catch (e) {
-		console.error('邮件接收异常: ', e);
-		if (e.message && e.message.toLowerCase().includes('full')) {
-			message.setReject('Database is full');
-			try {
-				await env.kv.put('db_full_status', 'true', { expirationTtl: 60 * 5 });
-			} catch (kvErr) {}
-		} else {
-			message.setReject('System error');
+		} catch (e) {
+			console.error('邮件接收异常: ', e);
+			if (activeInboundClaim && !activeInboundClaim.complete) {
+				await failInboundClaim({ env }, activeInboundClaim.claimKey, activeInboundClaim.leaseToken, e).catch(() => {});
+			}
+			if (/\bSQLITE_FULL\b|database or disk is full/i.test(String(e.message || ''))) {
+				try { await env.kv.put('db_full_status', 'true', { expirationTtl: 60 * 5 }); } catch (kvErr) {}
+			}
+			// Propagate the failure; Cloudflare controls the SMTP response and
+			// redelivery policy. Throwing here is not proof of an SMTP retry.
+			throw e;
 		}
-	}
+
 }
 
-function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, messageTo) {
+/**
+ * Match one administrator-configured sender entry.
+ *
+ * Wildcards are a supported list feature (`*@spam.example`, `alerts-*@...`).
+ * Escape every regex metacharacter first, then turn the escaped `\*` into
+ * `.*`. A malformed pattern must only fail its own entry: throwing here would
+ * reject every inbound message while the bad entry remains configured.
+ */
+export function senderPatternMatches(entry, address, domain) {
+	const e = String(entry || '').trim().toLowerCase();
+	if (!e) return false;
+	const targetAddress = String(address || '').toLowerCase();
+	const targetDomain = String(domain || '').toLowerCase();
+	if (e.includes('*')) {
+		try {
+			const escaped = e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*');
+			const regex = new RegExp('^' + escaped + '$');
+			return regex.test(targetAddress) || regex.test(targetDomain);
+		} catch (_) {
+			return false;
+		}
+	}
+	if (e.includes('@')) return targetAddress === e;
+	return targetDomain === e || targetDomain.endsWith('.' + e);
+}
+
+function headerValue(source, name) {
+	if (source && typeof source.get === 'function') {
+		return String(source.get(name) || '');
+	}
+	const headers = source?.headers || source;
+	if (headers instanceof Map) {
+		for (const [key, value] of headers) {
+			if (String(key).toLowerCase() === name) return String(value || '');
+		}
+		return '';
+	}
+	if (Array.isArray(headers)) {
+		for (const item of headers) {
+			const key = String(item?.key || item?.name || '').toLowerCase();
+			if (key === name) return String(item?.value || '');
+		}
+	}
+	return '';
+}
+
+/**
+ * A local From domain alone is not proof of an internal sender: external mail
+ * can spoof it. Require a DKIM/DMARC pass bound to that domain from the
+ * receiving path's Authentication-Results. Without an authenticated result the
+ * message is treated as external, so global blacklists still apply.
+ */
+export function isAuthenticatedInternalSender(email, envDomains, {
+	transportHeaders = null,
+	trustedAuthservId = '',
+	requireTransport = false
+} = {}) {
+	const senderDomain = emailUtils.getDomain(String(email?.from?.address || '').toLowerCase());
+	if (!senderDomain) return false;
+	const domains = Array.isArray(envDomains) ? envDomains.map(value => String(value).toLowerCase()) : [];
+	if (!domains.includes(senderDomain)) return false;
+	if (requireTransport && !transportHeaders) return false;
+	const source = transportHeaders || email;
+	const rawAuth = headerValue(source, 'authentication-results');
+	if (!rawAuth || /[\r\n]/.test(rawAuth)) return false;
+	// Headers.get() joins multiple headers with ', '. Evaluate only the first
+	// Authentication-Results header and never concatenate caller-supplied ARC headers.
+	const auth = rawAuth.split(',')[0].trim();
+	if (!auth) return false;
+	if (trustedAuthservId) {
+		const authservId = auth.split(';')[0].trim().split(/\s+/)[0].replace(/:$/, '').toLowerCase();
+		if (authservId !== String(trustedAuthservId).toLowerCase()) return false;
+		// 深度防御：A-R 可被发件人在原始 MIME 中自行注入。仅评估首条之外，
+		// 若可信 authserv-id 在该值内出现 ≥2 次（判定段被拼接注入）仍无法归属
+		// 判定结果，一律按外部发件人处理 (fail closed)，邮件因此仍受全局黑名单约束。
+		const needle = String(trustedAuthservId).toLowerCase();
+		if (auth.toLowerCase().split(needle).length - 1 !== 1) return false;
+	}
+	const domain = senderDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const passThenFrom = new RegExp(`(?:dmarc=pass|dkim=pass)[^;]*(?:header\\.from|header\\.d)\\s*=\\s*${domain}(?=$|[\\s;)])`, 'i');
+	const fromThenPass = new RegExp(`(?:header\\.from|header\\.d)\\s*=\\s*${domain}(?=$|[\\s;)])[^;]*(?:dmarc=pass|dkim=pass)`, 'i');
+	return passThenFrom.test(auth) || fromThenPass.test(auth);
+}
+
+const RESERVED_OFFICIAL_SENDERS = new Set([
+	'announcement@epocanvas.com',
+	'admin@epocanvas.com'
+]);
+
+export function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, messageTo, transportHeaders = null) {
 
 	const senderAddress = (email.from?.address || '').toLowerCase();
 	const senderDomain = emailUtils.getDomain(senderAddress) || '';
 	
-	let isInternal = false;
 	let envDomains = env?.domain || [];
 	if (typeof envDomains === 'string') {
 		try { envDomains = JSON.parse(envDomains); } catch(e){}
 	}
-	if (envDomains.includes(senderDomain)) {
-		isInternal = true;
+	const isInternal = isAuthenticatedInternalSender(email, envDomains, {
+		transportHeaders,
+		trustedAuthservId: String(env?.INBOUND_AUTHSERV_ID || 'mx.cloudflare.net'),
+		requireTransport: true
+	});
+
+	if (!isInternal && RESERVED_OFFICIAL_SENDERS.has(senderAddress)) {
+		return { block: true, hardBlock: false };
 	}
 
 	let blockInternalList = false;
@@ -464,19 +648,7 @@ function checkBlock(blackSubjectStr, blackContentStr, blackFromStr, email, env, 
 		regularContentList = blackContentStr ? blackContentStr.split(',').filter(Boolean) : [];
 	}
 
-	function matchesSender(entry, address, domain) {
-		const e = entry.trim().toLowerCase();
-		if (!e) return false;
-		if (e.includes('*')) {
-			const escaped = e.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-			const regex = new RegExp('^' + escaped.replace(/\\\*/g, '.*') + '$');
-			return regex.test(address) || regex.test(domain);
-		}
-		if (e.includes('@')) {
-			return address === e;
-		}
-		return domain === e || domain.endsWith('.' + e);
-	}
+	const matchesSender = (entry, address, domain) => senderPatternMatches(entry, address, domain);
 
 	if (!isInternal || blockInternalBlock) {
 		for (const blockEntry of hardBlockList) {

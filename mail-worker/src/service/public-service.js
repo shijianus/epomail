@@ -4,7 +4,7 @@ import BizError from '../error/biz-error';
 import { userOrm, mailOrm } from '../entity/orm';
 import { getUserDb, getMailDb } from '../utils/db-accessor';
 import { v4 as uuidv4 } from 'uuid';
-import { and, asc, desc, eq, sql, like } from 'drizzle-orm';
+import { and, asc, desc, eq, sql, like, inArray } from 'drizzle-orm';
 import totpUtils from '../utils/totp-utils';
 import cryptoUtils from '../utils/crypto-utils';
 import rateLimit from '../utils/rate-limit.js';
@@ -21,6 +21,9 @@ import userService from './user-service';
 import accountService from './account-service';
 import { isAdminUser } from '../utils/admin-utils';
 import KvConst from '../const/kv-const';
+import userContext from '../security/user-context.js';
+import account from '../entity/account.js';
+import { isActiveUser } from './privacy-revocation-service.js';
 
 
 const publicService = {
@@ -31,6 +34,7 @@ const publicService = {
 
 		const query = mailOrm(c).select({
 				emailId: email.emailId,
+				ownerUserId: email.userId,
 				sendEmail: email.sendEmail,
 				sendName: email.name,
 				subject: email.subject,
@@ -41,13 +45,19 @@ const publicService = {
 				content: email.content,
 				text: email.text,
 				isDel: email.isDel,
-		}).from(email)
+		}).from(email).innerJoin(account, and(
+			eq(email.accountId, account.accountId), eq(email.userId, account.userId)))
 
-		size = Math.min(Math.max(1, Number(size) || 20), 100);
-		num = Math.max(1, Number(num) || 1);
+		size = Number(size);
+		if (!Number.isInteger(size) || size < 1) size = 20;
+		if (size > 100) size = 100;
+		num = Number(num);
+		if (!Number.isInteger(num) || num < 1) num = 1;
 		const offset = (num - 1) * size;
 
-		let conditions = []
+		// This integration API is not a trash/archive export. Only active mailbox
+		// rows are returned, even when a caller explicitly requests deleted mail.
+		let conditions = [eq(email.isDel, 0), eq(account.isDel, 0), eq(account.status, 0)]
 
 		if (toEmail) {
 			conditions.push(sql`${email.toEmail} COLLATE NOCASE LIKE ${toEmail}`)
@@ -89,7 +99,16 @@ const publicService = {
 			query.orderBy(desc(email.emailId));
 		}
 
-		return query.limit(size).offset(offset);
+		const rows = await query.limit(size).offset(offset);
+		const owners = [...new Set(rows.map(row => row.ownerUserId))];
+		const active = new Set();
+		// USER_DB may be separate from MAIL_DB; never silently skip this gate.
+		for (let i = 0; i < owners.length; i += 90) {
+			const users = await userOrm(c).select({ userId: user.userId }).from(user).where(and(
+				inArray(user.userId, owners.slice(i, i + 90)), eq(user.isDel, 0), eq(user.status, 0))).all();
+			users.forEach(row => active.add(row.userId));
+		}
+		return rows.filter(row => active.has(row.ownerUserId)).map(({ ownerUserId, ...row }) => row);
 
 	},
 
@@ -178,87 +197,15 @@ const publicService = {
 
 	},
 
-	async genToken(c, params) {
-
-		await rateLimit.check(c, { scope: 'public-token', limit: 10, windowSeconds: 900 });
-
-		await this.verifyUser(c, params);
-
-		const uuid = uuidv4();
-
-		await c.env.kv.put(KvConst.PUBLIC_KEY, uuid, { expirationTtl: 24 * 3600 });
-
-		return { token: uuid };
-	},
-
-	async verifyUser(c, params) {
-
-		const { email, password, code, totpCode } = params;
-
-		const userRow = await userService.selectByEmailIncludeDel(c, email);
-
-		if (email !== c.env.admin) {
-			throw new BizError(t('notAdmin'));
-		}
-
-		if (!userRow || userRow.isDel === isDel.DELETE) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		if (userRow.status === 1) {
-			throw new BizError(t('isBanUser'));
-		}
-
-		if (!await cryptoUtils.verifyPassword(password, userRow.salt, userRow.password)) {
-			throw new BizError(t('IncorrectPwd'));
-		}
-
-		if (userRow.totpSecret) {
-			const mfaCode = (totpCode || code || '').trim();
-			if (!mfaCode) {
-				throw new BizError(t('totpCodeInvalid'));
-			}
-			const plainSecret = await totpUtils.decryptSecret(userRow.totpSecret, c.env);
-			const totpCheck = await totpUtils.verifyTOTP(plainSecret, mfaCode, 1);
-			if (!totpCheck.isValid) {
-				throw new BizError(t('totpCodeInvalid'));
-			}
-		}
+	async genToken() {
+		throw new BizError('Legacy public API is disabled', 403, 'legacy_public_api_disabled');
 	},
 
 
 	async getProfile(c, username) {
 		const cleanTarget = (username || '').trim().toLowerCase();
 		if (!cleanTarget) {
-			throw new BizError(t('notExistUser'));
-		}
-
-		let userRow = null;
-		if (cleanTarget.includes('@')) {
-			// 1. 完整邮箱精准匹配
-			userRow = await userOrm(c).select().from(user).where(sql`${user.email} COLLATE NOCASE = ${cleanTarget}`).get();
-			if (!userRow) {
-				const accRow = await accountService.selectByEmailIncludeDel(c, cleanTarget);
-				if (accRow && accRow.userId) {
-					userRow = await userOrm(c).select().from(user).where(eq(user.userId, accRow.userId)).get();
-				}
-			}
-		} else if (cleanTarget === 'admin') {
-			// 2. 纯 'admin' 明确指向主站长 c.env.admin
-			userRow = await userOrm(c).select().from(user).where(sql`${user.email} COLLATE NOCASE = ${c.env.admin}`).get();
-		} else {
-			// 3. 优先匹配抢注该短用户名的持有者（account.name = cleanTarget）
-			const accRow = await accountService.selectByNameIncludeDel(c, cleanTarget);
-			if (accRow && accRow.userId) {
-				userRow = await userOrm(c).select().from(user).where(eq(user.userId, accRow.userId)).get();
-			}
-			if (!userRow) {
-				userRow = await userOrm(c).select().from(user).where(like(user.email, `${cleanTarget}@%`)).get();
-			}
-		}
-
-		if (!userRow) {
-			throw new BizError(t('notExistUser'));
+			throw new BizError(t('notExistUser'), 404);
 		}
 
 		const settingStr = await c.env.kv.get(KvConst.SETTING);
@@ -270,7 +217,12 @@ const publicService = {
 			} catch (e) {}
 		}
 
-		if (publicProfileEnabled === 0) {
+		// Resolve the viewer before the target. Otherwise an unauthenticated
+		// request can distinguish "account exists but is private" (401) from
+		// "account does not exist" (404) and enumerate the user base.
+		let viewer = null;
+		let viewerMaySeeEmail = false;
+		if (Number(publicProfileEnabled) !== 1) {
 			const jwt = c.req.header(constant.TOKEN_HEADER);
 			if (!jwt) throw new BizError(t('unauthorized'), 401);
 
@@ -284,11 +236,57 @@ const publicService = {
 				throw new BizError(t('authExpired'), 401);
 			}
 
-			const currentUser = authInfo.user;
-			const isSelf = currentUser.userId === userRow.userId || currentUser.email?.toLowerCase() === userRow.email?.toLowerCase();
-			if (!isSelf && !isAdminUser(c, currentUser)) {
-				throw new BizError(t('unauthorized'), 403);
+			viewer = await userService.selectByIdIncludeDel(c, userId);
+			if (!isActiveUser(viewer)) throw new BizError(t('authExpired'), 401);
+			await userContext.requireSession(c, userId, viewer);
+		}
+
+		let userRow = null;
+		if (cleanTarget.includes('@')) {
+			// 1. 完整邮箱精准匹配
+			userRow = await userOrm(c).select().from(user).where(sql`${user.email} COLLATE NOCASE = ${cleanTarget}`).get();
+			if (!userRow) {
+				const accRow = await accountService.selectByEmailIncludeDel(c, cleanTarget);
+				if (accRow && (Number(accRow.isDel) !== 0 || Number(accRow.status) !== 0)) {
+					throw new BizError(t('notExistUser'), 404);
+				}
+				if (accRow && accRow.userId) {
+					userRow = await userOrm(c).select().from(user).where(eq(user.userId, accRow.userId)).get();
+				}
 			}
+		} else if (cleanTarget === 'admin') {
+			// 2. 纯 'admin' 明确指向主站长 c.env.admin
+			userRow = await userOrm(c).select().from(user).where(sql`${user.email} COLLATE NOCASE = ${c.env.admin}`).get();
+		} else {
+			// 3. 优先匹配真实邮箱前缀持有者，其次匹配未与他人邮箱前缀冲突的短用户名持有者
+			userRow = await userOrm(c).select().from(user).where(like(user.email, `${cleanTarget}@%`)).get();
+			if (!userRow) {
+				const accRow = await accountService.selectByNameIncludeDel(c, cleanTarget);
+				if (accRow && (Number(accRow.isDel) !== 0 || Number(accRow.status) !== 0)) {
+					throw new BizError(t('notExistUser'), 404);
+				}
+				if (accRow && accRow.userId) {
+					userRow = await userOrm(c).select().from(user).where(eq(user.userId, accRow.userId)).get();
+				}
+			}
+		}
+
+		if (!isActiveUser(userRow)) {
+			throw new BizError(t('notExistUser'), 404);
+		}
+		const primaryAccount = await accountService.selectByEmailIncludeDel(c, userRow.email);
+		if (!primaryAccount || Number(primaryAccount.isDel) !== 0 || Number(primaryAccount.status) !== 0) {
+			throw new BizError(t('notExistUser'), 404);
+		}
+
+		if (Number(publicProfileEnabled) !== 1) {
+			const isSelf = Number(viewer?.userId) === Number(userRow.userId);
+			if (!isSelf && !isAdminUser(c, viewer)) {
+				// Same status as a nonexistent account: private profiles must not
+				// become an account-existence oracle for authenticated users.
+				throw new BizError(t('notExistUser'), 404);
+			}
+			viewerMaySeeEmail = true;
 		}
 		
 		let roleRow = null;
@@ -301,13 +299,20 @@ const publicService = {
 			roleRow = await roleService.selectById(c, userRow.type);
 		}
 		
-		const allEmails = await mailOrm(c).select({ 
-            createTime: email.createTime, 
-            labels: email.labels, 
+		const profileStr = await c.env.kv.get('USER_PROFILE_' + userRow.userId);
+		const profile = profileStr ? JSON.parse(profileStr) : {};
+		const visible = value => value === true || value === 1;
+		const showStats = visible(profile.showStats);
+		const showTrend = visible(profile.showTrend);
+		const showSources = visible(profile.showSources);
+		const allEmails = showStats || showTrend || showSources ? await mailOrm(c).select({
+            createTime: email.createTime,
+            labels: email.labels,
             isSpam: email.isSpam,
             type: email.type,
             sendEmail: email.sendEmail
-        }).from(email).where(eq(email.userId, userRow.userId)).all();
+        }).from(email).innerJoin(account, and(eq(email.accountId, account.accountId), eq(email.userId, account.userId)))
+			.where(and(eq(email.userId, userRow.userId), eq(email.isDel, 0), eq(account.isDel, 0), eq(account.status, 0))).all() : [];
         
         let todaySent = 0;
         let todayReceived = 0;
@@ -320,7 +325,7 @@ const publicService = {
         const trendMap = {};
 		for (let i = 6; i >= 0; i--) {
 			const d = new Date(now);
-			d.setDate(d.getDate() - i);
+			d.setUTCDate(d.getUTCDate() - i);
 			const dateStr = d.toISOString().split('T')[0];
 			trendMap[dateStr] = { send: 0, receive: 0, intercept: 0 };
 		}
@@ -328,9 +333,12 @@ const publicService = {
 		const sourceMap = {};
 		
 		allEmails.forEach(e => {
-            const rawTime = e.createTime ? String(e.createTime).replace(' ', 'T') : '';
-			const dateObj = rawTime ? new Date(rawTime) : new Date();
-			const dateStr = dateObj.toISOString().split('T')[0];
+            const rawTime = e.createTime ? String(e.createTime).trim().replace(' ', 'T') : '';
+			// D1 CURRENT_TIMESTAMP is UTC but has no zone suffix. Make that
+			// explicit so server-local TZ cannot move a message into another day.
+			const isoTime = rawTime && !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(rawTime) ? `${rawTime}Z` : rawTime;
+			const dateObj = isoTime ? new Date(isoTime) : new Date();
+			const dateStr = Number.isNaN(dateObj.getTime()) ? '' : dateObj.toISOString().split('T')[0];
 			
 			let intercepted = false;
 			if (e.isSpam === 1) intercepted = true;
@@ -403,19 +411,15 @@ const publicService = {
 		let otherPercent = 100;
 		pieSources.forEach(s => otherPercent -= s.percent);
 		if (otherPercent < 0) otherPercent = 0;
-		
-		let profile = {};
-        try {
-            const profileStr = await c.env.kv.get('USER_PROFILE_' + userRow.userId);
-            if (profileStr) {
-                profile = JSON.parse(profileStr);
-            }
-        } catch (e) {}
+		const displayEmail = viewerMaySeeEmail ? userRow.email : (() => {
+			const [local, domain] = String(userRow.email || '').split('@');
+			return domain ? `${local.slice(0, 1)}***@${domain}` : '***';
+		})();
 
         return {
             userInfo: {
                 account: username,
-                email: userRow.email,
+                email: displayEmail,
                 roleName: roleRow ? roleRow.name : 'Unknown',
                 joinTime: userRow.createTime,
                 avatarInitials: username.substring(0, 2).toUpperCase(),
@@ -423,21 +427,21 @@ const publicService = {
                 bio: profile.bio || '',
                 avatarUrl: profile.avatarUrl || '',
                 backgroundUrl: profile.backgroundUrl || profile.background || '',
-                showStats: profile.showStats ?? true,
-                showTrend: profile.showTrend ?? true,
-                showSources: profile.showSources ?? true
+                showStats,
+                showTrend,
+                showSources
             },
-            stats: {
+            stats: showStats ? {
                 todaySent,
                 todayReceived,
                 interceptRate: totalProcessed > 0 ? ((totalIntercepted / totalProcessed) * 100).toFixed(1) + '%' : '0%',
-            },
-            trend,
-            sources: {
+            } : null,
+            trend: showTrend ? trend : [],
+            sources: showSources ? {
                 total: totalSources,
                 top: pieSources,
                 otherPercent
-            }
+            } : null
         }
 	}
 

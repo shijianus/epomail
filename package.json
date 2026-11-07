@@ -9,7 +9,11 @@
     "test": "npm --prefix mail-worker test",
     "test:unit": "npm --prefix mail-worker run test:unit",
     "test:integration": "npm --prefix mail-worker run test:integration",
-    "test:worker": "npm --prefix mail-worker test"
+    "test:worker": "npm --prefix mail-worker test",
+    "test:stress": "node tests/backend-stress.mjs",
+    "test:stress:unit": "node --test tests/helpers/load-runner.test.mjs",
+    "test:fullstack": "node tests/fullstack-smoke.mjs",
+    "test:fullstack:browser": "node tests/fullstack-browser-e2e.mjs"
   },
   "devDependencies": {
     "playwright": "^1.63.0"

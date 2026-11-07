@@ -533,15 +533,15 @@
       <div class="privacy-group">
         <div class="privacy-item">
           <span>{{ $t('showStats') }}</span>
-          <el-switch :model-value="userStore.user.showStats ?? true" @change="val => savePrivacy('showStats', val)" />
+          <el-switch :model-value="userStore.user.showStats ?? false" @change="val => savePrivacy('showStats', val)" />
         </div>
         <div class="privacy-item">
           <span>{{ $t('showTrend') }}</span>
-          <el-switch :model-value="userStore.user.showTrend ?? true" @change="val => savePrivacy('showTrend', val)" />
+          <el-switch :model-value="userStore.user.showTrend ?? false" @change="val => savePrivacy('showTrend', val)" />
         </div>
         <div class="privacy-item">
           <span>{{ $t('showSources') }}</span>
-          <el-switch :model-value="userStore.user.showSources ?? true" @change="val => savePrivacy('showSources', val)" />
+          <el-switch :model-value="userStore.user.showSources ?? false" @change="val => savePrivacy('showSources', val)" />
         </div>
       </div>
     </div>
@@ -793,6 +793,7 @@ import { useSettingStore } from '@/store/setting.js'
 import { updateProfile, uploadImage } from '@/request/my.js'
 import { parseInlineMarkdown } from '@/utils/md-parser.js'
 import { THEME_PRESETS, COVER_PRESETS, getPresetName } from '@/utils/theme-presets.js'
+import { normalizeUiLocale } from '@/utils/ui-locale.js'
 
 defineOptions({
   name: 'general-setting'
@@ -871,10 +872,10 @@ const priorityConfig = reactive({
 const customizeMultipleShow = ref(false)
 const multipleConfig = reactive({
   panels: [
-    { query: 'is:starred', title: '星标邮件' },
-    { query: 'is:unread', title: '未读邮件' },
-    { query: 'has:attachment', title: '含附件' },
-    { query: 'label:work', title: '工作' }
+    { query: 'is:starred', title: t('starredMail') },
+    { query: 'is:unread', title: t('unreadEmails') },
+    { query: 'has:attachment', title: t('hasAttachments') },
+    { query: 'label:work', title: t('labelWork') }
   ],
   position: 'right'
 })
@@ -1074,15 +1075,16 @@ function onConversationViewChange(val) {
 }
 
 function changeLang(lang) {
+  const normalizedLang = normalizeUiLocale(lang)
   let setting = {}
   try {
     setting = JSON.parse(localStorage.getItem('setting') || '{}')
   } catch (e) {
     setting = {}
   }
-  localStorage.setItem('setting', JSON.stringify({ ...setting, lang }))
-  settingStore.lang = lang
-  updateProfile({ lang }).catch(() => {}).finally(() => {
+  localStorage.setItem('setting', JSON.stringify({ ...setting, lang: normalizedLang }))
+  settingStore.lang = normalizedLang
+  updateProfile({ lang: normalizedLang }).catch(() => {}).finally(() => {
     window.location.reload()
   })
 }

@@ -4,6 +4,7 @@ import user from '../entity/user';
 import settingService from './setting-service';
 import userService from './user-service';
 import decisionNoticeService from './decision-notice-service.js';
+import { ensureNoticeDeliverySchema } from '../utils/notice-delivery-schema.js';
 import KvConst from '../const/kv-const.js';
 import { and, desc, asc, eq, sql, count, inArray } from 'drizzle-orm';
 import BizError from '../error/biz-error';
@@ -34,16 +35,33 @@ function desensitizeEmail(email) {
 	return `${name.slice(0, 2)}***${name.slice(-1)}@${domain}`;
 }
 
-function desensitizeIp(ip) {
-	if (!ip || typeof ip !== 'string') return '';
-	if (ip.includes('.')) {
-		const parts = ip.split('.');
-		if (parts.length === 4) return `${parts[0]}.${parts[1]}.*.*`;
-	} else if (ip.includes(':')) {
-		const parts = ip.split(':');
-		if (parts.length >= 2) return `${parts[0]}:${parts[1]}:****:****`;
-	}
-	return '***';
+// Public record table + drawer summary only. Never spread a case into this DTO:
+// free-text reasons, telemetry, staff identities and nested evidence/appeal data
+// are private even when the case is closed. New case fields stay private by default.
+function toVisitorAuditRecord(item) {
+	return {
+		id: item.id,
+		ticketId: item.ticketId,
+		ticketNo: item.ticketNo,
+		email: desensitizeEmail(item.email),
+		warningType: item.warningType,
+		eventType: item.eventType,
+		category: item.category,
+		reportCategory: item.reportCategory ?? null,
+		riskLevel: item.riskLevel,
+		priority: item.priority,
+		status: item.status,
+		identityGroup: item.identityGroup,
+		createTime: item.createTime,
+		banTime: item.banTime,
+		resolvedTime: item.resolvedTime ?? null,
+		processTime: item.processTime,
+		updateCount: item.updateCount,
+		lastUpdated: item.lastUpdated,
+		reasonCode: item.reasonCode,
+		publicReason: item.reasonCode || item.reportCategory || item.eventType || null,
+		publicDeadline: item.deadline || item.expireTime || item.deadlockTime || null
+	};
 }
 
 function assertValidCaseState(caseRow) {
@@ -232,52 +250,9 @@ const auditService = {
 				}
 			}
 
-			// Real table for final notice outbox & retries with distributed lease lock
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS notification_outbox (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					task_id TEXT NOT NULL UNIQUE,
-					case_id INTEGER,
-					ticket_id TEXT,
-					user_id INTEGER,
-					recipient TEXT NOT NULL,
-					channel TEXT NOT NULL DEFAULT 'internal',
-					template_code TEXT NOT NULL,
-					subject TEXT NOT NULL,
-					content TEXT NOT NULL,
-					reason_code TEXT,
-					status TEXT NOT NULL DEFAULT 'pending',
-					provider_message_id TEXT,
-					retry_count INTEGER NOT NULL DEFAULT 0,
-					max_retries INTEGER NOT NULL DEFAULT 5,
-					last_error TEXT,
-					next_retry_at TEXT,
-					delivered_at TEXT,
-					read_at TEXT,
-					claimant_id TEXT,
-					lease_expires_at TEXT,
-					lease_version INTEGER DEFAULT 0,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-					update_time DATETIME DEFAULT CURRENT_TIMESTAMP
-				);
-			`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON notification_outbox(status, next_retry_at);`).run();
-
-			// Idempotent columns for notification_outbox
-			const outboxInfo = await userDb.prepare(`PRAGMA table_info('notification_outbox')`).all().catch(() => ({ results: [] }));
-			const existingOutboxCols = new Set((outboxInfo?.results || []).map(r => r.name));
-			const outboxLeaseCols = [
-				{ name: 'claimant_id', sql: `ALTER TABLE notification_outbox ADD COLUMN claimant_id TEXT;` },
-				{ name: 'lease_expires_at', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_expires_at TEXT;` },
-				{ name: 'lease_version', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_version INTEGER DEFAULT 0;` }
-			];
-			for (const col of outboxLeaseCols) {
-				if (!existingOutboxCols.has(col.name)) {
-					try {
-						await userDb.prepare(col.sql).run();
-					} catch (_) {}
-				}
-			}
+			// Notification schema belongs to its two domain databases. The helper
+			// is also called by init; no swallowed PRAGMA/ALTER failures here.
+			await ensureNoticeDeliverySchema(c);
 
 			// Atomic adjudication decision ledger for strict CAS and unique idempotency
 			await userDb.prepare(`
@@ -438,8 +413,11 @@ const auditService = {
 		if (visitorMode) {
 			warningType = 'record';
 		}
-		size = Math.min(Number(size) || 15, 50);
-		num = Math.max(Number(num) || 1, 1);
+		size = Number(size);
+		if (!Number.isInteger(size) || size < 1) size = 15;
+		if (size > 50) size = 50;
+		num = Number(num);
+		if (!Number.isInteger(num) || num < 1) num = 1;
 		const offset = (num - 1) * size;
 
 		const conditions = [];
@@ -523,24 +501,43 @@ const auditService = {
 			query.orderBy(desc(auditLog.id));
 		}
 
-		// 并行执行独立查询以深度优化加载速度 (Promise.all 毫秒级极速响应)
-		const [list, countRes, allItems, settings, circuitBreaker] = await Promise.all([
+		// 并行执行独立查询以深度优化加载速度 (Promise.all 毫秒级极速响应)。
+		// 卡片指标改为 SQL 聚合：严禁把整张 audit_log 载入内存再过滤——
+		// 持 setting:query 的低权限角色（含参观者）曾可借此反复拉取全表打出 DoS。
+		const metricDb = getUserDb(c) || c?.env?.db;
+		const closedStatusSql = "('banned','unbanned','resolved','rejected','expired')";
+		const metricStatements = metricDb ? [
+			// 0 威胁：risk 未结案；无集群各记 1 案，同集群只计 1 个主案
+			metricDb.prepare(`SELECT
+					COALESCE(SUM(CASE WHEN cluster_id IS NULL OR cluster_id = '' THEN 1 ELSE 0 END), 0)
+					+ COUNT(DISTINCT CASE WHEN cluster_id IS NOT NULL AND cluster_id != '' THEN cluster_id END) AS total
+				FROM audit_log
+				WHERE warning_type = 'risk' AND status NOT IN ${closedStatusSql}`),
+			// 1 申诉：仅待复核
+			metricDb.prepare(`SELECT COUNT(*) AS total FROM audit_log WHERE warning_type = 'appeal' AND status = 'pending'`),
+			// 2 风险管理：14 天审计期内且未延期结案的待审工单
+			metricDb.prepare(`SELECT COUNT(*) AS total FROM audit_log
+				WHERE warning_type = 'audit' AND status IN ('active', 'pending')
+				AND (create_time >= datetime('now', '-14 days') OR detail_text LIKE '%[延期处置]%')`),
+			// 3 操作记录：全部已处置/已驳回/已封禁/已解禁/已过期案件
+			metricDb.prepare(`SELECT COUNT(*) AS total FROM audit_log
+				WHERE warning_type = 'ban' OR status IN ${closedStatusSql}
+				OR (warning_type = 'audit' AND (status = 'expired'
+					OR (create_time < datetime('now', '-14 days') AND (detail_text IS NULL OR detail_text NOT LIKE '%[延期处置]%'))))`),
+			// 4 当前有效封禁案件数
+			metricDb.prepare(`SELECT COUNT(*) AS total FROM audit_log WHERE status = 'banned'`),
+			// 5 全库案件总数
+			metricDb.prepare(`SELECT COUNT(*) AS total FROM audit_log`)
+		] : [];
+
+		const [list, countRes, metricRows, settings, circuitBreaker] = await Promise.all([
 			query.limit(size).offset(offset),
 			orm(c)
 				.select({ total: count() })
 				.from(auditLog)
 				.where(conditions.length > 0 ? and(...conditions) : undefined)
 				.get(),
-			orm(c).select({
-				id: auditLog.id,
-				warningType: auditLog.warningType,
-				status: auditLog.status,
-				riskLevel: auditLog.riskLevel,
-				priority: auditLog.priority,
-				clusterId: auditLog.clusterId,
-				detailText: auditLog.detailText,
-				createTime: auditLog.createTime
-			}).from(auditLog),
+			metricStatements.length > 0 ? metricDb.batch(metricStatements) : Promise.resolve([]),
 			settingService.get(c),
 			this.getCircuitBreaker(c)
 		]);
@@ -616,37 +613,15 @@ const auditService = {
 			return (Date.now() - createTs) >= 14 * 86400000;
 		};
 
-		// 1. 滥用威胁卡片指标：同集群账号聚合为 1 个威胁主案，仅统计真正活动待审案件，与表格显式展示行数 100% 绝对对齐
-		const seenClusters = new Set();
-		const threatActiveDistinct = allItems.filter(i => {
-			if (i.warningType !== 'risk') return false;
-			if (isClosedStatus(i.status)) return false;
-			if (i.clusterId) {
-				if (seenClusters.has(i.clusterId)) return false;
-				seenClusters.add(i.clusterId);
-				return true;
-			}
-			return true;
-		});
-		const threatCount = threatActiveDistinct.length;
-
-		// 2. 申诉审计卡片指标：仅统计待复核申诉 (status = 'pending')
-		const appealPendingItems = allItems.filter(i => i.warningType === 'appeal' && i.status === 'pending');
-		const appealCount = appealPendingItems.length;
-
-		// 3. 风险管理卡片指标：仅统计处于 14 天审计期限内且待审的工单 (未解决、未过期)
-		const auditActiveItems = allItems.filter(i => i.warningType === 'audit' && (i.status === 'active' || i.status === 'pending') && !isAuditExpired(i));
-		const auditCount = auditActiveItems.length;
-
-		// 4. 操作记录卡片指标：汇聚全平台所有已处理、已驳回、已封禁、已解禁、已过期案件
-		const recordItems = allItems.filter(i => {
-			if (i.warningType === 'ban') return true;
-			if (isClosedStatus(i.status)) return true;
-			if (i.warningType === 'audit' && isAuditExpired(i)) return true;
-			return false;
-		});
-		const recordCount = recordItems.length;
-		const banActive = recordItems.filter(i => i.status === 'banned').length;
+		// 指标全部来自上方批次内的 SQL 聚合，与历史 JS 全表过滤语义一一对齐：
+		// 0=威胁(集群去重) 1=待审申诉 2=审计期内工单 3=操作记录 4=有效封禁 5=全库总数
+		const metricTotal = (index) => Number(metricRows?.[index]?.results?.[0]?.total ?? 0) || 0;
+		const threatCount = metricTotal(0);
+		const appealCount = metricTotal(1);
+		const auditCount = metricTotal(2);
+		const recordCount = metricTotal(3);
+		const banActive = metricTotal(4);
+		const allTotal = metricTotal(5);
 		const totalPending = threatCount + appealCount + auditCount;
 
 		const counts = {
@@ -667,13 +642,13 @@ const auditService = {
 			banTotal: recordCount,
 			record: recordCount,
 			total: totalPending,
-			allTotal: allItems.length,
+			allTotal,
 			categories: {
 				audit: { pending: auditCount, total: auditCount },
 				risk: { pending: threatCount, total: threatCount },
 				appeal: { pending: appealCount, total: appealCount },
 				ban: { pending: recordCount, total: recordCount },
-				total: { pending: totalPending, total: allItems.length }
+				total: { pending: totalPending, total: allTotal }
 			}
 		};
 
@@ -876,22 +851,6 @@ const auditService = {
 				appealHistory: appealHistoryMap.get(Number(row.id)) || []
 			};
 
-			if (visitorMode) {
-				item.email = desensitizeEmail(item.email);
-				item.ip = desensitizeIp(item.ip);
-				item.baseIp = '';
-				item.baseGeo = '';
-				item.baseDevice = '';
-				item.baseFingerprint = '';
-				item.fingerprint = '';
-				item.clusterAccounts = [];
-				item.clusterCount = 1;
-				item.isCluster = false;
-				if (item.detailText) {
-					item.detailText = item.detailText.replace(/\[审核备忘\]:[^\n]*/g, '').trim();
-				}
-			}
-
 			return item;
 		});
 
@@ -1015,7 +974,8 @@ const auditService = {
 		if (visitorMode) {
 			const recordCount = counts?.record || counts?.banned || processedList.length;
 			return {
-				list: processedList,
+				// Project only at the response boundary, after all server-side filters.
+				list: processedList.map(toVisitorAuditRecord),
 				total: total ?? processedList.length,
 				counts: {
 					record: recordCount,
@@ -1409,6 +1369,14 @@ const auditService = {
 		// 严格绑定目标账号，不信任客户端随意指定的任何外部主体字段
 		const targetUser = await orm(c).select().from(user).where(eq(user.email, targetLog.email)).get();
 
+		// 目标保护：站长 (User 1 / env.admin) 与管理员账号的案件只能由站长本人裁决。
+		// 缺失这道闸时，持 audit:adjudicate 的协管可直接封禁站长，造成全站管理面失陷。
+		if (targetUser && (Number(targetUser.userId) === 1 || isAdminUser(c, targetUser))) {
+			if (!isAdminUser(c, currentUser)) {
+				throw new BizError('无权对站长或管理员账号执行案件裁决（仅站长本人可操作）', 403, 'admin_target_protected');
+			}
+		}
+
 		// 状态转换与业务场景合法性校验 (严防非法状态机跃迁)
 		const isAppealCase = targetLog.warningType === 'appeal' || Boolean(targetLog.appealReason);
 		if (APPEAL_ACTIONS.has(actionType) && !isAppealCase) {
@@ -1769,6 +1737,7 @@ const auditService = {
 			templateCode: noticeSnapshot.templateCode,
 			subject: noticeSnapshot.subject,
 			content: noticeSnapshot.htmlContent,
+			textContent: noticeSnapshot.textContent,
 			reasonCode: targetLog.reasonCode,
 			channel
 		});
@@ -1832,18 +1801,15 @@ const auditService = {
 			}
 		}
 
-		// B. 内部账号：将官方安全最终裁决通知直接送达其邮箱进行持久化
-		if (targetUser) {
+		// B. Immediate delivery uses the same durable task/lease/receipt as cron.
+		// USER_DB adjudication is already committed. A MAIL_DB failure remains
+		// retryable; a later USER_DB writeback failure is recovered from receipt.
+		if (channel === 'internal') {
 			try {
-				await decisionNoticeService.persistInternalNotice(c, {
-					targetUser,
-					recipient: targetLog.email,
-					subject: noticeSnapshot.subject,
-					htmlContent: noticeSnapshot.htmlContent,
-					textContent: noticeSnapshot.textContent
-				});
-			} catch (e) {
-				console.warn('Failed to persist internal notice to mailbox:', e.message);
+				await decisionNoticeService.deliverOutboxTask(c, noticeTaskId);
+			} catch (_) {
+				// Queue/lease read errors leave the original pending task intact.
+				console.warn('Internal notice remains queued for retry');
 			}
 		}
 

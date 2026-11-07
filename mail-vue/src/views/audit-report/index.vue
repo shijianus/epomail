@@ -65,7 +65,7 @@
               </div>
               <div class="kpi-data-stat kpi-value font-mono">
                 <span class="stat-number stat-danger">
-                  {{ summaryCounts.threat }}
+                  {{ formatUiNumber(summaryCounts.threat, locale) }}
                 </span>
               </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditKpiThreatEmailDesc')">
@@ -88,7 +88,7 @@
                 <span class="kpi-title">{{ $t('auditKpiAppealEmail') }}</span>
               </div>
               <div class="kpi-data-stat kpi-value font-mono">
-                <span class="stat-number stat-primary">{{ summaryCounts.appeal }}</span>
+                <span class="stat-number stat-primary">{{ formatUiNumber(summaryCounts.appeal, locale) }}</span>
               </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditKpiAppealEmailDesc')">
                 {{ $t('auditKpiAppealEmailSub') }}
@@ -110,7 +110,7 @@
                 <span class="kpi-title">{{ $t('auditKpiAuditEmail') }}</span>
               </div>
               <div class="kpi-data-stat kpi-value font-mono">
-                <span class="stat-number stat-warning">{{ summaryCounts.audit }}</span>
+                <span class="stat-number stat-warning">{{ formatUiNumber(summaryCounts.audit, locale) }}</span>
               </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditKpiAuditEmailDesc')">
                 {{ $t('auditKpiAuditEmailSub') }}
@@ -132,7 +132,7 @@
                 <span class="kpi-title">{{ $t('auditKpiActionRecord') }}</span>
               </div>
               <div class="kpi-data-stat kpi-value font-mono">
-                <span class="stat-number stat-success">{{ summaryCounts.record }}</span>
+                <span class="stat-number stat-success">{{ formatUiNumber(summaryCounts.record, locale) }}</span>
               </div>
               <div class="kpi-desc kpi-sub" :title="$t('auditKpiActionRecordDesc')">
                 {{ $t('auditKpiActionRecordSub') }}
@@ -412,7 +412,7 @@
                 <template #default="{ row }">
                   <div class="alarm-count-cell">
                     <span class="plain-alarm-count font-mono" :class="{ 'alarm-count-high': getAlarmCount(row) > 3 }">
-                      {{ getAlarmCount(row) }} {{ $t('auditTimesUnit') }}
+                      {{ formatUiNumber(getAlarmCount(row), locale) }}<template v-if="getAlarmCount(row) !== '—'"> {{ $t('auditTimesUnit') }}</template>
                     </span>
                   </div>
                 </template>
@@ -562,7 +562,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="!isVisitor && handleViewOperator(row)">
                       {{ getOperatorName(row) }}
                     </span>
                   </div>
@@ -599,7 +599,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="handleViewAdjudicator(row)">
+                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="!isVisitor && handleViewAdjudicator(row)">
                       {{ getAdjudicatorName(row) }}
                     </span>
                   </div>
@@ -751,7 +751,7 @@
                 <template #default="{ row }">
                   <div class="alarm-count-cell">
                     <span class="plain-alarm-count font-mono" :class="{ 'alarm-count-high': getSameCategoryAppealCount(row) > 3 }">
-                      {{ getSameCategoryAppealCount(row) }} {{ $t('auditTimesUnit') }}
+                      {{ formatUiNumber(getSameCategoryAppealCount(row), locale) }} {{ $t('auditTimesUnit') }}
                     </span>
                   </div>
                 </template>
@@ -921,7 +921,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="!isVisitor && handleViewOperator(row)">
                       {{ getOperatorName(row) }}
                     </span>
                   </div>
@@ -958,7 +958,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="handleViewAdjudicator(row)">
+                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="!isVisitor && handleViewAdjudicator(row)">
                       {{ getAdjudicatorName(row) }}
                     </span>
                   </div>
@@ -1152,7 +1152,7 @@
                 <template #default="{ row }">
                   <div class="alarm-count-cell">
                     <span class="plain-alarm-count font-mono" :class="{ 'alarm-count-high': getAlarmCount(row) > 3 }">
-                      {{ getAlarmCount(row) }} {{ $t('auditTimesUnit') }}
+                      {{ formatUiNumber(getAlarmCount(row), locale) }}<template v-if="getAlarmCount(row) !== '—'"> {{ $t('auditTimesUnit') }}</template>
                     </span>
                   </div>
                 </template>
@@ -1328,7 +1328,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="!isVisitor && handleViewOperator(row)">
                       {{ getOperatorName(row) }}
                     </span>
                   </div>
@@ -1551,7 +1551,7 @@
                 </template>
                 <template #default="{ row }">
                   <span class="plain-update-count font-mono font-medium">
-                    {{ getUpdateCount(row) }} {{ $t('auditTimesUnit') }}
+                    {{ formatUiNumber(getUpdateCount(row), locale) }} {{ $t('auditTimesUnit') }}
                   </span>
                 </template>
               </el-table-column>
@@ -1641,7 +1641,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="!isVisitor && handleViewOperator(row)">
                       {{ getOperatorName(row) }}
                     </span>
                   </div>
@@ -1678,7 +1678,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="handleViewAdjudicator(row)">
+                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="!isVisitor && handleViewAdjudicator(row)">
                       {{ getAdjudicatorName(row) }}
                     </span>
                   </div>
@@ -1981,7 +1981,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="handleViewOperator(row)">
+                    <span class="operator-name-link font-medium" :title="getOperatorName(row)" @click.stop="!isVisitor && handleViewOperator(row)">
                       {{ getOperatorName(row) }}
                     </span>
                   </div>
@@ -2018,7 +2018,7 @@
                 </template>
                 <template #default="{ row }">
                   <div class="operator-cell">
-                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="handleViewAdjudicator(row)">
+                    <span class="operator-name-link font-medium" :title="getAdjudicatorName(row)" @click.stop="!isVisitor && handleViewAdjudicator(row)">
                       {{ getAdjudicatorName(row) }}
                     </span>
                   </div>
@@ -2174,6 +2174,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Icon } from '@iconify/vue';
 import loading from '@/components/loading/index.vue';
 import { tzDayjs } from '@/utils/day.js';
+import { formatUiDate, formatUiNumber } from '@/utils/ui-locale.js';
 import { useSettingStore } from '@/store/setting.js';
 import { useEmailStore } from '@/store/email.js';
 import { useUserStore } from '@/store/user.js';
@@ -2528,6 +2529,7 @@ function formatTicketNo(row) {
 }
 
 function getAlarmCount(row) {
+  if (isVisitor.value) return row?.alarmCount ?? row?.reportedByOthers ?? '—';
   if (!row) return 1;
   if (typeof row.alarmCount === 'number') return row.alarmCount;
   if (row.reportedByOthers && row.reportedByOthers > 0) return row.reportedByOthers;
@@ -2628,6 +2630,11 @@ function getDecisionAuthority(row) {
 }
 
 function formatTableTime(time) {
+  return formatUiDate(time, locale.value, {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'});
+}
+
+// Export dates retain the existing machine format, independent of UI language.
+function formatCsvTime(time) {
   if (!time) return '-';
   return tzDayjs(time).format('MM/DD/YY HH:mm');
 }
@@ -2658,7 +2665,7 @@ function getDefaultViolationLevel(row) {
                    row.clusterId ||
                    (row.reportedByOthers && row.reportedByOthers >= 3);
   if (isThreat) {
-    return { level: 'Threat', text: 'Threat · ' + t('auditLevelThreat'), type: 'danger' };
+    return { level: 'Threat', text: t('auditLevelThreat'), type: 'danger' };
   }
   return getViolationLevel(row);
 }
@@ -2760,7 +2767,7 @@ function getAppealDeadlockInfo(row) {
   // 0 及以下展示“已成死局” (标红)
   if (diffMs <= 0 || diffDays <= 0) {
     return {
-      text: t('auditDeadlocked') || '已成死局',
+      text: t('auditDeadlocked'),
       color: 'red',
       days: diffDays,
       fullTime,
@@ -2842,7 +2849,9 @@ function getRiskDeadlineInfo(row) {
   // 2. 截止期限：若手动延期处置则使用 row.deadline / row.expireTime，
   // 否则按“发现后 14 天内完成审计”基准计算
   let deadlineTime = null;
-  if (row.detailText && row.detailText.includes('[延期处置]') && (row.deadline || row.expireTime)) {
+  if (row.publicDeadline) {
+    deadlineTime = row.publicDeadline;
+  } else if (row.detailText && row.detailText.includes('[延期处置]') && (row.deadline || row.expireTime)) {
     deadlineTime = row.deadline || row.expireTime;
   } else if (baseTime) {
     deadlineTime = tzDayjs(baseTime).add(14, 'day').toISOString();
@@ -3460,7 +3469,7 @@ function formatAbuseActionSub(row) {
   const status = row.status;
   if (status === 'banned' || status === 'unbanned' || status === 'resolved') {
     const timeStr = row.resolvedTime || row.banTime || row.createTime;
-    const formatted = timeStr ? tzDayjs(timeStr).format('MM/DD HH:mm') : '-';
+    const formatted = formatTableTime(timeStr);
     return `${formatted} ${assignee}`;
   }
   return assignee;
@@ -3754,7 +3763,7 @@ async function handleBatchDelete() {
 
 function handleExportCsv() {
   if (!logs.value || logs.value.length === 0) {
-    ElMessage.info(t('auditEmptyLogs') || '无数据可导出');
+    ElMessage.info(t('auditEmptyLogs'));
     return;
   }
   const headers = [
@@ -3779,7 +3788,7 @@ function handleExportCsv() {
       `"${getAlarmCount(row)}${t('auditTimesUnit')}"`,
       `"${getStatusLabel(row.status)}"`,
       `"${getHandlingSuggestion(row).text}"`,
-      `"${formatTableTime(row.banTime || row.createTime)}"`,
+      `"${formatCsvTime(row.banTime || row.createTime)}"`,
       `"${getOperatorName(row)}"`,
       `"${getAdjudicatorName(row)}"`
     ];
@@ -3794,15 +3803,15 @@ function handleExportCsv() {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
-  ElMessage.success(t('copySuccessMsg') || '导出成功');
+  ElMessage.success(t('copySuccessMsg'));
 }
 
 function copyText(text) {
   if (!text) return;
   navigator.clipboard.writeText(text).then(() => {
-    ElMessage.success(t('copySuccessMsg') || '复制成功');
+    ElMessage.success(t('copySuccessMsg'));
   }).catch(() => {
-    ElMessage.success(t('copySuccessMsg') || '复制成功');
+    ElMessage.success(t('copySuccessMsg'));
   });
 }
 
@@ -3831,6 +3840,7 @@ function getOperatorAvatar(row) {
 function getOperatorName(row) {
   if (row?.operatorName) return row.operatorName;
   if (row?.operator) return row.operator;
+  if (isVisitor.value) return '—';
   return row?.status === 'banned' ? 'System Bot' : 'SecAdmin';
 }
 
@@ -3840,7 +3850,7 @@ function getOperatorRole(row) {
 }
 
 function getAdjudicatorName(row) {
-  if (!row) return 'SecAdmin';
+  if (!row) return isVisitor.value ? '—' : 'SecAdmin';
   if (row.adjudicatorName) return row.adjudicatorName;
   if (row.adjudicator) return row.adjudicator;
   // 大部分时候拍案管理就是负责人
@@ -3916,7 +3926,7 @@ async function handleOpenExtend(row) {
 
 async function handleBatchExtend() {
   if (!selectedRows.value.length) {
-    ElMessage.warning(t('auditBatchSelectRequired') || '请先勾选需要延期的工单');
+    ElMessage.warning(t('auditBatchSelectRequired'));
     return;
   }
   const extendableRows = selectedRows.value.filter(r => canExtendRow(r));
@@ -3950,7 +3960,7 @@ async function handleBatchExtend() {
             targetEmail: row.email,
             extendDays: days,
             expireTime: newExpire,
-            notes: `批量延期: ${days}d`
+            notes: `${t('auditBatchExtend')}: ${days}d`
           });
           row.expireTime = newExpire;
         } catch (err) {
@@ -4016,7 +4026,7 @@ async function handleOpenNote(row) {
         cancelButtonText: t('cancel'),
         inputType: 'textarea',
         inputValue: row.banReason || row.notes || '',
-        inputPlaceholder: t('auditDecisionNotesPlaceholder') || '请输入审核备注...'
+        inputPlaceholder: t('auditDecisionNotesPlaceholder')
       }
     );
     if (value !== undefined) {
@@ -4847,6 +4857,8 @@ onUnmounted(() => {
 
   .batch-actions-wrap {
     display: inline-flex;
+    flex-wrap: wrap;
+    min-width: 0;
     align-items: center;
     gap: 10px;
     margin-left: 8px;
@@ -4871,10 +4883,12 @@ onUnmounted(() => {
   white-space: nowrap;
 
   > span {
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-width: 0;
     line-height: 1.2;
     font-size: 13px;
-    flex-shrink: 0;
+    flex-shrink: 1;
   }
 
   :deep(.el-dropdown) {
@@ -5362,7 +5376,8 @@ onUnmounted(() => {
     .cell {
       padding-left: 2px !important;
       padding-right: 2px !important;
-      white-space: nowrap !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere;
       overflow: visible !important;
     }
   }

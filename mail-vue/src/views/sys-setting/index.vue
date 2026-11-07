@@ -13,8 +13,8 @@
               <div class="setting-item">
                 <div><span>{{ $t('websiteReg') }}</span></div>
                 <div>
-                  <el-switch @change="(val) => changeField('register', val)" :before-change="beforeChange" :active-value="0" :inactive-value="1"
-                             v-model="setting.register"/>
+                  <el-switch @change="(val) => changeField('register', val)" :before-change="beforeRegisterChange" :active-value="0" :inactive-value="1"
+                             :model-value="legalRegistrationReady ? setting.register : 1" :aria-label="$t('websiteReg')"/>
                 </div>
               </div>
               <div class="setting-item">
@@ -47,7 +47,7 @@
                       @change="(val) => changeMailMode(val)"
                       :style="{ width: mailModeFixedSelectWidth, '--mail-mode-fs': mailModeFontSize }"
                       v-model="setting.allMailMode"
-                      placeholder="Select"
+                      :placeholder="$t('select')"
                       size="small"
                       class="mail-mode-select"
                       popper-class="mail-mode-popper"
@@ -90,9 +90,10 @@
                 <div>
                   <el-select
                       @change="(val) => changeField('regKey', val)"
-                      :style="`width: ${ locale === 'en' ?  100 : 80 }px;`"
+                      :style="{ width: regKeySelectWidth }"
+                      class="reg-key-select"
                       v-model="setting.regKey"
-                      placeholder="Select"
+                      :placeholder="$t('select')"
                       size="small"
                   >
                     <el-option
@@ -140,6 +141,41 @@
               </div>
             </div>
           </div>
+
+          <details class="settings-card legal-notice-card" :open="legalSettingsExpanded" @toggle="legalSettingsExpanded = $event.target.open">
+            <summary class="card-title">
+              <span>{{ $t('legalNotice.adminTitle') }}</span>
+              <el-tag size="small" :type="legalRegistrationReady ? 'info' : 'warning'">
+                {{ $t(legalRegistrationReady ? 'legalNotice.adminReady' : 'legalNotice.adminIncomplete') }}
+              </el-tag>
+            </summary>
+            <div class="card-content">
+              <p class="legal-settings-hint">{{ $t('legalNotice.adminIntro') }}</p>
+              <el-form :model="legalSettingsForm" label-position="top" :disabled="settingLoading || !settingReady" @submit.prevent="saveLegalSettings">
+                <div class="legal-form-grid">
+                  <el-form-item v-for="field in legalSettingsFields" :key="field.key" :label="$t(`legalNotice.${field.label}`)" :required="field.required" :prop="field.key" :class="{ 'legal-field-wide': field.key === 'contactAddress' }">
+                    <el-input v-model="legalSettingsForm[field.key]" :type="field.key === 'contactAddress' ? 'textarea' : 'text'" :maxlength="field.max" :rows="2" />
+                    <p v-if="field.key === 'contactAddress'" class="legal-settings-hint">{{ $t('legalNotice.adminAddressHint') }}</p>
+                  </el-form-item>
+                </div>
+                <p class="legal-settings-hint">{{ $t('legalNotice.adminRequiredHint') }}</p>
+                <h3 class="legal-processing-title">{{ $t('legalNotice.adminProcessingTitle') }}</h3>
+                <el-form-item :label="$t('legalNotice.adminNoticeUrl')">
+                  <el-input v-model="legalSettingsForm.contentProcessing.noticeUrl" maxlength="2048" />
+                  <p class="legal-settings-hint">{{ $t('legalNotice.adminNoticeHint') }}</p>
+                </el-form-item>
+                <div v-for="field in contentProcessingFields" :key="field.key" class="legal-processing-row">
+                  <label :for="`legal-${field.key}`">{{ $t(`legalNotice.${field.label}`) }}<span v-if="field.unavailable" id="legal-public-fallback-unavailable" class="legal-settings-hint"> · {{ $t('legalNotice.adminPublicFallbackUnavailable') }}</span></label>
+                  <el-switch :id="`legal-${field.key}`" :model-value="field.unavailable ? false : legalSettingsForm.contentProcessing[field.key]" :aria-label="$t(`legalNotice.${field.label}`)" :aria-describedby="field.unavailable ? 'legal-public-fallback-unavailable' : undefined" :disabled="field.unavailable || (!legalSettingsForm.contentProcessing[field.key] && !canEnableContentProcessing(legalSettingsForm.contentProcessing, field.key))" @change="value => changeContentProcessing(field.key, value)" />
+                </div>
+                <p class="legal-settings-hint">{{ $t('legalNotice.adminProcessingHint') }}</p>
+                <p class="legal-settings-hint">{{ $t('legalNotice.adminTranslationHint') }}</p>
+                <div class="legal-settings-actions">
+                  <el-button type="primary" :loading="settingLoading" @click="saveLegalSettings">{{ $t('save') }}</el-button>
+                </div>
+              </el-form>
+            </div>
+          </details>
 
           <!-- Personalization Settings Card -->
           <div class="settings-card customization-card">
@@ -753,9 +789,9 @@
                   </el-button>
                   <el-select
                       @change="change"
-                      :style="`width: ${ locale === 'en' ? 100 : 80 }px;`"
+                      :style="{ width: verificationSelectWidth }"
                       v-model="setting.registerVerify"
-                      placeholder="Select"
+                      :placeholder="$t('select')"
                       class="bot-verify-select"
                   >
                     <el-option key="1" :value="0" :label="$t('enable')"/>
@@ -777,9 +813,9 @@
                   </el-button>
                   <el-select
                       @change="change"
-                      :style="`width: ${ locale === 'en' ? 100 : 80 }px;`"
+                      :style="{ width: verificationSelectWidth }"
                       v-model="setting.addEmailVerify"
-                      placeholder="Select"
+                      :placeholder="$t('select')"
                       class="bot-verify-select"
                   >
                     <el-option key="1" :value="0" :label="$t('enable')"/>
@@ -790,7 +826,7 @@
               </div>
               <div class="setting-item">
                 <div class="title-item">
-                  <span>Site Key</span>
+                  <span>{{ $t('turnstileSiteKey') }}</span>
                   <el-tooltip effect="dark" :content="$t('turnstileKeyTooltip')">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
@@ -804,7 +840,7 @@
               </div>
               <div class="setting-item">
                 <div class="title-item">
-                  <span>Secret Key</span>
+                  <span>{{ $t('turnstileSecretKey') }}</span>
                   <el-tooltip effect="dark" :content="$t('turnstileKeyTooltip')">
                     <Icon class="warning" icon="fe:warning" width="18" height="18"/>
                   </el-tooltip>
@@ -1237,7 +1273,7 @@
                 <div class="hud-corner-bracket red top-right"></div>
                 <div class="hud-corner-bracket red bottom-left"></div>
                 <div class="hud-corner-bracket red bottom-right"></div>
-                <div class="center-warning-banner">W A R N I N G</div>
+                <div class="center-warning-banner">{{ $t('warning') }}</div>
                 <div class="preview-toast-item toast-red" :style="getPreviewToastStyle()">
                   <Icon icon="lucide:alert-triangle" width="18" />
                   <span>{{ getPreviewToastText() }}</span>
@@ -1274,8 +1310,8 @@
       <el-dialog v-model="turnstileShow" :title="$t('addTurnstileSecret')" width="340"
                  @closed="turnstileForm.secretKey = '';turnstileForm.siteKey = ''">
         <form>
-          <el-input type="text" placeholder="Site Key" v-model="turnstileForm.siteKey"/>
-          <el-input type="text" style="margin-top: 15px" placeholder="Secret Key" v-model="turnstileForm.secretKey"/>
+          <el-input type="text" :placeholder="$t('turnstileSiteKey')" v-model="turnstileForm.siteKey"/>
+          <el-input type="text" style="margin-top: 15px" :placeholder="$t('turnstileSecretKey')" v-model="turnstileForm.secretKey"/>
           <el-button type="primary" :loading="settingLoading" @click="saveTurnstileKey">{{ $t('save') }}</el-button>
         </form>
       </el-dialog>
@@ -1626,11 +1662,11 @@
               <template #prefix>
                 <span style="margin-right: 10px">{{ $t('icon') }}</span>
               </template>
-              <el-option key="none" label="None" value="none"/>
-              <el-option key="primary" label="Primary" value="primary"/>
-              <el-option key="success" label="Success" value="success"/>
-              <el-option key="warning" label="Warning" value="warning"/>
-              <el-option key="info" label="Info" value="info"/>
+              <el-option key="none" :label="$t('noticeTypeNone')" value="none"/>
+              <el-option key="primary" :label="$t('noticeTypePrimary')" value="primary"/>
+              <el-option key="success" :label="$t('successful')" value="success"/>
+              <el-option key="warning" :label="$t('warning')" value="warning"/>
+              <el-option key="info" :label="$t('noticeTypeInfo')" value="info"/>
             </el-select>
             <el-select v-model="noticeForm.noticePosition">
               <template #prefix>
@@ -3454,7 +3490,7 @@
             <template v-if="activeOauthProviderKey === 'custom'">
               <div class="grid-field">
                 <div class="field-label">{{ $t('oauthCustomName') }} <span class="required-star">*</span></div>
-                <el-input v-model="oauthForm.name" placeholder="e.g. Enterprise SSO" clearable />
+                <el-input v-model="oauthForm.name" :placeholder="$t('oauthCustomName')" clearable />
               </div>
               <div class="grid-field">
                 <div class="field-label">{{ $t('oauthScope') }}</div>
@@ -3467,7 +3503,7 @@
               <div class="field-label">
                 {{ $t('oauthClientId') }} <span class="required-star">*</span>
               </div>
-              <el-input v-model="oauthForm.clientId" placeholder="Client ID / App ID" clearable />
+              <el-input v-model="oauthForm.clientId" :placeholder="$t('oauthClientId')" clearable />
             </div>
 
             <!-- Client Secret (All Providers) -->
@@ -3475,7 +3511,7 @@
               <div class="field-label">
                 {{ $t('oauthClientSecret') }} <span v-if="activeOauthProviderKey !== 'apple'" class="required-star">*</span>
               </div>
-              <el-input v-model="oauthForm.clientSecret" type="password" show-password placeholder="Client Secret / App Secret" clearable />
+              <el-input v-model="oauthForm.clientSecret" type="password" show-password :placeholder="$t('oauthClientSecret')" clearable />
             </div>
 
             <!-- Microsoft: Tenant & Scope -->
@@ -3494,11 +3530,11 @@
             <template v-if="activeOauthProviderKey === 'apple'">
               <div class="grid-field">
                 <div class="field-label">{{ $t('oauthTeamId') }} <span class="required-star">*</span></div>
-                <el-input v-model="oauthForm.teamId" placeholder="10-character Team ID" clearable />
+                <el-input v-model="oauthForm.teamId" :placeholder="$t('oauthTeamId')" clearable />
               </div>
               <div class="grid-field">
                 <div class="field-label">{{ $t('oauthKeyId') }} <span class="required-star">*</span></div>
-                <el-input v-model="oauthForm.keyId" placeholder="10-character Key ID" clearable />
+                <el-input v-model="oauthForm.keyId" :placeholder="$t('oauthKeyId')" clearable />
               </div>
             </template>
 
@@ -3685,6 +3721,132 @@ const showResendList = ref(false)
 const settingStore = useSettingStore();
 const uiStore = useUiStore();
 const {settings: setting} = storeToRefs(settingStore);
+const legalSettingsExpanded = ref(false)
+const legalSettingsFields = [
+  { key: 'operatorName', label: 'adminOperatorName', required: true, max: 200 },
+  { key: 'operatorCountry', label: 'adminOperatorCountry', required: true, max: 120 },
+  { key: 'contactEmail', label: 'adminContactEmail', required: true, max: 320 },
+  { key: 'policyVersion', label: 'adminPolicyVersion', required: true, max: 120 },
+  { key: 'contactAddress', label: 'adminContactAddress', required: false, max: 500 },
+  { key: 'termsUrl', label: 'adminTermsUrl', required: true, max: 2048 },
+  { key: 'privacyUrl', label: 'adminPrivacyUrl', required: true, max: 2048 },
+  { key: 'recipientsUrl', label: 'adminRecipientsUrl', required: false, max: 2048 },
+  { key: 'retentionUrl', label: 'adminRetentionUrl', required: false, max: 2048 }
+]
+const contentProcessingFields = [
+  { key: 'verificationCodeEnabled', label: 'adminVerificationCode' },
+  { key: 'translationEnabled', label: 'adminTranslation' },
+  { key: 'ocrEnabled', label: 'adminOcr' },
+  { key: 'publicTranslationFallbackEnabled', label: 'adminPublicFallback', unavailable: true }
+]
+const legalSettingsForm = reactive({
+  ...Object.fromEntries(legalSettingsFields.map(field => [field.key, ''])),
+  contentProcessing: readContentProcessing({})
+})
+const legalRegistrationReady = computed(() => isLegalRegistrationReady(setting.value))
+
+function isLegalHttpsUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isLegalRegistrationReady(source = {}) {
+  const value = key => typeof source?.[key] === 'string' ? source[key].trim() : '';
+  return ['operatorName', 'operatorCountry', 'policyVersion'].every(key => Boolean(value(key)))
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value('contactEmail'))
+    && isLegalHttpsUrl(value('termsUrl')) && isLegalHttpsUrl(value('privacyUrl'));
+}
+
+function readContentProcessing(value) {
+  let source = value;
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source); } catch (_) { source = {}; }
+  }
+  if (!source || typeof source !== 'object' || Array.isArray(source)) source = {};
+  return {
+    verificationCodeEnabled: source.verificationCodeEnabled === true,
+    translationEnabled: source.translationEnabled === true,
+    ocrEnabled: source.ocrEnabled === true,
+    publicTranslationFallbackEnabled: false,
+    noticeUrl: typeof source.noticeUrl === 'string' ? source.noticeUrl : ''
+  };
+}
+
+function canEnableContentProcessing(source, key) {
+  if (key === 'publicTranslationFallbackEnabled') return false;
+  if (!isLegalHttpsUrl(source?.noticeUrl)) return false;
+  return key !== 'ocrEnabled' || source.translationEnabled === true;
+}
+
+function changeContentProcessing(key, enabled) {
+  const processing = legalSettingsForm.contentProcessing;
+  if (key === 'publicTranslationFallbackEnabled') {
+    processing.publicTranslationFallbackEnabled = false;
+    return;
+  }
+  if (enabled && !canEnableContentProcessing(processing, key)) return;
+  processing[key] = enabled === true;
+  if (key === 'translationEnabled' && !enabled) {
+    processing.ocrEnabled = false;
+    processing.publicTranslationFallbackEnabled = false;
+  }
+}
+
+function resetLegalSettingsForm(source = {}) {
+  for (const field of legalSettingsFields) {
+    legalSettingsForm[field.key] = typeof source[field.key] === 'string' ? source[field.key] : '';
+  }
+  legalSettingsForm.contentProcessing = readContentProcessing(source.contentProcessing);
+}
+
+function createLegalSettingsPayload(source) {
+  const payload = Object.fromEntries(legalSettingsFields.map(field => [field.key,
+    typeof source?.[field.key] === 'string' ? source[field.key].trim().slice(0, field.max) : ''
+  ]));
+  const content = readContentProcessing(source?.contentProcessing);
+  content.noticeUrl = content.noticeUrl.trim();
+  if (!content.translationEnabled) {
+    content.ocrEnabled = false;
+    content.publicTranslationFallbackEnabled = false;
+  }
+  return { ...payload, contentProcessing: content };
+}
+
+function legalSettingsError(payload) {
+  if (payload.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.contactEmail)) return 'adminInvalidEmail';
+  if (['termsUrl', 'privacyUrl', 'recipientsUrl', 'retentionUrl'].some(key => payload[key] && !isLegalHttpsUrl(payload[key]))) return 'adminInvalidUrl';
+  const content = payload.contentProcessing;
+  if (content.noticeUrl && !isLegalHttpsUrl(content.noticeUrl)) return 'adminInvalidUrl';
+  if (contentProcessingFields.some(field => content[field.key]) && !isLegalHttpsUrl(content.noticeUrl)) return 'adminNoticeRequired';
+  return '';
+}
+
+function saveLegalSettings() {
+  if (settingLoading.value || !settingReady.value) return;
+  const payload = createLegalSettingsPayload(legalSettingsForm);
+  const error = legalSettingsError(payload);
+  if (error) {
+    ElMessage.warning(t(`legalNotice.${error}`));
+    return;
+  }
+  if (!isLegalRegistrationReady(payload)) payload.register = 1;
+  editSetting(payload);
+}
+
+function beforeRegisterChange() {
+  if (!legalRegistrationReady.value) {
+    legalSettingsExpanded.value = true;
+    ElMessage.info(t('legalNotice.adminRequiredHint'));
+    return false;
+  }
+  return beforeChange();
+}
+
 const activeUiTab = ref('dynamic')
 const OAUTH_PROVIDERS_LIST = [
   { key: 'github', label: 'GitHub', icon: 'mdi:github' },
@@ -4370,7 +4532,7 @@ const saveAiHubConfig = (closeDialog = true) => {
   if (isCustom && modelsToTest.length === 0) {
     ElMessage({
       type: 'warning',
-      message: '请选择或键入至少一个主推理模型或模型池模型',
+      message: t('aiModelSelectionRequired'),
       plain: true
     })
     return
@@ -4648,10 +4810,13 @@ const tgMsgFrom = ref('')
 const tgMsgTo = ref('')
 const tgMsgText = ref('')
 
-const tgMsgFromOption = [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}, {label: t('onlyName'), value:'only-name'}]
-const tgMsgToOption = [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}]
-const tgMsgTextOption = [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}]
-const tgMsgLabelWidth = computed(() => locale.value === 'en' ? '120px' : '100px');
+const tgMsgFromOption = computed(() => [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}, {label: t('onlyName'), value:'only-name'}])
+const tgMsgToOption = computed(() => [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}])
+const tgMsgTextOption = computed(() => [{label: t('show'), value: 'show'}, {label: t('hide'), value: 'hide'}])
+
+// Measure all options, so changing the selection never changes the control width.
+const regKeySelectWidth = computed(() => `${Math.ceil(Math.max(96, ...regKeyOptions.value.map(item => getTextWidth(item.label, '13px sans-serif') + 40)))}px`);
+const verificationSelectWidth = computed(() => `${Math.ceil(Math.max(96, ...['enable', 'disable', 'rulesVerify'].map(key => getTextWidth(t(key), '14px sans-serif') + 40)))}px`);
 
 const mailModeOptions = computed(() => [
   { value: 1, label: `${t('allMailMode')} (Level 1)` },
@@ -4659,24 +4824,9 @@ const mailModeOptions = computed(() => [
   { value: 2, label: `${t('encryptedMailMode')} (Level 3 [E2EE])` }
 ]);
 
-// 固定尺寸：宽度由语言决定且不随选中内容变化，杜绝容器抖动变形
-const mailModeFixedSelectWidth = computed(() => {
-  return locale.value === 'en' ? '260px' : '210px';
-});
-
-// 字体大小自适应：通过微调字体大小兼容不同文字长度的最小变化，确保在固定容器中零截断且无过大空白
-const mailModeFontSize = computed(() => {
-  const m = Number(setting.value?.allMailMode);
-  const isEn = locale.value === 'en';
-  if (isEn) {
-    if (m === 1) return '12.5px';
-    if (m === 2) return '11.5px';
-    return '11px';
-  }
-  // 中文环境下：短文本使用 13.5px 饱满居中，较长文本使用 12px 严密贴合
-  if (m === 1) return '13.5px';
-  return '12px';
-});
+// Use the longest translated option, with a narrow-screen CSS cap.
+const mailModeFixedSelectWidth = computed(() => `${Math.ceil(Math.max(210, ...mailModeOptions.value.map(item => getTextWidth(item.label, '12px sans-serif') + 40)))}px`);
+const mailModeFontSize = '12px';
 
 const currentMailModeSecurityBadge = computed(() => {
   const m = Number(setting.value?.allMailMode);
@@ -4866,6 +5016,7 @@ function getSettings() {
     settingData.aiMaxTokens = settingData.aiMaxTokens !== undefined && settingData.aiMaxTokens !== null ? Number(settingData.aiMaxTokens) : 2048
     settingData.aiAdminOnly = settingData.aiAdminOnly !== undefined && settingData.aiAdminOnly !== null ? Number(settingData.aiAdminOnly) : 0
     setting.value = settingData
+    resetLegalSettingsForm(settingData)
     settingStore.domainList = settingData.domainList || []
     settingStore.settings = { ...settingStore.settings, ...settingData }
     resendTokenForm.domain = setting.value.domainList?.[0] || ''
@@ -6308,25 +6459,16 @@ function getScenarioLabel() {
 
 function getScenarioPlaceholder() {
   const lang = currentEditingLang.value || 'zh'
-  const placeholders = {
-    zh: {
-      loginSuccess: '成功连结节点',
-      registerSuccess: '节点创建成功',
-      invalidCredentials: '填写的坐标不存在',
-      passwordMismatch: '请确认前后坐标一致',
-      noLandingNodes: '当前没有可着陆的节点',
-      noNewNodes: '当前没有可以探索的新节点，请联系舰长改变航道'
-    },
-    en: {
-      loginSuccess: 'Node Link Established',
-      registerSuccess: 'Node Successfully Created',
-      invalidCredentials: 'Specified coordinates do not exist',
-      passwordMismatch: 'Please ensure coordinates match',
-      noLandingNodes: 'No landing nodes available',
-      noNewNodes: 'No new nodes to explore, please contact the captain'
-    }
+  const keys = {
+    loginSuccess: 'authPlaceholderLoginSuccess',
+    registerSuccess: 'authPlaceholderRegisterSuccess',
+    invalidCredentials: 'authPlaceholderInvalidCredentials',
+    passwordMismatch: 'authPlaceholderPasswordMismatch',
+    noLandingNodes: 'authPlaceholderNoLandingNodes',
+    noNewNodes: 'noNewNodesPlaceholder'
   }
-  return placeholders[lang]?.[selectedScenario.value] || ''
+  const key = keys[selectedScenario.value]
+  return key && ['zh', 'en'].includes(lang) ? t(key, {}, { locale: lang }) : ''
 }
 
 function getPreviewToastText() {
@@ -6489,6 +6631,45 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
 </script>
 
 <style scoped lang="scss">
+.legal-notice-card {
+  align-self: start;
+
+  summary {
+    cursor: pointer;
+    flex-wrap: wrap;
+    list-style: none;
+
+    &::-webkit-details-marker { display: none; }
+    &::before { content: '+'; font-weight: normal; }
+  }
+  &[open] summary::before { content: '−'; }
+  .legal-settings-hint {
+    margin: 4px 0 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--el-text-color-secondary);
+  }
+  .legal-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 12px;
+
+    @media (max-width: 600px) { grid-template-columns: 1fr; }
+  }
+  .legal-field-wide { grid-column: 1 / -1; }
+  .legal-processing-title { margin: 10px 0 12px; font-size: 14px; }
+  .legal-processing-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+
+    label { line-height: 1.5; }
+  }
+  .legal-settings-actions { display: flex; justify-content: end; margin-top: 12px; }
+}
+
 .settings-container {
   height: 100%;
   overflow: hidden;
@@ -6538,11 +6719,11 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
 .card-grid {
 
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
   padding: 20px;
   gap: 20px;
   @media (max-width: 500px) {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
   @media (max-width: 1023px) {
     gap: 15px;
@@ -6567,6 +6748,11 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   flex-direction: column;
 }
 
+.bot-verify-select,
+.reg-key-select {
+  max-width: 100%;
+}
+
 .bot-verify-select {
   margin-left: 10px;
 }
@@ -6588,6 +6774,11 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   display: flex;
   align-items: center;
   gap: 8px;
+  overflow-wrap: anywhere;
+
+  > .iconify {
+    flex-shrink: 0;
+  }
 }
 
 .oauth-sso-card {
@@ -6750,9 +6941,7 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
   cursor: help;
 }
 
-/* Unify control heights: el-select defaulted to 38px, taller than the 28px switches around it.
-   In English the mail-mode row needs 469px against 422px of card width, so the group wraps to a
-   second line instead of running off the card edge where overflow:hidden would clip the select. */
+/* Wrap translated labels while keeping configuration controls at stable widths. */
 .website-card {
   .setting-item {
     display: flex;
@@ -6855,7 +7044,7 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
 
 .setting-item {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   font-weight: normal;
 
@@ -6863,21 +7052,43 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
     display: flex;
     align-items: center;
     gap: 5px;
-    white-space: nowrap;
-    flex-shrink: 0;
-    min-width: max-content;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-width: 0;
+    max-width: 100%;
+
+    > .iconify {
+      flex-shrink: 0;
+    }
   }
 
   > div:last-child {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     justify-items: flex-end;
+    min-width: 0;
+    max-width: 100%;
     font-weight: normal;
+
+    > .el-button,
+    > .el-switch,
+    > .el-input-number {
+      flex-shrink: 0;
+    }
   }
 }
 
-.mail-mode-select {
+.mail-mode-select,
+.reg-key-select,
+.bot-verify-select {
   max-width: 100%;
+
+  :deep(.el-select__selected-item),
+  :deep(.el-select__placeholder) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+  }
 }
 
 .mail-mode-select :deep(.el-select__selected-item),
@@ -6893,13 +7104,21 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
 
 :deep(.mail-mode-popper),
 .mail-mode-popper {
-  min-width: max-content !important;
-  width: max-content !important;
+  min-width: 0 !important;
+  max-width: calc(100vw - 24px) !important;
 }
 
 :deep(.mail-mode-popper) .el-select-dropdown__item,
 .mail-mode-popper .el-select-dropdown__item {
   font-size: 13px !important;
+  height: auto;
+  min-height: 34px;
+  max-width: calc(100vw - 24px);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 .r2domain-item {
@@ -6953,11 +7172,13 @@ function editSetting(settingForm, refreshStatus = true, closeAiDialog = false) {
 .notice-line-item {
   margin-top: 15px;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 15px;
 
   > * {
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
 
   @media (max-width: 840px) {
@@ -7735,7 +7956,7 @@ form .el-button {
 
 .prompt-param-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   padding: 10px 14px;
   background: var(--el-fill-color-lighter);
@@ -7935,15 +8156,18 @@ form .el-button {
     transform: translate(-50%, -50%);
     font-size: 20px;
     font-weight: 800;
-    letter-spacing: 0.35em;
+    letter-spacing: 0.08em;
     color: #ef4444;
     background: rgba(127, 29, 29, 0.4);
-    padding: 6px 28px;
+    padding: 6px 16px;
     border-top: 1px solid #ef4444;
     border-bottom: 1px solid #ef4444;
     opacity: 0.85;
     pointer-events: none;
-    white-space: nowrap;
+    max-width: calc(100% - 24px);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
   }
 }
 

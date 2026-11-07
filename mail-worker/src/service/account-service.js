@@ -1,6 +1,6 @@
 import BizError from '../error/biz-error';
 import verifyUtils from '../utils/verify-utils';
-import emailUtils from '../utils/email-utils';
+import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES } from '../utils/email-utils';
 import userService from './user-service';
 import emailService from './email-service';
 import { mailOrm as orm } from '../entity/orm';
@@ -53,6 +53,11 @@ const accountService = {
 		const adminName = c.env.admin ? emailUtils.getName(c.env.admin) : '';
 		const userRow = await userService.selectById(c, userId);
 		if (adminName && localName.toLowerCase() === adminName.toLowerCase() && userRow?.email !== c.env.admin) {
+			throw new BizError(t('adminReserved'));
+		}
+
+		// RFC 2142 合规保留地址：别名创建同样不得占用官方身份地址
+		if (RESERVED_EMAIL_LOCAL_NAMES.has(localName.toLowerCase())) {
 			throw new BizError(t('adminReserved'));
 		}
 
@@ -148,6 +153,9 @@ const accountService = {
 		size = Number(size);
 		lastSort = Number(lastSort);
 
+		if (!Number.isInteger(size) || size < 1) {
+			size = 20;
+		}
 		if (size > 30) {
 			size = 30;
 		}
@@ -250,11 +258,41 @@ const accountService = {
 	},
 
 	async setName(c, params, userId) {
-		const { name, accountId } = params
-		if (name.length > 30) {
+		const { name, accountId } = params;
+		const cleanName = typeof name === 'string' ? name.trim() : '';
+		if (!cleanName) {
+			throw new BizError('名称不能为空', 400);
+		}
+		if (cleanName.length > 30) {
 			throw new BizError(t('usernameLengthLimit'));
 		}
-		await orm(c).update(account).set({name}).where(and(eq(account.userId, userId),eq(account.accountId, accountId))).run();
+		const userRow = await userService.selectById(c, userId);
+		if (!userRow) {
+			throw new BizError(t('notExistUser'), 404);
+		}
+		const roleRow = await roleService.selectById(c, userRow.type);
+		if (roleRow?.roleCode === 'visitor') {
+			throw new BizError('【参观者模式】仅提供只读体验，不支持修改账号名称', 403, 'visitor_readonly');
+		}
+		const lowerName = cleanName.toLowerCase();
+		const adminLocal = c?.env?.admin ? emailUtils.getName(c.env.admin).toLowerCase() : 'admin';
+		if ((lowerName === 'admin' || (adminLocal && lowerName === adminLocal)) && userRow.email !== c?.env?.admin) {
+			throw new BizError(t('adminReserved'), 403);
+		}
+		const existingByName = await this.selectByNameIncludeDel(c, cleanName);
+		if (existingByName && Number(existingByName.userId) !== Number(userId)) {
+			throw new BizError(t('isRegAccount'), 409);
+		}
+		const existingByPrefix = await orm(c).select({ userId: account.userId }).from(account).where(
+			and(
+				sql`lower(${account.email}) LIKE ${lowerName + '@%'}`,
+				ne(account.userId, userId)
+			)
+		).limit(1).get();
+		if (existingByPrefix) {
+			throw new BizError(t('isRegAccount'), 409);
+		}
+		await orm(c).update(account).set({ name: cleanName }).where(and(eq(account.userId, userId), eq(account.accountId, accountId))).run();
 	},
 
 	async allAccount(c, params) {
@@ -266,10 +304,16 @@ const accountService = {
 		num = Number(num)
 		size = Number(size)
 
+		if (!Number.isInteger(size) || size < 1) {
+			size = 20;
+		}
 		if (size > 30) {
 			size = 30;
 		}
 
+		if (!Number.isInteger(num) || num < 1) {
+			num = 1;
+		}
 		num = (num - 1) * size;
 
 		const userRow = await userService.selectByIdIncludeDel(c, userId);

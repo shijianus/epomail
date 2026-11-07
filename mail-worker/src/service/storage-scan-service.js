@@ -275,6 +275,25 @@ const storageScanService = {
 			if (batch.length < 1000) break;
 		}
 
+		// Recovery MIME objects live under attachments/ but are referenced by the
+		// claim row, not by an attachments row. Including them here prevents the
+		// orphan scanner from deleting a live 7-day recovery copy. Page by rowid
+		// so a busy instance with more than 5,000 claims cannot hide live objects.
+		try {
+			let after = 0;
+			while (true) {
+				const claims = await mailDb.prepare(`SELECT rowid AS claim_rowid, raw_object_key AS key
+					FROM mail_receive_claim
+					WHERE raw_object_key <> '' AND rowid > ?
+					ORDER BY rowid LIMIT 1000`).bind(after).all();
+				const batch = claims.results || [];
+				if (batch.length === 0) break;
+				for (const row of batch) keys.add(row.key);
+				after = batch[batch.length - 1].claim_rowid;
+				if (batch.length < 1000) break;
+			}
+		} catch (_) {}
+
 		return keys;
 	},
 
@@ -352,6 +371,11 @@ const storageScanService = {
 				referenced = await mailDb.prepare(
 					`SELECT 1 AS present FROM attachments WHERE key = ? LIMIT 1`
 				).bind(obj.key).first();
+				if (!referenced) {
+					referenced = await mailDb.prepare(
+						`SELECT 1 AS present FROM mail_receive_claim WHERE raw_object_key = ? LIMIT 1`
+					).bind(obj.key).first();
+				}
 			} catch (e) {
 				skipped++;
 				continue;

@@ -1,4 +1,5 @@
 const fr = {
+    forwardingNotSupported: 'Choisissez tous les e-mails ou indiquez un préfixe d’alias non vide, et conservez l’original ; les règles intelligentes et la suppression après transfert ne sont pas disponibles.',
     dynamicUi: 'Interface dynamique',
     staticUi: 'Interface statique',
     dynamicUiDesc: 'S\'applique à l\'interface dynamique de particules par défaut',
@@ -1914,6 +1915,12 @@ const fr = {
     updateTotpBtn: "Mettre à jour l'authentificateur",
     deleteTotpBtn: "Désactiver l'authentificateur",
     passkeyNotFound: "Clé d'accès spécifiée introuvable",
+
+    privacyProcessing: {
+        disabled: 'Le traitement facultatif du contenu est désactivé ou sa page d’information publique est indisponible.',
+        confirmationRequired: 'Confirmez que vous avez consulté l’information actuelle sur le traitement du contenu avant de traduire.',
+        noticeChanged: 'L’information sur le traitement du contenu a changé. Consultez-la puis réessayez.'
+    },
 
     // ===== 权限树本地化（perm-service.tree：按钮按 perm_key，分组按库内名称）=====
     perms: {

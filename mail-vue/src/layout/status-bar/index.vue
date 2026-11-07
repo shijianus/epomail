@@ -2,9 +2,9 @@
   <div class="status-bar">
     <div class="status-dot" :class="{'offline': !isOnline}"></div>
     <div class="status-text">
-      {{ isOnline ? ($t('connected') || 'Connected') : ($t('disconnected') || 'Disconnected') }} 
+      {{ isOnline ? $t('connected') : $t('disconnected') }}
       <span class="status-time" v-if="isOnline">{{ syncTimeText }}</span>
-      <span class="status-unread" v-if="isOnline && unreadCount > 0"> ({{ unreadCount }} {{ $t('statUnread') || 'Unread' }})</span>
+      <span class="status-unread" v-if="isOnline && unreadCount > 0"> ({{ unreadCount }} {{ $t('statUnread') }})</span>
     </div>
     <div style="flex: 1"></div>
     <el-tooltip effect="dark" :content="currentMailModeConfig.desc" placement="top">
@@ -34,7 +34,7 @@ import { useI18n } from 'vue-i18n';
 import { Icon } from '@iconify/vue';
 import { EmailUnreadEnum } from '@/enums/email-enum.js';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const settingStore = useSettingStore();
@@ -90,19 +90,19 @@ const handleOnlineStatus = () => {
   isOnline.value = navigator.onLine;
 };
 
-const syncTimeText = ref(t('syncedJustNow') || 'Synced just now');
+const syncTimeText = ref(t('syncedJustNow'));
 let timer = null;
 
 const updateSyncTimeText = () => {
   if (uiStore.lastSyncTime) {
     const diff = Date.now() - uiStore.lastSyncTime;
     if (diff < 60000) {
-      syncTimeText.value = t('syncedJustNow') || 'Synced just now';
+      syncTimeText.value = t('syncedJustNow');
     } else {
       syncTimeText.value = fromNow(uiStore.lastSyncTime);
     }
   } else {
-    syncTimeText.value = t('syncedJustNow') || 'Synced just now';
+    syncTimeText.value = t('syncedJustNow');
   }
 };
 
@@ -119,9 +119,7 @@ onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
 
-watch(() => uiStore.lastSyncTime, () => {
-  updateSyncTimeText();
-});
+watch([() => uiStore.lastSyncTime, locale], updateSyncTimeText);
 
 const unreadCount = computed(() => {
   const list = emailStore.emailScroll?.emailList || [];

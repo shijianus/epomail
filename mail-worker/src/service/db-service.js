@@ -5,7 +5,7 @@ import userEntity from '../entity/user';
 import accountEntity from '../entity/account';
 import emailEntity from '../entity/email';
 import attEntity from '../entity/att';
-import { isSafePublicUrl } from '../utils/url-utils';
+import { isSafePublicUrl, assertSafePublicUrl } from '../utils/url-utils';
 
 const dbService = {
 	/**
@@ -29,33 +29,30 @@ const dbService = {
 			mode = 'dual';
 		}
 
-		// Query live table statistics safely
-		let stats = {
-			userCount: 0,
-			accountCount: 0,
-			emailCount: 0,
-			attCount: 0
+		// Query live table statistics safely. COUNT(*) keeps this endpoint from
+		// materialising entire tables (a visitor-readable DoS on large instances).
+		const countRows = async (db, table) => {
+			try {
+				const row = await db.prepare(`SELECT COUNT(*) AS total FROM ${table}`).first();
+				const total = Number(row?.total);
+				return Number.isSafeInteger(total) && total >= 0 ? total : null;
+			} catch (_) {
+				return null;
+			}
 		};
-
-		try {
-			const uCountRes = await userOrm(c).select().from(userEntity).all().catch(() => []);
-			stats.userCount = Array.isArray(uCountRes) ? uCountRes.length : 0;
-		} catch (e) {}
-
-		try {
-			const accCountRes = await mailOrm(c).select().from(accountEntity).all().catch(() => []);
-			stats.accountCount = Array.isArray(accCountRes) ? accCountRes.length : 0;
-		} catch (e) {}
-
-		try {
-			const emailCountRes = await mailOrm(c).select().from(emailEntity).all().catch(() => []);
-			stats.emailCount = Array.isArray(emailCountRes) ? emailCountRes.length : 0;
-		} catch (e) {}
-
-		try {
-			const attCountRes = await mailOrm(c).select().from(attEntity).all().catch(() => []);
-			stats.attCount = Array.isArray(attCountRes) ? attCountRes.length : 0;
-		} catch (e) {}
+		const userCount = await countRows(getUserDb(c), 'user');
+		const accountCount = await countRows(getMailDb(c), 'account');
+		const emailCount = await countRows(getMailDb(c), 'email');
+		const attCount = await countRows(getMailDb(c), 'attachments');
+		const stats = {
+			userCount: userCount || 0,
+			accountCount: accountCount || 0,
+			emailCount: emailCount || 0,
+			attCount: attCount || 0
+		};
+		const userHealthy = userCount !== null;
+		const mailHealthy = accountCount !== null && emailCount !== null;
+		const attachmentHealthy = attCount !== null;
 
 		// Attachment domain evaluation
 		const hasS3Bucket = !!(setting.bucket && setting.bucket.trim());
@@ -79,7 +76,7 @@ const dbService = {
 				type: 'd1',
 				scope: '用户账号、密码哈希、2FA密钥、Passkeys、RBAC权限及OAuth应用',
 				count: stats.userCount,
-				status: 'healthy'
+				status: userHealthy ? 'healthy' : 'unknown'
 			},
 			mail: {
 				id: 'mail_db',
@@ -90,7 +87,7 @@ const dbService = {
 				scope: '邮件列表、纯文本邮件正文、收发邮箱号池、联系人',
 				count: stats.emailCount,
 				accountCount: stats.accountCount,
-				status: 'healthy'
+				status: mailHealthy ? 'healthy' : 'unknown'
 			},
 			attachment: {
 				id: 'attachment_db',
@@ -100,7 +97,7 @@ const dbService = {
 				type: attachmentDbType,
 				scope: '邮件大附件二进制实体、SHA-256 去重哈希、0元 CDN 直链下载',
 				count: stats.attCount,
-				status: hasS3Bucket ? 'connected' : 'native'
+				status: attachmentHealthy ? (hasS3Bucket ? 'connected' : 'native') : 'unknown'
 			}
 		};
 
@@ -115,12 +112,12 @@ const dbService = {
 			userDb: {
 				name: userDbBound ? 'USER_DB' : 'db (Primary D1)',
 				type: 'd1',
-				status: 'connected'
+				status: userHealthy ? 'connected' : 'unknown'
 			},
 			mailDb: {
 				name: externalEnabled ? (setting.externalDbName || setting.externalDbProvider) : (mailDbBound ? 'MAIL_DB' : 'db (Primary D1)'),
 				type: externalEnabled ? setting.externalDbProvider : 'd1',
-				status: 'connected'
+				status: mailHealthy ? 'connected' : 'unknown'
 			},
 			externalDb: {
 				enabled: externalEnabled,
@@ -190,7 +187,7 @@ const dbService = {
 				if (!cleanEndpoint.startsWith('http://') && !cleanEndpoint.startsWith('https://')) {
 					cleanEndpoint = 'https://' + cleanEndpoint;
 				}
-				if (!isSafePublicUrl(cleanEndpoint)) {
+				if (!(await assertSafePublicUrl(cleanEndpoint))) {
 					throw new Error('外部数据库 Endpoint 不合法或属于受限内网地址');
 				}
 

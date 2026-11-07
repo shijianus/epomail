@@ -256,7 +256,7 @@ const handleSubmitAppeal = async () => {
       }
       appealText.value = '';
     } else {
-      ElMessage.error(body.message || '申诉提交失败');
+      ElMessage.error(body.message || t('auditAppealSubmitFailed'));
     }
   } catch (err) {
     ElMessage.error(t('auditRestrictedNetworkError'));

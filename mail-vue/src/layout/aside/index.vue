@@ -8,7 +8,7 @@
             <span class="nav-ic-wrap">
               <Icon icon="material-symbols:edit-outline-sharp" width="24" height="24"/>
             </span>
-            <span class="compose-text">{{$t('writeEmail') || 'Compose'}}</span>
+            <span class="compose-text">{{$t('writeEmail')}}</span>
           </button>
         </div>
 
@@ -30,13 +30,13 @@
             <span class="nav-label">{{$t('starred')}}</span>
             <span class="nav-count" v-if="starCount > 0">{{ starCount }}</span>
           </div>
-          <div class="nav-item" role="button" tabindex="0" @click="handleNav('snoozed', '/snoozed')" :class="isNavActive('snoozed') ? 'active' : ''" :title="$t('snoozed') || 'Snoozed'">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('snoozed', '/snoozed')" :class="isNavActive('snoozed') ? 'active' : ''" :title="$t('snoozed')">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-access-time" width="20" height="20" />
               <div class="sidebar-red-dot" v-if="urgentSnoozedCount > 0"></div>
               <div class="sidebar-gray-dot" v-else-if="waitingSnoozedCount > 0"></div>
             </span>
-            <span class="nav-label">{{$t('snoozed') || 'Snoozed'}}</span>
+            <span class="nav-label">{{$t('snoozed')}}</span>
             <span class="nav-count" v-if="urgentSnoozedCount > 0">{{ urgentSnoozedCount }}</span>
             <span class="nav-count muted" v-else-if="waitingSnoozedCount > 0">{{ waitingSnoozedCount }}</span>
           </div>
@@ -64,30 +64,30 @@
             <span class="nav-label">{{$t('allMail')}}</span>
             <span class="nav-count muted" v-if="allMailCount > 0">{{ allMailCount }}</span>
           </div>
-          <div class="nav-item" role="button" tabindex="0" @click="handleNav('spam', '/spam')" :class="isNavActive('spam') ? 'active' : ''" :title="$t('spam') || 'Spam'">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('spam', '/spam')" :class="isNavActive('spam') ? 'active' : ''" :title="$t('spam')">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="spamCount > 0"></div>
               <div class="sidebar-gray-dot" v-else-if="spamReadCount > 0"></div>
             </span>
-            <span class="nav-label">{{$t('spam') || 'Spam'}}</span>
+            <span class="nav-label">{{$t('spam')}}</span>
             <span class="nav-count muted" v-if="spamCount > 0">{{ spamCount }}</span>
             <span class="nav-count muted" v-else-if="spamReadCount > 0">{{ spamReadCount }}</span>
           </div>
-          <div class="nav-item" role="button" tabindex="0" @click="handleNav('trash', '/trash')" :class="isNavActive('trash') ? 'active' : ''" :title="$t('trash') || 'Trash'">
+          <div class="nav-item" role="button" tabindex="0" @click="handleNav('trash', '/trash')" :class="isNavActive('trash') ? 'active' : ''" :title="$t('trash')">
             <span class="nav-ic-wrap">
               <Icon icon="ic:outline-delete" width="20" height="20" />
               <div class="sidebar-gray-dot" v-if="trashCount > 0"></div>
             </span>
-            <span class="nav-label">{{$t('trash') || 'Trash'}}</span>
+            <span class="nav-label">{{$t('trash')}}</span>
             <span class="nav-count muted" v-if="trashCount > 0">{{ trashCount }}</span>
           </div>
         </div>
         
         <div class="nav-section" id="labelSection" style="margin-top: 32px;" @keydown.enter.prevent="$event.target.click()">
           <div class="nav-section-label">
-            <span class="section-title">{{ $t('labels') || 'Labels' }}</span>
-            <div class="label-add-btn" :title="$t('createNewLabel') || 'Create new label'" @click.stop="uiStore.showAddLabel = true">
+            <span class="section-title">{{ $t('labels') }}</span>
+            <div class="label-add-btn" :title="$t('createNewLabel')" @click.stop="uiStore.showAddLabel = true">
               <Icon icon="ic:outline-add" width="20" height="20" />
             </div>
           </div>
@@ -117,12 +117,12 @@
 
       </div>
     </div>
-    <el-dialog v-model="uiStore.showAddLabel" :title="$t('createNewLabel') || 'Create new label'" width="400px">
-      <el-input v-model="newLabelName" :placeholder="$t('labels') || 'Label name'" @keyup.enter="handleAddLabel" />
+    <el-dialog v-model="uiStore.showAddLabel" :title="$t('createNewLabel')" width="min(400px, calc(100vw - 32px))">
+      <el-input v-model="newLabelName" :placeholder="$t('labelNamePlaceholder')" @keyup.enter="handleAddLabel" />
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="uiStore.showAddLabel = false">{{ $t('cancel') || 'Cancel' }}</el-button>
-          <el-button type="primary" @click="handleAddLabel">{{ $t('confirm') || 'Confirm' }}</el-button>
+          <el-button @click="uiStore.showAddLabel = false">{{ $t('cancel') }}</el-button>
+          <el-button type="primary" @click="handleAddLabel">{{ $t('confirm') }}</el-button>
         </span>
       </template>
     </el-dialog>
@@ -309,7 +309,8 @@ function openSend() {
 }
 
 .compose-btn {
-  height: 56px;
+  min-height: 56px;
+  height: auto;
   width: 100%;
   flex-shrink: 0;
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
@@ -339,7 +340,9 @@ function openSend() {
   }
 
   .compose-text {
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-width: 0;
   }
 }
 

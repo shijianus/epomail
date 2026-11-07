@@ -19,7 +19,11 @@ export function setInitialPassword(password) {
 }
 
 export function userDelete() {
-    return http.delete('/my/delete')
+    return http.delete('/my/delete', { noMsg: true })
+}
+
+export function revokeTelegramLinks() {
+    return http.post('/my/telegram/revokeLinks', {});
 }
 
 export function userSetCustomLabels(customLabels) {
@@ -42,28 +46,28 @@ export function getTotpStatus() {
     return http.get('/my/totp/status');
 }
 
-export function getTotpSetup() {
-    return http.get('/my/totp/setup');
+export function getTotpSetup(data) {
+    return http.post('/my/totp/setup', data);
 }
 
-export function enableTotp(code) {
-    return http.post('/my/totp/enable', { code });
+export function enableTotp(data) {
+    return http.post('/my/totp/enable', data);
 }
 
-export function disableTotp(password, code) {
-    return http.post('/my/totp/disable', { password, code });
+export function disableTotp(data) {
+    return http.post('/my/totp/disable', data);
 }
 
-export function regenerateBackupCodes(password) {
-    return http.post('/my/totp/backup-codes', { password });
+export function regenerateBackupCodes(data) {
+    return http.post('/my/totp/backup-codes', data);
 }
 
-export function viewBackupCodes(password) {
-    return http.post('/my/totp/view-backup-codes', { password });
+export function viewBackupCodes(data) {
+    return http.post('/my/totp/view-backup-codes', data);
 }
 
-export function getPasskeySetup() {
-    return http.get('/my/passkey/setup');
+export function getPasskeySetup(data) {
+    return http.post('/my/passkey/setup', data);
 }
 
 export function registerPasskey(data) {
@@ -74,20 +78,20 @@ export function getPasskeyList() {
     return http.get('/my/passkey/list');
 }
 
-export function deletePasskey(passkeyId) {
-    return http.delete(`/my/passkey/${passkeyId}`);
+export function deletePasskey(passkeyId, data) {
+    return http.delete(`/my/passkey/${passkeyId}`, { data });
 }
 
 export function updateTotp(data) {
     return http.post('/my/totp/update', data);
 }
 
-export function approvePasskeyWithTotp(passkeyId, code) {
-    return http.post(`/my/passkey/${passkeyId}/approve-totp`, { code });
+export function approvePasskeyWithTotp(passkeyId, data) {
+    return http.post(`/my/passkey/${passkeyId}/approve-totp`, data);
 }
 
-export function activateTimelockedPasskey(passkeyId) {
-    return http.post(`/my/passkey/${passkeyId}/activate-timelock`);
+export function activateTimelockedPasskey(passkeyId, data) {
+    return http.post(`/my/passkey/${passkeyId}/activate-timelock`, data);
 }
 
 export function getPasskeyTestOptions(passkeyId) {
@@ -176,3 +180,6 @@ export function completeOauthIdentityBind(token) {
 export function unbindOauthIdentity(id, stepUpToken) {
     return http.delete(`/my/oauthIdentities/${id}`, { data: { stepUpToken } });
 }
+
+export function securityReauthOptions(data) { return http.post('/my/security/reauth-options', data); }
+export function securityReauthenticate(data) { return http.post('/my/security/reauth', data); }

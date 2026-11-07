@@ -128,6 +128,7 @@ defineExpose({
 
 const {t} = useI18n()
 const writerStore = useWriterStore();
+writerStore.bindIdentity();
 const draftStore = userDraftStore()
 const settingStore = useSettingStore()
 const emailStore = useEmailStore();
@@ -186,7 +187,7 @@ function deleteContact() {
   }).then(() => {
     const contactList = contactsTabRef.value.getSelectionRows().map(item => item.email);
     form.receiveEmail = form.receiveEmail.filter(item => !contactList.includes(item));
-    writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.filter(item => !contactList.includes(item));
+    writerStore.removeRecipientRecords(contactList);
   })
 }
 
@@ -402,12 +403,7 @@ async function sendEmail() {
 }
 
 function addRecipientRecord() {
-  writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.filter(
-      email => !form.receiveEmail.includes(email)
-  );
-
-  writerStore.sendRecipientRecord.unshift(...form.receiveEmail);
-  writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.slice(0, 500);
+  writerStore.addRecipientRecords(form.receiveEmail);
 }
 
 function resetForm() {

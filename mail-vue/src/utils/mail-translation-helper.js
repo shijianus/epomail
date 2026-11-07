@@ -69,7 +69,7 @@ const SUPPORTED_LANGS = ['zh', 'zh-Hant', 'en', 'fr', 'es', 'nl'];
 /**
  * Check if the email matches a pre-defined official template without modifications.
  * If unmodified, returns the pre-defined translated version in targetLang.
- * If modified or not a pre-defined template, returns null (triggering fallback to AI translation).
+ * If modified or not a pre-defined template, returns null; external processing still needs explicit confirmation.
  *
  * @param {object} email - Email record { subject, content, text, toEmail, toName, sendEmail, isOfficial, labels }
  * @param {string} targetLang - Target language code ('en', 'zh', 'zh-Hant', 'fr', 'es', 'nl')
@@ -162,7 +162,52 @@ export function getPredefinedTranslation(email, targetLang) {
     }
   }
 
-  // Actual content differs from the official template (modified by admin) or unknown template:
-  // Fall back to AI translation!
+  // No local match. The caller must obtain fresh consent before any external request.
   return null;
+}
+
+// Keep the exact configured value for the confirmation contract; never silently
+// repair an invalid URL or replace it with another disclosure page.
+export function getContentProcessingNoticeUrl(value, { isDev = false } = {}) {
+  if (typeof value !== 'string' || !/^https?:\/\//i.test(value) || /[\s\u0000-\u001f\u007f\\]/.test(value)) return '';
+  try {
+    const url = new URL(value);
+    if (!url.hostname || url.username || url.password) return '';
+    if (url.protocol === 'https:') return value;
+    const loopback = url.hostname === 'localhost' || url.hostname.endsWith('.localhost') || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+    return isDev && url.protocol === 'http:' && loopback ? value : '';
+  } catch {
+    return '';
+  }
+}
+
+export function getContentProcessingPolicy(settings, options = {}) {
+  const config = settings?.contentProcessing;
+  const noticeUrl = getContentProcessingNoticeUrl(config?.noticeUrl, options);
+  const aiEnabled = [true, 1, '1'].includes(settings?.aiEnabled);
+  const enabled = config?.translationEnabled === true && Boolean(noticeUrl) && aiEnabled;
+  return { enabled, noticeUrl, ocrEnabled: enabled && config?.ocrEnabled === true };
+}
+
+// A pure decision helper: inspecting a selection never performs I/O. Only the
+// confirmed remote branch contains a request payload; local templates never do.
+export function prepareMailTranslation({ email, targetLang, settings, confirmed = false, noticeUrl, enableOcr = false, isDev = false }) {
+  if (!email || typeof targetLang !== 'string' || !targetLang) return { kind: 'blocked' };
+  const translation = getPredefinedTranslation(email, targetLang);
+  if (translation) return { kind: 'local', translation };
+
+  const policy = getContentProcessingPolicy(settings, { isDev });
+  if (!policy.enabled) return { kind: 'blocked' };
+  if (confirmed !== true || noticeUrl !== policy.noticeUrl) return { kind: 'confirmation', noticeUrl: policy.noticeUrl };
+  return {
+    kind: 'remote',
+    payload: {
+      text: email.text || '',
+      html: email.content || '',
+      targetLang,
+      confirmed: true,
+      noticeUrl: policy.noticeUrl,
+      enableOcr: policy.ocrEnabled && enableOcr === true
+    }
+  };
 }
