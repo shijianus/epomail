@@ -1,3 +1,18 @@
+### Git 全量同步收口：worktree WIP 零丢失归档与 push --all 报错消除 (2026-11-07)
+*   **关联提交 (Git Commit)**: `f111359933f0ed8b1ca4da931a6262915d5442af` (Short: `f111359`)
+*   **部署环境 (Deployment)**: 本地仓库维护操作（worktree 归档分支 + 远端 GitHub 全量同步）；未涉及生产/Staging 部署，无代码行为变更。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 变更点 1：将 `security/audit-2026-10-25` worktree 的 18 项未提交改动（16 修改 + 2 未跟踪，OAuth/附件/SSRF 收口草稿）零丢失存档至 `archive/superseded-wip-audit-20261025` 并推送远端；对应正式交付已由远端复审修复链承载（tip `7d88fdf`）。
+    - [x] 变更点 2：该 worktree 分支以 `--ff-only` 快进至远端 tip `7d88fdf`，消除 `git push --all` 的 non-fast-forward 拒绝。
+    - [x] 变更点 3：`backend-freeze-2026-11-05` 标签本地对齐远端新指向（`4d9d9d8`，本地旧指向为同线祖先提交，无丢失）；全量补齐 10 个分支 upstream 跟踪。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] `git push -u origin --all` 退出码 0、零拒绝（唯一远端新建 ref 为归档分支，纯新增非覆盖）。
+    - [x] `git log --branches --not --remotes` 为空：零未推送提交。
+    - [x] 全部本地分支与远端 tip 逐位一致（trackshort 全 `=`）；标签双向一致（本地独有 0 / 远端独有 0）。
+    - [x] 归档提交通过专案 pre-commit 密钥门禁；`oauth-security.spec.js` 使用运行时生成测试密钥，零真实凭据；零假数据写入。
+
+---
+
 ### 审计 P0/P1 加固收敛：提权链/裁决目标/登录与审计 DoS/入站信任边界 (2026-11-07)
 *   **关联提交 (Git Commit)**: `751586f0bd37ca2912d5ff0e839cdf613daf3535` (Short: `751586f`)
 *   **部署环境 (Deployment)**: 本地 workerd/D1/KV 定向回归 + 构建 dry-run；未部署生产/Staging，未调用真实供应商。
