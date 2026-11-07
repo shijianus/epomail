@@ -90,10 +90,25 @@ http.interceptors.response.use((res) => {
     const noMsg = error.config?.noMsg;
     if (noMsg) return Promise.reject(error);
 
+    const resData = error.response?.data;
+    const errorMsg = resData?.message;
+
     if (error.status === 403 || error.response?.status === 403) {
         ElMessage({
-            message: error.response?.data?.message || i18n.global.t('unauthorizedAccess') || '无权访问该资源',
+            message: errorMsg || i18n.global.t('unauthorizedAccess') || '无权访问该资源',
             type: 'warning',
+            plain: true,
+            grouping: true,
+            repeatNum: -4,
+        });
+        return Promise.reject(error);
+    }
+
+    // 非 2xx 响应优先读取并展示后端返回的结构化业务错误
+    if (errorMsg) {
+        ElMessage({
+            message: errorMsg,
+            type: 'error',
             plain: true,
             grouping: true,
             repeatNum: -4,

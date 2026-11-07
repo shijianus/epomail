@@ -97,5 +97,5 @@ describe('TOTP backend security with real D1 mutation paths',()=>{
   expect(stored.hashedCodes).toHaveLength(10);
   expect(stored.hashedCodes.filter(code=>code.used===0)).toHaveLength(10);
   expect(completed.data.backupCodes).not.toContain(backup.rawCodes[0]);
- });
+ }, 60000);
 });

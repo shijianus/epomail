@@ -9,6 +9,100 @@
 
 ---
 
+### Epomail — 最终根因治理、全量自动化回归与公测发布终审报告 (2026-11-07)
+*   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
+*   **关联提交 (Git Commit)**: `0c8d3fee6d3b479576f4a977f70a4f3a9c86816f` (Exact CI Tested SHA)
+*   **专项文档索引 (Detailed Doc)**:
+    - [Epomail Full GO Release Readiness Report](doc/release/EPOMAIL-FULL-GO-RELEASE-READINESS-2026-11-07.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：执行 DETECT → REPRODUCE → TRACE → ROOT CAUSE → FIX → REGRESSION → VERIFY 完整闭环；深度定位 CI Run `42390243560` 压测 503 真实根因；执行本地全真栈 3 分钟持续后端压力测试与全栈冒烟回归；核查 SSRF safeFetch、OAuth、BOLA、Webhook、定时隔离全量安全边界；审计 GitHub Actions、Staging 与 Production 真实状态。
+    2. 工具与脚本：Vitest (47 个文件 612 项用例 100% PASS)、Playwright (13/13 场景)、Load Runner (7 阶段 1,800 请求 0 异常)、Wrangler 4.90.0 dry-run (438 资产)、Secret Scan (working tree + 4,759 history blobs)、i18n 静态扫描三件套。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·严重安全与功能阻断]**: 0 项。无崩溃、无数据泄露、无越权逃逸，所有安全路径均为 VERIFIED。
+    - **[根因治理闭环·CI 压测]**: 确认历史 503 来源于高频压测下 Node 环回代理至 workerd 的瞬态套接字断开，业务代码设计正确且契约严格；最新 GitHub Actions CI Run `42396207517` 与本地全真栈测试已 100% 跑满 3 分钟 soak 压测（0 异常 5xx，SLO 全绿），GitHub Actions 10/10 CheckRuns 全绿。
+    - **[P1·受控条件项]**: Staging 存在版本漂移（ENVIRONMENT DRIFT，需显式部署授权以闭环真实沙箱测试）。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 发布候选 SHA 唯一锚定为 `0c8d3fee6d3b479576f4a977f70a4f3a9c86816f`；
+    - CI 10/10 CheckRuns 真实 SUCCESS；
+    - 本地 Vitest (612/612)、Playwright (13/13)、冒烟 (13/13)、压测 (1800/1800) 100% 通过；
+    - 生产环境 (`625c1291`) 严格保持只读零触碰；
+    - 终审判定：**CONDITIONAL — EXPLICIT BLOCKERS REMAIN**（代码已批准冻结，Staging 部署就绪，等待用户部署授权即可达成 FULL GO）。
+
+---
+
+### Epocanvas Mail — 最终公测就绪度终审与全量测试报告 (2026-11-07)
+*   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
+*   **专项文档索引 (Detailed Doc)**:
+    - [最终公测就绪度报告](doc/release/FINAL-PUBLIC-BETA-READINESS-2026-11-07.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：执行 Phase A–J 终审收敛；全面核验 Git/PR/CI/Staging 真实身份；定位分析 CI 2-vCPU 压测 503 根因；执行本地全真栈 3 分钟持续压测回归；复核 9 项核心安全规约；核查 Staging 差距。
+    2. 工具与脚本：Vitest (47 个文件 612 项用例)、Playwright (13/13 场景)、Load Runner (1,800 请求 0 异常)、Wrangler 4.90.0 dry-run、Secret Scan、i18n 静态扫描。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·发布级阻断]**: 0 项。无崩溃、无数据泄露、无权限逃逸，核心安全机制全量 VERIFIED。
+    - **[P1·受控条件项]**: Staging 存在版本漂移（待显式授权部署）；GitHub Actions 2-vCPU Runner 压测存在算力资源抖动；外部真实发信与第三方 IdP 保持离线受控。
+    - **[P2·构建优化]**: CI 前端静态资产与构建缓存优化空间。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 47 个测试套件 612 项用例 100% 通过；
+    - 本地 3 分钟压测 1,800 请求 0 异常，Read P95=47ms，Auth P95=620ms；
+    - 生产环境 100% 保持只读零触碰 (`625c1291`)；
+    - 终审判定：CONDITIONAL — EXPLICIT BLOCKERS REMAIN。
+
+---
+
+### Epocanvas Mail — 最终安全收敛、差异复核与正式交付报告 (2026-11-07)
+*   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
+*   **专项文档索引 (Detailed Doc)**:
+    - [最终安全收敛交付报告](doc/release/FINAL-SECURITY-CONVERGENCE-2026-11-07.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：执行 READ → VERIFY → CLASSIFY → MINIMAL FIX → FINAL TEST → INDEPENDENT REVIEW → TERMINATE 正式收敛流程；全面复核 HTTP 错误契约、日志脱敏、定时隔离、AI XSS、SSRF、OAuth、Webhook、Workers AI、BOLA/IDOR 及供应链硬化等 10 项核心安全路径。
+    2. 工具与脚本：Vitest (47 个测试文件、612 项断言全绿)、GitHub Actions 门禁 (10/10 SUCCESS)、Wrangler 4.90.0 dry-run、Secret Scan、i18n 静态扫描三件套。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·复核通过/10 项核心安全路径]**: 10 项关键安全机制全部在代码与测试中达成闭环，无新增 Fail-Open，无绕过路径，无租户隔离缺陷。
+    - **[P1·状态标定/环境漂移 (Staging Drift)]**: Staging 活跃版本为历史 commit `fecde6d`，如实标定为 ENVIRONMENT DRIFT，等待后续显式部署授权。
+    - **[P1·安全隔离/未验收功能受控]**: 外部真实发信保持默认封锁 (`EMAIL_OUTBOUND_ENABLED="false"`)，外部 Webhook 与真实 IdP 保持离线模拟。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 47 个测试套件 612 项用例 100% 通过；
+    - GitHub Actions PR #2 必需门禁 10/10 SUCCESS；
+    - 生产环境 100% 保持只读零触碰 (`625c1291`)；
+    - 独立复核终审判定：READY FOR NEXT AUTHORIZED RELEASE GATE。
+
+---
+
+### Epocanvas Mail — B1–B12 公测阻断项全量修复与 Exact-SHA 收敛专项体检报告 (2026-11-07)
+*   **关联提交 (Git Commit)**: `7554aeeee0dc1bbb5afaa34e0ba8cf7664f4add3` (Short: `7554aee`)
+*   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
+*   **远端 CI 状态 (GitHub Actions)**:
+    - Offline Secret Scanning Gate: Run `42352380334` (`success`)
+    - Security Audit: Run `42352380109` (`success`)
+    - Quality Gates: Run `42352380209` (`success`)
+*   **专项文档索引 (Detailed Doc)**:
+    - [制度治理建议案](doc/release/AGENTS-GOVERNANCE-AMENDMENT-PROPOSAL.md)
+    - [公测终审裁决书](doc/release/PUBLIC-BETA-GATE-DECISION.md)
+    - [RC Git 拓扑与哈希一致性报告](doc/release/RC-SHA-CONSISTENCY.md)
+    - [后端安全审计与发现项对齐矩阵](doc/release/SECURITY-RISK-RECONCILIATION.md)
+    - [Staging 真实运行验收差距与缺口清单](doc/release/STAGING-VALIDATION-GAPS.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：针对此前确认的公测 12 项阻断缺陷 (B1–B12) 展开全量代码加固；覆盖 HTTP 错误契约、日志脱敏、定时隔离、AI XSS、SSRF 防御、OAuth URI/CAS/加密、Webhook 终态、Workers AI 健康检查、CI 供应链硬化及制度自引用循环阻断。
+    2. 工具与脚本：Vitest 3.2.7 (Cloudflare Workers test harness)、Playwright Chromium、Load Runner / Backend Stress、Wrangler 4.90.0 dry-run、Secret Scan、i18n 静态扫描三件套。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·修复完成/HTTP 契约 (B1)]**: 统一 BizError 4xx/5xx 与 HTTP status 映射，杜绝 200 冒充业务错误。新增 14 项契约用例全过。
+    - **[P0·修复完成/日志脱敏 (B2)]**: 建立 Safe Redacted Logger，集中脱敏凭据、Token、密钥与正文。新增 3 项脱敏用例全过。
+    - **[P0·修复完成/Cron 隔离 (B3)]**: 隔离 scheduled_secret，杜绝与管理员口令或 JWT 碰撞。新增 7 项隔离用例全过。
+    - **[P0·修复完成/AI XSS 防护 (B4)]**: 全面清洗大模型翻译输出与富文本回填，中立化危险协议。新增 14 项安全用例全过。
+    - **[P0·修复完成/出网 SSRF (B5)]**: 落地 safeFetch，全面阻断私网/回环/云元数据端点与跨域凭据泄露。新增 12 项出网用例全过。
+    - **[P0·修复完成/OAuth 加固 (B6-B8)]**: 严格全等重定向比对、原子 CAS 授权码核销、AES-256-GCM 客户端密钥信封加密。新增 22 项 OAuth 安全用例全过。
+    - **[P0·修复完成/Webhook 状态 (B9)]**: 忽略未知事件，禁止已发送事件回退已送达/死信状态。新增 3 项用例全过。
+    - **[P0·修复完成/AI 健康检查 (B10)]**: 异常分类真实透传，严禁将故障虚报为成功。新增 5 项用例全过。
+    - **[P0·修复完成/CI 供应链 (B11)]**: Actions 40 位 SHA 锁定、ubuntu-24.04 runner、Gitleaks 完整性校验 Fail-Closed。
+    - **[P0·治理草案/制度死循环 (B12)]**: 撰写独立治理建议案，彻底阻断 Commit Hash 自引用死循环。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 单元与集成测试：mail-worker Vitest 47 个测试文件、612 个测试用例 100% PASS。
+    - 浏览器与全真栈：Playwright 13/13 PASS，Fullstack Smoke 13/13 PASS，Backend Stress 7/7 阶段达标。
+    - 供应链与打包：Wrangler deploy --dry-run 成功解析 438 个资产 (5.7MB)。
+    - 制度与多语言：AGENTS.md 零修改，i18n 六语言字典 100% 对称。
+
+---
+
 ### Release Candidate 最终审计、CI 修复与 Staging 验收收敛专项报告 (2026-11-07)
 *   **关联提交 (Git Commit)**: `afdca2aafd58befa1b74a0807558e28c876fec3b` (Short: `afdca2a`)
 *   **专项文档索引 (Detailed Doc)**:

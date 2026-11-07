@@ -36,10 +36,11 @@ env:
 jobs:
   diff-hygiene:
     name: Diff hygiene (whitespace & conflict markers)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
@@ -65,13 +66,14 @@ jobs:
 
   secret-scan:
     name: Secret scan (working tree)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -83,13 +85,14 @@ jobs:
 
   i18n:
     name: i18n gates (6-language dictionaries)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -110,18 +113,19 @@ jobs:
 
   login-ui:
     name: Login UI (typecheck + unit tests + build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
         with:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -129,6 +133,9 @@ jobs:
 
       - name: Install dependencies (frozen lockfile)
         run: pnpm --dir temp_login_ui install --frozen-lockfile
+
+      - name: Login UI dependency security audit
+        run: pnpm --dir temp_login_ui audit --registry=https://registry.npmjs.org --prod --audit-level=high
 
       - name: TypeScript typecheck (tsc --noEmit)
         run: pnpm --dir temp_login_ui run typecheck
@@ -140,7 +147,7 @@ jobs:
         run: pnpm --dir temp_login_ui run build
 
       - name: Upload built login bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: login-dist
           path: temp_login_ui/dist
@@ -150,18 +157,19 @@ jobs:
   login-ui-e2e:
     name: Login UI OAuth browser regression (Playwright, local only)
     needs: login-ui
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
         with:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -174,7 +182,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Download built login bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
         with:
           name: login-dist
           path: temp_login_ui/dist
@@ -186,18 +194,19 @@ jobs:
 
   worker:
     name: Worker (full test suite + deploy dry-run)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
         with:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -205,6 +214,9 @@ jobs:
 
       - name: Install dependencies (frozen lockfile)
         run: pnpm --dir mail-worker install --frozen-lockfile
+
+      - name: Worker dependency security audit
+        run: pnpm --dir mail-worker audit --registry=https://registry.npmjs.org --prod --audit-level=high
 
       - name: Worker test suite
         run: pnpm --dir mail-worker test
@@ -226,7 +238,7 @@ jobs:
 
       - name: Save backend verification evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: backend-stress-${{ github.sha }}
           path: tests/artifacts/backend-stress.json
@@ -236,18 +248,19 @@ jobs:
   mail-vue-build:
     name: mail-vue production build
     needs: login-ui
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
         with:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -255,13 +268,16 @@ jobs:
 
       # mail-vue 的 build 会调用 scripts/copy-login-dist.mjs，必须拿到 temp_login_ui 的产物
       - name: Download built login bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
         with:
           name: login-dist
           path: temp_login_ui/dist
 
       - name: Install dependencies (frozen lockfile)
         run: pnpm --dir mail-vue install --frozen-lockfile
+
+      - name: Vue frontend dependency security audit
+        run: pnpm --dir mail-vue audit --registry=https://registry.npmjs.org --prod --audit-level=high
 
       - name: Vite production build
         run: pnpm --dir mail-vue run build

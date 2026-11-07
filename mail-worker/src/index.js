@@ -27,21 +27,60 @@ function scheduledTimingSafeEqual(a, b) {
 	return diff === 0;
 }
 
-async function checkScheduledAuth(req, env) {
+export async function checkScheduledAuth(req, env) {
 	if (req.method !== 'POST') {
 		return { ok: false, status: 405, message: 'Method Not Allowed: Scheduled trigger requires POST' };
 	}
 
-	// 1. 系统内部安全头校验 (独立调度密钥优先，降级兼容 jwt_secret)
-	const secretHeader = req.headers.get('x-scheduled-secret') || req.headers.get('x-admin-secret');
-	if (secretHeader) {
-		const expected = env?.scheduled_secret || env?.jwt_secret;
-		if (expected && scheduledTimingSafeEqual(secretHeader, expected)) {
-			return { ok: true };
-		}
+	// 1. x-admin-secret 历史兼容入口必须坚决废弃
+	if (req.headers.get('x-admin-secret')) {
+		return { ok: false, status: 401, message: 'x-admin-secret is deprecated and forbidden' };
 	}
 
-	// 2. 真实管理员凭据校验 (JWT + KV 真实会话 + 封禁状态 + RBAC 真实角色判权)
+	// 2. 系统内部安全头校验 (独立 scheduled_secret 专用校验，与管理员 JWT 严格分离)
+	const secretHeader = req.headers.get('x-scheduled-secret');
+	if (secretHeader !== null && secretHeader !== undefined) {
+		if (typeof secretHeader !== 'string' || secretHeader.length === 0 || secretHeader.trim() !== secretHeader) {
+			return { ok: false, status: 401, message: 'Invalid scheduled secret format' };
+		}
+
+		const isProdOrStaging = env?.ENVIRONMENT === 'staging' || env?.ENVIRONMENT === 'production' || (!env?.dev && !env?.DEV && env?.ENVIRONMENT !== 'development');
+		const expected = env?.scheduled_secret;
+
+		if (isProdOrStaging) {
+			// Staging 与 Production 必须配置独立的 scheduled_secret，严禁回退至 jwt_secret
+			if (!expected) {
+				return { ok: false, status: 500, message: 'scheduled_secret is not configured' };
+			}
+
+			// 强物理隔离：scheduled_secret 严禁与其他机密发生碰撞
+			if (
+				(env?.jwt_secret && expected === env.jwt_secret) ||
+				(env?.init_secret && expected === env.init_secret) ||
+				(env?.totp_enc_key && expected === env.totp_enc_key) ||
+				(env?.email_enc_key && expected === env.email_enc_key)
+			) {
+				return { ok: false, status: 500, message: 'scheduled_secret must be isolated from other secrets' };
+			}
+
+			if (scheduledTimingSafeEqual(secretHeader, expected)) {
+				return { ok: true };
+			}
+			return { ok: false, status: 401, message: 'Invalid scheduled secret' };
+		}
+
+		// 本地开发环境仅在显式开发模式下允许降级
+		if (expected) {
+			if (scheduledTimingSafeEqual(secretHeader, expected)) return { ok: true };
+			return { ok: false, status: 401, message: 'Invalid scheduled secret' };
+		}
+		if (env?.jwt_secret && scheduledTimingSafeEqual(secretHeader, env.jwt_secret)) {
+			return { ok: true };
+		}
+		return { ok: false, status: 500, message: 'scheduled_secret is not configured' };
+	}
+
+	// 3. 真实管理员凭据校验 (JWT + KV 真实会话 + 封禁状态 + RBAC 真实角色判权)
 	const authHeader = req.headers.get('Authorization') || req.headers.get('authorization') || req.headers.get('token');
 	if (!authHeader) {
 		return { ok: false, status: 401, message: '未授权的调度触发请求 (Unauthorized scheduled trigger)' };

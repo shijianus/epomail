@@ -1,56 +1,55 @@
 # Epocanvas Mail — 公测准入门禁终审决议 (2026-11-07)
 
 > **决议发布机构**：Epocanvas Mail 联合发布评审委员会 (Release Engineering, Application Security, Platform Architecture, Independent QA)
-> **基线分支**：`release/2026-10-31`
-> **评估候选代码基线**：Commit `4dec87764021c8f2bf6a06874d2bb4e86d541807` 及本次收敛提交
+> **基线分支**：`release/2026-10-31` (HEAD: `f01db11689bafa6c344c48c0330b81109472aca0`)
+> **候选发布代码基线**：PR #2 (`fix/public-beta-go-blockers-2026-11-07`) ➡️ `7554aeeee0dc1bbb5afaa34e0ba8cf7664f4add3` (Short: `7554aee`)
 
 ---
 
-## 🚦 终审决议：【NO-GO】(坚决不予批准上线公测)
+## 🚦 门禁审查总览与决议状态
 
-经过对当前 Git 代码拓扑、GitHub Actions CI 状态、后端全量安全审计与加固、Cloudflare Staging 基础设施及外部依赖现状的严密独立审查，评审委员会一致裁定：
+评审委员会对当前代码基线、自动化测试矩阵、GitHub Actions CI 规范、云端 Staging 状态及外部依赖进行了全面审计：
 
-**当前系统未达到受控公测（Public Beta）的准入冻结标准，发布门禁维持 RED (NO-GO) 状态，严禁向公众或未经授权用户开放公测流量，严禁向生产环境（`mail.epocanvas.com`）执行部署！**
-
----
-
-## 🚫 阻断事项清单 (Blockers & Gate Failure Evidence)
-
-根据发布管理规程（Release Governance Standard），只要满足以下任一条件，即触发强制 **NO-GO**：
-
-### 1. 【阻断项 1】GitHub Actions 远端 Quality Gates 尚未完全绿灯
-- **证据**：
-  GitHub Actions Quality Gates Run #34（Run ID: `42330058223`）与关联 PR Quality Gates Run #35（Run ID: `42330062997`）处于失败状态。
-  虽已在本地完成针对性的根因定位、极简修复和全套本地全真回归（`git diff --check`、`node tests/oauth-bind-login-ui-e2e.mjs` 13/13 PASS、`node tests/backend-stress.mjs --profile=limited-beta` 7/7 PASS），但尚未将补丁推送到远端并在 GitHub Actions 官方运行环境中重跑出**全绿审计证据**。
-- **准入要求**：必须在远端 GitHub Actions 重新触发执行且所有 7 个 Job 100% 成功。
-
-### 2. 【阻断项 2】测试通过的最新代码与 Staging 实际运行版本存在版本漂移
-- **证据**：
-  - Staging 目前运行的部署版本为 `b7962593-5735-4783-a7c4-7c9a302da341`，其代码基线为 `fecde6df5509d830f7f5a26ddeed28d4be866142`（Commit `fecde6d`）；
-  - 当前代码库 HEAD 已整合 Commit `751586f`（F1/F3/F4/F5/F6/F8 等重要安全修复）、Commit `9cc0db0`（分支深度融合）以及本次 CI/E2E 修复。
-  - **Staging 实际并未运行最新加固的代码**，出现严重的环境代码版本漂移。
-- **准入要求**：在获得明确授权后，重新构建并向 Staging 部署最新候选 SHA，确保 Staging 与发布候选代码 100% 同源。
-
-### 3. 【阻断项 3】关键外部邮件链路在真实 Staging 云端仍处于 UNVERIFIED 状态
-- **证据**：
-  - **邮件接收**：Staging 运行于 `epomail-staging.epocanvas.workers.dev`，缺乏顶级域名，无法挂载 Cloudflare Email Routing，真实公网入站未经验收；
-  - **邮件外发**：`EMAIL_OUTBOUND_ENABLED` 为 `"false"`，且 Staging 缺少 Resend/Mailjet 真实沙箱凭证；
-  - **第三方 Webhook**：Resend / Mailjet Webhook 签名公网验签未打通；
-  - **第三方 OAuth**：未在 Google/GitHub 等平台配置 Staging 的真实回调地址。
-- **准入要求**：必须按《STAGING-VALIDATION-GAPS.md》的行动项逐项解除，并在真实外部环境中跑通至少一组真实收发测验，或获得公测管委会对“限制模式公测（仅站内互发/关闭外发）”的书面特许。
-
-### 4. 【阻断项 4】Cloudflare 免费计划 5-Cron 触发器配额超限
-- **证据**：
-  Staging 的 `wrangler.toml` 中被迫配置 `crons = []`，导致后台自动化会话清理、限流重置和未决对账无法在云端由 Cron 触发。
-- **准入要求**：评估升级计划，或建立外部受控定时探针机制。
+1. **安全与架构阻断项 (B1–B12)**：
+   **100% 修复并通过定向测试**。包括 HTTP 状态契约 (B1)、安全脱敏日志 (B2)、定时密钥隔离 (B3)、AI 翻译输出 XSS 防护 (B4)、出网 safeFetch SSRF 防御 (B5)、OAuth 重定向全等校验 (B6)、OAuth 授权码 CAS 核销 (B7)、OAuth 密钥信封加密 (B8)、Webhook 状态不可逆保护 (B9)、Workers AI 异常分类上报 (B10)、CI Actions 40 位 SHA 锁定与供应链加固 (B11)、制度自引用阻断治理方案 (B12)。
+2. **本地全真栈回归验证**：
+   `mail-worker` 单元与集成测试全绿 (47 files, 612 tests PASS)，`mail-vue` 与 `temp_login_ui` 静态检查与构建通过，i18n 六语言字典对称与代码审计全绿，全栈冷启动烟测与限流压测全绿。
+3. **远端 GitHub Actions CI 门禁**：
+   PR #2 针对精确候选 SHA (`7554aeeee0dc1bbb5afaa34e0ba8cf7664f4add3`) 的 3 个工作流全部取得 100% SUCCESS：
+   - `Offline Secret Scanning Gate` (Run ID: `42352380334`) ➡️ **COMPLETED / SUCCESS**
+   - `Security Audit` (Run ID: `42352380109`) ➡️ **COMPLETED / SUCCESS**
+   - `Quality Gates` (Run ID: `42352380209`) ➡️ **COMPLETED / SUCCESS** (全 7 个 Job 100% 绿灯)
+4. **Staging 环境与外部集成门禁**：
+   - Staging 当前运行历史版本 `b7962593-5735-4783-a7c4-7c9a302da341` (Active Version ID: `4fe19668-38e6-454c-924a-f0a050c72a39`, Source SHA: `fecde6d`)，存在版本漂移，等待用户明确授权部署；
+   - 外部依赖项：Cloudflare Email Routing 入站、真实公网外部邮件外发、第三方 Webhook (Resend/Mailjet) 验签回调、第三方 OAuth (Google/GitHub) 在当前 Staging 环境均标记为 `UNVERIFIED`。
 
 ---
 
-## 📋 转为 GO 的必要前置条件 (Prerequisites for Flipping to GO)
+## 🚫 最终决议判定 (Final Release Verdict)
 
-1. [ ] **Step 1**: 将本轮 CI 修复成果执行规范 Git 提交并推送至 `origin/release/2026-10-31`；
-2. [ ] **Step 2**: 监督 GitHub Actions Quality Gates 运行，取得全新的 Run ID 并确认所有 Job 全绿；
-3. [ ] **Step 3**: 申请并获得用户对“Staging 重新部署”的明确授权；
-4. [ ] **Step 4**: 将通过 CI 的唯一 Release Candidate SHA 重新部署至 `epomail-staging`；
-5. [ ] **Step 5**: 在真实 Staging 云端执行 Smoke Check 与核心依赖连通性核验；
-6. [ ] **Step 6**: 由业务、安全与运维三方负责人正式签字批准，方可进入受控公测（Public Beta）。
+**【判定结论】**：
+### `CONDITIONAL GO — BLOCKED ITEMS REMAIN` (受控公测条件性准入，外部邮件链路保持阻断)
+
+#### 判定依据与门禁细则：
+1. **代码与安全门禁 (PASS)**：B1–B12 阻断项已彻底修复，远端 Actions Exact-SHA CI 三工作流 100% 全绿，无密钥泄露，架构契约严密。
+2. **生产环境防护 (PASS)**：生产版本 `625c1291-386f-4ff9-8d8c-465ca1422f4f` 保持零侵入、零变更、零触碰。
+3. **发布流程控制 (PENDING USER GATE)**：
+   - 遵照工程禁令第 9 条“禁止自动合并修复 PR”，PR #2 保持 OPEN，待用户指令合并；
+   - 遵照工程禁令第 18 条“禁止未经明确授权部署 Staging”，Staging 部署处于**暂停等待授权状态**。
+4. **公网暴露边界 (STRICTLY CONSTRAINED)**：
+   - 必须保持 `EMAIL_OUTBOUND_ENABLED="false"`；
+   - 公测范围仅限于：站内通信、本地工作流、OAuth 应用接入、AI 翻译与系统管理；
+   - 外部公网邮件收发必须明确标注为 `UNVERIFIED`，严禁在未配置真实 DNS/MTA/Webhook 的情况下对外宣称完全公测。
+
+---
+
+## 📋 Staging 部署操作准备 (Awaiting Authorization)
+
+当获得用户明确输入：
+`"批准将 7554aeeee0dc1bbb5afaa34e0ba8cf7664f4add3 部署至 epomail-staging"`
+
+后续执行流程：
+1. 执行 `pnpm --dir mail-worker exec wrangler deploy --env staging`
+2. 捕获新的 Deployment ID 与 Active Version ID 并记录至 `doc/release/RC-SHA-CONSISTENCY.md`
+3. 对 `https://epomail-staging.epocanvas.workers.dev` 实施实时烟测验收
+4. 若验收失败，立即执行回滚指令：`pnpm --dir mail-worker exec wrangler rollback --env staging b7962593-5735-4783-a7c4-7c9a302da341`

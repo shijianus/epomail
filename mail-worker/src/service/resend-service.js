@@ -112,20 +112,49 @@ const resendService = {
 			} catch (_) {}
 		}
 
-		let emailStatus = emailConst.status.SENT;
+		const KNOWN_STATUS_MAP = {
+			'email.sent': emailConst.status.SENT,
+			'email.delivered': emailConst.status.DELIVERED,
+			'email.delivery_delayed': emailConst.status.DELAYED,
+			'email.bounced': emailConst.status.BOUNCED,
+			'email.failed': emailConst.status.FAILED,
+			'email.complained': emailConst.status.COMPLAINED
+		};
+
+		const isKnownEvent = Object.prototype.hasOwnProperty.call(KNOWN_STATUS_MAP, body.type);
+
+		// 若签名有效但属于未知/不支持的事件类型：
+		// 1. 绝不修改 outbox 或 email 记录状态
+		// 2. 将 webhook_event 状态记录为 ignored
+		// 3. 正常返回 HTTP 200 { success: true, ignored: true }，防止第三方重试风暴
+		if (!isKnownEvent) {
+			if (userDb && eventId) {
+				try {
+					await userDb.prepare(`
+						INSERT INTO webhook_event (event_id, provider, event_type, resource_id, status)
+						VALUES (?, 'resend', ?, ?, 'ignored')
+					`).bind(eventId, body.type || 'unknown', body.data?.email_id || null).run();
+				} catch (err) {
+					const msg = String(err?.message || err);
+					if (msg.includes('UNIQUE constraint failed') || msg.includes('PRIMARY KEY')) {
+						return { deduplicated: true, ignored: true, eventId };
+					}
+				}
+			}
+			if (eventId && c?.env?.kv) {
+				try {
+					await c.env.kv.put(`wh_resend:${eventId}`, '1', { expirationTtl: 86400 });
+				} catch (_) {}
+			}
+			return { success: true, ignored: true, eventId };
+		}
+
+		let emailStatus = KNOWN_STATUS_MAP[body.type];
 		let emailMessage = null;
 
-		if (body.type === 'email.delivered') {
-			emailStatus = emailConst.status.DELIVERED;
-		} else if (body.type === 'email.complained') {
-			emailStatus = emailConst.status.COMPLAINED;
-		} else if (body.type === 'email.bounced') {
-			emailStatus = emailConst.status.BOUNCED;
+		if (body.type === 'email.bounced') {
 			emailMessage = typeof body.data?.bounce === 'object' ? JSON.stringify(body.data.bounce) : String(body.data?.bounce || '');
-		} else if (body.type === 'email.delivery_delayed') {
-			emailStatus = emailConst.status.DELAYED;
 		} else if (body.type === 'email.failed') {
-			emailStatus = emailConst.status.FAILED;
 			emailMessage = body.data?.failed?.reason || 'Delivery failed';
 		}
 

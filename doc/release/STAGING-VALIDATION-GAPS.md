@@ -2,37 +2,44 @@
 
 > **审计执行角色**：Cloudflare Platform Engineer & Independent QA Auditor
 > **当前 Staging 地址**：`https://epomail-staging.epocanvas.workers.dev`
-> **当前部署 Version ID**：`b7962593-5735-4783-a7c4-7c9a302da341` (源码 SHA: `fecde6d`)
+> **当前 Staging 部署 ID**：`b7962593-5735-4783-a7c4-7c9a302da341` (Active Version ID: `4fe19668-38e6-454c-924a-f0a050c72a39`, 源码 SHA: `fecde6d`)
+> **当前评估 Release Candidate**：`fix/public-beta-go-blockers-2026-11-07`
 
 ---
 
 ## 1. 真实云端环境与测试验收差距总览
 
-在当前受控发布阶段，本地全真栈（Local Stack）与单元测试已实现 100% 通过，但在真实的 Cloudflare Staging 边缘运行环境中，仍存在一系列**无法伪造通过、必须如实披露的外部依赖与环境限制缺口**：
+在当前受控发布阶段，本地全真栈（Local Stack）与单元测试已实现 100% 自动化覆盖并通过，但在真实的 Cloudflare Staging 边缘运行环境中，依然客观存在一系列**不可伪造、必须向评审委员会如实披露的外部依赖与平台限制缺口**：
 
 | 缺口类别 | 检查项目 | 当前 Staging 实际状态 | 阻塞程度 | 真实环境差距根因与审计证据 |
 | :--- | :--- | :--- | :--- | :--- |
-| **版本漂移** | Worker 代码同步 | **BEHIND** (`fecde6d` vs HEAD `4dec877`) | **阻断** | Staging 部署早于安全收敛合并（`9cc0db0`）与本次 CI/E2E 修复。当前 Staging 运行的代码缺少最新的安全补丁。 |
-| **平台配额** | Cron 定时触发器 | **EMPTY** (`crons = []`) | **限制项** | Cloudflare Free Plan 账号（`0a1276d9d2f920936dc2f3eda8c126f8`）全账号限制最多 5 个定时触发器。生产 Worker 已占用 2 个，其他 Worker 占用 3 个。Staging 若配置 Cron 将触发 Cloudflare 10072 配额超限错误，故被迫在 `wrangler.toml` 中留空。所有后台定时任务（过期会话清理、限流计数清除、未决外发对账）目前无法在 Staging 自动调度，必须通过带 `x-scheduled-secret` 的 HTTP 请求手动触发。 |
-| **邮件接收** | Inbound Email Routing | **UNVERIFIED** | **阻断** | Cloudflare Email Routing 仅支持绑定在 Cloudflare 上的顶级/二级域名（Apex / Subdomain Zone）。Staging 当前直接运行于 `*.workers.dev` 子域名，无法在 Cloudflare 仪表盘中为此域名挂载真实的 Email Routing 规则。真实入站接收链路在 Staging 无法端到端打通。 |
-| **邮件外发** | Outbound Delivery | **UNVERIFIED** / **DISABLED** | **受控阻断** | `EMAIL_OUTBOUND_ENABLED` 处于安全锁定状态（`"false"`）；未在 Staging Secret 中配置经过官方沙箱验证的 Resend API Key 或 Mailjet API Key。目前外发拦截为预期防御，但真实外部投递未经验收。 |
-| **第三方 Webhook** | Resend / Mailjet Webhook | **UNVERIFIED** | **阻断** | `resend_webhook_secret` 与 `mailjet_secret_key` 在 Staging Secret 中尚未配置为真实第三方的有效签名密钥，公网回调验签链路未完成真实联调。 |
-| **第三方 OAuth** | OAuth 登录与绑定 | **UNVERIFIED** | **阻断** | Google、GitHub、Apple 等 OAuth 服务商后台未配置 `https://epomail-staging.epocanvas.workers.dev/oauth/callback` 作为合法回调 Redirect URI，无法在 Staging 进行非 Mock 的真实第三方授权登录。 |
+| **版本漂移** | Worker 代码同步 | **BEHIND** (`fecde6d` vs HEAD RC) | **阻断** | 当前 Staging 运行的代码为历史部署版本 `b7962593-5735-4783-a7c4-7c9a302da341`，尚未部署本次 B1–B12 安全加固补丁。在获得授权重新部署前，Staging 运行逻辑与最新 RC 存在版本漂移。 |
+| **平台配额** | Cron 定时触发器 | **EMPTY** (`crons = []`) | **限制项** | Cloudflare 免费计划（Account: `0a1276d9d2f920936dc2f3eda8c126f8`）全局限额 5 个 Cron 触发器，已完全被占用。Staging 的 `wrangler.toml` 保持 `crons = []` 以避免触发 Cloudflare 10072 部署错误。后台过期会话清理、限流计数重置与对账补偿在 Staging 无法由边缘定时器自动拉起，需通过外部 HTTP 携带 `x-scheduled-secret` 手动触发。 |
+| **邮件接收** | Inbound Email Routing | **UNVERIFIED** | **阻断** | Cloudflare Email Routing 严格要求挂载在用户托管的 Apex / Subdomain Zone 域名上。Staging 直接运行于 `epomail-staging.epocanvas.workers.dev`，无法在 Cloudflare 平台为其配置入站路由规则。公网真实入站接收在 Staging 处于未打通状态。 |
+| **邮件外发** | Outbound Delivery | **DISABLED** / **UNVERIFIED** | **受控阻断** | `EMAIL_OUTBOUND_ENABLED` 硬性设为 `"false"`；Staging Secret 中未注入真实的 Resend / Mailjet 沙箱 API Key。外发拦截符合公测初期最小受控暴露原则，但真实公网投递未经验收。 |
+| **第三方 Webhook** | Webhook 验签回调 | **UNVERIFIED** | **阻断** | Resend / Mailjet 的真实 Webhook 签名公钥未在 Staging 注入，真实公网事件投递与验签未完成联调。 |
+| **第三方 OAuth** | 外部 OAuth 登录与绑定 | **UNVERIFIED** | **阻断** | Google、GitHub 等第三方 OAuth 平台未登记 `https://epomail-staging.epocanvas.workers.dev/oauth/callback` 作为受信任重定向 URI，真实外部登录重定向未联调。 |
 
 ---
 
-## 2. 外部依赖真实性判定标准
+## 2. 外部依赖真实性判定标准 (Zero Fake Rule)
 
-必须坚决执行项目工程红线：**严禁将本地 Mock 测试当成真实生产/Staging 验收！**
-所有涉及上述未连接真实凭据或外部服务的环节，在报告与验收矩阵中必须明确标识为：
-- **UNVERIFIED (未在真实外部平台验证)**
+坚决贯彻项目工程红线：
+1. **严禁将本地 Mock 模拟用例伪造为真实第三方验收通过！**
+2. 凡未在真实公网、使用真实凭据与真实服务商完成端到端收发验证的链路，一律在验收报告中标记为 **UNVERIFIED**；
+3. 真实外部邮件链路的 UNVERIFIED 状态，直接触发公测门禁的阻断机制（触发 NO-GO 或带严格受限条件的 CONDITIONAL GO）。
 
 ---
 
-## 3. 下一步解除阻断的行动项清单 (Action Items for Beta Unblocking)
+## 3. 下一步解除缺口行动计划 (Remediation Roadmap)
 
-1. **代码同步**：在用户明确批准后，将合并了最新 CI 修复与安全加固的 RC 提交（最新 HEAD）打包构建并重新部署到 `epomail-staging`；
-2. **Staging 独立域名**：在 Cloudflare Zone 中为 Staging 分配独立的二级域名（例如 `staging-mail.epocanvas.com`），以支持配置真实的 Cloudflare Email Routing 规则；
-3. **第三方沙箱凭证注入**：申请 Resend / Mailjet 的沙箱测试专用 API Key 与 Webhook Secret，通过 `wrangler secret put --env staging` 安全注入；
-4. **OAuth 回调登记**：在 GitHub / Google Developer Console 中添加 Staging 回调地址；
-5. **定时调度自动化**：评估升级 Cloudflare Paid 计划解除 Cron 数量限制，或搭建外部独立 Ping 服务定时调用 Staging 的 `/api/scheduled` 端点。
+1. **Staging 部署同步**：
+   在 PR 合并至 `release/2026-10-31` 且远端 CI 确认全绿后，获得用户明确书面授权后部署候选 SHA 至 `epomail-staging`；
+2. **分配独立 Staging 域名**：
+   在 DNS 解析中为 Staging 配置独立二级域名（如 `staging-mail.epocanvas.com`），打通 Cloudflare Email Routing 真实入站；
+3. **注入沙箱密钥**：
+   向 Staging Worker 注入专用测试 Resend API Key 与 Webhook Secret，执行受控单组真实外发与回执验证；
+4. **登记 OAuth 白名单**：
+   在 OAuth 服务商后台补充 Staging 回调地址；
+5. **外部定时探针**：
+   通过第三方状态监控服务（如 Uptime Kuma 或 GitHub Actions 定时任务）每 5 分钟向 `/api/scheduled` 发起 HTTP 请求，弥补 Staging Cron 缺失。
