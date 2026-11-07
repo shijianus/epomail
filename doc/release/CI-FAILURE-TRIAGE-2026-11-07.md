@@ -19,8 +19,11 @@
 ## 2. 深度根因排查与复现链分析
 
 ### B1: Diff Hygiene 失败 (`git diff --check`)
-- **错误定位**：CI 的 `diff-hygiene` 任务执行 `git diff --check`，扫描到 `DEPLOYMENT-EXECUTION.md`、`REPORTS.md`、`STAGING-*.md` 及 `doc/backend-security-audit-2026-11-06.md` 等文件中存在行尾空格（Markdown 的双空格换行写法）以及文件末尾多余空行。
-- **本地复现**：执行 `git diff --check HEAD~5..HEAD`，立即输出 15+ 处 `trailing whitespace` 与 `new blank line at EOF`，退出码为 2。
+- **错误定位**：CI 的 `diff-hygiene` 任务执行 `git diff --check`。在 push 触发时比对提交增量，在 pull_request 触发时比对目标分支 `master...PR_HEAD` (`3e1ef74...HEAD`)。
+- **本地复现与根因**：
+  1. push 增量扫描：在 `DEPLOYMENT-EXECUTION.md`、`REPORTS.md`、`STAGING-*.md` 等文件中存在多处行尾空格与文件末尾多余空行，退出码为 2。
+  2. PR 全量比对：比对 `master...HEAD` 时，捕获到 `doc/production-release-runbook-2026-11-05.md` 第 3-7 行尾随空格与 `doc/backend-security-audit-2026-11-06.md` 末尾空行。
+- **修复措施**：全量清理行尾空格与末尾空行，本地执行 `git diff --check 3e1ef74` 确保比对 master 零输出退出码 0。
 - **影响评估**：纯排版规范问题，不涉及业务与安全逻辑。
 
 ### B2: OAuth Playwright 浏览器端到端测试超时

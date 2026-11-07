@@ -1,5 +1,21 @@
+### PR 模式质量门禁 diff-hygiene 修复与 GitHub Actions 全绿闭环 (2026-11-07)
+*   **关联提交 (Git Commit)**: `54d9d3a0ce6270c68ec338b465dcdda837724245` (Short: `54d9d3a`)
+*   **部署环境 (Deployment)**: `GitHub Actions Quality Gates (#36, PR #37)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] PR 门禁差异基线修复：消除 `doc/production-release-runbook-2026-11-05.md` 第 3-7 行尾随空格与 `doc/backend-security-audit-2026-11-06.md` 文件末尾空行，确保在 PR 触发时对比 `master...HEAD` (`3e1ef74...HEAD`) 100% 洁净。
+    - [x] 静态差异对比核验：运行 `git diff --check 3e1ef74` 退出码 0，零输出。
+    - [x] GitHub Actions Push 门禁闭环：Quality Gates push run 42338644024 全部 7 个 job 100% 绿灯通过（Worker 压测、Playwright 13/13、i18n、Secret Scan、Vue 构建等）。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 差异规范审计：`git diff --check 3e1ef74` 退出码 0 零报错
+    - [x] 差异规范审计：`git diff --check` (working tree) 退出码 0 零报错
+    - [x] 预提交文件检查：`scripts/check-staged-files.mjs` PASS
+    - [x] 密钥扫描门禁：`scripts/secret-scan.mjs` 1,288 文件无密钥泄露
+    - [x] 云端门禁验证：GitHub Actions Push Quality Gates #1 (42338644024) 7/7 jobs 全绿
+
+---
+
 ### 全量远端推送与零覆盖冲突保障：release/2026-10-31 与分支网络同步 (2026-11-07)
-*   **关联提交 (Git Commit)**: `20a1ea2e807f18dfc8f132b88a445bd247f75663` (Short: `20a1ea2`)
+*   **关联提交 (Git Commit)**: `09e34ee3103a2990c5bad0515b9b62280714566b` (Short: `09e34ee`)
 *   **部署环境 (Deployment)**: `GitHub 远端仓库 (https://github.com/shijianus/epomail)`
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 全量推送远端保障：执行 `git push --all origin`，确保本地所有分支与修改完整推送远端。

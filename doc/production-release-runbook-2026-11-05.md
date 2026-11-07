@@ -1,10 +1,10 @@
 # EpoMail 生产上线发布运行手册 (Production Release Runbook)
 
-> **版本发布批次**：`release/2026-10-31`  
-> **更新日期**：`2026-11-05`  
-> **代码冻结基线 (Backend Freeze SHA)**：`a4f262337bf58aed6927bdff5a11999b3c26003a` (Short: `a4f2623`)  
-> **Git 标签**：`backend-freeze-2026-11-05`  
-> **报告与归档基线**：`6818773b813ea23e5b6ffd5f09fe3bb32797f0e4` (Short: `6818773`)  
+> **版本发布批次**：`release/2026-10-31`
+> **更新日期**：`2026-11-05`
+> **代码冻结基线 (Backend Freeze SHA)**：`a4f262337bf58aed6927bdff5a11999b3c26003a` (Short: `a4f2623`)
+> **Git 标签**：`backend-freeze-2026-11-05`
+> **报告与归档基线**：`6818773b813ea23e5b6ffd5f09fe3bb32797f0e4` (Short: `6818773`)
 > **适用目标**：生产环境 Cloudflare Worker、D1 Database、KV Namespace、Assets 静态分发。
 
 ---
