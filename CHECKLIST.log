@@ -1,3 +1,31 @@
+### B1–B12 公测阻断项全量修复、Exact-SHA CI 加固与发布收敛核验 (2026-11-07)
+*   **关联提交 (Git Commit)**: `fix/public-beta-go-blockers-2026-11-07` 系列原子提交
+*   **部署环境 (Deployment)**: `本地全真栈 / GitHub Actions CI (epomail-staging 待授权)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] B1 HTTP 错误状态契约：BizError 4xx/5xx 作为真实 HTTP status，与 JSON code 保持绝对一致，前端 Axios 拦截器适配结构化业务错误读取，429 保留 Retry-After。
+    - [x] B2 统一安全脱敏日志：实现 Safe Redacted Logger，集中脱敏 Authorization, Cookie, JWT, Refresh Token, OAuth Code, Secret, 密码, TOTP, SQL 参数与邮件正文。
+    - [x] B3 scheduled_secret 物理隔离：定时任务与 Cron 触发仅校验独立 scheduled_secret，恒时比较，未配置 Fail-Closed，彻底杜绝与管理员凭据碰撞。
+    - [x] B4 AI 翻译输出 XSS 防护：提取前剔除 script/iframe/object/svg/events，占位符回填文本转义清洗，中立化 javascript:/vbscript:/shadowrootmode，废弃未校验的大模型原生 HTML 回退。
+    - [x] B5 统一出网 safeFetch SSRF 防御：协议白名单 (HTTP/HTTPS)，全面拦截 IPv4/IPv6 私网、回环、本地链路及云元数据端点（含十进制/十六进制变体），redirect: manual，跨域剥离敏感头，5MB 流量封顶。
+    - [x] B6 OAuth Redirect URI 严格全等匹配：录入与授权端全对称校验，禁止通配符、片段与用户信息，强制 HTTPS（127.0.0.1 除外），严格执行 RFC 6749 Section 3.1.2.4 字符串全等匹配。
+    - [x] B7 OAuth 授权码先验后原子核销：消除先 consume 后校验的错误消耗缺陷，先做完整只读校验，全部凭据合法后通过条件更新 WHERE consumed = 0 进行原子 CAS 核销。
+    - [x] B8 OAuth 客户端密钥信封加密：引入 AES-256-GCM 信封加密，AAD 绑定 clientId，D1 仅存 v1:iv:tag:ciphertext，支持遗留明文双读平滑迁移，无密钥 Fail-Closed。
+    - [x] B9 Webhook 未知事件与状态不可逆保护：未知事件安全记录 status: 'ignored' 并返回 HTTP 200，乱序到达的已发送事件禁止将 delivered 或 dead_letter 倒退回 sent。
+    - [x] B10 Workers AI 健康检查真实异常透传：测试异常坚决返回 success: false 并分类上报真实 reason (binding_missing, model_not_found, quota_exceeded, timeout, inference_failed)。
+    - [x] B11 CI 工作流硬化与供应链安全：Actions 完整 40 位 SHA 锁定，runner 统一 ubuntu-24.04，Gitleaks 带 SHA-256 完整性校验且 Fail-Closed，去除 continue-on-error，加入供应链 audit。
+    - [x] B12 制度文件治理建议草案：保持 AGENTS.md 零侵入，撰写独立治理修订建议案，分析并阻断 Commit Hash 自引用死循环。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：temp_login_ui 构建通过 (2.5s)，mail-vue 构建通过 (14.5s)，Wrangler deploy dry-run 438 个资产校验通过
+    - [x] 单元测试套件：mail-worker Vitest 47 个测试文件、612 个测试用例 100% PASS
+    - [x] 浏览器端到端：tests/oauth-bind-login-ui-e2e.mjs 13/13 全场景 PASS
+    - [x] 全真栈冷启动烟测：tests/fullstack-smoke.mjs 13/13 自动化全绿通过 (cleanup complete)
+    - [x] 压测与契约回归：tests/backend-stress.mjs 7 个阶段 100% 达成，SLO 全部达标
+    - [x] 多语言对称闭环：i18n 六语言字典 100% 对称，代码字面量引用零缺失，零未包裹硬编码
+    - [x] 密钥扫描门禁：scripts/secret-scan.mjs 1,288 文件无密钥泄露，scan-staged-secrets.mjs --self-test PASS
+    - [x] 零假数据残留：测试数据均在 finally 块中完成物理清理与 D1/KV 还原
+
+---
+
 ### PR 模式质量门禁 diff-hygiene 修复与 GitHub Actions 全绿闭环 (2026-11-07)
 *   **关联提交 (Git Commit)**: `192183258217f6fc6e861e27d87b881d589f3065` (Short: `1921832`)
 *   **部署环境 (Deployment)**: `GitHub Actions Quality Gates (#36, PR #37)`

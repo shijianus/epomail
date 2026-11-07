@@ -9,6 +9,36 @@
 
 ---
 
+### Epocanvas Mail — B1–B12 公测阻断项全量修复与 Exact-SHA 收敛专项体检报告 (2026-11-07)
+*   **关联提交 (Git Commit)**: `fix/public-beta-go-blockers-2026-11-07`
+*   **专项文档索引 (Detailed Doc)**:
+    - [制度治理建议案](doc/release/AGENTS-GOVERNANCE-AMENDMENT-PROPOSAL.md)
+    - [公测终审裁决书](doc/release/PUBLIC-BETA-GATE-DECISION.md)
+    - [RC Git 拓扑与哈希一致性报告](doc/release/RC-SHA-CONSISTENCY.md)
+    - [后端安全审计与发现项对齐矩阵](doc/release/SECURITY-RISK-RECONCILIATION.md)
+    - [Staging 真实运行验收差距与缺口清单](doc/release/STAGING-VALIDATION-GAPS.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 范围与环境：针对此前确认的公测 12 项阻断缺陷 (B1–B12) 展开全量代码加固；覆盖 HTTP 错误契约、日志脱敏、定时隔离、AI XSS、SSRF 防御、OAuth URI/CAS/加密、Webhook 终态、Workers AI 健康检查、CI 供应链硬化及制度自引用循环阻断。
+    2. 工具与脚本：Vitest 3.2.7 (Cloudflare Workers test harness)、Playwright Chromium、Load Runner / Backend Stress、Wrangler 4.90.0 dry-run、Secret Scan、i18n 静态扫描三件套。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·修复完成/HTTP 契约 (B1)]**: 统一 BizError 4xx/5xx 与 HTTP status 映射，杜绝 200 冒充业务错误。新增 14 项契约用例全过。
+    - **[P0·修复完成/日志脱敏 (B2)]**: 建立 Safe Redacted Logger，集中脱敏凭据、Token、密钥与正文。新增 3 项脱敏用例全过。
+    - **[P0·修复完成/Cron 隔离 (B3)]**: 隔离 scheduled_secret，杜绝与管理员口令或 JWT 碰撞。新增 7 项隔离用例全过。
+    - **[P0·修复完成/AI XSS 防护 (B4)]**: 全面清洗大模型翻译输出与富文本回填，中立化危险协议。新增 14 项安全用例全过。
+    - **[P0·修复完成/出网 SSRF (B5)]**: 落地 safeFetch，全面阻断私网/回环/云元数据端点与跨域凭据泄露。新增 12 项出网用例全过。
+    - **[P0·修复完成/OAuth 加固 (B6-B8)]**: 严格全等重定向比对、原子 CAS 授权码核销、AES-256-GCM 客户端密钥信封加密。新增 22 项 OAuth 安全用例全过。
+    - **[P0·修复完成/Webhook 状态 (B9)]**: 忽略未知事件，禁止已发送事件回退已送达/死信状态。新增 3 项用例全过。
+    - **[P0·修复完成/AI 健康检查 (B10)]**: 异常分类真实透传，严禁将故障虚报为成功。新增 5 项用例全过。
+    - **[P0·修复完成/CI 供应链 (B11)]**: Actions 40 位 SHA 锁定、ubuntu-24.04 runner、Gitleaks 完整性校验 Fail-Closed。
+    - **[P0·治理草案/制度死循环 (B12)]**: 撰写独立治理建议案，彻底阻断 Commit Hash 自引用死循环。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 单元与集成测试：mail-worker Vitest 47 个测试文件、612 个测试用例 100% PASS。
+    - 浏览器与全真栈：Playwright 13/13 PASS，Fullstack Smoke 13/13 PASS，Backend Stress 7/7 阶段达标。
+    - 供应链与打包：Wrangler deploy --dry-run 成功解析 438 个资产 (5.7MB)。
+    - 制度与多语言：AGENTS.md 零修改，i18n 六语言字典 100% 对称。
+
+---
+
 ### Release Candidate 最终审计、CI 修复与 Staging 验收收敛专项报告 (2026-11-07)
 *   **关联提交 (Git Commit)**: `afdca2aafd58befa1b74a0807558e28c876fec3b` (Short: `afdca2a`)
 *   **专项文档索引 (Detailed Doc)**:
