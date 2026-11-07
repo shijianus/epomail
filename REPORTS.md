@@ -10,7 +10,7 @@
 ---
 
 ### Release Candidate 最终审计、CI 修复与 Staging 验收收敛专项报告 (2026-11-07)
-*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING_SHORT`)
+*   **关联提交 (Git Commit)**: `afdca2aafd58befa1b74a0807558e28c876fec3b` (Short: `afdca2a`)
 *   **专项文档索引 (Detailed Doc)**:
     - [CI 失败归因与修复报告](doc/release/CI-FAILURE-TRIAGE-2026-11-07.md)
     - [RC Git 版本一致性与部署漂移报告](doc/release/RC-SHA-CONSISTENCY.md)

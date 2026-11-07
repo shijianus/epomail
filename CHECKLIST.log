@@ -1,5 +1,5 @@
 ### Release Candidate CI 修复、安全收敛与公测门禁审查 (2026-11-07)
-*   **关联提交 (Git Commit)**: `PENDING_COMMIT_HASH` (Short: `PENDING_SHORT`)
+*   **关联提交 (Git Commit)**: `afdca2aafd58befa1b74a0807558e28c876fec3b` (Short: `afdca2a`)
 *   **部署环境 (Deployment)**: `本地全真栈 / GitHub Actions Quality Gates` (Staging 部署暂缓，生产严格禁止)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] B1 Diff Hygiene 修复：全量清理 DEPLOYMENT-EXECUTION.md、REPORTS.md 等 15 个 Markdown 文件中的行尾空格与末尾空行，git diff --check 零报错通过。
