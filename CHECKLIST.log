@@ -1,3 +1,12 @@
+### EpoMail 存量 user.update_time 迁移兼容性修复与定向回归 (2026-11-14)
+*   **关联提交 (Git Commit)**: `a3f5e6b115c7b942af5a554d5b447b05e07bd7b7` (Short: `a3f5e6b`，基于 `967e01d7`)
+*   **根因与变更 (Root Cause & Fix)**:
+    - [x] 根因定位：在隔离旧库升级与回滚兼容演练中发现，`mail-worker/src/init/init.js` 中 `v3_14DB` 对缺少 `update_time` 的旧 `user` 表执行 `ALTER TABLE user ADD COLUMN update_time DATETIME DEFAULT CURRENT_TIMESTAMP` 会触发 SQLite `Cannot add a column with non-constant default` 报错并被异常捕获跳过，进而导致后续主站长/演示账号播种与更新语句因缺列报错（`table user has no column named update_time`）。
+    - [x] 迁移修复：`mail-worker/src/init/init.js` 改用幂等辅助函数 `addMissingColumns` 执行 `ALTER TABLE user ADD COLUMN update_time DATETIME;` 并在缺值行回填 `COALESCE(create_time, datetime('now'))`，同步消除吞错隐患；在 `mail-worker/test/beta-migrations.spec.js` 新增存量旧表 `user.update_time` 升级、回填及重复迁移幂等用例。
+    - [x] 定向回归验证：隔离 SQLite 旧库迁移/失败重试/重复升级/`8e65f36` 回滚兼容与 Staging D1 快照恢复 4 项场景全部通过；Worker 迁移专项 `init-visitor-security.spec.js` + `beta-migrations.spec.js` 2 文件 12/12 通过。
+
+---
+
 ### EpoMail 压测工具环回代理 503 根因修复与接手复验 (2026-11-14)
 *   **关联提交 (Git Commit)**: `9033982f150673b33a0f8c51538bbf6ec5bdb6e4` (Short: `9033982`，基于交接候选 `8efec93d`)
 *   **根因与变更 (Root Cause & Fix)**:
