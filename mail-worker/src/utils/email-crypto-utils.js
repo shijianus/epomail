@@ -1,13 +1,27 @@
 /**
  * Email Cryptography Utilities (AES-256-GCM + HKDF-SHA256)
- * High-performance, centralized DB encrypted storage engine for Epocanvas Mail.
- * Pure Web Crypto implementation without external dependencies for Cloudflare Workers.
+ * Domain-isolated key derivation and authenticated encryption for stored email fields.
+ * Supports dual-read of legacy un-tagged enc:v1 records while enforcing domain isolation
+ * for all new writes (never falling back to jwt_secret for encryption).
  */
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const CIPHER_PREFIX = 'enc:v1:';
+const DOMAIN_MARKER_PREFIX = 'd=';
 const ENCRYPTED_FIELDS = ['subject', 'content', 'text', 'code'];
+
+export const EMAIL_KEY_DOMAINS = Object.freeze({
+	EMAIL_ENC_KEY: 'e',
+	PREVIOUS_EMAIL_ENC_KEY: 'p',
+	TOTP_COMPAT: 't'
+});
+
+const EMAIL_KEY_DOMAIN_NAMES = Object.freeze({
+	e: 'email_enc_key',
+	p: 'previous_email_enc_key',
+	t: 'totp_enc_key_compat'
+});
 
 function uint8ToBase64(bytes) {
 	let binary = '';
@@ -28,111 +42,265 @@ function base64ToUint8(base64) {
 	return bytes;
 }
 
+function normalizeUserId(userOrUserId) {
+	return typeof userOrUserId === 'object' && userOrUserId !== null
+		? Number(userOrUserId.userId ?? 0)
+		: Number(userOrUserId ?? 0);
+}
+
+function buildEmailAad(userId, domainTag) {
+	return encoder.encode(`epomail:email:v1:uid=${Number(userId || 0)}:d=${domainTag}`);
+}
+
+async function deriveDomainAesKey(secret, uid, domainName) {
+	const baseKey = await crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey']);
+	return await crypto.subtle.deriveKey(
+		{
+			name: 'HKDF',
+			hash: 'SHA-256',
+			salt: encoder.encode(`epomail:email-enc:v2:${domainName}`),
+			info: encoder.encode(`epomail:email-encryption:domain=${domainName}:user-${uid || 0}`)
+		},
+		baseKey,
+		{ name: 'AES-GCM', length: 256 },
+		false,
+		['encrypt', 'decrypt']
+	);
+}
+
+async function deriveLegacyV1AesKey(secret, uid, legacySalt) {
+	const baseKey = await crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey']);
+	return await crypto.subtle.deriveKey(
+		{
+			name: 'HKDF',
+			hash: 'SHA-256',
+			salt: encoder.encode(legacySalt || `epomail-user-salt-${uid || 0}`),
+			info: encoder.encode(`epomail:email-encryption:user-${uid || 0}`)
+		},
+		baseKey,
+		{ name: 'AES-GCM', length: 256 },
+		false,
+		['encrypt', 'decrypt']
+	);
+}
+
+function isCryptoKey(obj) {
+	return typeof CryptoKey !== 'undefined' && obj instanceof CryptoKey;
+}
+
+function cleanSecret(val) {
+	return typeof val === 'string' ? val.trim() : '';
+}
+
 const emailCryptoUtils = {
 	CIPHER_PREFIX,
 	ENCRYPTED_FIELDS,
+	EMAIL_KEY_DOMAINS,
 
-	/**
-	 * Derive AES-256-GCM CryptoKey for a specific user using HKDF-SHA-256.
-	 * Base secret is derived from env (totp_enc_key || jwt_secret || master key).
-	 * Salt is user-specific (user.salt or user.userId).
-	 * Info binds the key specifically to email encryption for that user.
-	 */
-	async getUserEmailCryptoKey(env, userOrUserId, userSalt = null) {
-		const masterSecret = (env?.email_enc_key || env?.totp_enc_key || env?.jwt_secret || '').trim();
-		if (!masterSecret) {
-			throw new Error('email encryption key is not configured (set email_enc_key or totp_enc_key)');
+	inspectEncryptedValue(value) {
+		if (!value || typeof value !== 'string' || !value.startsWith(CIPHER_PREFIX)) {
+			return { encrypted: false, format: 'plaintext', domainTag: null };
 		}
+		const payload = value.slice(CIPHER_PREFIX.length);
+		if (payload.startsWith(DOMAIN_MARKER_PREFIX)) {
+			const secondSep = payload.indexOf(':');
+			if (secondSep > DOMAIN_MARKER_PREFIX.length) {
+				const domainTag = payload.slice(DOMAIN_MARKER_PREFIX.length, secondSep);
+				return { encrypted: true, format: 'domain_v1', domainTag };
+			}
+		}
+		return { encrypted: true, format: 'legacy_v1', domainTag: null };
+	},
 
-		const uid = typeof userOrUserId === 'object' ? userOrUserId?.userId : userOrUserId;
-		// Always derive the HKDF salt deterministically from userId (unless an explicit
-		// userSalt argument is passed) so password resets rotating userRow.salt never
-		// change the user's mailbox encryption key.
-		const salt = userSalt || `epomail-user-salt-${uid || 0}`;
-
-		const baseKey = await crypto.subtle.importKey(
-			'raw',
-			encoder.encode(masterSecret),
-			'HKDF',
-			false,
-			['deriveKey']
-		);
-
-		return await crypto.subtle.deriveKey(
-			{
-				name: 'HKDF',
-				hash: 'SHA-256',
-				salt: encoder.encode(salt),
-				info: encoder.encode(`epomail:email-encryption:user-${uid || 0}`)
-			},
-			baseKey,
-			{ name: 'AES-GCM', length: 256 },
-			false,
-			['encrypt', 'decrypt']
-		);
+	needsEmailRecordMigration(emailRow, keyring) {
+		if (!emailRow || !keyring?.activeDomain) return false;
+		return ENCRYPTED_FIELDS.some(field => {
+			const val = emailRow[field];
+			if (!val || typeof val !== 'string') return false;
+			const info = this.inspectEncryptedValue(val);
+			if (!info.encrypted) return false;
+			return info.format !== 'domain_v1' || info.domainTag !== keyring.activeDomain;
+		});
 	},
 
 	/**
-	 * Encrypt plain text using AES-256-GCM (12-byte random IV per record)
-	 * Output format: enc:v1:<ivBase64>:<cipherBase64>
+	 * Derive a domain-isolated keyring for a specific user using HKDF-SHA-256.
+	 * New writes prefer dedicated `email_enc_key` and NEVER fall back to `jwt_secret`.
+	 * Legacy `enc:v1` ciphertexts remain readable across key upgrades via dual-read.
 	 */
-	async encryptText(plainText, cryptoKey) {
+	async getUserEmailCryptoKey(env, userOrUserId, userSalt = null, options = {}) {
+		const { requireDedicatedKey = false, allowLegacyJwtDecryptOnly = false } = options;
+		const uid = normalizeUserId(userOrUserId);
+		const emailSecret = cleanSecret(env?.email_enc_key);
+		const prevEmailSecret = cleanSecret(env?.previous_email_enc_key);
+		const totpSecret = cleanSecret(env?.totp_enc_key);
+		const jwtSecret = cleanSecret(env?.jwt_secret);
+
+		let activeDomain = null;
+		let domainName = null;
+		let writeKey = null;
+
+		if (emailSecret) {
+			activeDomain = EMAIL_KEY_DOMAINS.EMAIL_ENC_KEY;
+			domainName = EMAIL_KEY_DOMAIN_NAMES.e;
+			writeKey = await deriveDomainAesKey(emailSecret, uid, domainName);
+		} else if (!requireDedicatedKey && totpSecret) {
+			activeDomain = EMAIL_KEY_DOMAINS.TOTP_COMPAT;
+			domainName = EMAIL_KEY_DOMAIN_NAMES.t;
+			writeKey = await deriveDomainAesKey(totpSecret, uid, domainName);
+		} else if (!allowLegacyJwtDecryptOnly || !jwtSecret) {
+			throw new Error('email encryption key is not configured (set email_enc_key or totp_enc_key)');
+		}
+
+		const readKeysByDomain = {
+			[EMAIL_KEY_DOMAINS.EMAIL_ENC_KEY]: [],
+			[EMAIL_KEY_DOMAINS.PREVIOUS_EMAIL_ENC_KEY]: [],
+			[EMAIL_KEY_DOMAINS.TOTP_COMPAT]: []
+		};
+
+		if (emailSecret) {
+			readKeysByDomain[EMAIL_KEY_DOMAINS.EMAIL_ENC_KEY].push(
+				await deriveDomainAesKey(emailSecret, uid, EMAIL_KEY_DOMAIN_NAMES.e)
+			);
+		}
+		if (prevEmailSecret) {
+			const prevWithE = await deriveDomainAesKey(prevEmailSecret, uid, EMAIL_KEY_DOMAIN_NAMES.e);
+			const prevWithP = await deriveDomainAesKey(prevEmailSecret, uid, EMAIL_KEY_DOMAIN_NAMES.p);
+			readKeysByDomain[EMAIL_KEY_DOMAINS.EMAIL_ENC_KEY].push(prevWithE);
+			readKeysByDomain[EMAIL_KEY_DOMAINS.PREVIOUS_EMAIL_ENC_KEY].push(prevWithP, prevWithE);
+		}
+		if (totpSecret) {
+			readKeysByDomain[EMAIL_KEY_DOMAINS.TOTP_COMPAT].push(
+				await deriveDomainAesKey(totpSecret, uid, EMAIL_KEY_DOMAIN_NAMES.t)
+			);
+		}
+
+		const legacySecrets = [...new Set([emailSecret, prevEmailSecret, totpSecret, jwtSecret].filter(Boolean))];
+		const legacyReadKeys = [];
+		const legacySalt = userSalt || `epomail-user-salt-${uid || 0}`;
+		for (const secret of legacySecrets) {
+			legacyReadKeys.push(await deriveLegacyV1AesKey(secret, uid, legacySalt));
+		}
+
+		return {
+			__epomailEmailKeyring: true,
+			userId: uid,
+			activeDomain,
+			domainName,
+			writeKey,
+			readKeysByDomain,
+			legacyReadKeys
+		};
+	},
+
+	/**
+	 * Encrypt plain text using AES-256-GCM (12-byte random IV per record).
+	 * Emits domain-tagged enc:v1:d=<domain>:<ivBase64>:<cipherBase64> bound with AAD.
+	 */
+	async encryptText(plainText, cryptoKeyOrKeyring, options = {}) {
 		if (plainText === null || plainText === undefined) return plainText;
 		if (typeof plainText !== 'string') plainText = String(plainText);
 		if (plainText === '') return '';
 
-		// If already encrypted with enc:v1:, do not double-encrypt
+		// Preserve already-encrypted payloads cleanly
 		if (plainText.startsWith(CIPHER_PREFIX)) return plainText;
 
 		const iv = new Uint8Array(12);
 		crypto.getRandomValues(iv);
-
 		const encodedData = encoder.encode(plainText);
+
+		if (isCryptoKey(cryptoKeyOrKeyring)) {
+			const cipherBuffer = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKeyOrKeyring, encodedData);
+			return `${CIPHER_PREFIX}${uint8ToBase64(iv)}:${uint8ToBase64(new Uint8Array(cipherBuffer))}`;
+		}
+
+		const keyring = cryptoKeyOrKeyring;
+		const targetDomain = options.domainOverride || keyring?.activeDomain;
+		let targetKey = keyring?.writeKey;
+		if (options.domainOverride) {
+			targetKey = keyring?.readKeysByDomain?.[options.domainOverride]?.[0] || null;
+		}
+		if (!keyring?.__epomailEmailKeyring || !targetKey || !targetDomain) {
+			throw new Error('Email encryption write key is unavailable for target key domain');
+		}
+
+		const aad = buildEmailAad(keyring.userId, targetDomain);
 		const cipherBuffer = await crypto.subtle.encrypt(
-			{
-				name: 'AES-GCM',
-				iv: iv
-			},
-			cryptoKey,
+			{ name: 'AES-GCM', iv, additionalData: aad },
+			targetKey,
 			encodedData
 		);
 
-		const ivBase64 = uint8ToBase64(iv);
-		const cipherBase64 = uint8ToBase64(new Uint8Array(cipherBuffer));
-		return `${CIPHER_PREFIX}${ivBase64}:${cipherBase64}`;
+		return `${CIPHER_PREFIX}${DOMAIN_MARKER_PREFIX}${targetDomain}:${uint8ToBase64(iv)}:${uint8ToBase64(new Uint8Array(cipherBuffer))}`;
 	},
 
 	/**
-	 * Decrypt cipher text using AES-256-GCM.
-	 * If text is not encrypted (does not start with enc:v1:), return as is (safe for plaintext/legacy data).
+	 * Decrypt cipher text using AES-256-GCM with domain isolation and legacy v1 dual-read.
+	 * If text is not encrypted (does not start with enc:v1:), return as is.
 	 */
-	async decryptText(cipherText, cryptoKey) {
+	async decryptText(cipherText, cryptoKeyOrKeyring) {
 		if (!cipherText || typeof cipherText !== 'string') return cipherText;
 		if (!cipherText.startsWith(CIPHER_PREFIX)) return cipherText;
 
+		const payload = cipherText.slice(CIPHER_PREFIX.length);
+
 		try {
-			const payload = cipherText.slice(CIPHER_PREFIX.length);
+			if (payload.startsWith(DOMAIN_MARKER_PREFIX)) {
+				const parts = payload.split(':');
+				if (parts.length !== 3) return cipherText;
+				const domainTag = parts[0].slice(DOMAIN_MARKER_PREFIX.length);
+				const ivBase64 = parts[1];
+				const cipherBase64 = parts[2];
+				if (!domainTag || !ivBase64 || !cipherBase64 || isCryptoKey(cryptoKeyOrKeyring)) {
+					return cipherText;
+				}
+				const candidateKeys = cryptoKeyOrKeyring?.readKeysByDomain?.[domainTag] || [];
+				if (candidateKeys.length === 0) return cipherText;
+
+				const iv = base64ToUint8(ivBase64);
+				const cipherBytes = base64ToUint8(cipherBase64);
+				const aad = buildEmailAad(cryptoKeyOrKeyring.userId, domainTag);
+				for (const candidateKey of candidateKeys) {
+					try {
+						const decryptedBuffer = await crypto.subtle.decrypt(
+							{ name: 'AES-GCM', iv, additionalData: aad },
+							candidateKey,
+							cipherBytes
+						);
+						return decoder.decode(decryptedBuffer);
+					} catch (_) {
+						// Continue trying remaining rotation keys inside this explicit domain
+					}
+				}
+				return cipherText;
+			}
+
+			// Legacy enc:v1:<ivBase64>:<cipherBase64> format
 			const sepIndex = payload.indexOf(':');
 			if (sepIndex === -1) return cipherText;
-
 			const ivBase64 = payload.slice(0, sepIndex);
 			const cipherBase64 = payload.slice(sepIndex + 1);
-
 			const iv = base64ToUint8(ivBase64);
 			const cipherBytes = base64ToUint8(cipherBase64);
 
-			const decryptedBuffer = await crypto.subtle.decrypt(
-				{
-					name: 'AES-GCM',
-					iv: iv
-				},
-				cryptoKey,
-				cipherBytes
-			);
+			const legacyKeys = isCryptoKey(cryptoKeyOrKeyring)
+				? [cryptoKeyOrKeyring]
+				: (cryptoKeyOrKeyring?.legacyReadKeys || []);
 
-			return decoder.decode(decryptedBuffer);
-		} catch (err) {
-			// 在解密遇到非本用户私钥密文、旧格式或损坏密文时安全降级返回原始字符串，由业务层做空值/过滤处理，避免刷屏噪音
+			for (const candidateKey of legacyKeys) {
+				try {
+					const decryptedBuffer = await crypto.subtle.decrypt(
+						{ name: 'AES-GCM', iv },
+						candidateKey,
+						cipherBytes
+					);
+					return decoder.decode(decryptedBuffer);
+				} catch (_) {
+					// Continue checking legacy derivation sources
+				}
+			}
+			return cipherText;
+		} catch (_) {
 			return cipherText;
 		}
 	},
@@ -188,18 +356,12 @@ const emailCryptoUtils = {
 			return true; // 加密邮件模式 (包含垃圾箱全量加密)
 		}
 		// Mode 0: 隐私邮件模式 (垃圾箱明文存储，其余密文存储)
-		const isTrashOrSpam = Number(emailRecord.isDel) === 1 || 
-		                      Number(emailRecord.isSpam) === 1 || 
+		const isTrashOrSpam = Number(emailRecord.isDel) === 1 ||
+		                      Number(emailRecord.isSpam) === 1 ||
 		                      emailRecord.status === 2; // emailConst.status.NOONE = 2
 		return !isTrashOrSpam;
 	},
 
-	/**
-	 * Canonical definition of protection levels for Epocanvas Mail:
-	 * Level 1: Standard Plaintext (全部邮件模式) - No encryption, full audit
-	 * Level 2: Selective E2EE & Spam Isolation (隐私邮件模式 - 推荐) - User keys encrypt normal mail, trash isolated
-	 * Level 3: Maximum Zero-Knowledge E2EE (端到端加密模式) - 100% encrypted, admin barred from all user data
-	 */
 	PROTECTION_LEVELS: {
 		0: {
 			code: 'PRIVACY',

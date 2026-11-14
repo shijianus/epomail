@@ -17,6 +17,7 @@ import mailReliabilityService, { failInboundClaim } from '../service/mail-reliab
 import { getMailDb } from '../utils/db-accessor.js';
 import forwardService from '../service/mail-forward-service.js';
 import { assertOutboundAllowed } from '../utils/outbound-policy.js';
+import safeLogger from '../utils/safe-logger.js';
 
 /** Read bounded raw bytes; decode only for callers that explicitly need text. */
 export async function readRawEmail(message, maxLimitBytes, maxLimitMB, { decode = true } = {}) {
@@ -137,7 +138,7 @@ export async function email(message, env, ctx) {
 		} catch (parseError) {
 			// A malformed MIME payload will never become parseable on retry.
 			// Reject it permanently instead of returning a transient failure.
-			console.warn('[inbound] malformed MIME rejected:', parseError.message);
+			safeLogger.warn('inbound_malformed_mime_rejected', { error: parseError });
 			message.setReject('Malformed message');
 			return;
 		}
@@ -150,7 +151,7 @@ export async function email(message, env, ctx) {
 		const attachmentsIn = Array.isArray(email.attachments) ? email.attachments : [];
 		const MAX_INBOUND_ATTACHMENTS = 200;
 		if (attachmentsIn.length > MAX_INBOUND_ATTACHMENTS) {
-			console.warn(`[inbound] rejected message with ${attachmentsIn.length} attachments from ${message.to}`);
+			safeLogger.warn('inbound_too_many_attachments', { attachmentCount: attachmentsIn.length });
 			message.setReject(`Too many attachments (max ${MAX_INBOUND_ATTACHMENTS})`);
 			return;
 		}
@@ -163,7 +164,7 @@ export async function email(message, env, ctx) {
 				const count = await env.kv.get(kvConst.HARD_INTERCEPT_TOTAL) || 0;
 				await env.kv.put(kvConst.HARD_INTERCEPT_TOTAL, Number(count) + 1);
 			} catch(e) {
-				console.error('Failed to update hard intercept total', e);
+				safeLogger.error('inbound_hard_intercept_metric_failed', { error: e });
 			}
 			message.setReject('Message rejected');
 			return;
@@ -393,7 +394,7 @@ export async function email(message, env, ctx) {
 						assertOutboundAllowed({ env }, [email]);
 						await message.forward(email);
 					} catch (e) {
-						if (e?.name !== 'BizError') console.warn('[inbound] system forwarding failed');
+						if (e?.name !== 'BizError') safeLogger.warn('inbound_system_forward_failed', { error: e });
 					}
 				}));
 			}
@@ -447,7 +448,7 @@ export async function email(message, env, ctx) {
 							for (const target of targets) {
 								const cleanTarget = target.trim().toLowerCase();
 								if (!cleanTarget || cleanTarget === currentTo || cleanTarget === currentFrom) {
-									console.warn(`Prevented forwarding loop: target [${target}] matches recipient or sender`);
+									safeLogger.warn('inbound_forwarding_loop_prevented');
 									continue;
 								}
 								const domains = Array.isArray(domainList) ? domainList : [];
@@ -475,12 +476,12 @@ export async function email(message, env, ctx) {
 										target: cleanTarget,
 										addPrefix: !!pfw.addPrefix
 									}).catch((err) => {
-										console.warn(`Personal forwarding task enqueue failed: ${err.message}`);
+										safeLogger.warn('personal_forward_enqueue_failed', { error: err });
 										return null;
 									});
 									if (forwardTask) {
 										await forwardService.processForwardTask({ env }, forwardTask.task_id)
-											.catch((err) => console.warn(`Personal forwarding task failed: ${err.message}`));
+											.catch((err) => safeLogger.warn('personal_forward_task_failed', { error: err }));
 									} else {
 										try {
 											const forwardSubject = pfw.addPrefix ? `[Fwd] ${email.subject || emailRow.subject || ''}` : (email.subject || emailRow.subject || '');
@@ -494,7 +495,7 @@ export async function email(message, env, ctx) {
 												accountId: emailRow.accountId
 											}, emailRow.userId);
 										} catch (sendErr) {
-											console.error(`Personal CC Forwarding to ${target} failed:`, sendErr.message);
+											safeLogger.error('personal_cc_forwarding_failed', { error: sendErr });
 										}
 									}
 								}
@@ -503,12 +504,12 @@ export async function email(message, env, ctx) {
 					}
 				}
 			} catch (ptgErr) {
-				console.error('Personal TG / Forwarding processing error:', ptgErr);
+				safeLogger.error('personal_tg_or_forwarding_failed', { error: ptgErr });
 			}
 		}
 
 		} catch (e) {
-			console.error('邮件接收异常: ', e);
+			safeLogger.error('inbound_email_receive_failed', { error: e });
 			if (activeInboundClaim && !activeInboundClaim.complete) {
 				await failInboundClaim({ env }, activeInboundClaim.claimKey, activeInboundClaim.leaseToken, e).catch(() => {});
 			}

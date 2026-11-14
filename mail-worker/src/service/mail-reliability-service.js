@@ -72,16 +72,30 @@ export async function inboundContentSha256(rawBytes) {
 	return mailSha256(canonical);
 }
 
-async function deriveInboundRawKey(env, keyUsages) {
-	const master = String(env?.email_enc_key || env?.totp_enc_key || '').trim();
-	if (!master) throw new Error('Inbound raw-MIME encryption key is not configured');
-	const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(master), 'HKDF', false, ['deriveKey']);
+async function importRawMimeKey(masterSecret, keyUsages) {
+	const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(masterSecret), 'HKDF', false, ['deriveKey']);
 	return crypto.subtle.deriveKey({
 		name: 'HKDF',
 		hash: 'SHA-256',
 		salt: encoder.encode('epomail:inbound-raw-mime:v1'),
 		info: encoder.encode('mail-receive-claim')
 	}, keyMaterial, { name: 'AES-GCM', length: 256 }, false, keyUsages);
+}
+
+async function deriveInboundRawKey(env, keyUsages) {
+	const master = String(env?.email_enc_key || env?.totp_enc_key || '').trim();
+	if (!master) throw new Error('Inbound raw-MIME encryption key is not configured');
+	return importRawMimeKey(master, keyUsages);
+}
+
+async function deriveInboundRawDecryptKeys(env) {
+	const secrets = [...new Set([
+		String(env?.email_enc_key || '').trim(),
+		String(env?.previous_email_enc_key || '').trim(),
+		String(env?.totp_enc_key || '').trim()
+	].filter(Boolean))];
+	if (secrets.length === 0) throw new Error('Inbound raw-MIME encryption key is not configured');
+	return Promise.all(secrets.map(secret => importRawMimeKey(secret, ['decrypt'])));
 }
 
 function base64ToBytes(value) {
@@ -102,17 +116,28 @@ async function encryptRawMime(env, rawBytes) {
 
 async function decryptRawMime(env, encrypted) {
 	const bytes = encrypted instanceof Uint8Array ? encrypted : new Uint8Array(encrypted);
-	const key = await deriveInboundRawKey(env, ['decrypt']);
-	if (bytes.byteLength >= RAW_V2_OVERHEAD && RAW_V2_PREFIX.every((byte, i) => byte === bytes[i])) {
-		return new Uint8Array(await crypto.subtle.decrypt({
-			name: 'AES-GCM', additionalData: RAW_V2_PREFIX,
-			iv: bytes.subarray(RAW_V2_PREFIX.byteLength, RAW_V2_PREFIX.byteLength + 12)
-		}, key, bytes.subarray(RAW_V2_PREFIX.byteLength + 12)));
+	const keys = await deriveInboundRawDecryptKeys(env);
+	const isV2 = bytes.byteLength >= RAW_V2_OVERHEAD && RAW_V2_PREFIX.every((byte, i) => byte === bytes[i]);
+	let lastErr;
+	for (const key of keys) {
+		try {
+			if (isV2) {
+				return new Uint8Array(await crypto.subtle.decrypt({
+					name: 'AES-GCM', additionalData: RAW_V2_PREFIX,
+					iv: bytes.subarray(RAW_V2_PREFIX.byteLength, RAW_V2_PREFIX.byteLength + 12)
+				}, key, bytes.subarray(RAW_V2_PREFIX.byteLength + 12)));
+			}
+			const parts = decoder.decode(bytes).split(':');
+			if (parts.length !== 4 || parts[0] !== 'raw' || parts[1] !== 'v1') {
+				throw new Error('Stored inbound raw MIME has an unknown format');
+			}
+			const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(parts[2]) }, key, base64ToBytes(parts[3]));
+			return base64ToBytes(decoder.decode(plain));
+		} catch (err) {
+			lastErr = err;
+		}
 	}
-	const parts = decoder.decode(bytes).split(':');
-	if (parts.length !== 4 || parts[0] !== 'raw' || parts[1] !== 'v1') throw new Error('Stored inbound raw MIME has an unknown format');
-	const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(parts[2]) }, key, base64ToBytes(parts[3]));
-	return base64ToBytes(decoder.decode(plain));
+	throw lastErr || new Error('Unable to decrypt inbound raw MIME');
 }
 
 async function readStoredRaw(c, claim) {

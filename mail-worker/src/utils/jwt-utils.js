@@ -1,3 +1,5 @@
+import safeLogger from './safe-logger.js';
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -110,7 +112,7 @@ const jwtUtils = {
 			return payload;
 
 		} catch (err) {
-			console.log(err)
+			safeLogger.warn('jwt_verify_failed', { error: err });
 			return null;
 		}
 	}

@@ -18,5 +18,7 @@ scheduled_secret=<your-strong-scheduled-secret>
 resend_webhook_secret=<whsec_your_webhook_signing_secret>
 # 可选：允许跨域访问 API 的前端源（逗号分隔）。未设置时仅允许同源。
 CORS_ORIGINS=
-# 可选：邮件静态加密主键；不设置时回退到 totp_enc_key
+# 可选：邮件静态加密主键（强建议生产独立配置，不与 jwt_secret/totp_enc_key 混用）
 email_enc_key=<your-optional-email-encryption-key>
+# 可选：BYO S3 凭据独立 AEAD 加密主键（生产强建议单独配置）
+storage_enc_key=<your-optional-byo-storage-encryption-key>

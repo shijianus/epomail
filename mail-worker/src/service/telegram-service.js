@@ -191,13 +191,15 @@ const telegramService = {
 			});
 
 			if (!res.ok) {
-				const errText = await res.text();
-				throw new BizError(`Telegram API 返回错误 (${res.status}): ${errText}`);
+				await res.text().catch(() => '');
+				safeLogger.warn('telegram_test_failed', { userId, status: res.status });
+				throw new BizError(`Telegram API 返回错误 (${res.status})`);
 			}
 			return { success: true };
 		} catch (e) {
 			if (e instanceof BizError) throw e;
-			throw new BizError(`发送 Telegram 测试消息失败: ${e.message}`);
+			safeLogger.error('telegram_test_request_error', { userId, error: e });
+			throw new BizError('发送 Telegram 测试消息失败');
 		}
 	},
 

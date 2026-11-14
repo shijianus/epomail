@@ -4,6 +4,7 @@ import domainUtils from '../utils/domain-uitls';
 import { settingConst } from '../const/entity-const';
 import s3Signer from '../utils/s3-signer';
 import { isSafePublicUrl, assertSafePublicUrl } from '../utils/url-utils';
+import safeLogger from '../utils/safe-logger.js';
 
 const s3Service = {
 
@@ -275,7 +276,7 @@ const s3Service = {
 					Key: probeKey
 				}));
 			} catch (delErr) {
-				console.warn('Probe cleanup warning:', delErr);
+				safeLogger.warn('s3_probe_cleanup_warning', { error: delErr });
 			}
 
 			const latencyMs = Date.now() - startTime;
@@ -295,7 +296,7 @@ const s3Service = {
 					customDomain
 				});
 			} catch (urlErr) {
-				console.warn('Presigned URL test warning:', urlErr);
+				safeLogger.warn('s3_presigned_url_test_warning', { error: urlErr });
 			}
 
 			return {

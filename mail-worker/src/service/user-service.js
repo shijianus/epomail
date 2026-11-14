@@ -33,6 +33,8 @@ import userContext from '../security/user-context.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import { mailSha256 } from '../utils/mail-pipeline.js';
+import safeLogger from '../utils/safe-logger.js';
+import { encryptByoStorageConfig } from '../utils/storage-credential-crypto.js';
 import { deleteKvKeys, deleteKvMatching, forEachKvPage } from '../utils/kv-revocation.js';
 import { assertStorageCanChange, beginAccountDeletion, deleteAccountEvidence, getObjectDeletionCounts,
 	isActiveUser, readPrivacyState, revokeAccountAccess, revokeTelegramLinks, setDeletionStatus } from './privacy-revocation-service.js';
@@ -1931,12 +1933,14 @@ const userService = {
 			customDomain: (customDomain || '').trim()
 		};
 
+		const encryptedConfig = await encryptByoStorageConfig(cleanConfig, c.env, userId);
+
 		const userDb = (await import('../utils/db-accessor')).getUserDb(c);
 		await userDb.prepare(`
 			UPDATE user 
 			SET byo_storage_enabled = 1, byo_storage_config = ? 
 			WHERE user_id = ?
-		`).bind(JSON.stringify(cleanConfig), userId).run();
+		`).bind(encryptedConfig, userId).run();
 
 		return {
 			ok: true,
@@ -1962,7 +1966,7 @@ const userService = {
 				detail: 'BYO Storage unlinked and reset to system default'
 			});
 		} catch (e) {
-			console.error('Failed to send storage purged notice:', e);
+			safeLogger.error('storage_purged_notice_failed', { userId, error: e });
 		}
 
 		return {

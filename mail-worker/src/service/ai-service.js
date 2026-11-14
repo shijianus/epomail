@@ -10,6 +10,7 @@ import { reserveAiRequest } from '../utils/ai-budget.js';
 import { t } from '../i18n/i18n.js';
 import { escapeHtml, sanitizeSharedEmailHtml } from '../utils/safe-email-html.js';
 import { safeFetch } from '../utils/safe-fetch.js';
+import safeLogger from '../utils/safe-logger.js';
 import {
 	getContentProcessingConfig,
 	requireTranslationConfirmation,
@@ -1094,7 +1095,7 @@ STRICT RULES:
 					}
 				}
 			} catch (e) {
-				console.warn(`探测端点 ${endpoint} 异常:`, e.message);
+				safeLogger.warn('ai_probe_endpoint_failed', { error: e });
 			}
 		}
 
@@ -1257,8 +1258,9 @@ STRICT RULES:
 						endpoint
 					};
 				} else {
-					const errText = await resp.text().catch(() => '');
-					lastError = new Error(`HTTP ${resp.status}: ${errText.slice(0, 160)}`);
+					await resp.text().catch(() => '');
+					safeLogger.warn('ai_ping_failed', { status: resp.status });
+					lastError = new Error(`HTTP ${resp.status}`);
 				}
 			} catch (e) {
 				lastError = e;

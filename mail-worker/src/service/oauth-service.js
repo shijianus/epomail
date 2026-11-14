@@ -15,6 +15,7 @@ import { getUserDb } from '../utils/db-accessor.js';
 import oneTimeCredential, { OTC_PURPOSE } from '../utils/one-time-credential.js';
 import oauthBindClaim from '../utils/oauth-bind-claim.js';
 import KvConst from '../const/kv-const.js';
+import safeLogger from '../utils/safe-logger.js';
 
 const OAUTH_STATE_TTL_SECONDS = 600;
 const OAUTH_LOGIN_CODE_TTL_SECONDS = 60;
@@ -521,8 +522,9 @@ const oauthService = {
 				body: formBody.toString()
 			});
 			if (!tokenRes.ok) {
-				const errText = await tokenRes.text();
-				throw new BizError(`Google token exchange failed: ${errText}`);
+				await tokenRes.text().catch(() => '');
+				safeLogger.warn('oauth_token_exchange_failed', { provider: 'google', status: tokenRes.status });
+				throw new BizError(`Google token exchange failed (HTTP ${tokenRes.status})`);
 			}
 			const tokenData = await tokenRes.json();
 			const userRes = await fetch(meta.userInfoUrl, {
@@ -559,8 +561,9 @@ const oauthService = {
 				body: formBody.toString()
 			});
 			if (!tokenRes.ok) {
-				const errText = await tokenRes.text();
-				throw new BizError(`Microsoft token exchange failed: ${errText}`);
+				await tokenRes.text().catch(() => '');
+				safeLogger.warn('oauth_token_exchange_failed', { provider: 'microsoft', status: tokenRes.status });
+				throw new BizError(`Microsoft token exchange failed (HTTP ${tokenRes.status})`);
 			}
 			const tokenData = await tokenRes.json();
 			const userRes = await fetch(meta.userInfoUrl, {
@@ -654,8 +657,9 @@ const oauthService = {
 				body: formBody.toString()
 			});
 			if (!tokenRes.ok) {
-				const errText = await tokenRes.text();
-				throw new BizError(`Custom token exchange failed: ${errText}`);
+				await tokenRes.text().catch(() => '');
+				safeLogger.warn('oauth_token_exchange_failed', { provider: 'custom', status: tokenRes.status });
+				throw new BizError(`Custom token exchange failed (HTTP ${tokenRes.status})`);
 			}
 			const tokenData = await tokenRes.json();
 			const accessToken = tokenData.access_token;

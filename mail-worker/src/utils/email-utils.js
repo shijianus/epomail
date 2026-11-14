@@ -1,4 +1,5 @@
 import { parseHTML } from 'linkedom';
+import safeLogger from './safe-logger.js';
 
 /**
  * 公共保留本地部分（统一小写比较）。注册与别名创建不得占用官方/合规身份地址，
@@ -71,7 +72,7 @@ const emailUtils = {
 			let text = document.body.innerText;
 			return this.formatText(text);
 		} catch (e) {
-			console.error(e)
+			safeLogger.error('email_html_to_text_failed', { error: e });
 			return ''
 		}
 	}

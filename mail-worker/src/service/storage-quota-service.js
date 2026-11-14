@@ -2,6 +2,7 @@ import { getMailDb, getUserDb } from '../utils/db-accessor';
 import settingService from './setting-service';
 import { s3Signer } from '../utils/s3-signer';
 import BizError from '../error/biz-error';
+import { decryptByoStorageConfig, maskByoStorageConfig } from '../utils/storage-credential-crypto.js';
 
 function quotaNumber(value) {
 	if (!['number', 'string'].includes(typeof value) || (typeof value === 'string' && !value.trim())) {
@@ -95,13 +96,8 @@ const storageQuotaService = {
 			const allowUserByo = quotaSwitch(setting.userByoStorage ?? 1) === 1;
 			const byoEnabled = quotaSwitch(userRow.byo_storage_enabled) === 1;
 			const defaultQuotaMb = quotaNumber(setting.defaultStorageQuotaMb ?? 500);
-			let byoStorageConfig = userRow.byo_storage_config;
-			if (typeof byoStorageConfig === 'string') {
-				try { byoStorageConfig = JSON.parse(byoStorageConfig); } catch (_) { byoStorageConfig = {}; }
-			}
-			if (!byoStorageConfig || typeof byoStorageConfig !== 'object' || Array.isArray(byoStorageConfig)) {
-				byoStorageConfig = {};
-			}
+			const decryptedByo = await decryptByoStorageConfig(userRow.byo_storage_config, c.env, userId);
+			const byoStorageConfig = decryptedByo.ok ? decryptedByo.config : {};
 			const isByoActive = byoEnabled && allowUserByo && hasStorageCredentials(byoStorageConfig);
 			// Only the visitor role is blocked at 0 MB. A non-visitor's role/default
 			// quota of 0 remains unlimited, as checkQuotaAvailable specifies.
@@ -121,13 +117,7 @@ const storageQuotaService = {
 			const storageType = isByoActive ? 'USER_S3' : systemS3 ? 'SYSTEM_S3' : c.env.r2 ? 'R2' : 'KV';
 			const systemStorageType = systemS3 ? `${s3Signer.detectProvider(setting.endpoint)} (S3)`
 				: c.env.r2 ? 'Cloudflare R2' : 'Cloudflare KV / D1';
-			const safeByoConfig = { ...byoStorageConfig };
-			for (const key of ['s3AccessKey', 's3SecretKey']) {
-				if (safeByoConfig[key]) {
-					safeByoConfig[key] = typeof safeByoConfig[key] === 'string' && safeByoConfig[key].length > 6
-						? `${safeByoConfig[key].slice(0, 6)}******` : '******';
-				}
-			}
+			const safeByoConfig = maskByoStorageConfig(byoStorageConfig);
 			if (typeof safeByoConfig.endpoint === 'string' && safeByoConfig.endpoint) {
 				safeByoConfig.provider = s3Signer.detectProvider(safeByoConfig.endpoint);
 			}

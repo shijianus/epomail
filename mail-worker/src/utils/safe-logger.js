@@ -16,20 +16,37 @@ const SENSITIVE_KEY_PATTERNS = [
 	/totp_?enc_?key/i,
 	/email_?enc_?key/i,
 	/oauth_?client_?enc_?key/i,
+	/storage_?enc_?key/i,
+	/byo_?enc_?key/i,
+	/s3_?access_?key/i,
+	/s3_?secret_?key/i,
+	/access_?key_?id/i,
+	/secret_?access_?key/i,
+	/byo_?storage_?config/i,
 	/authorization/i,
-	/^cookie$/i,
-	/^set-cookie$/i,
+	/cookie/i,
 	/^token$/i,
 	/access_?token/i,
 	/refresh_?token/i,
 	/id_?token/i,
 	/bind_?token/i,
+	/bot_?token/i,
+	/api_?token/i,
+	/external_?db_?token/i,
 	/device_?trust/i,
 	/^code$/i,
 	/auth_?code/i,
+	/backup_?codes?/i,
+	/recovery_?codes?/i,
+	/encrypted_?raw/i,
+	/private_?key/i,
+	/session_?key/i,
 	/verifier/i,
 	/totp/i,
 	/api_?key/i,
+	/x-?init-?secret/i,
+	/x-?scheduled-?secret/i,
+	/x-?api-?key/i,
 	/body_?html/i,
 	/html/i,
 	/content/i,
@@ -39,22 +56,32 @@ const SENSITIVE_KEY_PATTERNS = [
 	/sql/i,
 	/params/i,
 	/payload/i,
-	/upstream_?response/i
+	/upstream_?response/i,
+	/response_?body/i,
+	/raw_?body/i
 ];
 
 const BEARER_REGEX = /Bearer\s+[A-Za-z0-9._~+/-]+=*/gi;
 const JWT_REGEX = /ey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+/g;
+const TG_BOT_URL_REGEX = /(https?:\/\/api\.telegram\.org\/bot)[^/\s?#]+/gi;
+const TG_BOT_TOKEN_REGEX = /\bbot\d{5,20}:[A-Za-z0-9_-]{20,}\b/g;
+const AWS_ACCESS_KEY_REGEX = /\b(AKIA|ASIA)[0-9A-Z]{16}\b/g;
 const URL_QUERY_SECRET_REGEX = /([?&](?:secret|token|key|password|code|access_token|refresh_token|api_key|init_secret|scheduled_secret|client_secret)=)[^&#\s]+/gi;
-const KV_IN_STRING_REGEX = /\b(password|passwd|secret|api_?key|token|auth|bearer|jwt|totp|client_?secret)\b\s*[:=]\s*([^\s,;)"']+)/gi;
+const KV_IN_STRING_REGEX = /\b(password|passwd|secret|api_?key|token|auth|bearer|jwt|totp|client_?secret|cookie|set-cookie|x-init-secret|x-scheduled-secret|x-api-key|s3AccessKey|s3SecretKey|accessKeyId|secretAccessKey)\b\s*[:=]\s*([^\s,;)"']+)/gi;
 
 export function sanitizeUrl(urlStr) {
 	if (typeof urlStr !== 'string') return '';
-	return urlStr.replace(URL_QUERY_SECRET_REGEX, '$1[REDACTED]');
+	return urlStr
+		.replace(TG_BOT_URL_REGEX, '$1[REDACTED]')
+		.replace(URL_QUERY_SECRET_REGEX, '$1[REDACTED]');
 }
 
 export function sanitizeString(str) {
 	if (typeof str !== 'string') return str;
 	return str
+		.replace(TG_BOT_URL_REGEX, '$1[REDACTED]')
+		.replace(TG_BOT_TOKEN_REGEX, 'bot[REDACTED]')
+		.replace(AWS_ACCESS_KEY_REGEX, '[REDACTED_AWS_KEY]')
 		.replace(BEARER_REGEX, 'Bearer [REDACTED]')
 		.replace(JWT_REGEX, '[REDACTED_JWT]')
 		.replace(URL_QUERY_SECRET_REGEX, '$1[REDACTED]')

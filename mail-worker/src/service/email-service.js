@@ -26,6 +26,7 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 import emailCryptoUtils from '../utils/email-crypto-utils';
+import emailKeyMigrationService from './email-key-migration-service.js';
 import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT, getWelcomeTemplate, getGlobalAnnouncementTemplate, getLocaleByLang, getSenderNameByLang, getUserFallbackNameByLang, formatDateByLang, normalizeLangKey } from '../const/welcome-template';
 import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 import hashUtils from '../utils/hash-utils';
@@ -2030,6 +2031,9 @@ const emailService = {
 			emailRow.isStar = emailRow.starId != null ? 1 : 0;
 			if (emailRow.userId) {
 				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, emailRow.userId);
+				if (c?.env?.email_enc_key && emailCryptoUtils.needsEmailRecordMigration(emailRow, cryptoKey)) {
+					await emailKeyMigrationService.lazyReencryptEmailRow(c, emailRow, cryptoKey).catch(() => {});
+				}
 				emailRow = await emailCryptoUtils.decryptEmailRecord(emailRow, cryptoKey);
 			}
 			const isOfficial = emailRow.sendEmail === 'announcement@epocanvas.com' || emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
