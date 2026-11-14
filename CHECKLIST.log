@@ -2,14 +2,19 @@
 *   **关联提交 (Git Commit)**: `fb04eeb42a5ec527c78a302bee45dcd5891ffbc4` (Short: `fb04eeb`)
 *   **测试契约提交 (Test Contract Commit)**: `1f24e67` (Short: `1f24e67`)
 *   **追加安全提交 (Security Hardening Commit)**: `f52867b5d14878f94d00d0560fb1c636ea467fd0` (Short: `f52867b`)
+*   **差异卫生提交 (Diff Hygiene Commit)**: `f46b20bbce563c7fe4766b4c76de553657217232` (Short: `f46b20b`)
+*   **供应链与日志提交 (Supply Chain and Logging Commit)**: `e632fcd` (Short: `e632fcd`)
+*   **依赖回归提交 (Dependency Regression Commit)**: `b994976` (Short: `b994976`)
 *   **部署环境 (Deployment)**: 本地隔离 D1/KV 与静态构建，未触碰生产和外部账户
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 账号失败计数绑定来源、D1 一次性兑换码、申诉原子限流、10 会话上限、域名精确匹配。
     - [x] 备份码打印、邮件打印、注册旧令牌、壁纸/封面 URL 注入修复。
     - [x] Hono/ECharts 安全升级、固定 pnpm workspace 配置、fix/** CI 门禁和临时目录稳定性修复。
+    - [x] 修复四个发布文档 EOF 空白、Telegram 上游错误正文日志泄露、deepmerge 原型污染防护。
 *   **自动化测试与核验清单 (Verification Checklist)**:
     - [x] Worker 定向安全套件 103/103。
-    - [x] Worker 单元测试 42/42。
+    - [x] Worker 单元测试 43/43。
+    - [x] deepmerge 原型污染回归 3/3，pnpm frozen lockfile 安装通过。
     - [x] Worker 全量 Vitest 48 个文件 / 623/623。
     - [x] 登录 UI typecheck 与测试 29/29。
     - [x] 隐私与 URL 注入回归 31/31。

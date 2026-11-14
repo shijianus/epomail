@@ -66,4 +66,3 @@ flowchart TD
 # 当前审计基线说明 (2026-11-14)
 
 本文件中的早期冻结结果对应历史提交，不能替代当前分支的公测审计证据。当前可复核基线是 `fix/public-beta-go-blockers-2026-11-07` @ `fb04eeb42a5ec527c78a302bee45dcd5891ffbc4`，详见 `doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md`。
-
