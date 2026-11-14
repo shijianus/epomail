@@ -11,6 +11,7 @@
 
 ### Epomail — 公测阻断复审与可执行验收计划 (2026-11-13)
 *   **关联审计基线 (Git Commit)**: `8e65f36ae2d3728b826fd58fef9760086cb879ce` (Short: `8e65f36`)
+*   **关联实现提交 (Git Commit)**: `304e15fab459ba3fc26c825a00c1d6f052083f66` (Short: `304e15f`)
 *   **专项文档**: [公测审计与执行计划](doc/release/PUBLIC-BETA-EXECUTION-PLAN.md)
 *   **范围与方法**: 仓库静态审查、公开 GitHub CI 证据、Staging 匿名只读探针、隔离的本地 D1/KV 回归、构建与压测。
 *   **主要发现**: 基线 Quality Gates 失败在负载步骤。线上 Staging 的鉴权 HTTP 契约与候选不符。生产预检作用域与外发策略存在本地可修的缺口。
