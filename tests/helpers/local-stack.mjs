@@ -2,24 +2,53 @@ import { spawn, execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { createServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { parseLocalStackReadyUrl } from './local-stack-runtime.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const helperDir = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(helperDir, '../..');
 const execFileAsync = promisify(execFile);
 
-async function freePort() {
-	const server = createServer();
+// Wait for the child runtime to emit its validated loopback HTTP origin.
+function awaitRuntimeUrl(child, signal, timeoutMs) {
+	let stdoutBuffer = '';
 	return new Promise((resolve, reject) => {
-		server.once('error', reject);
-		server.listen(0, '127.0.0.1', () => {
-			const { port } = server.address();
-			server.close(error => error ? reject(error) : resolve(port));
-		});
+		let settled = false;
+		const finish = fn => value => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			signal.removeEventListener('abort', onAbort);
+			child.stdout.off('data', onStdout);
+			child.stdout.off('end', onEnd);
+			fn(value);
+		};
+		const consumeLine = line => {
+			const readyUrl = parseLocalStackReadyUrl(line);
+			if (readyUrl) finish(resolve)(readyUrl);
+		};
+		const onStdout = data => {
+			stdoutBuffer += data.toString();
+			const lines = stdoutBuffer.split(/\r?\n/);
+			stdoutBuffer = lines.pop() ?? '';
+			for (const line of lines) consumeLine(line);
+		};
+		const onEnd = () => {
+			if (stdoutBuffer) consumeLine(stdoutBuffer);
+		};
+		const onAbort = () => finish(reject)(signal.reason || new Error('Local stack aborted before runtime ready'));
+		const timer = setTimeout(() => finish(reject)(new Error(`Timed out waiting ${timeoutMs}ms for local runtime URL`)), timeoutMs);
+		if (signal.aborted) {
+			onAbort();
+			return;
+		}
+		signal.addEventListener('abort', onAbort, { once: true });
+		child.stdout.on('data', onStdout);
+		child.stdout.on('end', onEnd);
 	});
 }
 
@@ -336,21 +365,18 @@ export async function startLocalStack({
 	try {
 		await verifyProductionAssets(workerDir, assetsDir);
 		const require = createRequire(path.join(workerDir, 'package.json'));
-		// Invoke the installed CLI directly: no pnpm/cmd wrapper to orphan its
-		// children, no package download, and paths with spaces remain one argument.
-		const cli = path.resolve(path.dirname(require.resolve('wrangler/bin/wrangler.js')), '../wrangler-dist/cli.js');
+		require.resolve('wrangler');
+		// Run Miniflare directly inside an isolated process without Wrangler's ProxyWorker hop:
+		// ProxyWorker's workerd-to-workerd loopback pool hits Miniflare's 5s HTTP keep-alive close,
+		// and Wrangler's ProxyWorker misclassifies non-root errors as mid-request restarts (503).
+		const runtimeEntry = path.resolve(helperDir, 'local-stack-runtime.mjs');
 		directory = await fs.mkdtemp(path.join(os.tmpdir(), 'epomail-local-'));
 		const config = await writeLocalConfig(directory, workerDir, assetsDir);
 		secrets = config.secrets;
-		const port = await freePort();
-		const base = `http://127.0.0.1:${port}`;
 		controller.signal.throwIfAborted();
 		child = spawn(process.execPath, [
-			'--no-warnings', '--experimental-vm-modules', cli, 'dev',
-			'--config', config.configPath, '--local', '--remote=false',
-			'--ip', '127.0.0.1', '--port', String(port), '--inspector-port', '0',
-			'--persist-to', path.join(directory, 'state'),
-			'--show-interactive-dev-session=false'
+			'--no-warnings', '--experimental-vm-modules', runtimeEntry,
+			config.configPath, path.join(directory, 'state'), workerDir
 		], {
 			cwd: directory,
 			env: localEnvironment(directory),
@@ -363,9 +389,13 @@ export async function startLocalStack({
 		const collect = data => { log = (log + data.toString()).slice(-32768); };
 		child.stdout.on('data', collect);
 		child.stderr.on('data', collect);
+		const startedAt = Date.now();
+		const remainingStartupMs = () => Math.max(1_000, startupTimeoutMs - (Date.now() - startedAt));
+		const runtimeUrlPromise = awaitRuntimeUrl(child, controller.signal, remainingStartupMs());
 		const failure = Promise.race([state.failure, interrupted]);
 		failure.catch(() => {});
-		await Promise.race([waitForLogin(base, controller.signal, startupTimeoutMs), failure]);
+		const base = await Promise.race([runtimeUrlPromise, failure]);
+		await Promise.race([waitForLogin(base, controller.signal, remainingStartupMs()), failure]);
 		controller.signal.throwIfAborted();
 		starting = false;
 		return {

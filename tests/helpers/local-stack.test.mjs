@@ -450,3 +450,37 @@ test('real native process tree exits before locked state is removed', { timeout:
 		await assert.rejects(fs.access(directory), { code: 'ENOENT' });
 	});
 });
+
+test('local-stack runtime helper accepts only loopback worker URLs and prevents duplicate ready emits', async () => {
+	const {
+		READY_URL_PREFIX,
+		createDirectProxyController,
+		formatLoopbackWorkerUrl,
+		parseLocalStackReadyUrl
+	} = await import('./local-stack-runtime.mjs');
+
+	assert.equal(
+		formatLoopbackWorkerUrl({ protocol: 'http:', hostname: '127.0.0.1', port: '45465' }),
+		'http://127.0.0.1:45465'
+	);
+	assert.equal(formatLoopbackWorkerUrl({ protocol: 'https:', hostname: '127.0.0.1', port: 443 }), null);
+	assert.equal(formatLoopbackWorkerUrl({ protocol: 'http:', hostname: 'localhost', port: 8787 }), null);
+	assert.equal(formatLoopbackWorkerUrl({ protocol: 'http:', hostname: '127.0.0.1', port: 0 }), null);
+
+	assert.equal(parseLocalStackReadyUrl(`${READY_URL_PREFIX}http://127.0.0.1:41234`), 'http://127.0.0.1:41234');
+	assert.equal(parseLocalStackReadyUrl(`${READY_URL_PREFIX}http://127.0.0.1:41234/extra`), null);
+	assert.equal(parseLocalStackReadyUrl(`${READY_URL_PREFIX}http://example.com:80`), null);
+
+	const emitted = [];
+	const controller = createDirectProxyController({ onUrl: url => emitted.push(url) });
+	controller.onReloadComplete({ proxyData: { userWorkerUrl: { protocol: 'http:', hostname: 'evil.test', port: 80 } } });
+	assert.deepEqual(emitted, []);
+	controller.onReloadComplete({ proxyData: { userWorkerUrl: { protocol: 'http:', hostname: '127.0.0.1', port: '39123' } } });
+	controller.onReloadComplete({ proxyData: { userWorkerUrl: { protocol: 'http:', hostname: '127.0.0.1', port: '39123' } } });
+	assert.equal((await controller.ready.promise).userWorkerUrl, 'http://127.0.0.1:39123');
+	assert.deepEqual(emitted, ['http://127.0.0.1:39123']);
+
+	const earlyStop = createDirectProxyController();
+	await earlyStop.teardown();
+	await assert.rejects(earlyStop.ready.promise, /stopped before becoming ready/);
+});
