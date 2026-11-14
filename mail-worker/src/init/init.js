@@ -923,21 +923,15 @@ const dbInit = {
 
 		// v3_15 兼容迁移：为存量库补齐 entity 已声明但历史 DDL 遗漏的列（全新库由 CREATE TABLE 直接建立，此处幂等跳过）
 		const userLabelsDefault = getDefaultUserLabelsString().replace(/'/g, "''");
-		const legacyMissingCols = [
-			{ db: userDb, table: 'user', name: 'update_time', sql: `ALTER TABLE user ADD COLUMN update_time DATETIME DEFAULT CURRENT_TIMESTAMP;` },
-			{ db: userDb, table: 'user', name: 'custom_labels', sql: `ALTER TABLE user ADD COLUMN custom_labels TEXT NOT NULL DEFAULT '${userLabelsDefault}';` },
-			{ db: mailDb, table: 'email', name: 'labels', sql: `ALTER TABLE email ADD COLUMN labels TEXT NOT NULL DEFAULT '[]';` }
-		];
-		for (const col of legacyMissingCols) {
-			try {
-				const colInfo = await col.db.prepare(`SELECT * FROM pragma_table_info('${col.table}') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await col.db.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`跳过 ${col.table} 字段 ${col.name}：${e.message}`);
-			}
-		}
+		await addMissingColumns(userDb, 'user', [
+			`ALTER TABLE user ADD COLUMN update_time DATETIME;`,
+			`ALTER TABLE user ADD COLUMN custom_labels TEXT NOT NULL DEFAULT '${userLabelsDefault}';`
+		]);
+		// SQLite forbids non-constant defaults on ALTER TABLE ADD COLUMN; backfill NULL legacy rows once added.
+		await userDb.prepare(`UPDATE user SET update_time = COALESCE(create_time, datetime('now')) WHERE update_time IS NULL`).run();
+		await addMissingColumns(mailDb, 'email', [
+			`ALTER TABLE email ADD COLUMN labels TEXT NOT NULL DEFAULT '[]';`
+		]);
 
 		const aiSettingCols = [
 			{ name: 'ai_api_key', sql: `ALTER TABLE setting ADD COLUMN ai_api_key TEXT NOT NULL DEFAULT '';` },

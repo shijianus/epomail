@@ -123,4 +123,66 @@ describe('beta schema upgrades', () => {
 			await env.kv.delete('roles_seeded_v2');
 		}
 	});
+	it('adds legacy user.update_time and backfills existing rows without SQLite non-constant default errors', async () => {
+		const userDb = env.NOTICE_USER_DB;
+		const mailDb = env.NOTICE_MAIL_DB;
+		const legacyCtx = {
+			env: {
+				...env,
+				USER_DB: userDb,
+				MAIL_DB: mailDb,
+				admin: 'legacy-admin@example.test',
+				admin_initial_password: 'LocalOnly!LegacyInit99'
+			},
+			get: () => undefined,
+			set: () => {}
+		};
+		try {
+			await userDb.batch([
+				userDb.prepare('DROP TABLE IF EXISTS user'),
+				userDb.prepare('DROP TABLE IF EXISTS setting'),
+				userDb.prepare('DROP TABLE IF EXISTS role'),
+				userDb.prepare(`CREATE TABLE user (
+					user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+					email TEXT NOT NULL,
+					type INTEGER DEFAULT 1 NOT NULL,
+					password TEXT NOT NULL,
+					salt TEXT NOT NULL,
+					status INTEGER DEFAULT 0 NOT NULL,
+					create_time DATETIME DEFAULT '2024-01-01 00:00:00',
+					is_del INTEGER DEFAULT 0 NOT NULL
+				)`),
+				userDb.prepare("INSERT INTO user (user_id, email, password, salt) VALUES (10, 'legacy-user@example.test', 'x', 'y')"),
+				userDb.prepare('CREATE TABLE setting (register INTEGER DEFAULT 0)'),
+				userDb.prepare("CREATE TABLE role (role_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, role_code TEXT DEFAULT 'custom')")
+			]);
+			await mailDb.batch([
+				mailDb.prepare('DROP TABLE IF EXISTS email'),
+				mailDb.prepare('DROP TABLE IF EXISTS account'),
+				mailDb.prepare('CREATE TABLE email (email_id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL DEFAULT 0, user_id INTEGER NOT NULL DEFAULT 0)'),
+				mailDb.prepare(`CREATE TABLE account (account_id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, status INTEGER DEFAULT 0 NOT NULL,
+					user_id INTEGER NOT NULL DEFAULT 0, is_del INTEGER DEFAULT 0 NOT NULL, name TEXT DEFAULT '', all_receive INTEGER DEFAULT 0, sort INTEGER DEFAULT 0)`)
+			]);
+			await dbInit.v3_14DB(legacyCtx);
+			const legacyRow = await userDb.prepare('SELECT update_time, custom_labels FROM user WHERE user_id = 10').first();
+			expect(legacyRow.update_time).toBe('2024-01-01 00:00:00');
+			expect(legacyRow.custom_labels).toContain('allLabels');
+			const seededAdmin = await userDb.prepare("SELECT email, update_time FROM user WHERE email = 'legacy-admin@example.test'").first();
+			expect(seededAdmin).toMatchObject({ email: 'legacy-admin@example.test' });
+			expect(seededAdmin.update_time).toBeTruthy();
+			await userDb.prepare("UPDATE user SET update_time = '2025-05-05 05:05:05' WHERE user_id = 10").run();
+			await dbInit.v3_14DB(legacyCtx);
+			expect(await userDb.prepare('SELECT update_time FROM user WHERE user_id = 10').first()).toEqual({ update_time: '2025-05-05 05:05:05' });
+		} finally {
+			await userDb.batch([
+				userDb.prepare('DROP TABLE IF EXISTS user'),
+				userDb.prepare('DROP TABLE IF EXISTS setting'),
+				userDb.prepare('DROP TABLE IF EXISTS role')
+			]);
+			await mailDb.batch([
+				mailDb.prepare('DROP TABLE IF EXISTS email'),
+				mailDb.prepare('DROP TABLE IF EXISTS account')
+			]);
+		}
+	});
 });
