@@ -9,6 +9,26 @@
 
 ---
 
+
+### EpoMail — 公测前全量漏洞审计与修复 (2026-11-14)
+*   **关联提交 (Git Commit)**: `fb04eeb42a5ec527c78a302bee45dcd5891ffbc4` (Short: `fb04eeb`)
+*   **测试契约提交 (Test Contract Commit)**: `1f24e67` (Short: `1f24e67`)
+*   **追加安全提交 (Security Hardening Commit)**: `f52867b5d14878f94d00d0560fb1c636ea467fd0` (Short: `f52867b`)
+*   **专项文档索引 (Detailed Doc)**: [公测前全量漏洞审计与修复报告](doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 覆盖认证、锁定、MFA/OAuth/Passkey、D1/KV/R2 归属、受限通知、申诉、Webhook、前端危险渲染、依赖、CI、构建和本地全真栈。
+    2. 使用固定 pnpm `10.34.5`、Vitest、全栈 HTTP 冒烟、i18n 门禁、密钥扫描和生产预检。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P1·已修复]**: 账号锁定 DoS、一次性兑换码双存储重放、申诉限流竞态、域名字符串子串放行、会话上限边界、备份码打印 XSS、注册旧式全局令牌、壁纸/封面 CSS URL 注入。
+    - **[P1·已修复]**: Hono 与 ECharts 依赖升级，workspace overrides 与 CI 分支门禁补齐。
+    - **[P2·残余]**: deepmerge 低危传递依赖、BYO S3/日志/邮件加密域隔离待后续迁移和运维确认；OAuth 新种子已改为独立密钥加密，既有明文记录保留双读兼容。
+    - **[环境限制]**: 当前容器无法运行 Chromium 浏览器 E2E，CI 浏览器门禁与真实 Staging 集成仍待外部环境复验。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - Worker 定向安全 103/103、Worker 单元 42/42、Worker 全量 623/623、登录 UI 29/29、隐私/URL 注入 31/31、全栈冒烟 22/22。
+    - 固定 pnpm `10.34.5` 的前端构建通过，生产预检 8/8 通过，工作树清洁。
+    - 实现提交 `f52867b` 作为冻结候选，等待 CI 浏览器 E2E、CI 环境全量 Worker 门禁、Staging 外部集成和历史凭据轮换后再做最终公测裁决。
+
+
 ### Epomail — 公测阻断复审与可执行验收计划 (2026-11-13)
 *   **关联审计基线 (Git Commit)**: `8e65f36ae2d3728b826fd58fef9760086cb879ce` (Short: `8e65f36`)
 *   **关联实现提交 (Git Commit)**: `304e15fab459ba3fc26c825a00c1d6f052083f66` (Short: `304e15f`)

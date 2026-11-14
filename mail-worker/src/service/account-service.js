@@ -1,6 +1,6 @@
 import BizError from '../error/biz-error';
 import verifyUtils from '../utils/verify-utils';
-import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES } from '../utils/email-utils';
+import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES, isConfiguredDomain } from '../utils/email-utils';
 import userService from './user-service';
 import emailService from './email-service';
 import { mailOrm as orm } from '../entity/orm';
@@ -37,7 +37,7 @@ const accountService = {
 			throw new BizError(t('notEmail'));
 		}
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!isConfiguredDomain(c.env.domain, emailUtils.getDomain(email))) {
 			throw new BizError(t('notExistDomain'));
 		}
 

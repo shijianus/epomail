@@ -192,6 +192,7 @@ import { cvtR2Url } from "@/utils/convert.js"
 import { ElMessage } from "element-plus"
 import { resolveTabSession } from '@/utils/tab-session.js'
 import { formatUiDate, formatUiNumber } from '@/utils/ui-locale.js'
+import { COVER_PRESETS, sanitizeImageUrl } from '@/utils/theme-presets.js'
 
 const uiStore = useUiStore()
 const userStore = useUserStore()
@@ -334,7 +335,9 @@ const coverPhotoStyle = computed(() => {
   if (!bg) return {}
 
   const trimmed = bg.trim()
-  if (trimmed.startsWith('linear-gradient') || trimmed.startsWith('radial-gradient')) {
+  const isPresetGradient = COVER_PRESETS.some(preset => preset.url === trimmed
+    && (trimmed.startsWith('linear-gradient(') || trimmed.startsWith('radial-gradient(')))
+  if (isPresetGradient) {
     return {
       backgroundImage: trimmed,
       backgroundSize: 'cover',
@@ -344,8 +347,10 @@ const coverPhotoStyle = computed(() => {
     const url = (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/'))
       ? trimmed
       : cvtR2Url(trimmed)
+    const safeUrl = sanitizeImageUrl(url)
+    if (!safeUrl) return {}
     return {
-      backgroundImage: `url('${url}')`,
+      backgroundImage: `url("${safeUrl}")`,
       backgroundSize: 'cover',
       backgroundPosition: 'center'
     }

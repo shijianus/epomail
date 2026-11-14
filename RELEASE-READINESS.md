@@ -108,3 +108,7 @@ $ node scripts/verify-production-readiness.mjs
 5. **冒烟回归测试**：
    - 使用主管理员账号登录，确认两步验证、控制台展示正常。
    - 验证收信入站、附件下载及转发功能无异常报错。
+# 当前版本标注 (2026-11-14)
+
+本文件中的提交与测试数字属于历史基线。当前分支应以 `fb04eeb42a5ec527c78a302bee45dcd5891ffbc4` 与 `doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md` 为准。
+

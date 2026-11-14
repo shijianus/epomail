@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -11,6 +11,8 @@ import {
   runLiveProbes,
   MANDATORY_SECRETS
 } from '../scripts/verify-production-readiness.mjs';
+
+mkdirSync(tmpdir(), { recursive: true });
 
 test('parseArgs accepts a probe origin and refuses obsolete or incomplete flags', () => {
   assert.deepEqual(parseArgs(['--base-url', 'https://mail.example.test', '--json']),
@@ -66,6 +68,7 @@ test('MANDATORY_SECRETS includes bootstrap and scheduled credentials', () => {
   const secretNames = MANDATORY_SECRETS.map(s => s.name);
   assert.ok(secretNames.includes('jwt_secret'));
   assert.ok(secretNames.includes('totp_enc_key'));
+  assert.ok(secretNames.includes('oauth_client_enc_key'));
   assert.ok(secretNames.includes('email_enc_key'));
   assert.ok(secretNames.includes('init_secret'));
   assert.ok(secretNames.includes('resend_webhook_secret'));

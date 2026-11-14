@@ -1,6 +1,6 @@
 import BizError from '../error/biz-error.js';
 import userService from './user-service.js';
-import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES } from '../utils/email-utils.js';
+import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES, isConfiguredDomain } from '../utils/email-utils.js';
 import { isDel, settingConst, userConst } from '../const/entity-const.js';
 import JwtUtils from '../utils/jwt-utils.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -104,6 +104,15 @@ function attachSessionMeta(authInfo, token, meta) {
 
 const LOGIN_FAIL_WINDOW_SECONDS = 12 * 60 * 60;
 
+function loginFailSubject(c, email) {
+	const ip = rateLimit.clientIp(c) || 'local';
+	return `${email}|ip:${ip}`;
+}
+
+function loginFailKvKey(c, email) {
+	return KvConst.LOGIN_FAIL + loginFailSubject(c, email);
+}
+
 function loginFailWindow() {
 	const now = Math.floor(Date.now() / 1000);
 	const start = Math.floor(now / LOGIN_FAIL_WINDOW_SECONDS) * LOGIN_FAIL_WINDOW_SECONDS;
@@ -118,7 +127,7 @@ async function readLoginFail(c, email) {
 		const window = loginFailWindow();
 		const row = await db.prepare(`SELECT count FROM rate_limit_counter
 			WHERE scope = 'login-fail' AND subject = ? AND window_start = ?`)
-			.bind(`email:${email}`, window.start).first();
+			.bind(`email:${loginFailSubject(c, email)}`, window.start).first();
 		return Number(row?.count) || 0;
 	} catch (_) {
 		return null;
@@ -137,7 +146,7 @@ async function incrementLoginFail(c, email) {
 			ON CONFLICT(scope, subject, window_start)
 			DO UPDATE SET count = count + 1
 			RETURNING count
-		`).bind(`email:${email}`, window.start, window.expires).first();
+		`).bind(`email:${loginFailSubject(c, email)}`, window.start, window.expires).first();
 		return Number(row?.count) || 0;
 	} catch (_) {
 		return null;
@@ -150,11 +159,12 @@ async function clearLoginFail(c, email) {
 			const db = getUserDb(c);
 			if (db?.prepare) {
 				await db.prepare(`DELETE FROM rate_limit_counter
-					WHERE scope = 'login-fail' AND subject = ?`).bind(`email:${email}`).run();
+					WHERE scope = 'login-fail' AND subject = ?`).bind(`email:${loginFailSubject(c, email)}`).run();
 			}
 		} catch (_) {}
 	}
 	try {
+		await c.env.kv.delete(loginFailKvKey(c, email));
 		await c.env.kv.delete(KvConst.LOGIN_FAIL + email);
 	} catch (_) {}
 }
@@ -230,7 +240,7 @@ const loginService = {
 			throw new BizError(t('pwdMinLength'), undefined, 'password_too_short');
 		}
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!isConfiguredDomain(c.env.domain, emailUtils.getDomain(email))) {
 			throw new BizError(t('notEmailDomain'), undefined, 'domain_not_allowed');
 		}
 
@@ -581,7 +591,7 @@ const loginService = {
 			if (!identifier) return 0;
 			const durable = await readLoginFail(c, identifier);
 			if (durable !== null) return durable;
-			const str = await c.env.kv.get(KvConst.LOGIN_FAIL + identifier);
+			const str = await c.env.kv.get(loginFailKvKey(c, identifier));
 			return str ? parseInt(str) : 0;
 		};
 
@@ -592,7 +602,7 @@ const loginService = {
 			// Pre-migration / test fallback. The D1 counter is authoritative when
 			// the rate_limit_counter table is present.
 			try {
-				const key = KvConst.LOGIN_FAIL + identifier;
+				const key = loginFailKvKey(c, identifier);
 				const latest = await c.env.kv.get(key);
 				const current = latest ? parseInt(latest) : 0;
 				const nextCount = current + 1;
@@ -612,10 +622,15 @@ const loginService = {
 		const notifyLocked = async () => {
 			if (!userRow || !userRow.userId) return;
 			try {
+				const noticeKey = `login-lock-notified:${userRow.userId}`;
+				if (c?.env?.kv) {
+					if (await c.env.kv.get(noticeKey)) return;
+					await c.env.kv.put(noticeKey, '1', { expirationTtl: LOGIN_FAIL_WINDOW_SECONDS });
+				}
 				const securityNoticeService = (await import('./security-notice-service.js')).default;
 				const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
 				await securityNoticeService.sendNotice(c, userRow.userId, SECURITY_EVENT_TYPES.ACCOUNT_LOCKED, {
-					detail: '12 hours lockdown (5 consecutive failed attempts)'
+						detail: '12 hours source-bound login throttle (5 consecutive failed attempts)'
 				});
 			} catch (e) {
 				console.error('Failed to send account locked notice:', e);
@@ -681,6 +696,9 @@ const loginService = {
 		if (userRow.isDel === isDel.DELETE) {
 			// Same generic message as a wrong password to avoid account
 			// enumeration via the login endpoint.
+			try {
+				await cryptoUtils.genHashPassword(inputPassword, 'epomail-timing-equalization-salt');
+			} catch (_) {}
 			throw new BizError(t('IncorrectPwd'));
 		}
 
@@ -844,7 +862,7 @@ const loginService = {
 
 		if (authInfo && (authInfo.user.email === userRow.email)) {
 
-			if (authInfo.tokens.length > 10) {
+			if (authInfo.tokens.length >= 10) {
 				authInfo.tokens.shift();
 			}
 
@@ -926,7 +944,7 @@ const loginService = {
 		const operation=await authOperation.inspect(c,binding);
 		const pendingData=operation.payload;
 		const targetEmail = pendingData.email;
-		const failKey = targetEmail ? KvConst.LOGIN_FAIL + targetEmail.toLowerCase() : null;
+		const failKey = targetEmail ? loginFailKvKey(c, targetEmail.toLowerCase()) : null;
 		let failCount = 0;
 		if (failKey) {
 			const durable = await readLoginFail(c, targetEmail.toLowerCase());
@@ -1117,7 +1135,7 @@ const loginService = {
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
 		if (authInfo && (authInfo.user.email === userRow.email)) {
-			if (authInfo.tokens.length > 10) {
+			if (authInfo.tokens.length >= 10) {
 				authInfo.tokens.shift();
 			}
 			authInfo.tokens.push(uuid);

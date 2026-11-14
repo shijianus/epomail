@@ -199,12 +199,25 @@ const oauthAppService = {
 				if (!existingCount || Number(existingCount.count) === 0) {
 					const randomClientId = `epo_live_${genRandomHex(12)}`;
 					const randomClientSecret = `epo_sec_${genSecureSecret(32)}`;
+					const environment = String(c?.env?.ENVIRONMENT || '').toLowerCase();
+					const localLike = Boolean(c?.env?.DEV || c?.env?.dev)
+						|| environment === 'development' || environment === 'test';
+					if (!c?.env?.oauth_client_enc_key && !localLike) {
+						throw new BizError('OAuth client encryption key is required before seeding the default application', 500, 'oauth_client_enc_key_missing');
+					}
+					// New seeded applications follow the same encrypted-at-rest path as
+					// administrator-created applications. Existing plaintext rows remain
+					// readable through verifyClientSecret's legacy compatibility path so
+					// this does not require a data migration during deployment.
+					const storedClientSecret = c?.env?.oauth_client_enc_key
+						? await encryptClientSecret(c.env, randomClientId, randomClientSecret)
+						: randomClientSecret;
 					await userDb.prepare(`
 						INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, description, redirect_uris, logo_url, scopes, status)
 						VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 					`).bind(
 						randomClientId,
-						randomClientSecret,
+						storedClientSecret,
 						SAMPLE_OAUTH_APP_TEMPLATE.name,
 						SAMPLE_OAUTH_APP_TEMPLATE.homepageUrl,
 						SAMPLE_OAUTH_APP_TEMPLATE.description,

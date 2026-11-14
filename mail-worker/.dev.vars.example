@@ -6,6 +6,8 @@
 jwt_secret=<your-strong-random-secret>
 # TOTP 两步验证密钥加密主键 (建议 32 字节以上强随机字符串)
 totp_enc_key=<your-strong-random-totp-master-key>
+# OAuth Client Secret 独立信封加密主键 (生产/Staging 必需)
+oauth_client_enc_key=<your-strong-random-oauth-client-encryption-key>
 # 首次 /init 创建站长账号时使用；生产环境必须设置，禁用固定弱默认口令
 admin_initial_password=<your-strong-initial-admin-password>
 # 可选的独立初始化门禁密钥；不设置时回退到 jwt_secret。建议生产单独设置。

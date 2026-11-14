@@ -370,6 +370,7 @@ export async function startLocalStack({
 		// ProxyWorker's workerd-to-workerd loopback pool hits Miniflare's 5s HTTP keep-alive close,
 		// and Wrangler's ProxyWorker misclassifies non-root errors as mid-request restarts (503).
 		const runtimeEntry = path.resolve(helperDir, 'local-stack-runtime.mjs');
+		await fs.mkdir(os.tmpdir(), { recursive: true });
 		directory = await fs.mkdtemp(path.join(os.tmpdir(), 'epomail-local-'));
 		const config = await writeLocalConfig(directory, workerDir, assetsDir);
 		secrets = config.secrets;

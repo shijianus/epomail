@@ -8,7 +8,7 @@ import { and, asc, desc, eq, sql, like, inArray } from 'drizzle-orm';
 import totpUtils from '../utils/totp-utils';
 import cryptoUtils from '../utils/crypto-utils';
 import rateLimit from '../utils/rate-limit.js';
-import emailUtils from '../utils/email-utils';
+import emailUtils, { isConfiguredDomain } from '../utils/email-utils';
 import roleService from './role-service';
 import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n';
@@ -122,7 +122,7 @@ const publicService = {
 				throw new BizError(t('notEmail'));
 			}
 
-			if (!c.env.domain.includes(emailUtils.getDomain(emailRow.email))) {
+			if (!isConfiguredDomain(c.env.domain, emailUtils.getDomain(emailRow.email))) {
 				throw new BizError(t('notEmailDomain'));
 			}
 

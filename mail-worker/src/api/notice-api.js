@@ -9,6 +9,7 @@ import { eq, and } from 'drizzle-orm';
 import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
 import { isPenaltyLinkedToCase, normalizeCaseReference } from '../utils/audit-case-link';
+import rateLimit from '../utils/rate-limit.js';
 
 async function sha256Hex(str) {
 	const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -163,6 +164,7 @@ app.post('/notice/restricted/exchange', async (c) => {
 	if (!code) {
 		throw new BizError('缺少一次性兑换启动码', 400);
 	}
+	await rateLimit.check(c, { scope: 'security-exchange', limit: 30, windowSeconds: 60 });
 
 	const userDb = getUserDb(c) || c?.env?.db;
 	const nowSec = Math.floor(Date.now() / 1000);
@@ -191,15 +193,8 @@ app.post('/notice/restricted/exchange', async (c) => {
 				sessionData = JSON.parse(row.token_payload);
 			} catch (_) {}
 		}
-	} else if (c?.env?.kv) {
-		const kvKey = `restricted_code:${code}`;
-		sessionData = await c.env.kv.get(kvKey, { type: 'json' });
-		if (!sessionData || !sessionData.restrictedToken) {
-			throw new BizError('一次性兑换码已失效或已被使用', 401);
-		}
-		await c.env.kv.delete(kvKey);
 	} else {
-		throw new BizError('存储服务不可用', 500);
+		throw new BizError('一次性兑换码存储服务不可用', 503, 'exchange_storage_unavailable');
 	}
 
 	if (!sessionData || !sessionData.restrictedToken) {
@@ -329,15 +324,14 @@ app.post('/notice/restricted/appeal', async (c) => {
 	}
 	const isDelayedAppeal = targetCase.banTime && !isNaN(new Date(targetCase.banTime).getTime()) && (Date.now() - new Date(targetCase.banTime).getTime() > 30 * 24 * 3600 * 1000);
 
-	// 申诉频率防护 (每案件每小时上限 3 次)
-	const rateKey = `rate_appeal:${userEmail}:${targetCase.id}`;
-	if (c?.env?.kv) {
-		const attempts = Number(await c.env.kv.get(rateKey) || 0);
-		if (attempts >= 3) {
-			throw new BizError('申诉提交过于频繁，请 1 小时后再试 (Rate limit exceeded)', 429);
-		}
-		await c.env.kv.put(rateKey, String(attempts + 1), { expirationTtl: 3600 });
-	}
+	// Use the D1-backed atomic counter to prevent concurrent KV get-then-put
+	// requests from bypassing the per-case hourly limit.
+	await rateLimit.check(c, {
+		scope: 'security-appeal',
+		limit: 3,
+		windowSeconds: 3600,
+		subject: `${String(userEmail).trim().toLowerCase()}:${targetCase.id}`
+	});
 
 	let timeline = [];
 	try {

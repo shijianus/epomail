@@ -22,6 +22,14 @@ describe('B8: OAuth Client Secret Encrypted Storage Specification', () => {
 		await oauthAppService.ensureTables(mockContext);
 	});
 
+	it('seeds the built-in application with an encrypted client secret', async () => {
+		const row = await env.db.prepare(
+			'SELECT client_secret FROM oauth_app WHERE name = ? ORDER BY id DESC LIMIT 1'
+		).bind(oauthAppService.SAMPLE_OAUTH_APP_TEMPLATE?.name || 'shijianus-blog').first();
+
+		expect(row?.client_secret).toMatch(/^v1:/);
+	});
+
 	describe('AES-GCM Envelope Encryption & AAD Binding', () => {
 		it('encrypts client secret into v1:iv:tag:ciphertext format', async () => {
 			const clientId = 'epo_live_testclient123';

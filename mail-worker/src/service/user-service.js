@@ -13,7 +13,7 @@ import emailService from './email-service';
 import dayjs from 'dayjs';
 import permService from './perm-service';
 import roleService from './role-service';
-import emailUtils from '../utils/email-utils';
+import emailUtils, { isConfiguredDomain } from '../utils/email-utils';
 import fileUtils from '../utils/file-utils';
 import kvObjService from './kv-obj-service';
 import saltHashUtils from '../utils/crypto-utils';
@@ -1474,14 +1474,21 @@ const userService = {
 
 	async add(c, params, callerUserId) {
 
-		const { email, type, password } = params;
+		let { email, type, password } = params;
+		email = typeof email === 'string' ? email.trim().toLowerCase() : '';
+		if (!verifyUtils.isEmail(email) || email.length > 254) {
+			throw new BizError(t('notEmail'));
+		}
+		if (typeof password !== 'string') {
+			throw new BizError(t('pwdMinLength'));
+		}
 
 		// Creating an account is a role grant: the new user receives `type`.
 		// Without this guard any holder of `user:add` (e.g. a moderator) could
 		// mint an account with a more privileged role and use it to escalate.
 		await rbacGuard.assertCanAssignRole(c, callerUserId, Number(type));
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!isConfiguredDomain(c.env.domain, emailUtils.getDomain(email))) {
 			throw new BizError(t('notEmailDomain'));
 		}
 

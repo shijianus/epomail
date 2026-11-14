@@ -1,3 +1,25 @@
+### 公测前全量漏洞审计与修复 (2026-11-14)
+*   **关联提交 (Git Commit)**: `fb04eeb42a5ec527c78a302bee45dcd5891ffbc4` (Short: `fb04eeb`)
+*   **测试契约提交 (Test Contract Commit)**: `1f24e67` (Short: `1f24e67`)
+*   **追加安全提交 (Security Hardening Commit)**: `f52867b5d14878f94d00d0560fb1c636ea467fd0` (Short: `f52867b`)
+*   **部署环境 (Deployment)**: 本地隔离 D1/KV 与静态构建，未触碰生产和外部账户
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 账号失败计数绑定来源、D1 一次性兑换码、申诉原子限流、10 会话上限、域名精确匹配。
+    - [x] 备份码打印、邮件打印、注册旧令牌、壁纸/封面 URL 注入修复。
+    - [x] Hono/ECharts 安全升级、固定 pnpm workspace 配置、fix/** CI 门禁和临时目录稳定性修复。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Worker 定向安全套件 103/103。
+    - [x] Worker 单元测试 42/42。
+    - [x] Worker 全量 Vitest 48 个文件 / 623/623。
+    - [x] 登录 UI typecheck 与测试 29/29。
+    - [x] 隐私与 URL 注入回归 31/31。
+    - [x] 全栈 HTTP 冒烟 22/22，测试数据和进程清理完成。
+    - [x] i18n 门禁、密钥扫描、git diff --check 通过。
+    - [x] 固定 pnpm 10.34.5 构建生成主站、登录应用和 Service Worker。
+    - [x] 生产预检 8/8 通过，候选提交工作树清洁。
+    - [ ] 浏览器 E2E 需在可运行 Chromium 的 CI 环境复验。
+    - [ ] 真实 Staging 外部发信、Webhook、OAuth 与历史凭据轮换需运维阶段完成。
+
 ### EpoMail 存量 user.update_time 迁移兼容性修复与定向回归 (2026-11-14)
 *   **关联提交 (Git Commit)**: `a3f5e6b115c7b942af5a554d5b447b05e07bd7b7` (Short: `a3f5e6b`，基于 `967e01d7`)
 *   **根因与变更 (Root Cause & Fix)**:

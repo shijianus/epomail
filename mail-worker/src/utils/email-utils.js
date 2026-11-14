@@ -12,6 +12,26 @@ export const RESERVED_EMAIL_LOCAL_NAMES = new Set([
 	'billing', 'legal', 'privacy', 'contact', 'info', 'sales', 'hr', 'jobs'
 ]);
 
+export function configuredDomains(value) {
+	let raw = value;
+	if (typeof raw === 'string') {
+		try {
+			raw = JSON.parse(raw);
+		} catch (_) {
+			raw = raw.split(',');
+		}
+	}
+	if (!Array.isArray(raw)) return new Set();
+	return new Set(raw
+		.map(item => String(item || '').trim().toLowerCase().replace(/^@/, ''))
+		.filter(Boolean));
+}
+
+export function isConfiguredDomain(value, domain) {
+	const normalized = String(domain || '').trim().toLowerCase().replace(/^@/, '');
+	return Boolean(normalized) && configuredDomains(value).has(normalized);
+}
+
 const emailUtils = {
 
 	getDomain(email) {

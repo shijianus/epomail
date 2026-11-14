@@ -13,12 +13,14 @@ on:
       - main
       - 'review/**'
       - 'release/**'
+      - 'fix/**'
   pull_request:
     branches:
       - master
       - main
       - 'review/**'
       - 'release/**'
+      - 'fix/**'
   workflow_dispatch:
 
 permissions:
