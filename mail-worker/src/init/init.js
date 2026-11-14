@@ -16,6 +16,26 @@ function timingSafeEqual(a, b) {
 	return diff === 0;
 }
 
+async function addMissingColumns(db, table, statements) {
+	const { results } = await db.prepare(`PRAGMA table_info('${table}')`).all();
+	const existing = new Set(results.map(column => column.name));
+	for (const statement of statements) {
+		const [, target, column] = /^ALTER TABLE (\w+) ADD COLUMN (\w+) /.exec(statement);
+		if (target !== table) throw new Error(`Unexpected migration table: ${target}`);
+		if (existing.has(column)) continue;
+		try {
+			await db.prepare(statement).run();
+		} catch (error) {
+			// A concurrent initializer may have added this column after the read.
+			// Propagate all other errors so the upgrade cannot report success.
+			if (!/duplicate column name/i.test(error.message)) throw error;
+			const current = await db.prepare(`SELECT 1 AS present FROM pragma_table_info('${table}') WHERE name=?`)
+				.bind(column).first();
+			if (!current) throw error;
+		}
+	}
+}
+
 const dbInit = {
 	async init(c) {
 		const envName = String(c.env?.ENVIRONMENT || '').toLowerCase();
@@ -82,13 +102,11 @@ const dbInit = {
 		await this.v3_10DB(c);
 		await this.v3_11DB(c);
 		await this.v3_12DB(c);
-		await this.v3_18DB(c);
 		await this.v3_13DB(c);
 		await this.v3_14DB(c);
 		await this.v3_15DB(c);
 		await this.v3_16DB(c);
 		await this.v3_17DB(c);
-		await this.v3_18DB(c);
 		await this.v3_19DB(c);
 		await this.v3_20DB(c);
 		await this.v3_21DB(c);
@@ -573,16 +591,13 @@ const dbInit = {
 		const presentLegacy = legacyColMap.filter(item => existingCols.has(item.col));
 
 		for (const item of presentLegacy) {
-			// The copy and removal share one D1 transaction. A newer value already
-			// in setting_ext wins, and a failed copy leaves the legacy column intact.
-			await userDb.batch([
-				userDb.prepare(`
-					INSERT OR IGNORE INTO setting_ext (key, value)
-					SELECT ?, CAST(${item.col} AS TEXT) FROM setting
-					WHERE ${item.col} IS NOT NULL LIMIT 1
-				`).bind(item.key),
-				userDb.prepare(`ALTER TABLE setting DROP COLUMN ${item.col}`)
-			]);
+			// Keep the legacy columns during the rollback window. Existing
+			// setting_ext values remain authoritative on retries.
+			await userDb.prepare(`
+				INSERT OR IGNORE INTO setting_ext (key, value)
+				SELECT ?, CAST(${item.col} AS TEXT) FROM setting
+				WHERE ${item.col} IS NOT NULL LIMIT 1
+			`).bind(item.key).run();
 		}
 
 		for (const item of legacyColMap) {
@@ -1601,22 +1616,17 @@ const dbInit = {
 			`ALTER TABLE setting ADD COLUMN rule_type INTEGER NOT NULL DEFAULT 0;`
 		];
 
-		await Promise.all(settingColumns.map(async sql => {
-			try { await userDb.prepare(sql).run(); } catch (e) { console.warn(`跳过字段添加：${e.message}`); }
-		}));
-
-		try {
-			const nameColumn = await mailDb.prepare(`SELECT * FROM pragma_table_info('email') WHERE name = 'to_email' limit 1`).first();
-			if (!nameColumn) {
-				await mailDb.batch([
-					mailDb.prepare(`ALTER TABLE email ADD COLUMN to_email TEXT NOT NULL DEFAULT ''`),
-					mailDb.prepare(`ALTER TABLE email ADD COLUMN to_name TEXT NOT NULL DEFAULT ''`),
-					mailDb.prepare(`UPDATE email SET to_email = json_extract(recipient, '$[0].address'), to_name = json_extract(recipient, '$[0].name')`)
-				]);
-			}
-		} catch (e) {
-			console.warn(`跳过 email 字段添加：${e.message}`);
-		}
+		await addMissingColumns(userDb, 'setting', settingColumns);
+		await addMissingColumns(mailDb, 'email', [
+			"ALTER TABLE email ADD COLUMN to_email TEXT NOT NULL DEFAULT ''",
+			"ALTER TABLE email ADD COLUMN to_name TEXT NOT NULL DEFAULT ''"
+		]);
+		await mailDb.prepare(`UPDATE email SET
+			to_email = CASE WHEN to_email = '' THEN COALESCE(json_extract(recipient, '$[0].address'), '') ELSE to_email END,
+			to_name = CASE WHEN to_name = '' THEN COALESCE(json_extract(recipient, '$[0].name'), '') ELSE to_name END
+			WHERE CASE WHEN json_valid(recipient) THEN json_type(recipient, '$[0]') = 'object' ELSE 0 END
+				AND ((to_email = '' AND COALESCE(json_extract(CASE WHEN json_valid(recipient) THEN recipient END, '$[0].address'), '') != '')
+					OR (to_name = '' AND COALESCE(json_extract(CASE WHEN json_valid(recipient) THEN recipient END, '$[0].name'), '') != ''))`).run();
 	},
 
 	async v1_2DB(c) {
@@ -1632,9 +1642,7 @@ const dbInit = {
 			`ALTER TABLE email ADD COLUMN relation TEXT NOT NULL DEFAULT '';`
 		];
 
-		await Promise.all(emailCols.map(async sql => {
-			try { await mailDb.prepare(sql).run(); } catch (e) { console.warn(`跳过字段添加：${e.message}`); }
-		}));
+		await addMissingColumns(mailDb, 'email', emailCols);
 
 		await this.receiveEmailToRecipient(c);
 		await this.initAccountName(c);
@@ -1654,23 +1662,29 @@ const dbInit = {
 		const mailDb = getMailDb(c);
 		const userDb = getUserDb(c);
 
-		const mailCols = [
+		await addMissingColumns(mailDb, 'email', [
 			`ALTER TABLE email ADD COLUMN type INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE email ADD COLUMN status INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE email ADD COLUMN resend_email_id TEXT;`,
-			`ALTER TABLE email ADD COLUMN message TEXT;`,
+			`ALTER TABLE email ADD COLUMN message TEXT;`
+		]);
+
+		await addMissingColumns(mailDb, 'attachments', [
 			`ALTER TABLE attachments ADD COLUMN status INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE attachments ADD COLUMN type INTEGER NOT NULL DEFAULT 0;`
-		];
+		]);
 
-		const userCols = [
+		await addMissingColumns(userDb, 'setting', [
 			`ALTER TABLE setting ADD COLUMN resend_tokens TEXT NOT NULL DEFAULT '{}';`,
 			`ALTER TABLE setting ADD COLUMN send INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE setting ADD COLUMN r2_domain TEXT;`,
 			`ALTER TABLE setting ADD COLUMN site_key TEXT;`,
 			`ALTER TABLE setting ADD COLUMN secret_key TEXT;`,
 			`ALTER TABLE setting ADD COLUMN background TEXT;`,
-			`ALTER TABLE setting ADD COLUMN login_opacity INTEGER NOT NULL DEFAULT 0.90;`,
+			`ALTER TABLE setting ADD COLUMN login_opacity INTEGER NOT NULL DEFAULT 0.90;`
+		]);
+
+		await addMissingColumns(userDb, 'user', [
 			`ALTER TABLE user ADD COLUMN create_ip TEXT;`,
 			`ALTER TABLE user ADD COLUMN active_ip TEXT;`,
 			`ALTER TABLE user ADD COLUMN os TEXT;`,
@@ -1678,15 +1692,7 @@ const dbInit = {
 			`ALTER TABLE user ADD COLUMN device TEXT;`,
 			`ALTER TABLE user ADD COLUMN sort INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE user ADD COLUMN send_count INTEGER NOT NULL DEFAULT 0;`
-		];
-
-		await Promise.all(mailCols.map(async sql => {
-			try { await mailDb.prepare(sql).run(); } catch (e) { console.warn(`跳过字段添加：${e.message}`); }
-		}));
-
-		await Promise.all(userCols.map(async sql => {
-			try { await userDb.prepare(sql).run(); } catch (e) { console.warn(`跳过字段添加：${e.message}`); }
-		}));
+		]);
 
 		// 创建 perm 表并初始化
 		try {
@@ -2178,56 +2184,29 @@ const dbInit = {
 
 	async receiveEmailToRecipient(c) {
 		const mailDb = getMailDb(c);
-		try {
-			const receiveEmailColumn = await mailDb.prepare(`SELECT * FROM pragma_table_info('email') WHERE name = 'receive_email' limit 1`).first();
-
-			if (!receiveEmailColumn) {
-				return;
-			}
-
-			const queryList = [];
-			const { results } = await mailDb.prepare('SELECT receive_email,email_id FROM email').all();
-			results.forEach(emailRow => {
-				const recipient = {};
-				recipient.address = emailRow.receive_email;
-				recipient.name = '';
-				const recipientStr = JSON.stringify([recipient]);
-				const sql = mailDb.prepare('UPDATE email SET recipient = ? WHERE email_id = ?').bind(recipientStr, emailRow.email_id);
-				queryList.push(sql);
-			});
-
-			queryList.push(mailDb.prepare("ALTER TABLE email DROP COLUMN receive_email"));
-
-			await mailDb.batch(queryList);
-		} catch (e) {
-			console.warn(`receiveEmailToRecipient 跳过：${e.message}`);
+		const legacy = await mailDb.prepare(`SELECT "notnull" AS required, dflt_value AS default_value FROM pragma_table_info('email') WHERE name='receive_email'`).first();
+		if (!legacy) return;
+		if (legacy.required && (legacy.default_value === null || /^\(?null\)?$/i.test(legacy.default_value))) {
+			throw new Error('Legacy email.receive_email requires a compatible default before upgrade');
 		}
+
+		await mailDb.prepare(`UPDATE email SET recipient = json_array(json_object('address', receive_email, 'name', ''))
+			WHERE (recipient IS NULL OR trim(recipient) IN ('', '[]'))
+				AND receive_email IS NOT NULL AND trim(receive_email) != ''`).run();
 	},
 
 	async initAccountName(c) {
 		const mailDb = getMailDb(c);
-		try {
-			const nameColumn = await mailDb.prepare(`SELECT * FROM pragma_table_info('account') WHERE name = 'name' limit 1`).first();
+		const nameColumn = await mailDb.prepare("SELECT 1 AS present FROM pragma_table_info('account') WHERE name='name'").first();
+		if (nameColumn) return;
 
-			if (nameColumn) {
-				return;
-			}
-
-			const queryList = [];
-			queryList.push(mailDb.prepare(`ALTER TABLE account ADD COLUMN name TEXT NOT NULL DEFAULT ''`));
-
-			const { results } = await mailDb.prepare(`SELECT account_id, email FROM account`).all();
-
-			results.forEach(accountRow => {
-				const name = emailUtils.getName(accountRow.email);
-				const sql = mailDb.prepare('UPDATE account SET name = ? WHERE account_id = ?').bind(name, accountRow.account_id);
-				queryList.push(sql);
-			});
-
-			await mailDb.batch(queryList);
-		} catch (e) {
-			console.warn(`initAccountName 跳过：${e.message}`);
-		}
+		await mailDb.batch([
+			mailDb.prepare("ALTER TABLE account ADD COLUMN name TEXT NOT NULL DEFAULT ''"),
+			mailDb.prepare(`UPDATE account SET name = CASE
+				WHEN instr(trim(email), '@') > 0 AND instr(substr(trim(email), instr(trim(email), '@') + 1), '@') = 0
+				THEN substr(trim(email), 1, instr(trim(email), '@') - 1)
+				ELSE '' END`)
+		]);
 	}
 };
 
