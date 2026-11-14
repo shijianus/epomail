@@ -9,6 +9,14 @@
 
 ---
 
+### Epomail — 公测阻断复审与可执行验收计划 (2026-11-13)
+*   **关联审计基线 (Git Commit)**: `8e65f36ae2d3728b826fd58fef9760086cb879ce` (Short: `8e65f36`)
+*   **专项文档**: [公测审计与执行计划](doc/release/PUBLIC-BETA-EXECUTION-PLAN.md)
+*   **范围与方法**: 仓库静态审查、公开 GitHub CI 证据、Staging 匿名只读探针、隔离的本地 D1/KV 回归、构建与压测。
+*   **主要发现**: 基线 Quality Gates 失败在负载步骤。线上 Staging 的鉴权 HTTP 契约与候选不符。生产预检作用域与外发策略存在本地可修的缺口。
+*   **整改**: 生产预检、统一原生转发策略、发布身份与候选证据校验、全栈浏览器 CI、独立负载运行和发布包校验。
+*   **结论**: 公测 `BLOCK`。按新候选 SHA 验收 CI、Staging 业务、邮件和恢复证据。计划列明责任、指标、复验与停止条件。
+
 ### Epomail — 最终根因治理、全量自动化回归与公测发布终审报告 (2026-11-07)
 *   **关联 PR (Pull Request)**: PR #2 (`https://github.com/shijianus/epomail/pull/2`)
 *   **关联提交 (Git Commit)**: `0c8d3fee6d3b479576f4a977f70a4f3a9c86816f` (Exact CI Tested SHA)

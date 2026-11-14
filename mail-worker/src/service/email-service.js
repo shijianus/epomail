@@ -1051,30 +1051,6 @@ const emailService = {
 		const resendToken = resendTokens[domain];
 		const useCloudflareEmail = !!c.env.email;
 
-		// 分级外发闸门：对站外收件人强制校验 EMAIL_OUTBOUND_ENABLED 与 staging OUTBOUND_WHITELIST
-		if (!allInternal) {
-			const outboundDisabled = String(c.env?.EMAIL_OUTBOUND_ENABLED || '').trim().toLowerCase() === 'false';
-			if (outboundDisabled) {
-				throw new BizError('External email outbound is disabled in this environment (EMAIL_OUTBOUND_ENABLED=false)', 403, 'outbound_disabled');
-			}
-
-			const externalRecipients = receiveEmail.filter(addr => !domainList.includes('@' + emailUtils.getDomain(addr)));
-			const customWhitelist = String(c.env?.OUTBOUND_WHITELIST || '')
-				.split(',')
-				.map(s => s.trim().toLowerCase())
-				.filter(Boolean);
-			const isStaging = c.env?.ENVIRONMENT === 'staging';
-
-			if (isStaging || String(c.env?.OUTBOUND_WHITELIST_ENFORCE || '').toLowerCase() === 'true') {
-				const officialResendSandbox = ['delivered@resend.dev', 'bounced@resend.dev', 'complained@resend.dev'];
-				const allowedSet = new Set([...officialResendSandbox, ...customWhitelist]);
-				const blockedRecipient = externalRecipients.find(addr => !allowedSet.has(String(addr || '').trim().toLowerCase()));
-				if (blockedRecipient) {
-					throw new BizError(`External recipient (${blockedRecipient}) is not in OUTBOUND_WHITELIST`, 403, 'outbound_recipient_blocked');
-				}
-			}
-		}
-
 		//如果接收方存在站外邮箱，又没有发信服务
 		if (!useCloudflareEmail && !resendToken && !allInternal) {
 			throw new BizError(t('noSendProvider'));

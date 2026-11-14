@@ -195,7 +195,7 @@ jobs:
   worker:
     name: Worker (full test suite + deploy dry-run)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -230,8 +230,85 @@ jobs:
         working-directory: mail-worker
         run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-dry-run"
 
+      - name: Install browser test dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Cold-start full-stack smoke (local D1/KV, disposable secrets)
         run: node tests/fullstack-smoke.mjs
+
+      - name: Full-stack browser regression (local Worker)
+        run: node tests/fullstack-browser-e2e.mjs
+
+      - name: Release preflight and evidence contract
+        run: |
+          node scripts/verify-production-readiness.mjs
+          node --test tests/verify-production-readiness.test.mjs tests/public-beta-gate.test.mjs
+
+      - name: Package the tested Worker and static assets
+        shell: bash
+        run: |
+          candidate="$RUNNER_TEMP/epomail-candidate"
+          mkdir -p "$candidate"
+          cp -R "$RUNNER_TEMP/worker-dry-run" "$candidate/bundle"
+          cp -R mail-worker/dist "$candidate/dist"
+          # The archive is deployed without invoking the source checkout's build hook.
+          sed '/^\[build\]$/,/^\[env\.staging\]$/{ /^\[env\.staging\]$/!d; }' mail-worker/wrangler.toml > "$candidate/wrangler.toml"
+          git rev-parse HEAD > "$candidate/SOURCE_SHA"
+          tar -czf "$RUNNER_TEMP/epomail-candidate.tar.gz" -C "$candidate" .
+          cd "$RUNNER_TEMP"
+          sha256sum epomail-candidate.tar.gz > epomail-candidate.tar.gz.sha256
+
+      - name: Upload candidate package
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: epomail-candidate-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/epomail-candidate.tar.gz
+            ${{ runner.temp }}/epomail-candidate.tar.gz.sha256
+          retention-days: 14
+          if-no-files-found: error
+
+  backend-load:
+    name: Backend load and recovery (isolated local Worker)
+    needs: worker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: mail-worker/pnpm-lock.yaml
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm --dir mail-worker install --frozen-lockfile
+
+      - name: Download candidate package
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: epomail-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate-package
+
+      - name: Verify candidate assets
+        shell: bash
+        run: |
+          package="$RUNNER_TEMP/candidate-package"
+          (cd "$package" && sha256sum -c epomail-candidate.tar.gz.sha256)
+          tar -xzf "$package/epomail-candidate.tar.gz" -C "$package"
+          test "$(cat "$package/SOURCE_SHA")" = "$(git rev-parse HEAD)"
+          cp -R "$package/dist" mail-worker/dist
 
       - name: Bounded local backend load and recovery
         run: node tests/backend-stress.mjs --profile=limited-beta --soak=3m --out=tests/artifacts/backend-stress.json

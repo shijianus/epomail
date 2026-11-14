@@ -16,6 +16,7 @@ import kvConst from '../const/kv-const';
 import mailReliabilityService, { failInboundClaim } from '../service/mail-reliability-service.js';
 import { getMailDb } from '../utils/db-accessor.js';
 import forwardService from '../service/mail-forward-service.js';
+import { assertOutboundAllowed } from '../utils/outbound-policy.js';
 
 /** Read bounded raw bytes; decode only for callers that explicitly need text. */
 export async function readRawEmail(message, maxLimitBytes, maxLimitMB, { decode = true } = {}) {
@@ -91,7 +92,8 @@ export async function email(message, env, ctx) {
 			aiCodeFilter,
 			allMailMode,
 			userTgForward,
-			userEmailForward
+			userEmailForward,
+			domainList
 		} = await settingService.query({ env });
 
 		if (receive === settingConst.receive.CLOSE) {
@@ -388,9 +390,10 @@ export async function email(message, env, ctx) {
 				const emails = forwardEmail.split(',').map(e => e.trim()).filter(Boolean);
 				await Promise.all(emails.map(async email => {
 					try {
+						assertOutboundAllowed({ env }, [email]);
 						await message.forward(email);
 					} catch (e) {
-						console.error(`系统转发邮箱 ${email} 失败：`, e);
+						if (e?.name !== 'BizError') console.warn('[inbound] system forwarding failed');
 					}
 				}));
 			}
@@ -447,10 +450,17 @@ export async function email(message, env, ctx) {
 									console.warn(`Prevented forwarding loop: target [${target}] matches recipient or sender`);
 									continue;
 								}
+								const domains = Array.isArray(domainList) ? domainList : [];
+								try {
+									assertOutboundAllowed({ env }, [cleanTarget], { domains });
+								} catch (_) {
+									continue;
+								}
 								let cfForwardSuccess = false;
 								try {
 									// 尝试 Cloudflare 原生无损转发（若已在 CF Email Routing 中验证）
-									await message.forward(target);
+									assertOutboundAllowed({ env }, [cleanTarget]);
+									await message.forward(cleanTarget);
 									cfForwardSuccess = true;
 								} catch (cfErr) {
 									cfForwardSuccess = false;

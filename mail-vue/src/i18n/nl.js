@@ -1609,6 +1609,8 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     storageQuota: 'Opslagquotum',
     sendLimit: 'Verzendlimiet',
     sendEmailsPerDay: '{count} e-mails/dag',
+    composeOutboundDisabled: 'Extern verzenden is uitgeschakeld. Pas de ontvangers aan of bewaar het concept.',
+    composeRecipientNotAllowed: 'Deze ontvanger valt buiten het toegestane verzendbereik. Controleer het adres of bewaar het concept.',
     internalOnly: 'Alleen intern',
     cumulativeEmails: 'Totaal {count} e-mails',
     attachmentPermission: 'Machtiging voor bijlagen',

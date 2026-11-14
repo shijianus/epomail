@@ -225,6 +225,8 @@ describe('Production inbound email handler with local D1 and stubbed providers',
 		await handlerFixture(async ({ localEnv, recipient, settings, message, rows, claims, ai, tg, store, publish }) => {
 			settings.tgBotStatus = settingConst.tgBotStatus.OPEN; settings.tgChatId = 'local-stub';
 			settings.forwardStatus = settingConst.forwardStatus.OPEN; settings.forwardEmail = 'local-forward@local.test';
+			localEnv.EMAIL_OUTBOUND_ENABLED = 'true';
+			localEnv.OUTBOUND_WHITELIST = settings.forwardEmail;
 			const first = message(inboundMime(recipient, { files: 2 }));
 			await handleInbound(first, localEnv, {});
 			expect(first.setReject).not.toHaveBeenCalled(); expect(first.forward).toHaveBeenCalledOnce();
@@ -241,6 +243,22 @@ describe('Production inbound email handler with local D1 and stubbed providers',
 			expect(ai).toHaveBeenCalledOnce(); expect(tg).toHaveBeenCalledOnce(); expect(publish).toHaveBeenCalledOnce();
 			expect(r2Service.putInboundRawObj).toHaveBeenCalledOnce();
 			await expect(handleInbound(message(inboundMime(recipient, { files: 2, body: 'different body' })), localEnv, {})).rejects.toMatchObject({ code: 'inbound_content_conflict' });
+			expect((await rows()).results).toHaveLength(1);
+		});
+	});
+
+	it('stores inbound mail without dispatching native forwards when outbound is disabled', async () => {
+		await handlerFixture(async ({ localEnv, userId, settings, profile, message, rows }) => {
+			settings.forwardStatus = settingConst.forwardStatus.OPEN;
+			settings.forwardEmail = 'system-forward@external.test';
+			settings.userEmailForward = 1;
+			profile.set(`USER_PROFILE_${userId}`, JSON.stringify({ personalForwarding: {
+				enabled: true, mode: 'all', targets: 'personal-forward@external.test'
+			} }));
+			const incoming = message();
+			await handleInbound(incoming, localEnv, {});
+			expect(incoming.forward).not.toHaveBeenCalled();
+			expect(emailService.send).not.toHaveBeenCalled();
 			expect((await rows()).results).toHaveLength(1);
 		});
 	});

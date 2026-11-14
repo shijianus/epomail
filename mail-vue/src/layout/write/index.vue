@@ -115,7 +115,6 @@ import dayjs from "dayjs";
 import {useI18n} from "vue-i18n";
 import router from "@/router/index.js";
 import {ElMessageBox} from "element-plus";
-import {forceLogoutToLogin} from "@/utils/auth.js";
 
 defineExpose({
   open,
@@ -383,16 +382,21 @@ async function sendEmail() {
 
     show.value = false
     resetForm();
-  }).catch((e) => {
+  }).catch((error) => {
+    const failure = error.response?.data || error;
+    const status = error.response?.status ?? failure.code;
+    let message = failure.message || t('reqFailErrorMsg');
+    if (failure.errorCode === 'outbound_disabled') {
+      message = t('composeOutboundDisabled');
+    } else if (failure.errorCode === 'outbound_recipient_blocked') {
+      message = t('composeRecipientNotAllowed');
+    }
     ElNotification({
       title: t('sendFailMsg'),
-      type: e.code === 403 ? 'warning' : 'error',
-      message: h('span', {style: 'color: teal'}, e.message),
+      type: status === 403 ? 'warning' : 'error',
+      message: h('span', {style: 'color: teal'}, message),
       position: 'bottom-right'
     })
-    if (e.code === 401) {
-      forceLogoutToLogin(e.message);
-    }
     show.value = true
     addRecipientRecord();
   }).finally(() => {

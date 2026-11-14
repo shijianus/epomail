@@ -150,6 +150,20 @@ export default {
 
 		const url = new URL(req.url)
 
+		if (url.pathname === '/api/version' && req.method === 'GET') {
+			const version = env.CF_VERSION_METADATA;
+			const sha = version?.tag;
+			const versionId = version?.id;
+			const identified = typeof sha === 'string' && /^[0-9a-f]{40}$/.test(sha)
+				&& typeof versionId === 'string' && versionId.length > 0;
+			return Response.json(identified
+				? { sha, versionId }
+				: { errorCode: 'release_identity_unavailable' }, {
+				status: identified ? 200 : 503,
+				headers: { 'Cache-Control': 'no-store' }
+			});
+		}
+
 		if (url.pathname === '/api/scheduled' || url.pathname.startsWith('/api/scheduled')) {
 			const auth = await checkScheduledAuth(req, env);
 			if (!auth.ok) {

@@ -1609,6 +1609,8 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     storageQuota: 'Cuota de almacenamiento',
     sendLimit: 'Límite de envío',
     sendEmailsPerDay: '{count} correos/día',
+    composeOutboundDisabled: 'El envío externo está desactivado. Cambia los destinatarios o conserva el borrador.',
+    composeRecipientNotAllowed: 'Este destinatario está fuera del ámbito de envío permitido. Comprueba la dirección o conserva el borrador.',
     internalOnly: 'Solo interno',
     cumulativeEmails: 'Total {count} correos',
     attachmentPermission: 'Permiso de adjuntos',

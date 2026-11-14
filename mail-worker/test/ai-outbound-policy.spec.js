@@ -25,7 +25,7 @@ afterEach(async () => {
 });
 
 describe('provider dispatch isolation', () => {
-	it.each(['false', ' FALSE ', '', '0', false])('blocks an explicit disabled flag: %s', flag => {
+	it.each([undefined, 'false', ' FALSE ', '', '0', false])('blocks dispatch without explicit enablement: %s', flag => {
 		expect(() => assertOutboundAllowed({ env: { EMAIL_OUTBOUND_ENABLED: flag } }, ['user@example.com']))
 			.toThrow('disabled');
 	});

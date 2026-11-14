@@ -330,7 +330,7 @@ function git(args) {
  * Static staging configuration audit
  * ------------------------------------------------------------------------- */
 
-export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Checks() } = {}) {
+export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Checks(), allowSandboxOutbound = false } = {}) {
 	let text;
 	try {
 		text = fs.readFileSync(configPath, 'utf8');
@@ -439,16 +439,19 @@ export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Chec
 		checks.pass('CFG-10', 'staging environment is labelled', 'ENVIRONMENT=staging');
 	}
 
-	const urlInit = String(vars.ALLOW_URL_INIT ?? '').toLowerCase() === 'false' || vars.ALLOW_URL_INIT === false;
-	const outbound = String(vars.EMAIL_OUTBOUND_ENABLED ?? '').toLowerCase() === 'false' || vars.EMAIL_OUTBOUND_ENABLED === false;
-	if (!urlInit || !outbound) {
-		const detail = [
-			urlInit ? null : 'ALLOW_URL_INIT is not false',
-			outbound ? null : 'EMAIL_OUTBOUND_ENABLED is not false'
-		].filter(Boolean).join('; ');
-		checks.fail('CFG-11', 'staging cannot bootstrap or send real mail', detail);
+	const urlInitDisabled = String(vars.ALLOW_URL_INIT) === 'false';
+	const outboundDisabled = String(vars.EMAIL_OUTBOUND_ENABLED) === 'false';
+	const sandboxRecipients = String(vars.OUTBOUND_WHITELIST ?? '').split(',').map(value => value.trim()).filter(Boolean);
+	const boundedSandbox = String(vars.EMAIL_OUTBOUND_ENABLED) === 'true'
+		&& String(vars.OUTBOUND_WHITELIST_ENFORCE) === 'true'
+		&& sandboxRecipients.length > 0 && sandboxRecipients.length <= 20
+		&& sandboxRecipients.every(value => /^[^*\s@<>]+@[^*\s@<>]+\.[^*\s@<>]+$/.test(value));
+	if (urlInitDisabled && (outboundDisabled || (allowSandboxOutbound && boundedSandbox))) {
+		checks.pass('CFG-11', 'URL init is disabled and the Staging outbound policy is bounded',
+			outboundDisabled ? 'Outbound disabled' : 'Explicit sandbox recipient allowlist');
 	} else {
-		checks.pass('CFG-11', 'staging cannot bootstrap or send real mail', 'init and outbound are disabled');
+		checks.fail('CFG-11', 'URL init is disabled and the Staging outbound policy is bounded',
+			'Disable URL init and outbound, or select sandbox mode with a bounded recipient allowlist');
 	}
 
 	const domains = Array.isArray(vars.domain) ? vars.domain.map(item => String(item).toLowerCase()) : [];
@@ -524,7 +527,7 @@ export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Chec
 
 	const crons = getPath(toml, 'env.staging.triggers.crons');
 	if (Array.isArray(crons) && crons.length) {
-		checks.info('CFG-18', 'staging cron triggers are enabled', `${crons.join(', ')} (outbound mail is disabled)`);
+		checks.info('CFG-18', 'staging cron triggers are enabled', `${crons.join(', ')} (verify the selected outbound policy before scheduling)`);
 	} else {
 		checks.warn('CFG-18', 'staging cron triggers are missing', 'scheduled cleanup/outbox jobs will not run');
 	}
@@ -573,7 +576,7 @@ export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Chec
 	if (isolationProblems.length) {
 		checks.fail('CFG-21', 'staging cannot affect production users', `shared production resource: ${isolationProblems.join(', ')}`);
 	} else {
-		checks.pass('CFG-21', 'staging cannot affect production users', 'distinct Worker, D1, KV, domain and routes; outbound disabled');
+		checks.pass('CFG-21', 'staging cannot affect production users', 'distinct Worker, D1, KV, domain and routes');
 	}
 
 	return checks;

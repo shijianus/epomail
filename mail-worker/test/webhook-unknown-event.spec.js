@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import resendService from '../src/service/resend-service.js';
-import emailService from '../src/service/email-service.js';
+import { dbInit } from '../src/init/init.js';
 import { emailConst } from '../src/const/entity-const.js';
 
 describe('B9: Webhook Unknown Event & State Transition Protection Specification', () => {
@@ -12,71 +12,44 @@ describe('B9: Webhook Unknown Event & State Transition Protection Specification'
 		}
 	};
 
+	const fixtureIds = { messages: [], tasks: [], events: [] };
+
 	beforeAll(async () => {
-		const db = env.db;
-		await db.prepare(`
-			CREATE TABLE IF NOT EXISTS webhook_event (
-				event_id TEXT PRIMARY KEY,
-				provider TEXT NOT NULL,
-				event_type TEXT NOT NULL,
-				resource_id TEXT,
-				status TEXT NOT NULL,
-				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
-			)
-		`).run();
-
-		await db.prepare(`
-			CREATE TABLE IF NOT EXISTS notification_outbox (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				task_id TEXT NOT NULL UNIQUE,
-				channel TEXT NOT NULL DEFAULT 'resend',
-				status TEXT NOT NULL DEFAULT 'pending',
-				provider_message_id TEXT,
-				recipient TEXT NOT NULL DEFAULT 'user@example.com',
-				template_code TEXT NOT NULL DEFAULT 'notice_tpl',
-				subject TEXT NOT NULL DEFAULT 'Notice Subject',
-				content TEXT NOT NULL DEFAULT 'Notice Content',
-				last_error TEXT,
-				delivered_at DATETIME,
-				claimant_id TEXT,
-				lease_expires_at DATETIME,
-				next_retry_at DATETIME,
-				update_time DATETIME DEFAULT CURRENT_TIMESTAMP
-			)
-		`).run();
-
-		try { await db.prepare("ALTER TABLE notification_outbox ADD COLUMN recipient TEXT NOT NULL DEFAULT 'user@example.com'").run(); } catch {}
-		try { await db.prepare("ALTER TABLE notification_outbox ADD COLUMN template_code TEXT NOT NULL DEFAULT 'notice_tpl'").run(); } catch {}
-		try { await db.prepare("ALTER TABLE notification_outbox ADD COLUMN subject TEXT NOT NULL DEFAULT 'Notice Subject'").run(); } catch {}
-		try { await db.prepare("ALTER TABLE notification_outbox ADD COLUMN content TEXT NOT NULL DEFAULT 'Notice Content'").run(); } catch {}
-
-		await db.prepare(`
-			CREATE TABLE IF NOT EXISTS email (
-				email_id INTEGER PRIMARY KEY AUTOINCREMENT,
-				resend_email_id TEXT,
-				status INTEGER NOT NULL,
-				message TEXT,
-				update_time DATETIME DEFAULT CURRENT_TIMESTAMP
-			)
-		`).run();
+		await dbInit.intDB({ env });
+		await dbInit.v1_1DB({ env });
 	});
+
+	afterEach(async () => {
+		const deletes = [
+			...fixtureIds.messages.splice(0).map(id => env.db.prepare('DELETE FROM email WHERE resend_email_id=?').bind(id)),
+			...fixtureIds.tasks.splice(0).map(id => env.db.prepare('DELETE FROM notification_outbox WHERE task_id=?').bind(id))
+		];
+		const events = fixtureIds.events.splice(0);
+		deletes.push(...events.map(id => env.db.prepare('DELETE FROM webhook_event WHERE event_id=?').bind(id)));
+		if (deletes.length) await env.db.batch(deletes);
+		await Promise.all(events.map(id => env.kv.delete(`wh_resend:${id}`)));
+	});
+
+	async function seedDelivery(taskId, messageId) {
+		fixtureIds.tasks.push(taskId);
+		fixtureIds.messages.push(messageId);
+		await env.db.batch([
+			env.db.prepare(`INSERT INTO notification_outbox
+				(task_id, channel, status, provider_message_id, recipient, template_code, subject, content)
+				VALUES (?, 'resend', 'delivered', ?, 'user@example.com', 'notice_tpl', 'Notice Subject', 'Notice Content')`)
+				.bind(taskId, messageId),
+			env.db.prepare(`INSERT INTO email (account_id, user_id, resend_email_id, status) VALUES (?, ?, ?, ?)`)
+				.bind(910001, 910001, messageId, emailConst.status.DELIVERED)
+		]);
+	}
 
 	it('safely ignores unknown/unsupported webhook events without modifying outbox or email', async () => {
 		const emailId = `resend_msg_${Date.now()}_unknown`;
 		const taskId = `task_${Date.now()}_unknown`;
 		const eventId = `evt_${Date.now()}_unknown`;
 
-		// 预先插入一笔已有的 notification_outbox 记录 (处于 delivered 终态)
-		await env.db.prepare(`
-			INSERT INTO notification_outbox (task_id, channel, status, provider_message_id, recipient, template_code, subject, content)
-			VALUES (?, 'resend', 'delivered', ?, 'user@example.com', 'notice_tpl', 'Notice Subject', 'Notice Content')
-		`).bind(taskId, emailId).run();
-
-		// 预先插入 email 记录 (处于 DELIVERED 终态)
-		await env.db.prepare(`
-			INSERT INTO email (resend_email_id, status)
-			VALUES (?, ?)
-		`).bind(emailId, emailConst.status.DELIVERED).run();
+		fixtureIds.events.push(eventId);
+		await seedDelivery(taskId, emailId);
 
 		// 模拟第三方发送了一个未支持的新事件类型 (如 email.clicked, email.opened, domain.verified)
 		const unknownPayload = {
@@ -116,19 +89,11 @@ describe('B9: Webhook Unknown Event & State Transition Protection Specification'
 		const emailId = `resend_msg_${Date.now()}_ooo`;
 		const taskId = `task_${Date.now()}_ooo`;
 
-		// 1. 初始化为 delivered 终态
-		await env.db.prepare(`
-			INSERT INTO notification_outbox (task_id, channel, status, provider_message_id, recipient, template_code, subject, content)
-			VALUES (?, 'resend', 'delivered', ?, 'user@example.com', 'notice_tpl', 'Notice Subject', 'Notice Content')
-		`).bind(taskId, emailId).run();
-
-		await env.db.prepare(`
-			INSERT INTO email (resend_email_id, status)
-			VALUES (?, ?)
-		`).bind(emailId, emailConst.status.DELIVERED).run();
+		await seedDelivery(taskId, emailId);
 
 		// 2. 模拟延迟到达的 email.sent 事件 (早于 delivered 发生，但网络乱序迟到)
 		const lateSentEventId = `evt_late_sent_${Date.now()}`;
+		fixtureIds.events.push(lateSentEventId);
 		const latePayload = {
 			type: 'email.sent',
 			id: lateSentEventId,
