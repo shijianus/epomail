@@ -1,3 +1,12 @@
+### EpoMail 压测工具环回代理 503 根因修复与接手复验 (2026-11-14)
+*   **关联提交 (Git Commit)**: `9033982f150673b33a0f8c51538bbf6ec5bdb6e4` (Short: `9033982`，基于交接候选 `8efec93d`)
+*   **根因与变更 (Root Cause & Fix)**:
+    - [x] 根因定位：通过 `ProxyWorker.js` 异常插桩与 `workerd` keep-alive 探测确认，Wrangler `ProxyWorker` 到 `UserWorker` 的环回 HTTP 连接池在并发重叠请求（`send-replay` 跨 125ms 调度窗口使 `send-external-disabled` 抽取次级空闲连接）命中 Miniflare 约 5,000ms 服务端空闲断开，抛出 `"Error: Network connection lost."`；而 Wrangler `4.90.0` `ProxyWorker.js` 因 `urlFromParts` 缺失路径比对将其误判为 Worker 重启并返回 503。
+    - [x] 测试隔离层修复：新增 `tests/helpers/local-stack-runtime.mjs` 并在 `tests/helpers/local-stack.mjs` 中通过 `unstable_DevEnv` 轻量化 `proxyFactory` 直连校验后的 `127.0.0.1` Miniflare UserWorker 监听端口，完整保留子进程组隔离、环境变量过滤与临时目录物理清理。
+    - [x] 定向回归验证：`local-stack` + `load-runner` 单元测试 29/29、`fullstack-smoke` 22/22、`privacy-fullstack` 11/11、Chromium `fullstack-browser-e2e` 11/11、Chromium `oauth-bind-login-ui-e2e` 13/13 及 `backend-stress --profile=limited-beta --soak=3m`（1,801 请求、0 异常、读 P95 36.63ms、认证 P95 574.77ms）全部通过。
+
+---
+
 ### EpoMail 公测阻断修复和本地验证 (2026-11-13)
 *   **关联提交 (Git Commit)**: `304e15fab459ba3fc26c825a00c1d6f052083f66` (Short: `304e15f`)
 *   **验证环境**: 本地隔离 Worker、D1/KV；GitHub 和 Staging 仅匿名读取。
