@@ -10,6 +10,23 @@
 ---
 
 
+### EpoMail — P0 加固交接复验与 Turnstile CSP 浏览器回归修复报告 (2026-11-15)
+*   **关联提交 (Git Commit)**: `d2b813b967e52efb6a6b7e3685714f816c9ff7cb` (原样补丁提交) -> `e49a987ab63a9d76346538225827f94fc0b39a55` (Turnstile CSP 修复提交)
+*   **专项文档索引 (Detailed Doc)**: [doc/release/P0-HARDENING-2026-11-15.md](doc/release/P0-HARDENING-2026-11-15.md)、[reports/p0/limited-beta.json](reports/p0/limited-beta.json)、[reports/p0/capacity.json](reports/p0/capacity.json)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. **范围与环境**：在 `fix/public-beta-go-blockers-2026-11-07`（基线 `36871d180f4739092ecabbdc469a907ddc71a541`）校验并原样合入 `epomail-p0-hardening-dd11b37.patch`（SHA256: `e28855f8554fa9529519828bf92d0f00117960d8ca15a54abba94aeb4454b9ed`），零接触生产域名 `mail.epocanvas.com`，在本地隔离 Miniflare D1/KV 与真实 Chrome 环境下执行全量静态、单测、全栈及浏览器回归复验。
+    2. **工具与脚本**：`pnpm@10.34.5 --frozen-lockfile`、Vitest `3.2.7`、Node `test`、`temp_login_ui` `tsc`/tests/build、`mail-vue` release build + `copy-login-dist.mjs`、Playwright Chromium、`fullstack-smoke.mjs`、`privacy-fullstack.mjs`、`fullstack-browser-e2e.mjs`、`oauth-bind-login-ui-e2e.mjs`、`verify-production-readiness.mjs`、`verify-staging-config.mjs`、`secret-scan.mjs`、`i18n` 四件套及 `git diff --check`。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·浏览器阻断（已修复）]**: 在补丁原样树 `d2b813b` 补跑 `fullstack-browser-e2e.mjs` 时发现，`mail-worker/src/index.js` 新增默认 `Content-Security-Policy` 缺少 `https://challenges.cloudflare.com`，导致 `mail-vue/index.html` 加载 Turnstile 脚本被浏览器拦截并触发 `no uncaught page errors` 失败（10/11）。已在 `e49a987` 于 `script-src` 与 `frame-src` 显式放行 `https://challenges.cloudflare.com`（保持 `default-src 'self'`、`frame-ancestors 'none'` 等隔离不变）并补充断言，复跑 `fullstack-browser-e2e.mjs` 通过（11/11）。
+    - **[P1·本地容量门禁（保留 FAIL）]**: `reports/p0/limited-beta.json`（总计 `1,800` 请求、`0` 异常 `4xx`/`5xx`/超时，读 P95 `80.45ms`，认证 P95 `726.5ms`）通过；`reports/p0/capacity.json`（总计 `5,826` 请求、`0` 异常 `4xx`/`5xx`/超时）在 `ramp-32` 阶段因本地单实例 D1 串行瓶颈仅完成 `692/1280` 请求（低于 `960` 下限）维持 `FAIL`，须在隔离 Cloudflare Staging 复测。
+    - **[BLOCKED·线上 Staging 实时门禁]**: 本环境无法与 Cloudflare Staging API 建连（DNS 解析超时），且未执行远端部署；Staging 部署对齐、`/api/version` 校验、Access 授权放行、公网 HTTP 全梯度与 `>=15m` 长稳压测、provider-failure/恢复/备份回滚演练及历史凭据轮换仍待实施。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 基于 `e49a987` 实测全绿：四包 `frozen-lockfile` 安装、`temp_login_ui` `tsc` + `29/29` + build、`mail-vue` build + 资产同步、定向 P0 Vitest `4/4` (`41/41`)、全量 Vitest `51/51` (`645/645`, `462.30s`)、Node 套件 `237/237`、`fullstack-smoke` `22/22`、`privacy-fullstack` `11/11`、`fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13`、`verify-production-readiness.mjs --json` (`8/8`, `liveProbes=NOT_RUN`)、`verify-staging-config.mjs`、`secret-scan`（工作树 `1326` 文件 / 历史 `4925` blobs）、`i18n` 四件套及 `git diff --check`。
+    - **当前裁决**：本地代码与浏览器端到端回归均已就绪；受控公测与 GA 仍处于 **`CONDITIONAL / BLOCKED`（等待隔离 Staging 实时门禁与凭据轮换完成）**。
+
+---
+
+
 ### EpoMail — 公测前安全收尾、隔离 Staging 验收、压测恢复与准入终审 (2026-11-15)
 *   **关联提交 (Git Commit)**: `e75305491edf9300475ab45ddc8cc2450c48addf` (Short: `e753054`，基于基线 `6c0c01058a39062569241300edf28b91e125c668` / 远端 `edcaa3f`)
 *   **专项文档索引 (Detailed Doc)**: [doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md](doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md)

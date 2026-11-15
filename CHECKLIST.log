@@ -1,3 +1,19 @@
+### EpoMail P0 安全加固交接合入、Turnstile CSP 修复与全量复验 (2026-11-15)
+*   **关联提交 (Git Commit)**: `e49a987ab63a9d76346538225827f94fc0b39a55` (Short: `e49a987`，在原样应用补丁提交 `d2b813b967e52efb6a6b7e3685714f816c9ff7cb` 之上修复 Turnstile CSP；基线 `36871d180f4739092ecabbdc469a907ddc71a541`；补丁 `epomail-p0-hardening-dd11b37.patch` SHA256: `e28855f8554fa9529519828bf92d0f00117960d8ca15a54abba94aeb4454b9ed`)
+*   **部署环境 (Deployment)**: 本地隔离 Miniflare D1/KV 与本地 Chrome 浏览器回归；生产环境 (`mail.epocanvas.com`) 零接触；Cloudflare Staging 未在本机重新部署
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 原样应用 `epomail-p0-hardening-dd11b37.patch`（`d2b813b`）：WebAuthn 计数器冲突返回 `409 passkey_counter_conflict`、验签失败返回 `403 passkey_verification_failed`、登录/注册/TOTP 与全局 Hono JSON 解析异常返回 `400 INVALID_JSON`、Passkey `DELETE` 兼容空请求体、`email-key/migrate` 传递 `dryRun`、`staging/production` 启用 HTTPS 308 重定向与安全响应头、保留 `doc/release/P0-HARDENING-2026-11-15.md` 与 `reports/p0/*.json`（其中 `capacity.json` 保持 `FAIL`）。
+    - [x] 修复 Chrome 实测暴露的 Turnstile CSP 阻塞（`e49a987`）：`d2b813b` 在运行 `fullstack-browser-e2e` 时因默认 `Content-Security-Policy` 未放行 `https://challenges.cloudflare.com` 导致 `mail-vue/index.html` 加载 Turnstile 报错（10/11 通过，1 项失败）；已在 `mail-worker/src/index.js` 将 `https://challenges.cloudflare.com` 加入 `script-src` 与 `frame-src 'self' https://challenges.cloudflare.com`，并在 `mail-worker/test/index.spec.js` 补充断言。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 依赖锁文件核验：仓库根、`mail-worker`、`mail-vue`、`temp_login_ui` 四包 `npx --yes pnpm@10.34.5 install --frozen-lockfile` 全部通过。
+    - [x] 构建与前端单测：`temp_login_ui` `tsc --noEmit` + `29/29` 单测 + `vite build`、`mail-vue` `vite build --mode release` + `copy-login-dist.mjs` 全部通过。
+    - [x] Worker 与 Node 回归（基于 `e49a987`）：定向 P0 Vitest `4/4` 文件 `41/41` 通过；`mail-worker` 全量 Vitest `51/51` 文件 `645/645` 通过（`462.30s`）；`node --test tests/*.test.mjs tests/helpers/*.test.mjs` `237/237` 通过。
+    - [x] 本地全真栈与浏览器 E2E（基于 `e49a987`）：`fullstack-smoke` `22/22`、`privacy-fullstack` `11/11`、`fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13` 全部通过且自动清理零残留。
+    - [x] 静态门禁与配置安全：`verify-production-readiness.mjs --json` `8` passed / `0` failed (`liveProbes=NOT_RUN`)、`verify-staging-config.mjs` 通过、`secret-scan.mjs`（工作树 `1326` 文件 + 历史 `4925` blobs）`0` 命中、六语 `i18n` 四件套全绿、`git diff --check` 无空白/冲突错误。
+    - [ ] `BLOCKED / 尚待人工及线上 Staging 门禁`：受本环境出站 DNS 解析超时影响，隔离 Staging 未完成重部署与 `/api/version` 在线核验；仍需在隔离 Staging 完成部署校验、Access 授权放行、公网 HTTP 全梯度压测（含 Staging `capacity`、`>=15m` soak、provider-failure、backup/restore、rollback）及历史凭据轮换后方可评估受控公测。
+
+---
+
 ### EpoMail 公测前安全收尾、隔离 Staging 验收、压测恢复与准入终审 (2026-11-15)
 *   **关联提交 (Git Commit)**: `e75305491edf9300475ab45ddc8cc2450c48addf` (Short: `e753054`，基于 `6c0c01058a39062569241300edf28b91e125c668`)
 *   **部署环境 (Deployment)**: 本地隔离 Miniflare D1/KV + Cloudflare Staging (`https://epomail-staging.epocanvas.workers.dev`，当前线上版本 `598171bf-042a-4ffb-937c-b90f4ca82ab4` @ `6c0c010`)；生产环境零接触、零外部账号登录
