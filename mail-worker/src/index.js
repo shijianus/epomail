@@ -40,7 +40,8 @@ const DEFAULT_SECURITY_HEADERS = {
 		"form-action 'self'",
 		"img-src 'self' data: blob: https:",
 		"style-src 'self' 'unsafe-inline'",
-		"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+		"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+		"frame-src 'self' https://challenges.cloudflare.com",
 		"font-src 'self' data: https:",
 		"connect-src 'self' https: wss:"
 	].join('; ')

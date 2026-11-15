@@ -205,7 +205,10 @@ describe('Public API hardening', () => {
 		expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
 		expect(response.headers.get('X-Frame-Options')).toBe('DENY');
 		expect(response.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
-		expect(response.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'none'");
+		const csp = response.headers.get('Content-Security-Policy');
+		expect(csp).toContain("frame-ancestors 'none'");
+		expect(csp).toContain('https://challenges.cloudflare.com');
+		expect(csp).toContain("frame-src 'self' https://challenges.cloudflare.com");
 	});
 
 	it('rejects unsigned Resend webhooks', async () => {
