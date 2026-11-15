@@ -1,7 +1,16 @@
 # Epocanvas Mail - 最终安全审计报告 (SECURITY-AUDIT-FINAL.md)
 
-> **审计主体**：Epocanvas Mail 团队 (应用安全工程与 Release Engineering)
-> **审计基线版本**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
+> [!WARNING]
+> **基线更新说明 (2026-11-15)**：本文件正文第 1–7 节记录的是历史 `release/2026-10-31` (`4d9d9d8`) 阶段审计结论；该结论**已过期，不代表当前分支可执行上线**。
+> 当前唯一有效的公测前安全收尾与准入基线为 **`fix/public-beta-go-blockers-2026-11-07` @ `e75305491edf9300475ab45ddc8cc2450c48addf`**（详细证据见 [PUBLIC-BETA-AUDIT-2026-11-14.md](doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md)）：
+> - **当前代码安全加固增量 (`e753054`)**：补齐 `email-crypto-utils` 回滚密钥环顺序与 `email-key-migration-service` 可空 `code` CAS、全量日志 `safeLogger` 脱敏与外部请求 15s 超时、个人中心 XSS/profile URL 校验与 `profile/index.vue` 安全计算样式、`master` RBAC 加密迁移/回滚运维接口、以及 `deepmerge` 6/6 原型污染回归。
+> - **仍存在的公开安全与架构风险**：(1) 第三方登录 IdP 配置列 `setting.oauthProviders` 若经管理端存储于 D1 `setting` 与 KV 缓存仍为 JSON 明文（不同于已采用 `oauth_client_enc_key` AEAD 的 `oauth_app`），且 `oauthLoginEnabled` 缺服务端拦截与 PKCE 校验；(2) Staging 缺失 `oauth_client_enc_key`、`email_enc_key`、`storage_enc_key`、`scheduled_secret`、`resend_webhook_secret`，历史凭据与旧会话轮换未执行。
+> - **当前正式安全裁决**：**受控公测 `NO-GO (BLOCKED)` / 无条件 GA `NO-GO`**，直到 Staging 对齐版本、补齐密钥与隐私告知、完成真实外部供应商/IdP 验收及历史凭据轮换。
+
+---
+
+> **历史审计主体**：Epocanvas Mail 团队 (应用安全工程与 Release Engineering)
+> **历史审计基线版本**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
 > **安全基准标准**：OWASP ASVS 5.0 (Application Security Verification Standard L2/L3)
 > **执行环境**：Linux x86_64 / Node v24.14.0 / npm 11.9.0 / Vitest 3.2.7 (@cloudflare/vitest-pool-workers) / Wrangler 4.90.0
 > **审计模式**：白盒全量源代码审计、攻击面威胁建模、自动化对抗性与回归用例验证、静态密钥与多语言闭环扫描。
@@ -190,6 +199,6 @@
 基于本轮全量白盒审计、53+ 项核心安全测试用例、1268 个跟踪文件零密钥泄漏及端到端生产构建核验：
 
 **公测上线最终安全判定：GO (准许进入 Release Candidate 冻结与受控公测阶段)。**
-# 当前审计基线说明 (2026-11-14)
+# 当前审计基线说明 (2026-11-15 更新)
 
-本文记录的是历史审计阶段。当前分支的修复、测试和残余风险请以 `doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md` 为准。
+上述第 7 节 `GO` 判定仅对应历史 `release/2026-10-31` (`4d9d9d8`) 阶段。当前最新分支 `fix/public-beta-go-blockers-2026-11-07` (`e75305491edf9300475ab45ddc8cc2450c48addf`) 下的安全验证、隔离 Staging 缺口、`setting.oauthProviders` 残余风险及 **受控公测 `NO-GO (BLOCKED)` / 无条件 GA `NO-GO`** 最终裁决，一律以 `doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md` 与 `REMAINING-RISKS.md` 最新章节为准。

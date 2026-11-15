@@ -10,6 +10,22 @@
 ---
 
 
+### EpoMail — 公测前安全收尾、隔离 Staging 验收、压测恢复与准入终审 (2026-11-15)
+*   **关联提交 (Git Commit)**: `e75305491edf9300475ab45ddc8cc2450c48addf` (Short: `e753054`，基于基线 `6c0c01058a39062569241300edf28b91e125c668` / 远端 `edcaa3f`)
+*   **专项文档索引 (Detailed Doc)**: [doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md](doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. **范围与环境**：未交互登录任何外部账号、零触碰生产，围绕第 1–10 阶段覆盖代码 14 项安全审计、4 包 `pnpm@10.34.5 --frozen-lockfile`、全量自动化构建/单测/浏览器与全栈回归、Cloudflare 隔离 Staging (`epomail-staging.epocanvas.workers.dev`) 只读/Fail-Closed 探针与 D1 备份恢复演练、以及本地 Miniflare 多梯度压测 / >=15 分钟长稳 / 锁争用 / 崩溃重启恢复。
+    2. **工具与脚本**：Vitest 3.2.7、Playwright Chromium、`backend-stress.mjs` (`limited-beta` & `capacity`)、自定义 `phase7-long-soak-15m.mjs` (15.39m) 与 `phase7-recovery-and-contention.mjs`、Wrangler `4.90.0`、`sqlite3`、`verify-production-readiness.mjs`、`secret-scan.mjs` (`gitleaks`) 及 i18n 四件套。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·Staging/运维阻断]**: 线上 Staging 仍部署 `6c0c010`（未含 `e753054`）、缺失 `oauth_client_enc_key`/`email_enc_key`/`storage_enc_key`/`scheduled_secret`/`resend_webhook_secret`、`crons=[]`、`legalNotice` 为空 (`notReady`)、`role_id=1 & 2` 双重 `is_default=1`；无认证/第三方平台条件下，Staging 全流程认证与外部 OAuth/Resend/Mailjet/Webhook/BYO/Cron、历史凭据轮换、旧会话吊销及外部告警/值班体制均 `BLOCKED`。
+    - **[P1·安全与容量]**: 区分确认 `oauth_app` 已使用 `oauth_client_enc_key` 加密，而 `setting.oauthProviders` 若由管理后台写入 D1/KV 仍为 JSON 明文且 `oauthLoginEnabled` 缺服务端拦截与 PKCE；官方 `capacity` 压测在 `ramp-16` 因单实例 D1 串行瓶颈（~46–50 RPS）仅完成 `464/640` (<480 下限) 失败，PBKDF2 100k 轮单 Isolate 并发极限约 `1.6/s`（首轮 40 并发超时已保留原日志）；15.39m 长稳（9,150 请求, `0 5xx`, `0` 超时, `P95=30.89ms`）按实际 `scope='login' 30/900s` 限流对同源 IP 负面登录探测触发 34 次 `HTTP 429`。
+    - **[P2·供应链/并发]**: `mail-worker` 生产审计检出 1 项 `deepmerge@4.3.1` 低危告警 (`1243505` / `CVE-2026-93753`，路径 `resend>@react-email/render>html-to-text>deepmerge`)，已由本地补丁及 6/6 回归拦截；16 并行登录存在 KV 会话数组覆写竞态（留存 `2 <= 10` 个）。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - 代码加固与测试结果：Worker 全量 `49/49` 文件 `634/634` (`448.68s`, strictly post-final-edit)、登录 UI `tsc` + `29/29`、Node 套件 `237/237`、`deepmerge` `6/6`、`fullstack-smoke` `22/22`、`fullstack-browser-e2e` `11/11`、`privacy-fullstack` `11/11`、`oauth-bind-login-ui-e2e` `13/13`、`mail-vue` 发布构建与全部静态密钥/六语门禁全绿；Staging D1 导出 (`390,011 bytes`, SHA256 `9c45048...`) 恢复核验 `ok` 并清理。
+    - **最终准入裁决**：**受控公测 `NO-GO (BLOCKED)` / 无条件 GA `NO-GO`**，待人工按手册完成 Staging 部署与上述外部/运维闭环后方可复评。
+
+---
+
 ### EpoMail — 公测前全量漏洞审计与修复 (2026-11-14)
 *   **关联提交 (Git Commit)**: `fb04eeb42a5ec527c78a302bee45dcd5891ffbc4` (Short: `fb04eeb`)
 *   **测试契约提交 (Test Contract Commit)**: `1f24e67` (Short: `1f24e67`)

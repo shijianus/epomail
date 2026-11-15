@@ -1,3 +1,21 @@
+### EpoMail 公测前安全收尾、隔离 Staging 验收、压测恢复与准入终审 (2026-11-15)
+*   **关联提交 (Git Commit)**: `e75305491edf9300475ab45ddc8cc2450c48addf` (Short: `e753054`，基于 `6c0c01058a39062569241300edf28b91e125c668`)
+*   **部署环境 (Deployment)**: 本地隔离 Miniflare D1/KV + Cloudflare Staging (`https://epomail-staging.epocanvas.workers.dev`，当前线上版本 `598171bf-042a-4ffb-937c-b90f4ca82ab4` @ `6c0c010`)；生产环境零接触、零外部账号登录
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 修复 `mail-worker/src/utils/email-crypto-utils.js` 回滚密钥环顺序与 `email-key-migration-service.js` 可空 `code` CAS，并完善惰性重加密。
+    - [x] 全量迁移 `resend-api`, `email-service`, `login-service`, `oauth-provider-service`, `oauth-service`, `user-service` 至 `safeLogger` 与 `AbortSignal.timeout(15000)`。
+    - [x] 收紧 `user-service.js` `profileImageUrl`/渐变校验并修复 `mail-vue/src/views/profile/index.vue` 安全计算头像样式。
+    - [x] 新增 `master` RBAC 保护的 `/setting/security/*` 加密状态、迁移与确认回滚 API，补充 `security-hardening-p3.spec.js` (11/11) 与 `deepmerge-hardening.test.mjs` (6/6) 并清洗触发 `gitleaks` 的测试字面量。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 依赖与供应链：`4` 包 `pnpm@10.34.5 install --frozen-lockfile` 零锁文件差异；`npm` 上游 `audit --prod` 仅 `mail-worker` 报告 1 低危传递 `deepmerge@4.3.1` (`CVE-2026-93753`，本地补丁拦截且 `6/6` 测试通过)。
+    - [x] 代码/前端/浏览器全量：`mail-worker` Vitest `49/49` 文件 `634/634` (`448.68s`)；`temp_login_ui` `tsc` + `29/29` + build；`mail-vue` release build + SHA256 记录；Node 回归 `237/237`；`fullstack-smoke` `22/22`、`fullstack-browser-e2e` `11/11`、`privacy-fullstack` `11/11`、`oauth-bind-login-ui-e2e` `13/13`。
+    - [x] 静态门禁与预检：`scan-staged-secrets` (`gitleaks --staged`) 0 命中、`secret-scan` (1320 文件 / 4899 历史 blobs) 0 未豁免、六语 `i18n` 四件套全过、`verify-production-readiness.mjs`（提交前 7/8，文档提交后于干净 `HEAD` 执行终验）。
+    - [x] 隔离 Staging 与容灾演练：只读/Fail-Closed 探针（401/403/503）正常；D1 `epomail-staging-db` 备份 (`390,011 bytes`, SHA256 `9c45048...`) 恢复至临时 SQLite 校验 `ok` 并清理；记录版本回滚演练 `598171bf -> a1a24b3f -> 598171bf`。
+    - [x] 压力与长稳恢复：`limited-beta --soak=3m` (`1,796+5` req, `rc=0`)、48c 突发 (`240/240`)、D1/KV 锁争用、幂等重放 (`deliveredCopies=1`)、`SIGKILL` 重启恢复与上游异常收敛 (`0` 密钥泄漏) 通过；`capacity` (`ramp-16` 464/640 `rc=1`) 与 `>15m` 长稳（`9,150` req, `0 5xx/timeout`, `P95=30.89ms`, 因 `scope=login 30/900s` 触发 34x429 致严格脚本 `rc=1`）已完整保留失败日志。
+    - [ ] `BLOCKED / 需人工执行`：Staging 重部署对齐、补齐 5 项 Secrets、配置 `legalNotice`/`crons`、修复双默认角色、有账号态全链路与外部 OAuth/Resend/Webhook/BYO/Cron 验收、历史凭据/旧会话轮换及 5xx/429/Cron 告警/值班体制。
+
+---
+
 ### 公测前全量漏洞审计与修复 (2026-11-14)
 *   **关联提交 (Git Commit)**: `fb04eeb42a5ec527c78a302bee45dcd5891ffbc4` (Short: `fb04eeb`)
 *   **测试契约提交 (Test Contract Commit)**: `1f24e67` (Short: `1f24e67`)
