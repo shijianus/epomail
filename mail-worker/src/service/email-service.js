@@ -33,6 +33,7 @@ import hashUtils from '../utils/hash-utils';
 import verifyUtils from '../utils/verify-utils';
 import storageQuotaService from './storage-quota-service';
 import { assertOutboundAllowed } from '../utils/outbound-policy.js';
+import safeLogger from '../utils/safe-logger.js';
 import { mailSha256, normalizeMailAddress, assertMailRowSize, buildBoundedInserts, prepareMailQuery } from '../utils/mail-pipeline.js';
 import { mailTransactionGuard } from '../utils/mail-transaction.js';
 import mailOutboundService from './mail-outbound-service.js';
@@ -1434,7 +1435,10 @@ const emailService = {
 		}
 
 		// 仅记录状态与消息数量，不记录收件人、正文或完整供应商响应
-		console.log(`Mailjet response status=${response.status} messages=${Array.isArray(result?.Messages) ? result.Messages.length : 0}`);
+		safeLogger.info('mailjet_send_response', {
+			status: response.status,
+			messageCount: Array.isArray(result?.Messages) ? result.Messages.length : 0
+		});
 
 		if (!response.ok) {
 			return { data: null, error: { statusCode: response.status, message: `Mailjet returned HTTP ${response.status}` } };
@@ -2031,7 +2035,7 @@ const emailService = {
 			emailRow.isStar = emailRow.starId != null ? 1 : 0;
 			if (emailRow.userId) {
 				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, emailRow.userId);
-				if (c?.env?.email_enc_key && emailCryptoUtils.needsEmailRecordMigration(emailRow, cryptoKey)) {
+				if (emailCryptoUtils.needsEmailRecordMigration(emailRow, cryptoKey)) {
 					await emailKeyMigrationService.lazyReencryptEmailRow(c, emailRow, cryptoKey).catch(() => {});
 				}
 				emailRow = await emailCryptoUtils.decryptEmailRecord(emailRow, cryptoKey);
@@ -3022,7 +3026,7 @@ const emailService = {
 			}).sort((a,b) => b.count - a.count).slice(0, 5);
 			
 		} catch (e) {
-			console.error('Analytics error:', e);
+			safeLogger.error('email_analytics_failed', { error: e });
 		}
 		return result;
 	}

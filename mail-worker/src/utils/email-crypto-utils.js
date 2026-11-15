@@ -169,6 +169,13 @@ const emailCryptoUtils = {
 			readKeysByDomain[EMAIL_KEY_DOMAINS.EMAIL_ENC_KEY].push(prevWithE);
 			readKeysByDomain[EMAIL_KEY_DOMAINS.PREVIOUS_EMAIL_ENC_KEY].push(prevWithP, prevWithE);
 		}
+		if (emailSecret) {
+			// Append after prevEmailSecret so domainOverride=p writes still select previous_email_enc_key[0],
+			// while d=p ciphertext stays readable after rollback clears previous_email_enc_key.
+			readKeysByDomain[EMAIL_KEY_DOMAINS.PREVIOUS_EMAIL_ENC_KEY].push(
+				await deriveDomainAesKey(emailSecret, uid, EMAIL_KEY_DOMAIN_NAMES.p)
+			);
+		}
 		if (totpSecret) {
 			readKeysByDomain[EMAIL_KEY_DOMAINS.TOTP_COMPAT].push(
 				await deriveDomainAesKey(totpSecret, uid, EMAIL_KEY_DOMAIN_NAMES.t)

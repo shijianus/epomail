@@ -118,12 +118,14 @@ const premKey = {
 	'user:delete': ['/user/delete','/user/deleteAccount', '/user/purgeEmails'],
 	'all-email:query': ['/allEmail/list','/allEmail/latest','/allEmail/outbound/unknown'],
 	'all-email:delete': ['/allEmail/delete','/allEmail/batchDelete','/allEmail/outbound/resolve'],
-	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig', '/audit/list', '/audit/circuit-breaker', '/audit/outbox/list'],
+	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig', '/setting/security/encryption-status', '/audit/list', '/audit/circuit-breaker', '/audit/outbox/list'],
 	'setting:set': [
 		'/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist',
 		'/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status', '/admin/oauthApp/delete',
 		'/setting/sendWelcomeEmail', '/setting/sendGlobalEmail', '/setting/globalEmailConfig',
 		'/setting/ai/test', '/setting/ai/models', '/setting/s3/test', '/setting/db/test', '/setting/storage/scan', '/setting/storage/cleanup', '/setting/storage/orphans/cleanup',
+		'/setting/security/email-key/migrate', '/setting/security/email-key/rollback',
+		'/setting/security/byo-storage/migrate', '/setting/security/byo-storage/rollback',
 		'/oauth/verify',
 		'/audit/action', '/audit/adjudicate', '/audit/purge', '/audit/circuit-breaker',
 		'/audit/outbox/list', '/audit/outbox/retry', '/audit/outbox/process'

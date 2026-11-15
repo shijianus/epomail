@@ -924,7 +924,7 @@ const oauthService = {
 						proofConsumed: false
 					});
 			}
-			console.error('OAuth bind preflight failed:', err);
+			safeLogger.error('oauth_bind_preflight_failed', { provider: boundProvider, error: err });
 			throw new BizError('OAuth binding failed; retry with the same proof', 400, 'bind_failed');
 		}
 
@@ -1003,7 +1003,7 @@ const oauthService = {
 					code: typeof code === 'string' ? code : ''
 				});
 			} catch (err) {
-				console.error('Failed to record OAuth bind claim account:', err);
+				safeLogger.error('oauth_bind_claim_record_failed', { userId, error: err });
 			}
 
 			// Atomic association: lease still ours AND identity still unbound.
@@ -1031,11 +1031,11 @@ const oauthService = {
 					try {
 						await c.env.kv.put(KvConst.INITIAL_PASSWORD + userId, createdRow.password);
 					} catch (kvErr) {
-						console.error('Failed to cache initial password marker:', kvErr);
+						safeLogger.error('oauth_initial_password_kv_cache_failed', { userId, error: kvErr });
 					}
 				}
 			} catch (err) {
-				console.error('Failed to mark initial password for OAuth account:', err);
+				safeLogger.error('oauth_initial_password_mark_failed', { userId, error: err });
 			}
 		} catch (err) {
 			if (!proofSpent) {
@@ -1051,13 +1051,13 @@ const oauthService = {
 				// new flow. Preserve the user-facing message.
 				throw new BizError(err.message, 409, err.errorCode || 'bind_failed');
 			}
-			console.error('OAuth binding failed after proof consumption:', err);
+			safeLogger.error('oauth_bind_after_proof_failed', { provider: boundProvider, error: err });
 			throw new BizError('OAuth binding failed; restart the OAuth login flow', 409, 'bind_failed');
 		} finally {
 			try {
 				await oauthBindClaim.release(c, { oauthUserId, claimToken });
 			} catch (err) {
-				console.error('Failed to release OAuth bind claim:', err);
+				safeLogger.error('oauth_bind_claim_release_failed', { provider: boundProvider, error: err });
 			}
 		}
 
@@ -1074,7 +1074,7 @@ const oauthService = {
 			});
 			return { userInfo: oauthRow, ...splitLoginResult(loginResult) }
 		} catch (err) {
-			console.error('OAuth binding committed but session creation failed:', err);
+			safeLogger.error('oauth_bind_session_create_failed', { provider: boundProvider, error: err });
 			return { userInfo: oauthRow, token: null, alreadyBound: true };
 		}
 	},
@@ -1090,7 +1090,7 @@ const oauthService = {
 			try {
 				await regKeyService.restoreOne(c, code);
 			} catch (err) {
-				console.error('Failed to restore invite slot after OAuth bind rollback:', err);
+				safeLogger.error('oauth_bind_rollback_invite_restore_failed', { userId, error: err });
 			}
 		}
 	},

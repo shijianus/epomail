@@ -262,17 +262,33 @@ const userService = {
         // Bound every free-form field so one request cannot fill a 25 MB KV
         // value or force oversized public responses.
         const boundedString = (value, max) => typeof value === 'string' ? value.slice(0, max) : '';
-        const profileImageUrl = (value) => {
+        const profileImageUrl = (value, { allowGradient = false } = {}) => {
             if (value === undefined || value === null || value === '') return '';
             const text = String(value).trim();
             if (!text) return '';
+            if (/[\u0000-\u001f\u007f"'\\<>]/.test(text) || text.startsWith('//')) {
+                throw new BizError('Invalid profile image URL', 400, 'invalid_profile_url');
+            }
+            // Allow small legacy inline images, but never a multi-megabyte data URL.
+            if (/^data:image\/(?:png|jpe?g|gif|webp|avif|bmp);base64,[a-z0-9+/=\s]+$/i.test(text) && text.length <= 512 * 1024) {
+                return text;
+            }
             if (text.length > 2048) {
                 throw new BizError('Profile image URL is too long', 400, 'invalid_profile_url');
             }
-            if (/^https?:\/\//i.test(text) || text.startsWith('/')) return text;
-            // Allow small legacy inline images, but never a multi-megabyte data URL.
-            if (/^data:image\/(?:png|jpe?g|gif|webp|avif|bmp);base64,/i.test(text) && text.length <= 512 * 1024) {
+            if (allowGradient && /^(?:linear|radial)-gradient\(\s*[a-z0-9#%,.\s-]+\)$/i.test(text) && !/\b(?:url|var|attr|expression)\b/i.test(text)) {
                 return text;
+            }
+            if (text.startsWith('/')) {
+                return text;
+            }
+            if (/^https?:\/\//i.test(text)) {
+                try {
+                    const parsed = new URL(text);
+                    if (['http:', 'https:'].includes(parsed.protocol) && !parsed.username && !parsed.password) {
+                        return text;
+                    }
+                } catch (_) {}
             }
             throw new BizError('Invalid profile image URL', 400, 'invalid_profile_url');
         };
@@ -280,9 +296,9 @@ const userService = {
         if (safeParams.nickname !== undefined) safeParams.nickname = boundedString(safeParams.nickname, 64);
         if (safeParams.bio !== undefined) safeParams.bio = boundedString(safeParams.bio, 2000);
         if (safeParams.signature !== undefined) safeParams.signature = boundedString(safeParams.signature, 500);
-        if (safeParams.background !== undefined) safeParams.background = boundedString(safeParams.background, 2048);
+        if (safeParams.background !== undefined) safeParams.background = profileImageUrl(safeParams.background, { allowGradient: true });
         if (safeParams.avatarUrl !== undefined) safeParams.avatarUrl = profileImageUrl(safeParams.avatarUrl);
-        if (safeParams.backgroundUrl !== undefined) safeParams.backgroundUrl = profileImageUrl(safeParams.backgroundUrl);
+        if (safeParams.backgroundUrl !== undefined) safeParams.backgroundUrl = profileImageUrl(safeParams.backgroundUrl, { allowGradient: true });
         if (safeParams.themeMode !== undefined) {
             safeParams.themeMode = ['auto', 'light', 'dark', 'system'].includes(safeParams.themeMode)
                 ? safeParams.themeMode : 'auto';
@@ -308,7 +324,7 @@ const userService = {
                         : 'Auto-forwarding disabled'
                 });
             } catch (e) {
-                console.error('Failed to send forwarding notice:', e);
+                safeLogger.error('forwarding_notice_failed', { userId, error: e });
             }
         }
 
@@ -322,7 +338,7 @@ const userService = {
                         : 'Telegram Bot disabled'
                 });
             } catch (e) {
-                console.error('Failed to send telegram notice:', e);
+                safeLogger.error('telegram_notice_failed', { userId, error: e });
             }
         }
 
@@ -369,7 +385,8 @@ const userService = {
 
             const res = await fetch(`${externalHost}/upload`, {
                 method: 'POST',
-                body: newFormData
+                body: newFormData,
+                signal: AbortSignal.timeout(15000)
             });
 
             if (!res.ok) {
@@ -628,7 +645,7 @@ const userService = {
 		try {
 			await getUserDb(c).prepare("UPDATE user SET initial_password_hash = '' WHERE user_id = ?").bind(userId).run();
 		} catch (err) {
-			console.warn('Failed to clear initial password marker:', err.message);
+			safeLogger.warn('initial_password_marker_clear_failed', { userId, error: err });
 		}
 
 		// Password changes invalidate every existing session. The user must log
@@ -644,7 +661,7 @@ const userService = {
 			profile.passwordUpdatedAt = new Date().toISOString();
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 		} catch (e) {
-			console.error('Failed to update password timestamp', e);
+			safeLogger.error('password_timestamp_update_failed', { userId, error: e });
 		}
 
 		try {
@@ -652,7 +669,7 @@ const userService = {
 			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
 			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSWORD_CHANGED);
 		} catch (e) {
-			console.error('Failed to send password changed notice:', e);
+			safeLogger.error('password_changed_notice_failed', { userId, error: e });
 		}
 	},
 
@@ -684,7 +701,7 @@ const userService = {
 			).bind(passwordHash, userId, passwordHash).run();
 			return Number(result?.meta?.changes ?? 0) > 0;
 		} catch (err) {
-			console.error('Failed to persist initial password marker:', err);
+			safeLogger.error('initial_password_marker_persist_failed', { userId, error: err });
 			return false;
 		}
 	},
@@ -766,7 +783,7 @@ const userService = {
 				generatedHash,
 				authVersion: authVersionOf(userRow)			};
 		} catch (err) {
-			console.error('Failed to evaluate initial password eligibility:', err);
+			safeLogger.error('initial_password_eligibility_failed', { userId, error: err });
 			return status;
 		}
 	},
@@ -815,7 +832,7 @@ const userService = {
 		try {
 			await c.env.kv.delete(KvConst.INITIAL_PASSWORD + userId);
 		} catch (err) {
-			console.error('Failed to clear initial password marker:', err);
+			safeLogger.error('initial_password_kv_clear_failed', { userId, error: err });
 		}
 
 		// Invalidate every session, including this one, exactly like a normal
@@ -832,7 +849,7 @@ const userService = {
 			profile.passwordUpdatedAt = new Date().toISOString();
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 		} catch (e) {
-			console.error('Failed to update password timestamp', e);
+			safeLogger.error('initial_password_timestamp_update_failed', { userId, error: e });
 		}
 
 		try {
@@ -840,7 +857,7 @@ const userService = {
 			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
 			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSWORD_CHANGED);
 		} catch (e) {
-			console.error('Failed to send password changed notice:', e);
+			safeLogger.error('initial_password_changed_notice_failed', { userId, error: e });
 		}
 
 		return { success: true };
@@ -1557,7 +1574,7 @@ const userService = {
 					await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
 				}
 			} catch (err) {
-				console.error('Failed to deliver welcome email on user add:', err);
+				safeLogger.error('user_add_welcome_email_failed', { userId, error: err });
 			}
 		} catch (err) {
 			// The user row, profile KV entry and primary account are separate
@@ -1693,7 +1710,7 @@ const userService = {
 			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
 			decryptedEmails = await Promise.all(userEmails.map(em => emailCryptoUtils.decryptEmailRecord(em, cryptoKey)));
 		} catch (err) {
-			console.error('Decryption during export:', err);
+			safeLogger.error('export_decryption_failed', { userId, error: err });
 		}
 
 		return {
@@ -1844,7 +1861,7 @@ const userService = {
 				detail: `Token: ${tokenObj.name} (${days ? days + 'd' : 'never'})`
 			});
 		} catch (e) {
-			console.error('Failed to send PAT notice:', e);
+			safeLogger.error('pat_created_notice_failed', { userId, error: e });
 		}
 
 		// The plaintext value is returned exactly once. Only its SHA-256 hash is

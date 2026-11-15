@@ -37,6 +37,7 @@ import authOperation from '../utils/auth-security-operation.js';
 import { authVersionOf, hashToken } from '../utils/one-time-credential.js';
 import { getUserDb } from '../utils/db-accessor.js';
 import legalPolicyService from './legal-policy-service.js';
+import safeLogger from '../utils/safe-logger.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -348,18 +349,18 @@ const loginService = {
 			await (await import('../utils/db-accessor.js')).getUserDb(c)
 				.prepare('DELETE FROM legal_acceptance WHERE user_id = ?').bind(id).run();
 		} catch (error) {
-			console.error('Failed to roll back registration acceptance:', error);
+			safeLogger.error('rollback_registration_acceptance_failed', { userId: id, error });
 		}
 		try {
 			await accountService.physicsDeleteByUserIds(c, [id]);
 		} catch (err) {
-			console.error('Failed to roll back OAuth registration account rows:', err);
+			safeLogger.error('rollback_oauth_registration_accounts_failed', { userId: id, error: err });
 		}
 
 		try {
 			await orm(c).delete(user).where(eq(user.userId, id)).run();
 		} catch (err) {
-			console.error('Failed to roll back OAuth registration user row:', err);
+			safeLogger.error('rollback_oauth_registration_user_failed', { userId: id, error: err });
 		}
 
 		try {
@@ -440,7 +441,7 @@ const loginService = {
 				await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
 			}
 		} catch (err) {
-			console.error('Failed to deliver welcome email on register:', err);
+			safeLogger.error('register_welcome_email_failed', { userId, error: err });
 		}
 
 		const extra = oauth ? { userId, email, reservedRegKey } : {};
@@ -562,7 +563,7 @@ const loginService = {
 			const { salt, hash } = await cryptoUtils.hashPassword(plainPassword, c.env);
 			await orm(c).update(user).set({ password: hash, salt }).where(and(eq(user.userId, row.userId), eq(user.password, row.password), eq(user.salt, row.salt), eq(user.authVersion, authVersionOf(row)))).run();
 		} catch (err) {
-			console.error('Lazy password migration failed:', err);
+			safeLogger.error('lazy_password_migration_failed', { userId: row?.userId, error: err });
 		}
 	},
 
@@ -633,7 +634,7 @@ const loginService = {
 						detail: '12 hours source-bound login throttle (5 consecutive failed attempts)'
 				});
 			} catch (e) {
-				console.error('Failed to send account locked notice:', e);
+				safeLogger.error('account_locked_notice_failed', { userId: userRow?.userId, error: e });
 			}
 		};
 

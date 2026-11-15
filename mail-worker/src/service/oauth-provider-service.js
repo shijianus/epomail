@@ -7,6 +7,7 @@ import KvConst from '../const/kv-const';
 import { isAdminUser } from '../utils/admin-utils';
 import oneTimeCredential, { OTC_PURPOSE, authVersionOf } from '../utils/one-time-credential.js';
 import { encryptClientSecret, decryptClientSecret, verifyClientSecret } from '../utils/oauth-secret-crypto.js';
+import safeLogger from '../utils/safe-logger.js';
 
 const encoder = new TextEncoder();
 
@@ -230,7 +231,7 @@ const oauthProviderService = {
 				detail: `App: ${app.name || app.clientId} (Scopes: ${scope || 'openid profile email'})`
 			});
 		} catch (e) {
-			console.error('Failed to send OAuth authorized notice:', e);
+			safeLogger.error('oauth_authorized_notice_failed', { userId: user?.userId, error: e });
 		}
 
 		const finalUrl = new URL(redirect_uri);

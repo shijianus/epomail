@@ -241,7 +241,7 @@ const emailKeyMigrationService = {
 			rawRow.subject ?? null,
 			rawRow.content ?? null,
 			rawRow.text ?? null,
-			rawRow.code ?? ''
+			rawRow.code ?? null
 		).first();
 
 		if (!updated) {

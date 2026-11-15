@@ -42,11 +42,30 @@ test('patched deepmerge rejects constructor and prototype keys on nested and arr
 test('patched deepmerge patch file is installed and active in worker node_modules', () => {
 	const patchPath = new URL('../mail-worker/patches/deepmerge@4.3.1.patch', import.meta.url);
 	const cjsPath = new URL('../mail-worker/node_modules/deepmerge/dist/cjs.js', import.meta.url);
+	const esmEntryPath = new URL('../mail-worker/node_modules/deepmerge/index.js', import.meta.url);
+	const pkgJsonPath = new URL('../mail-worker/node_modules/deepmerge/package.json', import.meta.url);
 	assert.equal(fs.existsSync(patchPath), true);
 	const patchContent = fs.readFileSync(patchPath, 'utf8');
 	const runtimeContent = fs.readFileSync(cjsPath, 'utf8');
+	const esmContent = fs.readFileSync(esmEntryPath, 'utf8');
+	const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+	assert.equal(pkgJson.main, 'dist/cjs.js');
 	assert.match(patchContent, /isUnsafeKey/);
 	assert.match(runtimeContent, /isUnsafeKey/);
+	assert.match(esmContent, /isUnsafeKey/);
+});
+
+test('patched deepmerge blocks deep nested constructor/prototype chains without polluting Object.prototype', () => {
+	const attack = JSON.parse(
+		'{"a":{"constructor":{"prototype":{"pwnedDeep":1}}},"b":{"__proto__":{"pwnedProto":2}},"c":{"prototype":{"pwnedProp":3}}}'
+	);
+	const result = deepmerge({ a: { nested: true }, b: null, c: {} }, attack);
+	assert.equal(({}).pwnedDeep, undefined);
+	assert.equal(({}).pwnedProto, undefined);
+	assert.equal(({}).pwnedProp, undefined);
+	assert.deepEqual(result.a, { nested: true });
+	assert.deepEqual(result.b, {});
+	assert.deepEqual(result.c, {});
 });
 
 test('patched deepmerge preserves ordinary merge behavior', () => {

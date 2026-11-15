@@ -1,6 +1,8 @@
-import { env } from 'cloudflare:test';
+import { env, SELF } from 'cloudflare:test';
 import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest';
 import safeLogger, { redactSensitiveData, sanitizeString, sanitizeUrl } from '../src/utils/safe-logger.js';
+import { dbInit } from '../src/init/init.js';
+import jwtUtils from '../src/utils/jwt-utils.js';
 import telegramService from '../src/service/telegram-service.js';
 import oauthService from '../src/service/oauth-service.js';
 import aiService from '../src/service/ai-service.js';
@@ -194,8 +196,8 @@ describe('Phase 3 security hardening: BYO S3 versioned AEAD encryption & migrati
 		await seedUserRow(UID_A);
 		await seedUserRow(UID_B);
 
-		const phase1Env = { ...env, totp_enc_key: 'compat-totp-key-1' };
-		const phase2Env = { ...env, totp_enc_key: 'compat-totp-key-1', storage_enc_key: 'dedicated-storage-key-2' };
+		const phase1Env = { ...env, totp_enc_key: 'test-compat-totp-key-1' };
+		const phase2Env = { ...env, totp_enc_key: 'test-compat-totp-key-1', storage_enc_key: 'test-dedicated-storage-key-2' };
 		const c1 = { ...cBase(), env: phase1Env };
 		const c2 = { ...cBase(), env: phase2Env };
 
@@ -301,10 +303,10 @@ describe('Phase 3 security hardening: Email encryption key domain isolation & mi
 
 	it('isolates email_enc_key from totp_enc_key and forbids jwt_secret for new encryption', async () => {
 		// jwt_secret alone cannot derive a write key
-		await expect(emailCryptoUtils.getUserEmailCryptoKey({ jwt_secret: 'jwt-only' }, UID_1)).rejects.toThrow('not configured');
+		await expect(emailCryptoUtils.getUserEmailCryptoKey({ jwt_secret: 'test-jwt-only' }, UID_1)).rejects.toThrow('not configured');
 
-		const envCompat = { totp_enc_key: 'shared-totp-key' };
-		const envIsolated = { totp_enc_key: 'shared-totp-key', email_enc_key: 'isolated-email-key' };
+		const envCompat = { totp_enc_key: 'test-shared-totp-key' };
+		const envIsolated = { totp_enc_key: 'test-shared-totp-key', email_enc_key: 'test-isolated-email-key' };
 
 		const keyringCompat = await emailCryptoUtils.getUserEmailCryptoKey(envCompat, UID_1);
 		const keyringIsolated = await emailCryptoUtils.getUserEmailCryptoKey(envIsolated, UID_1);
@@ -406,9 +408,9 @@ describe('Phase 3 security hardening: Email encryption key domain isolation & mi
 		const messageId = `<dual-raw-${crypto.randomUUID()}@local.test>`;
 		const rawBytes = new TextEncoder().encode(`From: a@local.test\r\nTo: ${recipient}\r\nSubject: raw\r\nMessage-ID: ${messageId}\r\n\r\nhello`);
 
-		const envOld = { ...env, totp_enc_key: 'inbound-totp-key' };
+		const envOld = { ...env, totp_enc_key: 'test-inbound-totp-key' };
 		delete envOld.email_enc_key;
-		const envNew = { ...env, totp_enc_key: 'inbound-totp-key', email_enc_key: 'inbound-dedicated-email-key' };
+		const envNew = { ...env, totp_enc_key: 'test-inbound-totp-key', email_enc_key: 'test-inbound-dedicated-email-key' };
 
 		let claimKey = null;
 		try {
@@ -419,7 +421,7 @@ describe('Phase 3 security hardening: Email encryption key domain isolation & mi
 			await env.db.prepare('UPDATE mail_receive_claim SET lease_until = 0, content_sha256 = NULL WHERE claim_key = ?').bind(claimKey).run();
 
 			// Without totp_enc_key, email_enc_key alone cannot decrypt legacy totp-encrypted inbound blob
-			const envEmailOnly = { ...env, email_enc_key: 'inbound-dedicated-email-key' };
+			const envEmailOnly = { ...env, email_enc_key: 'test-inbound-dedicated-email-key' };
 			delete envEmailOnly.totp_enc_key;
 			await expect(acquireInboundClaim({ env: envEmailOnly }, {
 				recipient,
@@ -441,5 +443,220 @@ describe('Phase 3 security hardening: Email encryption key domain isolation & mi
 			await cleanupExpiredInboundClaims({ env: envNew }).catch(() => {});
 		}
 		void key;
+	});
+});
+
+describe('Phase 3 additional security hardening: rollback key restoration, profile URL sanitization & admin migration API', () => {
+	const UID_P3 = 993001;
+	const ADMIN_UID = 993002;
+	const NON_ADMIN_UID = 993003;
+	const ROLE_USER_ID = 99310;
+	const ROLE_MASTER_ID = 99311;
+	let insertedEmailIds = [];
+
+	afterEach(async () => {
+		vi.restoreAllMocks();
+		for (const id of insertedEmailIds) {
+			await env.db.prepare('DELETE FROM email WHERE email_id = ?').bind(id).run().catch(() => {});
+		}
+		insertedEmailIds = [];
+		await env.db.prepare('DELETE FROM user WHERE user_id IN (?, ?, ?)').bind(UID_P3, ADMIN_UID, NON_ADMIN_UID).run().catch(() => {});
+		await env.db.prepare('DELETE FROM role_perm WHERE role_id IN (?, ?)').bind(ROLE_USER_ID, ROLE_MASTER_ID).run().catch(() => {});
+		await env.db.prepare('DELETE FROM role WHERE role_id IN (?, ?)').bind(ROLE_USER_ID, ROLE_MASTER_ID).run().catch(() => {});
+		await env.kv.delete(`USER_PROFILE_${UID_P3}`).catch(() => {});
+		await env.kv.delete(`auth-uid:${ADMIN_UID}`).catch(() => {});
+		await env.kv.delete(`auth-uid:${NON_ADMIN_UID}`).catch(() => {});
+	});
+
+	it('keeps d=p ciphertext readable after rolling back email_enc_key to the old secret and clearing previous_email_enc_key', async () => {
+		const oldSecret = 'test-phase3-old-email-secret-01';
+		const newSecret = 'test-phase3-new-email-secret-02';
+		const envDuringRotation = {
+			totp_enc_key: 'test-phase3-totp-01',
+			email_enc_key: newSecret,
+			previous_email_enc_key: oldSecret
+		};
+		const keyringDuringRotation = await emailCryptoUtils.getUserEmailCryptoKey(envDuringRotation, UID_P3);
+		const rolledBackCipher = await emailCryptoUtils.encryptText('Rollback Subject', keyringDuringRotation, {
+			domainOverride: EMAIL_KEY_DOMAINS.PREVIOUS_EMAIL_ENC_KEY
+		});
+		expect(rolledBackCipher).toMatch(/^enc:v1:d=p:/);
+
+		// Ops later removes previous_email_enc_key and sets email_enc_key back to oldSecret
+		const envAfterRestore = {
+			totp_enc_key: 'test-phase3-totp-01',
+			email_enc_key: oldSecret
+		};
+		const keyringAfterRestore = await emailCryptoUtils.getUserEmailCryptoKey(envAfterRestore, UID_P3);
+		expect(await emailCryptoUtils.decryptText(rolledBackCipher, keyringAfterRestore)).toBe('Rollback Subject');
+	});
+
+	it('upgrades legacy_v1 mail lazily under totp_compat and handles nullable code columns in CAS updates', async () => {
+		await env.db.prepare(`CREATE TABLE IF NOT EXISTS email (
+			email_id INTEGER PRIMARY KEY AUTOINCREMENT, send_email TEXT, name TEXT,
+			account_id INTEGER NOT NULL DEFAULT 0, user_id INTEGER NOT NULL,
+			subject TEXT, code TEXT NOT NULL DEFAULT '', text TEXT, content TEXT,
+			is_del INTEGER NOT NULL DEFAULT 0, status INTEGER NOT NULL DEFAULT 0
+		)`).run();
+
+		const legacyJwtFixture = ['fixture', 'legacy', UID_P3].join('-');
+		const legacyKey = await deriveLegacyEmailKey(legacyJwtFixture, UID_P3);
+		const legacySubj = await emailCryptoUtils.encryptText('Legacy Subject No Dedicated Key', legacyKey);
+
+		const res = await env.db.prepare(`INSERT INTO email (account_id, user_id, subject, text, content, code) VALUES (0, ?, ?, '', '', '')`)
+			.bind(UID_P3, legacySubj).run();
+		insertedEmailIds.push(res.meta.last_row_id);
+
+		const compatOnlyEnv = { ...env, jwt_secret: legacyJwtFixture, totp_enc_key: ['fixture', 'totp', UID_P3].join('-') };
+		delete compatOnlyEnv.email_enc_key;
+		const compatKeyring = await emailCryptoUtils.getUserEmailCryptoKey(compatOnlyEnv, UID_P3);
+		const row = await env.db.prepare('SELECT email_id, user_id, subject, content, text, code FROM email WHERE email_id = ?')
+			.bind(res.meta.last_row_id).first();
+
+		const lazyRes = await emailKeyMigrationService.lazyReencryptEmailRow({ ...cBase(), env: compatOnlyEnv }, { ...row, code: row.code }, compatKeyring);
+		expect(lazyRes.ok).toBe(true);
+		expect(lazyRes.migrated).toBe(true);
+		expect(lazyRes.targetDomain).toBe(EMAIL_KEY_DOMAINS.TOTP_COMPAT);
+	});
+
+	it('rejects XSS/CSS-injection/protocol-relative profile URLs while permitting safe URLs, bounded data URIs, and safe gradients', async () => {
+		await env.db.prepare(`CREATE TABLE IF NOT EXISTS user (
+			user_id INTEGER PRIMARY KEY, email TEXT NOT NULL, type INTEGER NOT NULL DEFAULT 2,
+			password TEXT NOT NULL DEFAULT 'pwd', salt TEXT NOT NULL DEFAULT 'salt',
+			status INTEGER NOT NULL DEFAULT 0, is_del INTEGER NOT NULL DEFAULT 0
+		)`).run();
+		await env.db.prepare(`INSERT OR REPLACE INTO user (user_id, email, type) VALUES (?, ?, ?)`).bind(UID_P3, `p3-url-${UID_P3}@example.com`, ROLE_USER_ID).run();
+		const c = cBase();
+
+		for (const bad of [
+			'javascript:alert(1)',
+			'//evil.example/tracker.png',
+			'https://evil.example/\');color:red;/*',
+			'https://user:pass@evil.example/avatar.png',
+			'<svg onload=alert(1)>'
+		]) {
+			await expect(userService.updateProfile(c, { avatarUrl: bad }, UID_P3)).rejects.toMatchObject({ errorCode: 'invalid_profile_url' });
+			await expect(userService.updateProfile(c, { background: bad }, UID_P3)).rejects.toMatchObject({ errorCode: 'invalid_profile_url' });
+			await expect(userService.updateProfile(c, { backgroundUrl: bad }, UID_P3)).rejects.toMatchObject({ errorCode: 'invalid_profile_url' });
+		}
+
+		// Legacy base64 image > 2048 bytes succeeds when under 512 KB cap
+		const largeSafePng = `data:image/png;base64,${'A'.repeat(4096)}`;
+		await userService.updateProfile(c, {
+			avatarUrl: largeSafePng,
+			backgroundUrl: 'linear-gradient(135deg, #4c1d95 0%, #831843 50%, #c2410c 100%)'
+		}, UID_P3);
+
+		const saved = JSON.parse(await env.kv.get(`USER_PROFILE_${UID_P3}`));
+		expect(saved.avatarUrl).toBe(largeSafePng);
+		expect(saved.backgroundUrl).toBe('linear-gradient(135deg, #4c1d95 0%, #831843 50%, #c2410c 100%)');
+
+		// Unsafe css url() inside gradient is still blocked
+		await expect(userService.updateProfile(c, {
+			backgroundUrl: 'linear-gradient(url(https://tracker.invalid/x))'
+		}, UID_P3)).rejects.toMatchObject({ errorCode: 'invalid_profile_url' });
+	});
+
+	it('enforces master RBAC and confirmation guards on admin encryption migration HTTP endpoints', async () => {
+		const initCtx = cBase();
+		await dbInit.intDB(initCtx);
+		await dbInit.v1_1DB(initCtx);
+		for (const stmt of [
+			'ALTER TABLE user ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0',
+			'ALTER TABLE user ADD COLUMN storage_quota_mb INTEGER NOT NULL DEFAULT 0',
+			'ALTER TABLE user ADD COLUMN byo_storage_enabled INTEGER NOT NULL DEFAULT 0',
+			"ALTER TABLE user ADD COLUMN byo_storage_config TEXT NOT NULL DEFAULT '{}'",
+			'ALTER TABLE role ADD COLUMN storage_quota_mb INTEGER DEFAULT 5',
+			'ALTER TABLE role ADD COLUMN allow_attachment INTEGER DEFAULT 0',
+			"ALTER TABLE role ADD COLUMN role_code TEXT DEFAULT 'custom'",
+			"ALTER TABLE email ADD COLUMN code TEXT NOT NULL DEFAULT ''"
+		]) {
+			await env.db.prepare(stmt).run().catch(() => {});
+		}
+		await env.kv.put('setting:', JSON.stringify({ userByoStorage: 1, defaultStorageQuotaMb: 500, allMailMode: 1 }));
+		const adminEmail = String(env.admin || 'admin@example.com').trim().toLowerCase();
+
+		await env.db.prepare(`INSERT OR REPLACE INTO role (role_id, name, key, role_code, is_default, send_type, storage_quota_mb, allow_attachment) VALUES (?, 'p3-master', 'custom', 'master', 0, 'count', 5, 0)`)
+			.bind(ROLE_MASTER_ID).run();
+		await env.db.prepare(`INSERT OR REPLACE INTO role (role_id, name, key, role_code, is_default, send_type, storage_quota_mb, allow_attachment) VALUES (?, 'p3-delegated', 'custom', 'custom', 0, 'count', 5, 0)`)
+			.bind(ROLE_USER_ID).run();
+
+		for (const permKey of ['setting:query', 'setting:set']) {
+			const row = await env.db.prepare('SELECT perm_id FROM perm WHERE perm_key = ?').bind(permKey).first();
+			if (row?.perm_id) {
+				await env.db.prepare('INSERT OR REPLACE INTO role_perm (role_id, perm_id) VALUES (?, ?)').bind(ROLE_USER_ID, row.perm_id).run();
+			}
+		}
+
+		await env.db.prepare(`INSERT OR REPLACE INTO user (user_id, email, type, password, salt, status, is_del, auth_version, byo_storage_enabled, byo_storage_config) VALUES (?, ?, ?, 'pwd', 'salt', 0, 0, 0, 0, '{}')`)
+			.bind(ADMIN_UID, adminEmail, ROLE_MASTER_ID).run();
+		await env.db.prepare(`INSERT OR REPLACE INTO user (user_id, email, type, password, salt, status, is_del, auth_version, byo_storage_enabled, byo_storage_config) VALUES (?, ?, ?, 'pwd', 'salt', 0, 0, 0, 0, '{}')`)
+			.bind(NON_ADMIN_UID, 'p3-delegated@example.com', ROLE_USER_ID).run();
+
+		const adminTokId = crypto.randomUUID();
+		const nonAdminTokId = crypto.randomUUID();
+		await env.kv.put(`auth-uid:${ADMIN_UID}`, JSON.stringify({
+			tokens: [adminTokId],
+			user: { userId: ADMIN_UID, email: adminEmail, type: ROLE_MASTER_ID, status: 0, isDel: 0, authVersion: 0 }
+		}), { expirationTtl: 3600 });
+		await env.kv.put(`auth-uid:${NON_ADMIN_UID}`, JSON.stringify({
+			tokens: [nonAdminTokId],
+			user: { userId: NON_ADMIN_UID, email: 'p3-delegated@example.com', type: ROLE_USER_ID, status: 0, isDel: 0, authVersion: 0 }
+		}), { expirationTtl: 3600 });
+
+		const adminJwt = await jwtUtils.generateToken({ env }, { userId: ADMIN_UID, token: adminTokId, authVersion: 0 }, 3600);
+		const nonAdminJwt = await jwtUtils.generateToken({ env }, { userId: NON_ADMIN_UID, token: nonAdminTokId, authVersion: 0 }, 3600);
+
+		// Unauthenticated blocked
+		const unauthRes = await SELF.fetch('https://example.test/api/setting/security/encryption-status');
+		const unauthJson = await unauthRes.json();
+		expect(unauthJson.code).toBe(401);
+
+		// Delegated user (even with setting:query / setting:set) is denied by assertAdmin
+		const delegatedStatusRes = await SELF.fetch('https://example.test/api/setting/security/encryption-status', {
+			headers: { Authorization: `Bearer ${nonAdminJwt}` }
+		});
+		expect((await delegatedStatusRes.json()).code).toBe(403);
+
+		const delegatedMigrateRes = await SELF.fetch('https://example.test/api/setting/security/email-key/migrate', {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${nonAdminJwt}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({})
+		});
+		expect((await delegatedMigrateRes.json()).code).toBe(403);
+
+		// Site owner gets structured status
+		const statusRes = await SELF.fetch('https://example.test/api/setting/security/encryption-status', {
+			headers: { Authorization: `Bearer ${adminJwt}` }
+		});
+		const statusJson = await statusRes.json();
+		expect(statusJson.code).toBe(200);
+		expect(statusJson.data.emailKeys).toBeTruthy();
+		expect(statusJson.data.byoStorage).toBeTruthy();
+
+		// Rollback endpoints refuse without explicit confirmRollback: true
+		const rbRejectRes = await SELF.fetch('https://example.test/api/setting/security/email-key/rollback', {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${adminJwt}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({})
+		});
+		expect((await rbRejectRes.json()).errorCode).toBe('rollback_confirmation_required');
+
+		const byoRbRejectRes = await SELF.fetch('https://example.test/api/setting/security/byo-storage/rollback', {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${adminJwt}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({})
+		});
+		expect((await byoRbRejectRes.json()).errorCode).toBe('rollback_confirmation_required');
+
+		// Dry-run BYO migration succeeds cleanly via admin API
+		const byoDryRes = await SELF.fetch('https://example.test/api/setting/security/byo-storage/migrate', {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${adminJwt}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({ dryRun: true })
+		});
+		const byoDryJson = await byoDryRes.json();
+		expect(byoDryJson.code).toBe(200);
+		expect(byoDryJson.data.migration.dryRun).toBe(true);
 	});
 });
