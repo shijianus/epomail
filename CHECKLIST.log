@@ -1,3 +1,21 @@
+### 公测安全加固补丁同步与本机复验 (2026-11-15)
+*   **关联提交 (Git Commit)**: `18d633fa066ca67efd198822c9297f67a1355d93` (Short: `18d633f`，基线 `0a213435134f5ef2b2f8cabdf569117007f9ceae`；补丁 `epomail-public-beta-hardening.patch` SHA256 `847f244c4f29d616c5bafaeaac514906cf2edcda8aa06c3183540a9e71b0b85e`)
+*   **部署环境 (Deployment)**: `本地隔离 Miniflare/local-stack (127.0.0.1)`；未登录任何外部账户，零接触 `mail.epocanvas.com` 与生产 D1/KV/R2
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 完整同步 24 个既定加固补丁文件与本机实测压力报告（`backend-stress-limited-beta-0a21343.json`、`backend-stress-capacity-0a21343.json`）：覆盖 OAuth Provider 密钥 AES-GCM 加密与缺失/明文配置 fail-closed、OAuth 畸形 JSON 返回 400 与错误净化、Session 并发刷新/登出收敛、OAuth 注册回滚清理、默认角色唯一性、管理员账号同步失败阻断、`production` 外发收件人白名单及审计证据。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] `npx --yes pnpm@10.34.5 install --frozen-lockfile`：通过
+    - [x] `mail-worker` Vitest (`CI=true ./node_modules/.bin/vitest run --maxWorkers=1`)：`54/54` 文件、`659/659` 用例 PASS
+    - [x] 根目录 Node 测试 (`node --test tests/*.test.mjs`)：`208/208` PASS
+    - [x] `temp_login_ui`：`tsc --noEmit` PASS、`29/29` 用例 PASS、`vite build` + `copy-login-dist.mjs` PASS
+    - [x] `mail-vue`：`vite build --mode release` + `copy-login-dist.mjs` PASS
+    - [x] `tests/fullstack-smoke.mjs`：`22/22` PASS（自动清理完成）
+    - [x] 安全与多语言静态门禁：`secret-scan.mjs`（1335 文件零密钥告警）、`i18n-symmetry.mjs`、`i18n-audit.mjs`、`i18n-hardcoded.mjs`、`i18n-auth-locale.mjs` 全部 PASS
+    - [x] `scripts/verify-production-readiness.mjs --json`：提交后干净工作树 `9/9 PASS`（`liveProbes: NOT_RUN`）
+    - [x] 本机 `limited-beta` 压测（`reports/final/backend-stress-limited-beta-0a21343.json`，SHA256 `33263f4f489966200b5a3d45079925e9a9c515bc95de1601f174a9d678c8c36f`）：**PASS**（7 阶段完成、1800 请求 + 5 登录、0 非预期 4xx/5xx/超时、读 P95 `50.41ms`、登录 P95 `587.8ms`）
+    - [ ] 本机 `capacity` 压测（`reports/final/backend-stress-capacity-0a21343.json`，SHA256 `0744324af060fdaf86cc5d5330b53a3a3d0daaeb271d8dc9201f536a6ed9a36a`）：**FAIL**（`ramp-32` 完成 `525/1280`，低于样本下限 `960`，0 非预期 4xx/5xx/超时，已原样保留失败证据）
+    - [ ] 公测准入裁决：**NO-GO**（未完成真实 Staging 外部集成、容量、回滚、告警等外部门禁前不得宣称公测 GO）
+
 ### 本机公测候选终审（2026-11-15）
 *   **候选提交**: `99cbf588abfd4b6a7777493d374d753aaacb9021` (`fix/public-beta-local-hardening-2026-11-15`)
 *   **范围**: 仅本机隔离 D1/KV 与 127.0.0.1 local-stack；未登录外部账户、未部署生产、未接触真实用户数据。
