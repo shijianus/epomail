@@ -128,7 +128,11 @@ app.get('/my/passkey/list', async (c) => {
 
 app.delete('/my/passkey/:id', async (c) => {
 	const passkeyId = c.req.param('id');
-	await totpService.deletePasskey(c, userContext.getUserId(c), passkeyId, await c.req.json());
+	// The re-authentication proof is optional at the transport layer. The
+	// service still enforces it, but an empty DELETE body must become a normal
+	// validation failure instead of an uncaught JSON parser exception (HTTP 500).
+	const body = await c.req.json().catch(() => ({}));
+	await totpService.deletePasskey(c, userContext.getUserId(c), passkeyId, body);
 	return c.json(result.ok());
 });
 

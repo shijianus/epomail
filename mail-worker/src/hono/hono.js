@@ -62,6 +62,18 @@ app.use('*', async (c, next) => {
 });
 
 export const errorHandler = (err, c) => {
+	// Every public JSON endpoint must turn parser failures into a client
+	// validation response. A raw SyntaxError would otherwise be classified as
+	// an internal exception and expose an avoidable HTTP 500 surface.
+	if (err?.name === 'SyntaxError' && /JSON|Unexpected token|Unexpected end|Expected property/i.test(String(err.message || ''))) {
+		safeLogger.warn('InvalidJsonBody', {
+			route: c?.req?.path,
+			method: c?.req?.method,
+			status: 400
+		});
+		return c.json(result.fail('Invalid JSON request body', 400, 'INVALID_JSON'), 400);
+	}
+
 	if (err?.name === 'BizError') {
 		const rawCode = Number(err.code);
 		const status = (Number.isInteger(rawCode) && rawCode >= 400 && rawCode <= 599) ? rawCode : 400;

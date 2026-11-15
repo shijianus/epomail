@@ -48,7 +48,8 @@ describe('WebAuthn ceremony checks with genuine signatures', () => {
  });
  it('rejects a repeated nonzero authenticator counter', async () => {
   const { key, params } = await assertion();
-  await expect(webauthn.verifyAssertion(params, { ...key, signCount: 1 }, expected)).rejects.toThrow();
+  await expect(webauthn.verifyAssertion(params, { ...key, signCount: 1 }, expected))
+   .rejects.toMatchObject({ code: 'webauthn_counter_conflict' });
  });
  it('requires expected bindings and rejects truncated authenticator data', async () => {
   const { key, params } = await assertion();

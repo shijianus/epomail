@@ -121,10 +121,12 @@ app.post('/setting/security/email-key/migrate', async (c) => {
 	const body = await c.req.json().catch(() => ({}));
 	const userId = body?.userId ? Number(body.userId) : null;
 	const limit = Math.max(1, Math.min(Number(body?.limit) || 100, 500));
+	const dryRun = body?.dryRun === true;
 	const requireDedicatedKey = body?.requireDedicatedKey !== false;
 	const migration = await emailKeyMigrationService.migrateBatch(c, {
 		userId: Number.isInteger(userId) && userId > 0 ? userId : null,
 		limit,
+		dryRun,
 		requireDedicatedKey
 	});
 	const verification = await emailKeyMigrationService.postDeployVerify(c, {

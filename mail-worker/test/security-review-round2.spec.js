@@ -482,15 +482,19 @@ describe('Signed object URL as consumed by the browser', () => {
 });
 
 describe('Exception sanitization at the public OAuth entry point', () => {
-	it('returns a generic 500 body for a malformed JSON request', async () => {
+	it('returns a validation response for a malformed JSON request', async () => {
 		const response = await SELF.fetch('http://example.com/api/oauth/github/login', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: '{'
 		});
 		const body = await response.json();
-		expect(body.code).toBe(500);
-		expect(body.message).toBe('Internal Server Error');
+		expect(response.status).toBe(400);
+		expect(body).toMatchObject({
+			code: 400,
+			message: 'Invalid JSON request body',
+			errorCode: 'INVALID_JSON'
+		});
 		expect(JSON.stringify(body)).not.toMatch(/SyntaxError|at JSON\.parse|\/D:/);
 	});
 });

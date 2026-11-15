@@ -2,9 +2,10 @@ import app from '../hono/hono';
 import loginService from '../service/login-service';
 import result from '../model/result';
 import userContext from '../security/user-context';
+import readJsonObject from '../utils/request-body.js';
 
 app.post('/login', async (c) => {
-	const { email, password, secPayload, deviceTag, trustedDeviceToken } = await c.req.json();
+	const { email, password, secPayload, deviceTag, trustedDeviceToken } = await readJsonObject(c);
 	const loginRes = await loginService.login(c, { email, password, secPayload, deviceTag, trustedDeviceToken });
 	if (typeof loginRes === 'object' && (loginRes.mfaRequired || loginRes.isRestricted)) {
 		return c.json(result.ok(loginRes));
@@ -16,7 +17,7 @@ app.post('/login', async (c) => {
 });
 
 app.post('/login/totp', async (c) => {
-	const tokenRes = await loginService.verifyTotpLogin(c, await c.req.json());
+	const tokenRes = await loginService.verifyTotpLogin(c, await readJsonObject(c));
 	if (typeof tokenRes === 'object') {
 		return c.json(result.ok(tokenRes));
 	}
@@ -24,7 +25,7 @@ app.post('/login/totp', async (c) => {
 });
 
 app.post('/register', async (c) => {
-	const jwt = await loginService.register(c, await c.req.json());
+	const jwt = await loginService.register(c, await readJsonObject(c));
 	return c.json(result.ok(jwt));
 });
 

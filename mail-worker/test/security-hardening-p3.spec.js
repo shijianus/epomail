@@ -625,6 +625,35 @@ describe('Phase 3 additional security hardening: rollback key restoration, profi
 		});
 		expect((await delegatedMigrateRes.json()).code).toBe(403);
 
+		// The email migration endpoint must propagate dryRun to the service. A
+		// dry-run is an inspection-only operation and must never invoke a write
+		// path by accident.
+		const migrateSpy = vi.spyOn(emailKeyMigrationService, 'migrateBatch').mockResolvedValue({
+			ok: true,
+			dryRun: true,
+			scanned: 2,
+			migrated: 0,
+			wouldMigrate: 2,
+			alreadyTarget: 0,
+			failed: 0,
+			errors: []
+		});
+		const verifySpy = vi.spyOn(emailKeyMigrationService, 'postDeployVerify').mockResolvedValue({ ok: true });
+		const emailDryRes = await SELF.fetch('https://example.test/api/setting/security/email-key/migrate', {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${adminJwt}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({ dryRun: true, limit: 2, requireDedicatedKey: true })
+		});
+		const emailDryJson = await emailDryRes.json();
+		expect(emailDryJson.code).toBe(200);
+		expect(emailDryJson.data.migration.dryRun).toBe(true);
+		expect(migrateSpy).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+			dryRun: true,
+			limit: 2,
+			requireDedicatedKey: true
+		}));
+		expect(verifySpy).toHaveBeenCalledTimes(1);
+
 		// Site owner gets structured status
 		const statusRes = await SELF.fetch('https://example.test/api/setting/security/encryption-status', {
 			headers: { Authorization: `Bearer ${adminJwt}` }

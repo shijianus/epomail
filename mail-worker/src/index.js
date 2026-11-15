@@ -27,6 +27,48 @@ function scheduledTimingSafeEqual(a, b) {
 	return diff === 0;
 }
 
+const DEFAULT_SECURITY_HEADERS = {
+	'Referrer-Policy': 'strict-origin-when-cross-origin',
+	'X-Content-Type-Options': 'nosniff',
+	'X-Frame-Options': 'DENY',
+	'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+	'Content-Security-Policy': [
+		"default-src 'self'",
+		"base-uri 'self'",
+		"object-src 'none'",
+		"frame-ancestors 'none'",
+		"form-action 'self'",
+		"img-src 'self' data: blob: https:",
+		"style-src 'self' 'unsafe-inline'",
+		"script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+		"font-src 'self' data: https:",
+		"connect-src 'self' https: wss:"
+	].join('; ')
+};
+
+function withSecurityHeaders(response, request) {
+	const headers = new Headers(response?.headers);
+	for (const [name, value] of Object.entries(DEFAULT_SECURITY_HEADERS)) {
+		if (!headers.has(name)) headers.set(name, value);
+	}
+	const protocol = new URL(request.url).protocol;
+	if (protocol === 'https:') {
+		headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+	}
+	return new Response(response?.body, {
+		status: response?.status ?? 500,
+		statusText: response?.statusText,
+		headers
+	});
+}
+
+function redirectHttpToHttps(request, env) {
+	const url = new URL(request.url);
+	if (url.protocol !== 'http:' || !['staging', 'production'].includes(env?.ENVIRONMENT)) return null;
+	url.protocol = 'https:';
+	return Response.redirect(url.toString(), 308);
+}
+
 export async function checkScheduledAuth(req, env) {
 	if (req.method !== 'POST') {
 		return { ok: false, status: 405, message: 'Method Not Allowed: Scheduled trigger requires POST' };
@@ -149,6 +191,8 @@ export default {
 	 async fetch(req, env, ctx) {
 
 		const url = new URL(req.url)
+		const httpsRedirect = redirectHttpToHttps(req, env);
+		if (httpsRedirect) return withSecurityHeaders(httpsRedirect, req);
 
 		if (url.pathname === '/api/version' && req.method === 'GET') {
 			const version = env.CF_VERSION_METADATA;
@@ -156,35 +200,35 @@ export default {
 			const versionId = version?.id;
 			const identified = typeof sha === 'string' && /^[0-9a-f]{40}$/.test(sha)
 				&& typeof versionId === 'string' && versionId.length > 0;
-			return Response.json(identified
+			return withSecurityHeaders(Response.json(identified
 				? { sha, versionId }
 				: { errorCode: 'release_identity_unavailable' }, {
 				status: identified ? 200 : 503,
 				headers: { 'Cache-Control': 'no-store' }
-			});
+			}), req);
 		}
 
 		if (url.pathname === '/api/scheduled' || url.pathname.startsWith('/api/scheduled')) {
 			const auth = await checkScheduledAuth(req, env);
 			if (!auth.ok) {
-				return new Response(JSON.stringify({ code: auth.status, message: auth.message }), {
+				return withSecurityHeaders(new Response(JSON.stringify({ code: auth.status, message: auth.message }), {
 					status: auth.status,
 					headers: { 'Content-Type': 'application/json' }
-				});
+				}), req);
 			}
 
 			const cronParam = url.searchParams.get('cron') || '*/5 * * * *';
 			await this.scheduled({ cron: cronParam, type: 'scheduled', scheduledTime: Date.now() }, env, ctx);
-			return new Response(JSON.stringify({ success: true, ran: cronParam }), {
+			return withSecurityHeaders(new Response(JSON.stringify({ success: true, ran: cronParam }), {
 				status: 200,
 				headers: { 'Content-Type': 'application/json' }
-			});
+			}), req);
 		}
 
 		if (url.pathname.startsWith('/api/')) {
 			url.pathname = url.pathname.replace('/api', '')
 			req = new Request(url.toString(), req)
-			return app.fetch(req, env, ctx);
+			return withSecurityHeaders(await app.fetch(req, env, ctx), req);
 		}
 
 		if (
@@ -196,17 +240,17 @@ export default {
 			url.pathname === '/oauth/authorize/info' ||
 			(url.pathname === '/oauth/authorize' && req.method === 'POST')
 		) {
-			return app.fetch(req, env, ctx);
+			return withSecurityHeaders(await app.fetch(req, env, ctx), req);
 		}
 
 		if (url.pathname.startsWith('/cdn-cgi/handler/scheduled')) {
 			const auth = await checkScheduledAuth(req, env);
 			if (!auth.ok) {
-				return new Response(auth.message, { status: auth.status });
+				return withSecurityHeaders(new Response(auth.message, { status: auth.status }), req);
 			}
 			const cronParam = url.searchParams.get('cron') || '*/5 * * * *';
 			await this.scheduled({ cron: cronParam, type: 'scheduled', scheduledTime: Date.now() }, env, ctx);
-			return new Response('Ran scheduled event: ' + cronParam, { status: 200 });
+			return withSecurityHeaders(new Response('Ran scheduled event: ' + cronParam, { status: 200 }), req);
 		}
 
 		 // Avatars and backgrounds are public by policy. This route reads through
@@ -217,7 +261,7 @@ export default {
 		 // workerd throw an uncaught exception for a merely malformed URL.
 		 if (url.pathname.startsWith('/static/')) {
 			 const response = await readObjectForRequest({ env }, url.pathname.substring(1), url);
-			 return response || new Response('Object Not Found', { status: 404 });
+				 return withSecurityHeaders(response || new Response('Object Not Found', { status: 404 }), req);
 		 }
 
 		 // Signed attachment capabilities are minted as origin-relative
@@ -227,7 +271,7 @@ export default {
 		 // ever be served.
 		 if (url.pathname.startsWith('/oss/')) {
 			 const response = await readObjectForRequest({ env }, url.pathname.slice('/oss/'.length), url);
-			 return response || new Response('Object Not Found', { status: 404 });
+				 return withSecurityHeaders(response || new Response('Object Not Found', { status: 404 }), req);
 		 }
 
 		 // Legacy alias kept for previously issued links. The path prefix here
@@ -235,15 +279,15 @@ export default {
 		 // slash (`attachments/<name>`) — not the text after `/attachments/`.
 		 if (url.pathname.startsWith('/attachments/')) {
 			 const response = await readObjectForRequest({ env }, url.pathname.substring(1), url);
-			 return response || new Response('Object Not Found', { status: 404 });
+				 return withSecurityHeaders(response || new Response('Object Not Found', { status: 404 }), req);
 		 }
 
 		if (url.pathname.startsWith('/login/challenge/')) {
 			const loginReq = new Request(new URL('/login/' + url.search, req.url), req);
-			return env.assets.fetch(loginReq);
+			return withSecurityHeaders(await env.assets.fetch(loginReq), req);
 		}
 
-		return env.assets.fetch(req);
+		return withSecurityHeaders(await env.assets.fetch(req), req);
 	},
 	email: email,
 	async scheduled(c, env, ctx) {
