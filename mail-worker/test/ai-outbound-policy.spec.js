@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import assert from 'node:assert/strict';
 import { assertOutboundAllowed } from '../src/utils/outbound-policy.js';
 import { ensureAiBudgetSchema, reserveAiRequest, purgeAiBudgets } from '../src/utils/ai-budget.js';
 import aiService from '../src/service/ai-service.js';
@@ -41,6 +42,16 @@ describe('provider dispatch isolation', () => {
 			expect(() => assertOutboundAllowed(context, ['delivered@resend.dev'])).not.toThrow();
 			expect(() => assertOutboundAllowed(context, ['private@elsewhere.test'])).toThrow('whitelist');
 		}
+	});
+
+	it('enforces the recipient whitelist when production outbound is explicitly enabled', () => {
+		const context = { env: {
+			ENVIRONMENT: 'production',
+			EMAIL_OUTBOUND_ENABLED: 'true',
+			OUTBOUND_WHITELIST: 'qa@example.test'
+		} };
+		assert.doesNotThrow(() => assertOutboundAllowed(context, ['qa@example.test']));
+		assert.throws(() => assertOutboundAllowed(context, ['external@example.net']), /outbound whitelist/i);
 	});
 });
 

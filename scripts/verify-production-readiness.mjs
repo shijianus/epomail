@@ -133,6 +133,12 @@ export function checkWranglerConfig(suite, configPath = wranglerPath) {
 
   // Top-level vars and bindings are the production target for this repository.
   const vars = config.vars || {};
+  if (String(vars.ENVIRONMENT) === 'production') {
+    suite.pass('CFG-01', '生产环境标识已显式固定为 production');
+  } else {
+    suite.fail('CFG-01', '生产 [vars] 必须显式声明 ENVIRONMENT = \"production\"');
+  }
+
   if (String(vars.ALLOW_URL_INIT) === 'false') {
     suite.pass('CFG-02', '生产配置明确禁用 URL 初始化');
   } else {

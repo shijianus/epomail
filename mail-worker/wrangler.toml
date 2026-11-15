@@ -56,6 +56,7 @@ crons = ["0 16 * * *", "*/5 * * * *"]	#每天夜间例行任务 + 每5分钟通�
 
 
 [vars]
+ENVIRONMENT = "production"
 ALLOW_URL_INIT = "false"
 EMAIL_OUTBOUND_ENABLED = "false"
 #ai_model = ""			#ai模型,不填默认使用@cf/meta/llama-3.1-8b-instruct

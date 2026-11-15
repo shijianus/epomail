@@ -26,6 +26,7 @@ import totpUtils from '../utils/totp-utils.js';
 import webauthnUtils from '../utils/webauthn-utils.js';
 import orm from '../entity/orm.js';
 import user from '../entity/user.js';
+import account from '../entity/account.js';
 import { auditLog } from '../entity/audit-log.js';
 import { eq, and, desc } from 'drizzle-orm';
 import riskService from './risk-service.js';
@@ -38,6 +39,7 @@ import { authVersionOf, hashToken } from '../utils/one-time-credential.js';
 import { getUserDb } from '../utils/db-accessor.js';
 import legalPolicyService from './legal-policy-service.js';
 import safeLogger from '../utils/safe-logger.js';
+import { removeSessionToken } from '../utils/session-auth-store.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -118,6 +120,39 @@ function loginFailWindow() {
 	const now = Math.floor(Date.now() / 1000);
 	const start = Math.floor(now / LOGIN_FAIL_WINDOW_SECONDS) * LOGIN_FAIL_WINDOW_SECONDS;
 	return { start, expires: start + LOGIN_FAIL_WINDOW_SECONDS };
+}
+
+function mergeSessionAuthInfo(current, incoming) {
+	const currentTokens = Array.isArray(current?.tokens) ? current.tokens : [];
+	const incomingTokens = Array.isArray(incoming?.tokens) ? incoming.tokens : [];
+	const tokens = [...new Set([...currentTokens, ...incomingTokens])].slice(-10);
+	const tokenMeta = { ...(current?.tokenMeta || {}), ...(incoming?.tokenMeta || {}) };
+	for (const key of Object.keys(tokenMeta)) {
+		if (!tokens.includes(key)) delete tokenMeta[key];
+	}
+	return {
+		...(current || {}),
+		...(incoming || {}),
+		tokens,
+		tokenMeta,
+		refreshTime: incoming?.refreshTime || current?.refreshTime || dayjs().toISOString()
+	};
+}
+
+/**
+ * KV has no compare-and-swap primitive. Re-read after writing and merge a
+ * concurrent token when another login won the read/modify/write race.
+ */
+export async function persistSessionAuthInfo(c, userId, authInfo, token) {
+	const key = KvConst.AUTH_INFO + userId;
+	let candidate = authInfo;
+	for (let attempt = 0; attempt < 3; attempt++) {
+		await c.env.kv.put(key, JSON.stringify(candidate), { expirationTtl: constant.TOKEN_EXPIRE });
+		const observed = await c.env.kv.get(key, { type: 'json' });
+		if (Array.isArray(observed?.tokens) && observed.tokens.includes(token)) return observed;
+		candidate = mergeSessionAuthInfo(observed, candidate);
+	}
+	throw new BizError('Session persistence conflict, please retry', 503, 'session_persistence_conflict');
 }
 
 async function readLoginFail(c, email) {
@@ -355,6 +390,16 @@ const loginService = {
 			await accountService.physicsDeleteByUserIds(c, [id]);
 		} catch (err) {
 			safeLogger.error('rollback_oauth_registration_accounts_failed', { userId: id, error: err });
+			// Storage cleanup can fail before accountService reaches its D1
+			// delete. Never remove the user while leaving a live mailbox row that
+			// permanently reserves the address. A direct row cleanup is safe here
+			// because this user id was created by the current registration.
+			try {
+				await orm(c).delete(account).where(eq(account.userId, id)).run();
+			} catch (accountCleanupError) {
+				safeLogger.error('rollback_oauth_registration_account_row_failed', { userId: id, error: accountCleanupError });
+				throw new Error('Registration rollback incomplete', { cause: accountCleanupError });
+			}
 		}
 
 		try {
@@ -904,7 +949,7 @@ const loginService = {
 			console.warn('Failed to check login environment notice:', e.message);
 		}
 
-		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		await persistSessionAuthInfo(c, userRow.userId, authInfo, uuid);
 		const legalAcceptance = await legalPolicyService.getLegalAcceptanceStatus(c, userRow.userId);
 		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, legalAcceptance };
 	},
@@ -1173,7 +1218,7 @@ const loginService = {
 			console.warn('Failed to check login environment notice on TOTP login:', e.message);
 		}
 
-		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		await persistSessionAuthInfo(c, userRow.userId, authInfo, uuid);
 		const legalAcceptance = await legalPolicyService.getLegalAcceptanceStatus(c, userRow.userId);
 		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, trustedDeviceToken: issuedTrustToken,
 			legalAcceptance, ...(recoveredBackupCodes ? { backupCodes: recoveredBackupCodes } : {}) };
@@ -1181,18 +1226,7 @@ const loginService = {
 
 	async logout(c, userId) {
 		const token = await userContext.getToken(c);
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo && authInfo.tokens) {
-			const index = authInfo.tokens.findIndex(item => item === token);
-			if (index > -1) {
-				authInfo.tokens.splice(index, 1);
-			}
-			if (authInfo.tokens.length === 0) {
-				await c.env.kv.delete(KvConst.AUTH_INFO + userId);
-			} else {
-				await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-			}
-		}
+		await removeSessionToken(c, userId, token);
 	}
 
 };

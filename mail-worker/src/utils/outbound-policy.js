@@ -21,7 +21,8 @@ export function assertOutboundAllowed(c, recipients, { domains = [] } = {}) {
 	if (String(enabled).trim().toLowerCase() !== 'true') {
 		throw new BizError('External email outbound is disabled in this environment', 403, 'outbound_disabled');
 	}
-	const enforce = String(env.ENVIRONMENT || '').trim().toLowerCase() === 'staging'
+	const environment = String(env.ENVIRONMENT || '').trim().toLowerCase();
+	const enforce = ['staging', 'production'].includes(environment)
 		|| String(env.OUTBOUND_WHITELIST_ENFORCE || '').trim().toLowerCase() === 'true';
 	if (!enforce) return;
 	const allowed = new Set([

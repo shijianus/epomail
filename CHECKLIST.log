@@ -1,3 +1,25 @@
+### 本机公测候选终审（2026-11-15）
+*   **候选提交**: `99cbf588abfd4b6a7777493d374d753aaacb9021` (`fix/public-beta-local-hardening-2026-11-15`)
+*   **范围**: 仅本机隔离 D1/KV 与 127.0.0.1 local-stack；未登录外部账户、未部署生产、未接触真实用户数据。
+*   **代码与功能验收**: Worker Vitest `54/54` 文件、`659/659` 用例；根目录 Node `208/208`；temp_login_ui `tsc --noEmit` + `29/29`；fullstack-smoke `22/22`；双前端构建、secret scan、i18n 四门禁全部通过。
+*   **本机压力证据**: `reports/final/backend-stress-limited-beta-84ca0bb.json` 通过（3 分钟 soak、1802 请求 + 5 次登录、0 非预期 4xx/5xx、0 超时，读 P95 108.45ms，认证 P95 924.48ms）；`reports/final/backend-stress-capacity-99cbf58.json` 保留失败（ramp-32 `764/1280`，下限 `960`，0 非预期 4xx/5xx/超时）。
+*   **发布裁决**: 本机候选验证完成，但公测仍 `NO-GO / 待外部验收`；必须在隔离 Staging 完成 Access 放行、真实容量与长稳、provider/外发/Webhook/R2、备份恢复、回滚和告警值班证据后复评。详见 `doc/release/PUBLIC-BETA-LOCAL-AUDIT-2026-11-15.md`。
+
+### OAuth Provider 密钥加密与启用 Fail-Closed (2026-11-15)
+*   **后续加固提交**: `84509560298620c04ea2a69ea5b19997b9e41e55`, `73e1a335157773e6f626c36641bba951c80f7bc0`, `0e79d316d0961a0fd2989a97f742d637529e7314`（privateKey migration gate、settings 持久化断言、缺失密钥 503 fail-closed）
+*   **关联提交 (Git Commit)**: `4dea05e5d0739039ca4f8f5a2389fa5f87d3edc9` (Short: `4dea05e`)
+*   **部署环境 (Deployment)**: 仅本地源码与隔离单元验证，未部署、未访问生产或外部账户
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] `setting.oauthProviders` 的 `clientSecret`/`privateKey` 在配置密钥可用时使用独立 OAuth AES-GCM 根密钥加密，并以 provider 与字段名绑定 AAD。
+    - [x] staging/production 启用已存明文 provider secret 时返回 `503 oauth_provider_secret_migration_required`，不允许绕过，公开 provider 列表同步隐藏未迁移配置。
+    - [x] 保持 OAuth 全局与 provider 默认关闭，保留本地/测试旧数据 dual-read，供迁移前读取但不在生产启用。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] `node --check`：OAuth service、setting service、加密工具及两个测试文件通过。
+    - [x] Web Crypto 自测：provider secret 加密/解密通过，跨 provider/字段 AAD 替换被拒绝。
+    - [ ] Vitest 定向套件：因当前工作树依赖目录需重新安装且 pnpm frozen lockfile 的 patchedDependencies 配置不一致，本轮未能执行；交付前必须在完整依赖环境重跑并纳入全量矩阵。
+
+---
+
 ### EpoMail P0 安全加固交接合入、Turnstile CSP 修复与全量复验 (2026-11-15)
 *   **关联提交 (Git Commit)**: `e49a987ab63a9d76346538225827f94fc0b39a55` (Short: `e49a987`，在原样应用补丁提交 `d2b813b967e52efb6a6b7e3685714f816c9ff7cb` 之上修复 Turnstile CSP；基线 `36871d180f4739092ecabbdc469a907ddc71a541`；补丁 `epomail-p0-hardening-dd11b37.patch` SHA256: `e28855f8554fa9529519828bf92d0f00117960d8ca15a54abba94aeb4454b9ed`)
 *   **部署环境 (Deployment)**: 本地隔离 Miniflare D1/KV 与本地 Chrome 浏览器回归；生产环境 (`mail.epocanvas.com`) 零接触；Cloudflare Staging 未在本机重新部署

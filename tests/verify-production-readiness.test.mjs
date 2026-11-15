@@ -57,6 +57,9 @@ test('checkWranglerConfig validates security baselines in repo', () => {
   assert.equal(suite.hasFailures(), false);
 
   const results = suite.toJSON();
+  const cfg01 = results.find(r => r.id === 'CFG-01');
+  assert.ok(cfg01 && cfg01.status === 'PASS', 'Production environment must be explicit');
+
   const cfg02 = results.find(r => r.id === 'CFG-02');
   assert.ok(cfg02 && cfg02.status === 'PASS', 'ALLOW_URL_INIT must be verified');
 

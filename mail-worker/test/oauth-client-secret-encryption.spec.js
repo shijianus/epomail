@@ -5,6 +5,8 @@ import oauthProviderService from '../src/service/oauth-provider-service.js';
 import {
 	decryptClientSecret,
 	encryptClientSecret,
+	decryptProviderSecret,
+	encryptProviderSecret,
 	verifyClientSecret
 } from '../src/utils/oauth-secret-crypto.js';
 
@@ -60,6 +62,14 @@ describe('B8: OAuth Client Secret Encrypted Storage Specification', () => {
 			delete envWithoutKey.oauth_client_enc_key;
 
 			await expect(encryptClientSecret(envWithoutKey, 'client1', 'secret1')).rejects.toThrow(/oauth_client_enc_key/i);
+		});
+
+		it('binds provider secrets to provider and field and decrypts only with the dedicated key', async () => {
+			const cipher = await encryptProviderSecret(mockContext.env, 'Google', 'clientSecret', 'provider-secret-value');
+			expect(cipher).toMatch(/^v1:/);
+			expect(await decryptProviderSecret(mockContext.env, 'google', 'clientSecret', cipher)).toBe('provider-secret-value');
+			await expect(decryptProviderSecret(mockContext.env, 'github', 'clientSecret', cipher)).rejects.toThrow(/decrypt|integrity|AAD/i);
+			await expect(decryptProviderSecret(mockContext.env, 'google', 'privateKey', cipher)).rejects.toThrow(/decrypt|integrity|AAD/i);
 		});
 	});
 

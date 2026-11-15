@@ -86,6 +86,7 @@ import {t} from '../i18n/i18n'
 import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
 import { isDualDbMode, getDbModeInfo } from '../utils/db-accessor';
+import { encryptProviderSecret } from '../utils/oauth-secret-crypto.js';
 
 const settingService = {
 
@@ -580,6 +581,13 @@ const settingService = {
 					const nextValue = incoming[secretField];
 					if (!nextValue || String(nextValue).includes('******')) {
 						merged[secretField] = previous[secretField] || '';
+					}
+					const plaintext = typeof merged[secretField] === 'string'
+						&& merged[secretField]
+						&& !merged[secretField].startsWith('v1:');
+					const productionLike = ['production', 'staging'].includes(String(c.env?.ENVIRONMENT || '').toLowerCase());
+					if (plaintext && (c.env?.oauth_client_enc_key || productionLike)) {
+						merged[secretField] = await encryptProviderSecret(c.env, key, secretField, merged[secretField]);
 					}
 				}
 				if (merged.enabled !== 1 && merged.enabled !== true) {

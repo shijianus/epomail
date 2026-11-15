@@ -206,9 +206,24 @@ export async function verifyClientSecret(env, clientId, candidatePlaintext, stor
 	return await timingSafeEqualStr(candidatePlaintext, storedSecret);
 }
 
+/**
+ * Provider configuration secrets use the same dedicated OAuth root key as
+ * oauth_app client secrets, but bind the ciphertext to the provider and field
+ * name so a Google secret cannot be replayed as an Apple or private-key value.
+ */
+export async function encryptProviderSecret(env, providerKey, field, plaintextSecret) {
+	return encryptClientSecret(env, `provider:${String(providerKey).toLowerCase()}:${field}`, plaintextSecret);
+}
+
+export async function decryptProviderSecret(env, providerKey, field, storedSecret) {
+	return decryptClientSecret(env, `provider:${String(providerKey).toLowerCase()}:${field}`, storedSecret);
+}
+
 export default {
 	encryptClientSecret,
 	decryptClientSecret,
 	verifyClientSecret,
+	encryptProviderSecret,
+	decryptProviderSecret,
 	timingSafeEqualStr
 };

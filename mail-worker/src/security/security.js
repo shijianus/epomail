@@ -10,6 +10,7 @@ import app from '../hono/hono';
 import { isAdminUser } from '../utils/admin-utils';
 import { getUserDb } from '../utils/db-accessor.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
+import { refreshSessionAuthInfo } from '../utils/session-auth-store.js';
 
 const exclude = [
 	'/login',
@@ -182,7 +183,7 @@ app.use('*', async (c, next) => {
 	if (loginEmail) {
 		c.set('loginEmail', loginEmail);
 	}
-	const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+	let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
 
 	if (!authInfo || !authInfo.user || !Array.isArray(authInfo.tokens)) {
 		throw new BizError(t('authExpired'), 401);
@@ -251,7 +252,8 @@ app.use('*', async (c, next) => {
 	if (!nowTime.isSame(refreshTime)) {
 		authInfo.refreshTime = dayjs().toISOString();
 		await userService.updateUserInfo(c, authInfo.user.userId);
-		await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		const refreshed = await refreshSessionAuthInfo(c, userId, authInfo);
+		if (refreshed?.user) authInfo = refreshed;
 	}
 
 	c.set('user', authInfo.user)

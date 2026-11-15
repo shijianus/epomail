@@ -314,6 +314,26 @@ const dbInit = {
 			if (c?.env?.kv) await c.env.kv.put('roles_seeded_v2', '1');
 		}
 
+		// Repair legacy databases that accumulated more than one default role.
+		// Registration must resolve to one deterministic role after every init,
+		// including installs that already carry the completion marker.
+		const defaultRoles = (await userDb.prepare(`
+			SELECT role_id, role_code, sort FROM role WHERE is_default = 1
+			ORDER BY CASE WHEN role_code = 'user_base' THEN 0 ELSE 1 END, sort ASC, role_id ASC
+		`).all()).results || [];
+		let keeper = defaultRoles[0];
+		if (!keeper) {
+			keeper = await userDb.prepare(`
+				SELECT role_id FROM role
+				WHERE role_code = 'user_base' OR key = 'user_base' OR name = '普通用户'
+				ORDER BY role_id ASC LIMIT 1
+			`).first();
+		}
+		if (keeper?.role_id) {
+			await userDb.prepare(`UPDATE role SET is_default = 0 WHERE is_default = 1`).run();
+			await userDb.prepare(`UPDATE role SET is_default = 1 WHERE role_id = ?`).bind(keeper.role_id).run();
+		}
+
 		if (c.env.admin) {
 			try {
 				const masterRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
@@ -1004,7 +1024,8 @@ const dbInit = {
 						`).bind(c.env.admin, adminUser.user_id, emailUtils.getName(c.env.admin)).run();
 					}
 				} catch (e) {
-					console.warn('admin account sync warning:', e.message);
+					console.error('[init] admin account synchronization failed', e?.name || 'Error');
+					throw new Error('Admin mailbox account synchronization failed', { cause: e });
 				}
 			}
 		}

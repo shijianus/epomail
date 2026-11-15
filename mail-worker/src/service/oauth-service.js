@@ -16,6 +16,7 @@ import oneTimeCredential, { OTC_PURPOSE } from '../utils/one-time-credential.js'
 import oauthBindClaim from '../utils/oauth-bind-claim.js';
 import KvConst from '../const/kv-const.js';
 import safeLogger from '../utils/safe-logger.js';
+import { decryptProviderSecret } from '../utils/oauth-secret-crypto.js';
 
 const OAUTH_STATE_TTL_SECONDS = 600;
 const OAUTH_LOGIN_CODE_TTL_SECONDS = 60;
@@ -49,6 +50,21 @@ function resolveAllowedRedirectUri(c, providerKey, redirectUri, config) {
 
 const OIDC_NONCE_PROVIDERS = new Set(['google', 'microsoft', 'apple', 'custom']);
 const PKCE_PROVIDERS = new Set(['github', 'google', 'microsoft', 'apple', 'custom', 'linuxdo']);
+
+async function decryptStoredProviderSecret(c, providerKey, field, value) {
+	if (typeof value !== 'string' || !value.startsWith('v1:')) return value || '';
+	try {
+		return await decryptProviderSecret(c.env, providerKey, field, value);
+	} catch (error) {
+		safeLogger.warn('oauth_provider_secret_unavailable', {
+			provider: providerKey,
+			field,
+			errorName: typeof error?.name === 'string' ? error.name : 'Error',
+			errorCode: typeof error?.errorCode === 'string' ? error.errorCode : 'secret_decrypt_failed'
+		});
+		throw new BizError('OAuth provider secret is unavailable', 503, 'oauth_provider_secret_unavailable');
+	}
+}
 
 function generateCodeVerifier() {
 	const bytes = new Uint8Array(32);
@@ -172,6 +188,8 @@ const oauthService = {
 			config.clientSecret = config.clientSecret || c.env?.linuxdo_client_secret || '';
 			config.callbackUrl = config.callbackUrl || c.env?.linuxdo_callback_url || '';
 		}
+		config.clientSecret = await decryptStoredProviderSecret(c, providerKey, 'clientSecret', config.clientSecret);
+		config.privateKey = await decryptStoredProviderSecret(c, providerKey, 'privateKey', config.privateKey);
 		return config;
 	},
 
@@ -181,6 +199,18 @@ const oauthService = {
 		if (Number(settingData?.oauthLoginEnabled) !== 1) {
 			throw new BizError('OAuth login is currently disabled', 403, 'oauth_disabled');
 		}
+		let providers = settingData?.oauthProviders;
+		if (typeof providers === 'string') {
+			try { providers = JSON.parse(providers); } catch (_) { providers = {}; }
+		} else if (!providers || typeof providers !== 'object') {
+			providers = {};
+		}
+		const rawCfg = providers[normalizedKey];
+		const rawSecret = typeof rawCfg?.clientSecret === 'string' ? rawCfg.clientSecret : '';
+		const rawPrivateKey = typeof rawCfg?.privateKey === 'string' ? rawCfg.privateKey : '';
+		const productionLike = ['production', 'staging'].includes(String(c.env?.ENVIRONMENT || '').toLowerCase());
+		const secretNeedsMigration = productionLike && [rawSecret, rawPrivateKey]
+			.some(value => value && !value.startsWith('v1:'));
 
 		if (normalizedKey === 'linuxdo') {
 			const linuxdoOn = settingData?.linuxdoSwitch === true
@@ -188,6 +218,9 @@ const oauthService = {
 				|| c.env?.linuxdo_switch === 'true';
 			if (!linuxdoOn) {
 				throw new BizError('Provider linuxdo is disabled', 403, 'oauth_provider_disabled');
+			}
+			if (secretNeedsMigration) {
+				throw new BizError('OAuth provider secret requires encrypted-at-rest migration', 503, 'oauth_provider_secret_migration_required');
 			}
 			const cfg = await this.getProviderConfig(c, 'linuxdo');
 			if (!cfg.clientId || !cfg.clientSecret || !cfg.callbackUrl) {
@@ -200,20 +233,15 @@ const oauthService = {
 			throw new BizError(`Unsupported provider: ${providerKey}`, 400, 'oauth_provider_unsupported');
 		}
 
-		let providers = settingData?.oauthProviders;
-		if (typeof providers === 'string') {
-			try { providers = JSON.parse(providers); } catch (_) { providers = {}; }
-		} else if (!providers || typeof providers !== 'object') {
-			providers = {};
-		}
-
-		const rawCfg = providers[normalizedKey];
 		const isExplicitlyEnabled = Boolean(rawCfg && (rawCfg.enabled === 1 || rawCfg.enabled === true));
 		if (!isExplicitlyEnabled) {
 			throw new BizError(`Provider ${normalizedKey} is disabled`, 403, 'oauth_provider_disabled');
 		}
 
 		const config = await this.getProviderConfig(c, normalizedKey);
+		if (secretNeedsMigration) {
+			throw new BizError(`Provider ${normalizedKey} secret requires encrypted-at-rest migration`, 503, 'oauth_provider_secret_migration_required');
+		}
 		const hasClientId = Boolean(config?.clientId && String(config.clientId).trim());
 		const hasClientSecret = Boolean(config?.clientSecret && String(config.clientSecret).trim());
 		if (!hasClientId || !hasClientSecret) {
@@ -248,6 +276,10 @@ const oauthService = {
 			const rawCfg = providers[key];
 			const isExplicitlyEnabled = Boolean(rawCfg && (rawCfg.enabled === 1 || rawCfg.enabled === true));
 			if (!isExplicitlyEnabled) continue;
+			const rawSecret = typeof rawCfg?.clientSecret === 'string' ? rawCfg.clientSecret : '';
+			const rawPrivateKey = typeof rawCfg?.privateKey === 'string' ? rawCfg.privateKey : '';
+			if (['production', 'staging'].includes(String(c.env?.ENVIRONMENT || '').toLowerCase())
+				&& [rawSecret, rawPrivateKey].some(value => value && !value.startsWith('v1:'))) continue;
 
 			const cfg = await this.getProviderConfig(c, key);
 			const hasClientId = Boolean(cfg?.clientId && String(cfg.clientId).trim());

@@ -7,6 +7,7 @@ import { isAdminUser } from "../utils/admin-utils";
 import BizError from "../error/biz-error";
 import rateLimit from '../utils/rate-limit.js';
 import safeLogger from '../utils/safe-logger.js';
+import readJsonObject from '../utils/request-body.js';
 
 function redirectToLogin(c, params) {
 	const query = new URLSearchParams(params);
@@ -176,7 +177,7 @@ app.get('/oauth/authorize/:provider', async (c, next) => {
 // Public: direct login with OAuth authorization code or ID token
 app.post('/oauth/:provider/login', async (c) => {
 	const provider = (c.req.param('provider') || '').trim().toLowerCase();
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	await oauthService.assertProviderEnabled(c, provider);
 
 	let loginParams = { ...body };
@@ -211,7 +212,7 @@ app.post('/oauth/:provider/login', async (c) => {
 // Public: exchange the short-lived callback code for the real mailbox token
 app.post('/oauth/exchange', async (c) => {
 	await rateLimit.check(c, { scope: 'oauth-exchange', limit: 60, windowSeconds: 900 });
-	const body = await c.req.json().catch(() => ({}));
+	const body = await readJsonObject(c);
 	const exchange = await oauthService.consumeLoginExchangeCode(c, body.code);
 	if (exchange.mfa) {
 		return c.json(result.ok({
@@ -230,7 +231,7 @@ app.post('/oauth/verify/:provider', async (c) => {
 		throw new BizError('Admin permission required to verify OAuth provider');
 	}
 	const provider = c.req.param('provider');
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const verifyResult = await oauthService.verifyProvider(c, provider, body);
 	return c.json(result.ok(verifyResult));
 });
