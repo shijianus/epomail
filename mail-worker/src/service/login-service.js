@@ -39,7 +39,7 @@ import { authVersionOf, hashToken } from '../utils/one-time-credential.js';
 import { getUserDb } from '../utils/db-accessor.js';
 import legalPolicyService from './legal-policy-service.js';
 import safeLogger from '../utils/safe-logger.js';
-import { mergeSessionRecords, removeSessionToken } from '../utils/session-auth-store.js';
+import { mergeSessionRecords, persistSessionRecord, removeSessionToken, revokeAllUserSessions } from '../utils/session-auth-store.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -123,28 +123,8 @@ function loginFailWindow() {
 }
 
 export async function persistSessionAuthInfo(c, userId, authInfo, token) {
-	const key = KvConst.AUTH_INFO + userId;
-	const latest = await c.env.kv.get(key, { type: 'json' });
-	const sameUserLatest = latest && (!latest.user?.email || !authInfo?.user?.email || latest.user.email === authInfo.user.email)
-		? latest
-		: null;
-	let candidate = mergeSessionRecords(sameUserLatest, authInfo);
-	for (let attempt = 0; attempt < 6; attempt++) {
-		await c.env.kv.put(key, JSON.stringify(candidate), { expirationTtl: constant.TOKEN_EXPIRE });
-		const observed = await c.env.kv.get(key, { type: 'json' });
-		if (Array.isArray(observed?.tokens) && observed.tokens.includes(token)) {
-			const missed = candidate.tokens.filter(item => !observed.tokens.includes(item));
-			const shiftedByCapacity = missed.length > 0 && observed.tokens.length >= 10
-				&& missed.length <= Math.max(0, candidate.tokens.length + observed.tokens.length - 10);
-			if (missed.length === 0 || shiftedByCapacity) return observed;
-		}
-		if (attempt < 5) {
-			const jitterMs = 25 + Math.floor(Math.random() * 65 * (attempt + 1));
-			await new Promise(resolve => setTimeout(resolve, jitterMs));
-		}
-		const refreshed = await c.env.kv.get(key, { type: 'json' });
-		candidate = mergeSessionRecords(refreshed || observed, candidate);
-	}
+	const persisted = await persistSessionRecord(c, userId, authInfo, token);
+	if (persisted) return persisted;
 	throw new BizError('Session persistence conflict, please retry', 503, 'session_persistence_conflict');
 }
 
@@ -402,7 +382,7 @@ const loginService = {
 		}
 
 		try {
-			await c.env.kv.delete(KvConst.AUTH_INFO + id);
+			await revokeAllUserSessions(c, id, { ignoreKvError: true });
 		} catch (_) {}
 	},
 

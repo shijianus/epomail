@@ -8,6 +8,7 @@ import { isAdminUser } from '../utils/admin-utils';
 import oneTimeCredential, { OTC_PURPOSE, authVersionOf } from '../utils/one-time-credential.js';
 import { encryptClientSecret, decryptClientSecret, verifyClientSecret } from '../utils/oauth-secret-crypto.js';
 import safeLogger from '../utils/safe-logger.js';
+import { readAuthorizedSession } from '../utils/session-auth-store.js';
 
 const encoder = new TextEncoder();
 
@@ -119,7 +120,7 @@ const oauthProviderService = {
 		if (jwt) {
 			const payload = await jwtUtils.verifyToken(c, jwt);
 			if (payload && payload.userId) {
-				const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
+				const authInfo = await readAuthorizedSession(c, payload.userId, payload.token);
 				if (authInfo && Array.isArray(authInfo.tokens) && authInfo.tokens.includes(payload.token)
 					&& sessionWithinAbsoluteCap(authInfo)) {
 					const userRow = await userService.selectById(c, payload.userId);
@@ -182,7 +183,7 @@ const oauthProviderService = {
 			throw new BizError('登录会话已过期，请重新登录', 401);
 		}
 
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
+		const authInfo = await readAuthorizedSession(c, payload.userId, payload.token);
 		if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(payload.token)
 			|| !sessionWithinAbsoluteCap(authInfo)) {
 			throw new BizError('登录会话已过期，请重新登录', 401);

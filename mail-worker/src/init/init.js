@@ -8,6 +8,7 @@ import { ensureAiBudgetSchema } from '../utils/ai-budget.js';
 import { ensureMailReliabilitySchema } from '../utils/mail-reliability-schema.js';
 import { ensureNoticeDeliverySchema } from '../utils/notice-delivery-schema.js';
 import { ensureAuthSecurityOperationSchema } from '../utils/auth-security-operation.js';
+import { ensureUserSessionTable } from '../utils/session-auth-store.js';
 
 function timingSafeEqual(a, b) {
 	if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
@@ -37,7 +38,7 @@ async function addMissingColumns(db, table, statements) {
 }
 
 const dbInit = {
-	async init(c) {
+	async authorizeRequest(c, { allowUrlParam = false } = {}) {
 		const envName = String(c.env?.ENVIRONMENT || '').toLowerCase();
 		const localLike = Boolean(c.env?.DEV || c.env?.dev) || envName === 'development' || envName === 'test';
 		const productionLike = !localLike || envName === 'production' || envName === 'prod';
@@ -53,11 +54,11 @@ const dbInit = {
 				secret = body.secret || '';
 			} catch (_) {}
 		}
-		if (!secret) {
+		if (!secret && allowUrlParam) {
 			const urlSecret = c.req.param('secret');
 			if (urlSecret) {
 				if (c.env?.ALLOW_URL_INIT === 'false' || envName === 'staging' || productionLike) {
-					return c.text('❌ Passing initialization secret via URL is prohibited in this environment. Use POST /api/init with X-Init-Secret header.', 403);
+					return { ok: false, response: c.text('❌ Passing initialization secret via URL is prohibited in this environment. Use POST /api/init with X-Init-Secret header.', 403) };
 				}
 				secret = urlSecret;
 			}
@@ -67,8 +68,14 @@ const dbInit = {
 		// secret. Local development and tests may keep the compatibility fallback.
 		const expected = c.env.init_secret || (localLike ? c.env.jwt_secret : '');
 		if (!expected || !secret || !timingSafeEqual(secret, expected)) {
-			return c.text('❌ Forbidden', 403);
+			return { ok: false, response: c.text('❌ Forbidden', 403) };
 		}
+		return { ok: true };
+	},
+
+	async init(c) {
+		const auth = await this.authorizeRequest(c, { allowUrlParam: true });
+		if (!auth.ok) return auth.response;
 
 		await this.intDB(c);
 		await this.v3_23DB(c);
@@ -114,12 +121,60 @@ const dbInit = {
 		await this.v3_23DB(c);
 		await this.v3_24DB(c);
 		await this.v3_25DB(c);
+		await this.v3_26DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
 			return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
 		}
 		return c.text('success');
+	},
+
+	async v3_26DB(c) {
+		const userDb = getUserDb(c);
+		await ensureUserSessionTable(userDb);
+	},
+
+	async securityMigrate(c) {
+		const auth = await this.authorizeRequest(c, { allowUrlParam: false });
+		if (!auth.ok) return auth.response;
+
+		const { default: oauthAppService } = await import('../service/oauth-app-service.js');
+		const { default: emailKeyMigrationService } = await import('../service/email-key-migration-service.js');
+
+		const oauthApps = await oauthAppService.migratePlaintextSecrets(c, { dryRun: false });
+		const oauthAppState = await oauthAppService.inspectSecretState(c);
+
+		const emailBatches = [];
+		let emailTotalMigrated = 0;
+		for (let round = 0; round < 10; round++) {
+			const step = await emailKeyMigrationService.migrateBatch(c, { limit: 200, dryRun: false, requireDedicatedKey: true });
+			emailBatches.push({
+				round,
+				scanned: step.scanned,
+				migrated: step.migrated,
+				alreadyTarget: step.alreadyTarget,
+				failed: step.failed,
+				errors: step.errors
+			});
+			emailTotalMigrated += Number(step.migrated || 0);
+			if (!step.ok || step.migrated === 0 || step.scanned < 200) break;
+		}
+		const emailVerification = await emailKeyMigrationService.postDeployVerify(c);
+		await settingService.refresh(c);
+
+		const ok = Boolean(oauthApps.ok && emailVerification.ok && oauthAppState.plaintextApps === 0);
+		return c.json({
+			code: ok ? 200 : 500,
+			data: {
+				ok,
+				oauthApps,
+				oauthAppState,
+				emailTotalMigrated,
+				emailBatches,
+				emailVerification
+			}
+		}, ok ? 200 : 500);
 	},
 
 	async v3_13DB(c) {
@@ -2195,6 +2250,7 @@ const dbInit = {
 		await ensureMailReliabilitySchema(c);
 		await ensureNoticeDeliverySchema(c);
 		await ensureAuthSecurityOperationSchema(c);
+		await ensureUserSessionTable(userDb);
 	},
 
 	async receiveEmailToRecipient(c) {

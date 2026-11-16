@@ -38,7 +38,7 @@ import { encryptByoStorageConfig } from '../utils/storage-credential-crypto.js';
 import { deleteKvKeys, deleteKvMatching, forEachKvPage } from '../utils/kv-revocation.js';
 import { assertStorageCanChange, beginAccountDeletion, deleteAccountEvidence, getObjectDeletionCounts,
 	isActiveUser, readPrivacyState, revokeAccountAccess, revokeTelegramLinks, setDeletionStatus } from './privacy-revocation-service.js';
-import { updateSessionUserFields } from '../utils/session-auth-store.js';
+import { updateSessionUserFields, deleteUserSessionsFromDb, revokeAllUserSessions } from '../utils/session-auth-store.js';
 
 const userService = {
 
@@ -52,7 +52,7 @@ const userService = {
 			.returning({ authVersion: user.authVersion }).get();
 		if (!changed) throw new BizError(t('authExpired'), 409, 'auth_changed');
 		// D1 is authoritative even if a concurrent stale KV writer restores a token.
-		await c.env.kv.delete(KvConst.AUTH_INFO + row.userId).catch(() => {});
+		await revokeAllUserSessions(c, row.userId, { ignoreKvError: true });
 		return changed.authVersion;
 	},
 
@@ -647,7 +647,7 @@ const userService = {
 
 		// Password changes invalidate every existing session. The user must log
 		// in again with the new credential.
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		await revokeAllUserSessions(c, userId);
 
 		try {
 			let profile = {};
@@ -835,7 +835,7 @@ const userService = {
 		// Invalidate every session, including this one, exactly like a normal
 		// password change: the user signs in again with the credential they
 		// just chose.
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		await revokeAllUserSessions(c, userId);
 
 		try {
 			let profile = {};
@@ -1063,6 +1063,7 @@ const userService = {
 		try {
 			const kv = c.env.kv;
 			for (const id of userIds) {
+				await deleteUserSessionsFromDb(c, id);
 				await deleteKvKeys(kv, [KvConst.AUTH_INFO + id, 'USER_PROFILE_' + id,
 					'HAS_WELCOME_' + id, 'USER_KNOWN_ENV_' + id]);
 				for (const prefix of [`REVOKED_GRANT_${id}_`, `HAS_GLOBAL_EMAIL_${id}_`, `static/avatar/${id}/`]) {
@@ -1292,7 +1293,7 @@ const userService = {
 		await rbacGuard.assertCanManageUser(c, callerUserId, Number(userId));
 		await this.assertAdminStepUp(c, callerUserId, operatorPassword);
 		await this.resetPassword(c, { password }, userId);
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		await revokeAllUserSessions(c, userId);
 	},
 
 	async setStatus(c, params, callerUserId) {
@@ -1313,7 +1314,7 @@ const userService = {
 			.run();
 
 		if (nextStatus === userConst.status.BAN) {
-			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+			await revokeAllUserSessions(c, userId);
 		}
 	},
 
@@ -1357,7 +1358,7 @@ const userService = {
 
 		await this.updateUserInfo(c, userId, true);
 		try {
-			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+			await revokeAllUserSessions(c, userId, { ignoreKvError: true });
 		} catch (e) {}
 	},
 
@@ -1582,6 +1583,7 @@ const userService = {
 					orm(c).delete(user).where(eq(user.userId, userId)).run(),
 					getMailDb(c).prepare('DELETE FROM account WHERE user_id = ? AND email = ?').bind(userId, email).run(),
 					c.env.kv.delete('USER_PROFILE_' + userId),
+					deleteUserSessionsFromDb(c, userId),
 					c.env.kv.delete(KvConst.AUTH_INFO + userId)
 				]);
 			}

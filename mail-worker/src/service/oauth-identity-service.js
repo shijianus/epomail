@@ -48,7 +48,7 @@ import { t } from '../i18n/i18n.js';
 import reqUtils from '../utils/req-utils.js';
 import totpService from './totp-service.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
-import { removeSessionTokens } from '../utils/session-auth-store.js';
+import { removeSessionTokens, revokeAllUserSessions } from '../utils/session-auth-store.js';
 
 const STEP_UP_TTL_SECONDS = 300;
 const STEP_UP_TTL_MS = STEP_UP_TTL_SECONDS * 1000;
@@ -523,7 +523,7 @@ const oauthIdentityService = {
 		});
 		await notifyIdentityEvent(c, userId, 'OAUTH_IDENTITY_BOUND', `${await providerDisplayName(c, provider)} · ${payload.oauthUserId}`);
 
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		await revokeAllUserSessions(c, userId);
 		return { bound: true, provider, reauthRequired:true };
 	},
 
@@ -614,7 +614,7 @@ const oauthIdentityService = {
 			}
 
 			const revoked = await this.revokeProviderSessions(c, userId, provider, null);
-			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+			await revokeAllUserSessions(c, userId);
 
 			await recordAudit(c, {
 				userId,

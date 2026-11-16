@@ -9,6 +9,7 @@ import aiService from '../service/ai-service';
 import rbacGuard from '../service/rbac-guard-service.js';
 import byoStorageMigrationService from '../service/byo-storage-migration-service.js';
 import emailKeyMigrationService from '../service/email-key-migration-service.js';
+import oauthAppService from '../service/oauth-app-service.js';
 import BizError from '../error/biz-error.js';
 import { readJsonObject } from '../utils/request-body.js';
 
@@ -110,11 +111,21 @@ app.get('/setting/security/encryption-status', async (c) => {
 	const parsedUserId = userIdParam ? Number(userIdParam) : null;
 	const userId = Number.isInteger(parsedUserId) && parsedUserId > 0 ? parsedUserId : null;
 	const sampleLimit = Math.max(1, Math.min(Number(c.req.query('sampleLimit')) || 20, 50));
-	const [emailKeys, byoStorage] = await Promise.all([
+	const [emailKeys, byoStorage, oauthApps] = await Promise.all([
 		emailKeyMigrationService.preDeployCheck(c, { userId, sampleLimit }),
-		byoStorageMigrationService.preDeployCheck(c)
+		byoStorageMigrationService.preDeployCheck(c),
+		oauthAppService.inspectSecretState(c)
 	]);
-	return c.json(result.ok({ emailKeys, byoStorage }));
+	return c.json(result.ok({ emailKeys, byoStorage, oauthApps }));
+});
+
+app.post('/setting/security/oauth-apps/migrate', async (c) => {
+	await rbacGuard.assertAdmin(c, userContext.getUserId(c));
+	const body = await readJsonObject(c, { allowEmpty: true });
+	const dryRun = body?.dryRun === true;
+	const migration = await oauthAppService.migratePlaintextSecrets(c, { dryRun });
+	const verification = await oauthAppService.inspectSecretState(c);
+	return c.json(result.ok({ migration, verification }));
 });
 
 app.post('/setting/security/email-key/migrate', async (c) => {

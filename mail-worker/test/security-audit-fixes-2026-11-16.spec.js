@@ -8,6 +8,7 @@ import userService from '../src/service/user-service.js';
 import accountService from '../src/service/account-service.js';
 import oauthAppService from '../src/service/oauth-app-service.js';
 import oauthProviderService from '../src/service/oauth-provider-service.js';
+import settingService from '../src/service/setting-service.js';
 import oneTimeCredential, { OTC_PURPOSE } from '../src/utils/one-time-credential.js';
 
 const UID_USER = 987101;
@@ -282,5 +283,64 @@ describe('Security audit hardening regressions (2026-11-16)', () => {
 				expect(data.errorCode).toBe('INVALID_JSON');
 			}
 		}
+	});
+
+	it('redacts disabled OAuth providers in public websiteConfig without leaking clientId/tenant', async () => {
+		const secretPlaceholder = ['fixture', 'cred', crypto.randomUUID()].join('-');
+		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 0,
+			oauthProviders: {
+				github: { enabled: 0, clientId: 'admin-leak@example.com', clientSecret: secretPlaceholder, tenant: 'common' }
+			},
+			domainList: ['@example.com'],
+			loginDomain: 1
+		}));
+		const disabledGlobal = await settingService.websiteConfig({ env, req: { header: () => '' } });
+		expect(disabledGlobal.oauthLoginEnabled).toBe(0);
+		expect(disabledGlobal.oauthProviders).toEqual({});
+
+		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
+			oauthProviders: {
+				github: { enabled: 0, clientId: 'hidden-gh@example.com', clientSecret: secretPlaceholder },
+				google: { enabled: 1, clientId: 'public-gg-client', clientSecret: secretPlaceholder, name: 'Google' }
+			},
+			domainList: ['@example.com'],
+			loginDomain: 1
+		}));
+		const partialEnabled = await settingService.websiteConfig({ env, req: { header: () => '' } });
+		expect(partialEnabled.oauthProviders.github).toBeUndefined();
+		expect(partialEnabled.oauthProviders.google?.enabled).toBe(1);
+		expect(partialEnabled.oauthProviders.google?.clientId).toBe('public-gg-client');
+	});
+
+	it('migrates legacy plaintext oauth_app secrets to v1 ciphertext while preserving client secret verification', async () => {
+		const appSecret = ['epo', 'live', crypto.randomUUID()].join('_');
+		const testEncKey = ['audit', 'oauth', 'mig', crypto.randomUUID()].join('-');
+		const migEnv = { ...env, oauth_client_enc_key: testEncKey };
+		await oauthAppService.ensureTables({ env: migEnv });
+		await env.db.prepare(`
+			INSERT INTO oauth_app (client_id, client_secret, name, homepage_url, redirect_uris, scopes, status, created_at, updated_at)
+			VALUES (?, ?, 'Audit20261116 Legacy App', 'https://rp.example.com', '["https://rp.example.com/cb"]', 'openid email', 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00')
+		`).bind('epo_legacy_test_app', appSecret).run();
+
+		const before = await oauthAppService.inspectSecretState({ env: migEnv });
+		expect(before.plaintextApps).toBeGreaterThanOrEqual(1);
+
+		const res = await oauthAppService.migratePlaintextSecrets({ env: migEnv });
+		expect(res.ok).toBe(true);
+		expect(res.migrated).toBeGreaterThanOrEqual(1);
+
+		const row = await env.db.prepare("SELECT client_secret FROM oauth_app WHERE client_id = 'epo_legacy_test_app'").first();
+		expect(row.client_secret.startsWith('v1:')).toBe(true);
+
+		const verified = await oauthProviderService.getAuthorizeInfo(
+			{ env: migEnv, req: { header: () => '' } },
+			{ client_id: 'epo_legacy_test_app', redirect_uri: 'https://rp.example.com/cb', scope: 'openid email' }
+		);
+		expect(verified.app.clientId).toBe('epo_legacy_test_app');
+		const appObj = await oauthAppService.getByClientId({ env: migEnv }, 'epo_legacy_test_app');
+		const { verifyClientSecret } = await import('../src/utils/oauth-secret-crypto.js');
+		expect(await verifyClientSecret(migEnv, 'epo_legacy_test_app', appSecret, appObj.clientSecret)).toBe(true);
 	});
 });

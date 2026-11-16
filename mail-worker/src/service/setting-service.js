@@ -1175,6 +1175,9 @@ const settingService = {
 				contentProcessing: normalizeContentProcessing(settingRow.contentProcessing, c),
 				oauthLoginEnabled: settingRow.oauthLoginEnabled ?? 0,
 			oauthProviders: (() => {
+				if (Number(settingRow.oauthLoginEnabled) !== 1) {
+					return {};
+				}
 				let p = settingRow.oauthProviders;
 				if (typeof p === 'string') {
 					try { p = JSON.parse(p); } catch (_) { p = {}; }
@@ -1182,13 +1185,18 @@ const settingService = {
 					p = {};
 				}
 				const sanitized = {};
+				const envName = String(c?.env?.ENVIRONMENT || '').toLowerCase();
+				const productionLike = ['staging', 'production', 'prod'].includes(envName);
 				for (const [k, v] of Object.entries(p)) {
 					if (v && typeof v === 'object') {
+						const isEnabled = v.enabled === 1 || v.enabled === true;
+						if (!isEnabled) continue;
 						const hasClientId = Boolean(v.clientId && typeof v.clientId === 'string' && v.clientId.trim() !== '');
 						const hasClientSecret = Boolean(v.clientSecret && typeof v.clientSecret === 'string' && v.clientSecret.trim() !== '');
-						const isConfigured = (hasClientId && hasClientSecret) ? 1 : 0;
+						const unmigratedSecret = productionLike && hasClientSecret && !String(v.clientSecret).startsWith('v1:');
+						const isConfigured = (hasClientId && hasClientSecret && !unmigratedSecret) ? 1 : 0;
 						sanitized[k] = {
-							enabled: (v.enabled === 1 || v.enabled === true) ? 1 : 0,
+							enabled: 1,
 							configured: isConfigured,
 							clientId: v.clientId || '',
 							name: v.name || '',

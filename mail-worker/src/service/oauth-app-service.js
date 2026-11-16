@@ -610,6 +610,82 @@ const oauthAppService = {
 		`).bind(userId, clientId).first();
 
 		return !grant;
+	},
+
+	async inspectSecretState(c) {
+		await this.ensureTables(c);
+		const userDb = getUserDb(c) || c?.env?.db;
+		if (!userDb) {
+			return { ok: false, keyConfigured: Boolean(String(c?.env?.oauth_client_enc_key || '').trim()), totalApps: 0, encryptedApps: 0, plaintextApps: 0 };
+		}
+		const { results } = await userDb.prepare(`SELECT id, client_id, client_secret FROM oauth_app`).all();
+		let encryptedApps = 0;
+		let plaintextApps = 0;
+		for (const row of (results || [])) {
+			if (typeof row?.client_secret === 'string' && row.client_secret.startsWith('v1:')) encryptedApps++;
+			else plaintextApps++;
+		}
+		return {
+			ok: true,
+			keyConfigured: Boolean(String(c?.env?.oauth_client_enc_key || '').trim()),
+			totalApps: (results || []).length,
+			encryptedApps,
+			plaintextApps
+		};
+	},
+
+	/**
+	 * Encrypt legacy plaintext oauth_app.client_secret values in place while
+	 * preserving the exact plaintext secret used by external relying parties.
+	 */
+	async migratePlaintextSecrets(c, { dryRun = false } = {}) {
+		await this.ensureTables(c);
+		const userDb = getUserDb(c) || c?.env?.db;
+		const keyConfigured = Boolean(String(c?.env?.oauth_client_enc_key || '').trim());
+		if (!userDb) {
+			return { ok: false, dryRun, migrated: 0, alreadyEncrypted: 0, wouldMigrate: 0, failed: 0, errors: ['db_unavailable'] };
+		}
+		const { results } = await userDb.prepare(`SELECT id, client_id, client_secret FROM oauth_app`).all();
+		const summary = { ok: true, dryRun, scanned: (results || []).length, migrated: 0, alreadyEncrypted: 0, wouldMigrate: 0, failed: 0, errors: [] };
+		for (const row of (results || [])) {
+			if (typeof row?.client_secret === 'string' && row.client_secret.startsWith('v1:')) {
+				summary.alreadyEncrypted++;
+				continue;
+			}
+			if (dryRun) {
+				summary.wouldMigrate++;
+				continue;
+			}
+			if (!keyConfigured) {
+				summary.failed++;
+				summary.errors.push({ id: row.id, reason: 'oauth_client_enc_key_missing' });
+				continue;
+			}
+			try {
+				const encrypted = await encryptClientSecret(c.env, row.client_id, row.client_secret);
+				const verified = await decryptClientSecret(c.env, row.client_id, encrypted);
+				if (verified !== row.client_secret) {
+					summary.failed++;
+					summary.errors.push({ id: row.id, reason: 'verify_mismatch' });
+					continue;
+				}
+				const updated = await userDb.prepare(`
+					UPDATE oauth_app SET client_secret = ?, updated_at = CURRENT_TIMESTAMP
+					WHERE id = ? AND client_secret = ?
+					RETURNING id
+				`).bind(encrypted, row.id, row.client_secret).first();
+				if (updated) summary.migrated++;
+				else {
+					summary.failed++;
+					summary.errors.push({ id: row.id, reason: 'cas_conflict' });
+				}
+			} catch (err) {
+				summary.failed++;
+				summary.errors.push({ id: row.id, reason: err?.errorCode || 'encrypt_failed' });
+			}
+		}
+		summary.ok = summary.failed === 0;
+		return summary;
 	}
 };
 

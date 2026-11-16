@@ -24,6 +24,7 @@ import KvConst from '../const/kv-const';
 import userContext from '../security/user-context.js';
 import account from '../entity/account.js';
 import { isActiveUser } from './privacy-revocation-service.js';
+import { readAuthorizedSession } from '../utils/session-auth-store.js';
 
 
 const publicService = {
@@ -230,7 +231,7 @@ const publicService = {
 			if (!result) throw new BizError(t('authExpired'), 401);
 
 			const { userId, token } = result;
-			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+			const authInfo = await readAuthorizedSession(c, userId, token);
 
 			if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(token)) {
 				throw new BizError(t('authExpired'), 401);

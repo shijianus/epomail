@@ -19,6 +19,7 @@ import { cleanupExpiredInboundClaims } from './service/mail-reliability-service.
 import { maintainOutboundTasks } from './service/mail-outbound-service.js';
 import { clearNoOne } from './service/mail-lifecycle-service.js';
 import forwardService from './service/mail-forward-service.js';
+import { readAuthorizedSession } from './utils/session-auth-store.js';
 
 function scheduledTimingSafeEqual(a, b) {
 	if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
@@ -148,7 +149,7 @@ export async function checkScheduledAuth(req, env) {
 			return { ok: false, status: 500, message: '系统 KV 服务不可用 (KV storage unavailable)' };
 		}
 
-		const authInfo = await env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
+		const authInfo = await readAuthorizedSession({ env }, payload.userId, payload.token);
 		if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(payload.token)) {
 			return { ok: false, status: 401, message: '会话已过期或已被注销 (Session expired or revoked)' };
 		}

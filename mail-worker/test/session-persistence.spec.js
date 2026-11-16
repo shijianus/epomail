@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { persistSessionAuthInfo } from '../src/service/login-service.js';
 import {
+	persistSessionRecord,
+	readAuthorizedSession,
 	refreshSessionAuthInfo,
 	removeSessionToken,
 	removeSessionTokens,
+	revokeAllUserSessions,
 	updateSessionUserFields
 } from '../src/utils/session-auth-store.js';
+import { env } from 'cloudflare:test';
 import constant from '../src/const/constant.js';
 
 function racingKv() {
@@ -154,5 +158,51 @@ describe('session persistence convergence', () => {
 		for (const token of tokens) {
 			expect(finalState.tokens).toContain(token);
 		}
+	});
+
+	it('recovers concurrent logins from D1 user_session even when KV loses updates and self-heals KV', async () => {
+		const uid = 987654;
+		await env.db.prepare('DELETE FROM user_session WHERE user_id = ?').bind(uid).run().catch(() => {});
+		await env.kv.delete(`auth-uid:${uid}`).catch(() => {});
+		// Adversarial clobbering KV that always only retains the last single-write array
+		let kvMap = new Map();
+		const clobberingKv = {
+			async get(k) {
+				const v = kvMap.get(k);
+				return v ? JSON.parse(v) : null;
+			},
+			async put(k, raw) {
+				kvMap.set(k, raw);
+			},
+			async delete(k) {
+				kvMap.delete(k);
+			}
+		};
+		const ctx = { env: { ...env, kv: clobberingKv } };
+		const batch = Array.from({ length: 12 }, (_, i) => `conc-tok-${i}`);
+		await Promise.all(batch.map(tok => persistSessionRecord(ctx, uid, {
+			tokens: [tok],
+			user: { userId: uid, email: 'd1-kv-hybrid@example.test', status: 0, isDel: 0 },
+			refreshTime: new Date().toISOString()
+		}, tok)));
+
+		// Even if KV gets overwritten by a single stale writer carrying only the oldest survivor
+		await clobberingKv.put(`auth-uid:${uid}`, JSON.stringify({
+			tokens: ['conc-tok-11'],
+			user: { userId: uid, email: 'd1-kv-hybrid@example.test', status: 0, isDel: 0 },
+			refreshTime: new Date().toISOString()
+		}));
+
+		const active = await readAuthorizedSession(ctx, uid, 'conc-tok-10');
+		expect(active).toBeTruthy();
+		expect(active.tokens).toContain('conc-tok-10');
+		// KV should now be self-healed
+		const healedKv = await clobberingKv.get(`auth-uid:${uid}`);
+		expect(healedKv.tokens).toContain('conc-tok-10');
+
+		// Revocation removes both D1 user_session and KV
+		await revokeAllUserSessions(ctx, uid);
+		const afterRevoke = await readAuthorizedSession(ctx, uid, 'conc-tok-10');
+		expect(afterRevoke).toBeNull();
 	});
 });

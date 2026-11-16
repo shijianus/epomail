@@ -3,6 +3,7 @@ import KvConst from '../const/kv-const.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import { deleteKvKeys, deleteKvMatching } from '../utils/kv-revocation.js';
 import deviceTrustService from './device-trust-service.js';
+import { deleteUserSessionsFromDb } from '../utils/session-auth-store.js';
 
 export async function readPrivacyState(c, userId) {
 	return getUserDb(c).prepare(`
@@ -127,6 +128,7 @@ export async function revokeAccountAccess(c, userId) {
 	const tasks = [
 		() => getMailDb(c).prepare('UPDATE account SET is_del = 1, status = 1, all_receive = 0 WHERE user_id = ?')
 			.bind(owner).run(),
+		() => deleteUserSessionsFromDb(c, owner),
 		() => deleteKvKeys(kv, [KvConst.AUTH_INFO + owner, KvConst.INITIAL_PASSWORD + owner,
 			KvConst.TOTP_SETUP + owner, KvConst.WEBAUTHN_SETUP + owner, KvConst.WEBAUTHN_TEST + owner]),
 		() => deviceTrustService.revokeAllTrust(c, owner),
