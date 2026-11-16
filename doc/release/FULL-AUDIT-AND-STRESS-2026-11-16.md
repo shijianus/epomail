@@ -100,3 +100,23 @@
    - **Staging 历史测试角色残留**：`epomail-staging-db` 中存在早期遗留的非业务测试角色 `p4-stress-6f5aa1a7`；生产/Staging 均故意将 `visitor`（`role_id=2`, 0MB, `ban`）设为 `is_default=1`。
    - **包管理器版本漂移陷阱**：容器内若运行 `pnpm@12.x` 会无视/破坏 `mail-worker/patches/deepmerge@4.3.1.patch`；开发与 CI 必须严格锁定 `corepack pnpm@10.34.5`。
    - **容器环境双栈 NAT64 网络兼容提示**：无完整 IPv6 出站路由（仅存在 DNS64 `2001:2::114`）的容器中，Node 默认 `fetch` 可能因优先握手 IPv6 遭遇 edge TLS `ECONNRESET`，自动化探测脚本应固定 IPv4（`dns.lookup(..., { family: 4 })`）。
+
+---
+
+## 五、 顽固风险专项优化与二次发布关闭记录 (Commit `c3c434d`)
+
+针对上述第 1–5 项剩余问题，于提交 **`c3c434ddc375d40fe95adcc11f5fde827293cd1e` (`c3c434d`)** 完成以下深化治理与实网闭环：
+
+1. **D1+KV 双引擎会话存储消除 KV 并发丢帧 (`AUD-OPT-01`)**
+   - 在 `session-auth-store.js`、`init.js` (`v3_26DB` + `intDB`) 及 `security.js` / `user-context.js` / `index.js` / `oauth-provider-service.js` / `public-service.js` 与全部会话吊销路径上线 D1 `user_session` 原子持久表与 KV 边缘缓存自愈机制（`readAuthorizedSession`、`persistSessionRecord`、`revokeAllUserSessions`）。
+   - Cloudflare Staging (`Version ID: e386552f-eb12-4939-b4f0-cf12f10315be`) 实网复测同用户 **`10` 并发登录 `10/10` 同步生效（`0` 丢更新）**，**`16` 并发峰值登录 `16/16` 返回 200 且原子收口最新 10 会话（`0` 次 `503`）**，单端登出精确吊销目标会话（`401` / 其余 `200`）。
+2. **公开配置 `websiteConfig.oauthProviders` 彻底脱敏与历史假配置清除 (`AUD-OPT-02`)**
+   - 修改 `setting-service.js`：当 `oauthLoginEnabled !== 1` 时 `websiteConfig` 直接返回 `oauthProviders: {}`，仅在开启后返回已启用的非未迁移提供商；同步清理生产 D1 废置 `github` 测试配置（原明文 `"clientSecret":"123456"` 与 `"clientId":"admin@epomail.bond"`）并刷新 KV 缓存，线上实测 `/api/setting/websiteConfig` 返回 `oauthProviders: {}`。
+3. **历史明文 `oauth_app` 凭证与 135 封历史密文邮件全量迁移闭环 (`AUD-OPT-03`)**
+   - 为 `oauth-app-service.js`、`setting-api.js`、`init.js` / `init-api.js` 新增安全迁移接口（`/setting/security/oauth-apps/migrate` 与 `x-init-secret` 门禁 `POST /api/init/security-migrate`），原地加密 `oauth_app.client_secret` 而不改变第三方业务密钥原值，并在生产部署 (`Version ID: 1aaa552b-fd34-4653-8ed6-3db0d2efb806`) 实网完成迁移：
+     - **3/3 `oauth_app`** 全部转为 `v1:` AES-GCM 密文（`plain_apps=0`）；
+     - **135/135** 历史邮件全部重加密升级为 `email_enc_key` 专用域 `enc:v1:d=e:...`（`unmigrated_emails=0`, `undecryptableRows=0`, `fullyMigrated=true`）。
+4. **Staging 遗留脏数据清零与工具链护栏 (`AUD-OPT-04`)**
+   - 物理清除 `epomail-staging-db` 中早期 `p4-stress-6f5aa1a7` 测试角色及关联 794 封压测邮件 / 2 账号（还原 6 角色、20 用户、`sessions=0`、`rate_limit_counter=0`）；在根 `package.json` 固定 `"packageManager": "pnpm@10.34.5"` 防止误用 `pnpm@12` 跳过 `deepmerge` 补丁。
+   - 重新运行 `mail-worker` 全量 Vitest **`55/55` 文件 `671/671` PASS (`509.55s`)**、Node **`208/208` PASS**、`temp_login_ui` `tsc` + **`29/29`**、`build-prod.mjs`、`fullstack-smoke` **`22/22`**、`fullstack-browser-e2e` **`11/11`**、`oauth-bind-login-ui-e2e` **`13/13`**、六语 `i18n` 四件套、`secret-scan` (`1,337` 文件 0 命中) 与 Production 终检（三域名 200、`c=8 n=40` `40/40` 200 / `0` 5xx、Chromium `375px overflow=0px`）。
+   - **当前仍保留给平台/运维侧事项**：CF 账户 `workers_paid`（$5/月，覆盖 2 名 `pbkdf2:210000` 存量用户 Free Plan 10ms 边缘配额余量），及未来开放外部收发邮件前替换 `resend_webhook_secret` 真实 `whsec_...` 并切换 `EMAIL_OUTBOUND_ENABLED="true"`。

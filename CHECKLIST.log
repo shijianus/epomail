@@ -1,3 +1,18 @@
+### EpoMail 顽固风险优化、D1+KV 并发会话闭环与生产历史密文全量迁移上线 (2026-11-16)
+*   **关联提交 (Git Commit)**: `c3c434ddc375d40fe95adcc11f5fde827293cd1e` (Short: `c3c434d`)
+*   **部署环境 (Deployment)**:
+    - `Cloudflare Staging (epomail-staging.epocanvas.workers.dev)` — Version ID: `e386552f-eb12-4939-b4f0-cf12f10315be` (已恢复 Access `302` 拦截)
+    - `Cloudflare Production (mail.epocanvas.com / mail.epomail.bond / mail.epomail.cyou)` — Version ID: `1aaa552b-fd34-4653-8ed6-3db0d2efb806` (Tag: `c3c434ddc375d40fe95adcc11f5fde827293cd1e`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 实现 D1 `user_session` 原子持久表 (`init.js` `v3_26DB` + `intDB`) + KV 边缘自愈机制 (`session-auth-store.js`)，覆盖所有会话验证 (`security.js` / `user-context.js` / `index.js` / `oauth-provider-service.js` / `public-service.js`) 与全部吊销路径。
+    - [x] 优化 `setting-service.js` `websiteConfig`，禁止向未启用 OAuth 或禁用提供商输出 `clientId` 等元数据，并清理生产 D1 历史废置 `github` 占位配置 (`"123456"`)。
+    - [x] 新增 `oauth-app-service.js` 原地加密迁移、`setting-api.js` `/setting/security/oauth-apps/migrate` 及 `x-init-secret` 门禁 `POST /api/init/security-migrate`。
+    - [x] 物理清理 Staging 遗留 `p4-stress-6f5aa1a7` 角色与 794 条关联压测邮件，并在根 `package.json` 固定 `packageManager: pnpm@10.34.5`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 全量自动化回归：`mail-worker` Vitest `55/55` 文件 `671/671` PASS (`509.55s`)、Node `208/208`、`temp_login_ui` `tsc` + `29/29`、`scripts/build-prod.mjs`、`fullstack-smoke` `22/22`、`fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13`、`i18n` 四件套、`secret-scan` (1,337 文件) 与 `wrangler deploy --dry-run` 全绿。
+    - [x] CF Staging 实网验证：`10` 并发同用户登录 `10/10` 生效、`16` 并发风暴 `16/16` HTTP 200 且稳定留存最新 `10` 令牌（`0` 次 503）、单端登出隔离 (`401`/`200`)、`websiteConfig` 脱敏为 `{}`，测后清理与 Access 复锁 `302`。
+    - [x] CF Production 上线与迁移：完成临时备份（测后物理销毁）、`POST /api/init/security-migrate` 原地将 `3/3 oauth_app` 加密为 `v1:` (`plain_apps=0`) 与 **`135/135` 历史邮件迁移至 `email_enc_key` (`unmigrated_emails=0`, `undecryptableRows=0`)**；三域名 `/api/version` 对齐、`verify-production-readiness` 通过、`c=8 n=40` 突发只读 `40/40` 200、`Chromium 375px` `0` 溢出、D1 (`users=123, emails=201, rl_rows=0`) 零损零残留。
+
 ### Epocanvas Mail 深度安全审计修复、CF Staging 压测验收与 Production 正式部署上线 (2026-11-16)
 *   **关联提交 (Git Commit)**: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0` (Short: `d320ffb`)
 *   **部署环境 (Deployment)**:

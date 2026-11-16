@@ -10,6 +10,21 @@
 ---
 
 
+### EpoMail — 审计发现问题专项优化（D1+KV 混合会话、配置脱敏与历史密文全量迁移）报告 (2026-11-16)
+*   **关联提交 (Git Commit)**: `c3c434ddc375d40fe95adcc11f5fde827293cd1e` (Short: `c3c434d`)
+*   **专项文档索引 (Detailed Doc)**: [doc/release/FULL-AUDIT-AND-STRESS-2026-11-16.md](doc/release/FULL-AUDIT-AND-STRESS-2026-11-16.md#五-顽固风险专项优化与二次发布关闭记录-commit-c3c434d)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. 针对 2026-11-16 首轮审计留存的 KV 并发会话竞争、`websiteConfig` 禁用 OAuth 元数据外泄、生产 `oauth_app` 3 明文凭证与 135 封历史密文未独立域加密、Staging 历史测试角色残留及 `pnpm@12` 版本漂移进行系统性修复与线上迁移。
+    2. 在 `c3c434d` 完成全部本地全套回归 (`55/55` Vitest `671/671`、`208/208` Node、`22/22` 冒烟、`11/11` + `13/13` Chromium E2E)、Cloudflare Staging (`e386552f-eb12-4939-b4f0-cf12f10315be`) 同账号 10/16 并发登录实测，以及 Production (`1aaa552b-fd34-4653-8ed6-3db0d2efb806`) 线上安全迁移与只读验收。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P1·已根本修复]**: KV 单键并发丢帧架构缺陷已由 D1 `user_session` 原子持久表 + `readAuthorizedSession` 边缘自愈机制消除（Staging 10 并发登录 `10/10` 生效、16 并发峰值 `0` 503 且准确收敛最新 10 会话）。
+    - **[P1·已关闭]**: `setting-service.js` `websiteConfig` 在 `oauthLoginEnabled !== 1` 或提供商未启用时彻底隐藏配置，并清理 Prod 历史 dummy `github` 配置，实测返回 `oauthProviders: {}`。
+    - **[P1·已全量迁移]**: 新增 `/setting/security/oauth-apps/migrate` 与 `POST /api/init/security-migrate`，在不改变客户端实值的前提下完成 Prod **3/3 `oauth_app` (`v1:`)** 加密与 **135/135** 历史邮件轮转至 `email_enc_key` (`unmigrated_emails=0, undecryptableRows=0, fullyMigrated=true`)；D1 原数据零损坏（`users=123, emails=201`）。
+    - **[P2·已清理/待平台演进]**: 已清空 Staging `p4-stress-6f5aa1a7` 及 794 条压测邮件并在根 `package.json` 锚定 `packageManager: pnpm@10.34.5`；剩余待平台演进项仅包括 CF `workers_paid`（消除 2 名 `pbkdf2:210000` 存量账户在 Free Plan 10ms 上限下的余量制约）与开放真实发信前替换 `resend_webhook_secret`。
+
+---
+
+
 ### EpoMail — 全仓深度安全审计、顽固漏洞修复、CF Staging/Production 真实压测与上线报告 (2026-11-16)
 *   **关联提交 (Git Commit)**: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0` (Short: `d320ffb`)
 *   **专项文档索引 (Detailed Doc)**: [doc/release/FULL-AUDIT-AND-STRESS-2026-11-16.md](doc/release/FULL-AUDIT-AND-STRESS-2026-11-16.md)
