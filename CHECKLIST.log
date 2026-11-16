@@ -1,3 +1,21 @@
+### Epocanvas Mail 深度安全审计修复、CF Staging 压测验收与 Production 正式部署上线 (2026-11-16)
+*   **关联提交 (Git Commit)**: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0` (Short: `d320ffb`)
+*   **部署环境 (Deployment)**:
+    - `Cloudflare Staging (epomail-staging.epocanvas.workers.dev)` — Version IDs: `62912e7c-1593-4cc6-95a4-de64e1694096` / `371e907c-c853-44f9-855b-c81c36c8aef2` (已恢复 Access 拦截，匿名返回 `302`)
+    - `Cloudflare Production (mail.epocanvas.com / mail.epomail.bond / mail.epomail.cyou)` — Version ID: `a0408c1a-0234-4b1a-8dd9-ca805ab59767` (Tag: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 修复 `login-service.js` 未知/已删账号 PBKDF2 缺省 `c.env` 触发 Free Plan 10ms CPU 超限 (`503 1102`) 缺陷，并将 KV 并发会话持久化升级为写前预读合并 + 6 次指数抖动退避。
+    - [x] 新增 `session-auth-store.js` (`mergeSessionRecords`, `updateSessionUserFields`, `removeSessionTokens`) 统一替换 `email-service.js`、`user-service.js`、`oauth-identity-service.js` 原始覆写逻辑与 7 天 TTL 误降级缺陷。
+    - [x] 修复 `user-service.js` `uploadImage` 未校验 `checkQuotaAvailable().allowed` 导致的存储配额绕过（返回 `413 storage_quota_exceeded`）。
+    - [x] 收紧 `oauth-provider-service.js` PKCE `id_token` 签名密钥校验与解密 fail-closed，并为 `oauth-app-service.js` `ensureTables` 密钥轮换补齐加密入库。
+    - [x] 为 `account-service.js` 补充不存在/越权 `404/403` 防护，全 API 统一采用 `readJsonObject(c)` 返回 `400 INVALID_JSON`，修复 `restricted-notice.vue` `useRouter` 导入及 DOMPurify 标签策略。
+    - [x] 生产环境运维闭环：预先导出全量 D1 备份后，原子升级 9 项核心凭证为 `secret_text`（精确保留 `totp_enc_key` 兼容 135 封历史密文与 1 名 2FA 用户，旋转 6 位明文弱 `jwt_secret`），注入 `PBKDF2_WRITER_ITERATIONS="100000"`、补充 `docs.epocanvas.com/epomail/mail/*` (`5.4`) 法务披露并执行 `/api/init` 幂等迁移。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地依赖与双前端构建：`corepack pnpm@10.34.5` 恢复 `deepmerge` 补丁，执行 `scripts/build-prod.mjs` 零报错产出，`temp_login_ui` `tsc` + `29/29` 全绿。
+    - [x] 本地自动化测试矩阵：`mail-worker` Vitest `55/55` 文件 `668/668` (`505.13s`) + 补丁恢复后安全定向复测 + `wrangler deploy --dry-run` (438 assets)、Node 套件 `208/208`、`fullstack-smoke` `22/22`、`fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13`、`i18n` 四件套与 `secret-scan` (1,335 文件) 全绿。
+    - [x] Cloudflare Staging 实网验证：端到端功能 `16/16`、Chromium 桌面/移动端（`375px` 0 溢出）、`16c` 突发 `159/160` 200、`12c` PBKDF2 并发登录 `0/12` `503`、`60s` 长稳 `226/226` HTTP 200，测后 D1 `leftovers=0` 并收口 Access。
+    - [x] Cloudflare Production 实网验证：三域名 `/api/version` 200 对齐 `d320ffb`、`verify-production-readiness` `11/11 PASS`、`check-privacy-readiness` `ready`、Fail-Closed 端点与 `INVALID_JSON` 拦截正常、只读基线/突发/30s 长稳共 `256/256` HTTP 200（`0` 错误/`1102`）、Chromium 桌面/移动渲染正常；本地备份、临时报告及 2 条探针 `rate_limit_counter` 已物理清除（`rate_limit_rows=0`, D1 `users=123, emails=201`）。
+
 ### 公测安全加固补丁同步与本机复验 (2026-11-15)
 *   **关联提交 (Git Commit)**: `18d633fa066ca67efd198822c9297f67a1355d93` (Short: `18d633f`，基线 `0a213435134f5ef2b2f8cabdf569117007f9ceae`；补丁 `epomail-public-beta-hardening.patch` SHA256 `847f244c4f29d616c5bafaeaac514906cf2edcda8aa06c3183540a9e71b0b85e`)
 *   **部署环境 (Deployment)**: `本地隔离 Miniflare/local-stack (127.0.0.1)`；未登录任何外部账户，零接触 `mail.epocanvas.com` 与生产 D1/KV/R2

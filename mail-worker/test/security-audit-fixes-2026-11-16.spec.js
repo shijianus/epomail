@@ -149,10 +149,14 @@ describe('Security audit hardening regressions (2026-11-16)', () => {
 			VALUES (?, ?, ?, ?, 0, 0, 1, 1)
 		`).bind(UID_USER, EMAIL_USER, creds.hash, creds.salt).run();
 
+		const testOauthEncKey = ['audit', 'oauth', 'enc', crypto.randomUUID()].join('-');
+		const testJwtKey = ['audit', 'jwt', 'fixture', crypto.randomUUID()].join('-');
+		const forgedInput = ['attacker', 'forged', crypto.randomUUID()].join('-');
+
 		const oauthEnv = {
 			...env,
-			oauth_client_enc_key: 'audit-oauth-enc-key-32bytes-!!',
-			jwt_secret: 'audit-jwt-secret-32bytes-long!!'
+			oauth_client_enc_key: testOauthEncKey,
+			jwt_secret: testJwtKey
 		};
 		const appCtx = { env: oauthEnv };
 		const created = await oauthAppService.add(appCtx, {
@@ -192,7 +196,7 @@ describe('Security audit hardening regressions (2026-11-16)', () => {
 			code: authCode,
 			redirect_uri: 'https://rp.example.com/callback',
 			code_verifier: verifier,
-			client_secret: 'attacker-forged-secret'
+			client_secret: forgedInput
 		});
 
 		const verifiedWithRealSecret = await JwtUtils.verifyToken(
@@ -202,7 +206,7 @@ describe('Security audit hardening regressions (2026-11-16)', () => {
 		expect(verifiedWithRealSecret?.sub).toBe(String(UID_USER));
 
 		const verifiedWithAttackerSecret = await JwtUtils.verifyToken(
-			{ env: { jwt_secret: 'attacker-forged-secret' } },
+			{ env: { jwt_secret: forgedInput } },
 			tokenResp.id_token
 		);
 		expect(verifiedWithAttackerSecret).toBeNull();
@@ -221,7 +225,7 @@ describe('Security audit hardening regressions (2026-11-16)', () => {
 				codeChallengeMethod: 'S256'
 			}
 		});
-		const envNoKey = { ...env, jwt_secret: 'audit-jwt-secret-32bytes-long!!' };
+		const envNoKey = { ...env, jwt_secret: testJwtKey };
 		delete envNoKey.oauth_client_enc_key;
 		await expect(oauthProviderService.token({
 			env: envNoKey,

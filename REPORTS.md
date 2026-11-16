@@ -10,6 +10,24 @@
 ---
 
 
+### EpoMail — 全仓深度安全审计、顽固漏洞修复、CF Staging/Production 真实压测与上线报告 (2026-11-16)
+*   **关联提交 (Git Commit)**: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0` (Short: `d320ffb`)
+*   **专项文档索引 (Detailed Doc)**: [doc/release/FULL-AUDIT-AND-STRESS-2026-11-16.md](doc/release/FULL-AUDIT-AND-STRESS-2026-11-16.md)
+*   **体检/审计范围与方法 (Scope & Methodology)**:
+    1. **范围与环境**：完成全仓源码级安全与并发审计，并在本地 Miniflare 全套门禁通过后，推进 Cloudflare 隔离预发布环境（`epomail-staging.epocanvas.workers.dev`，临时 Access 服务令牌放行后收口复锁）、生产环境 `epomail`（`mail.epocanvas.com` / `mail.epomail.bond` / `mail.epomail.cyou`，Version ID `a0408c1a-0234-4b1a-8dd9-ca805ab59767`）安全密钥改造、`/api/init` 幂等迁移、实网功能及压力测试。
+    2. **工具与脚本**：`corepack pnpm@10.34.5`、Vitest `3.2.7` (`55/55` 文件 `668/668`)、Node 测试 (`208/208`)、`scripts/build-prod.mjs`、`fullstack-smoke.mjs` (`22/22`)、`fullstack-browser-e2e.mjs` (`11/11`)、`oauth-bind-login-ui-e2e.mjs` (`13/13`)、`i18n` 四件套、`secret-scan.mjs`、Cloudflare Staging 实网功能与 2 轮压力/60s 长稳/Chromium 脚本、Production IPv4 只读安全检查、`verify-production-readiness.mjs` (`11/11`)、`check-privacy-readiness.mjs` (`ready`) 与有界 30s 长稳压测。
+*   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
+    - **[P0·已修复]**: `login-service.js` 未知/已删账号漏传 `c.env` 致 PBKDF2 回退 `210,000` 轮纯 JS 派生触发 CF Free Plan `error code: 1102`（Pre-fix Staging `fakeLogin#3` 已实测复现，修复后 0 次 `1102`）；`user-service.uploadImage` 忽略 `checkQuotaAvailable().allowed` 绕过存储配额（修复返回 `413 storage_quota_exceeded`）；`oauth-provider-service` 允许 PKCE 模式携带未核验 `client_secret` 及解密异常回退密文串签名 `id_token`（已强制 fail-closed，`oauth-app-service` 同步加密轮换密钥）。
+    - **[P1·已修复]**: `persistSessionAuthInfo` 未写前预读合并且仅有 3 次无退避重试（Staging `12c` 并发登录首轮命中 `2/6` `503`，扩容为 6 次随机指数抖动退避后复测 `0/12` `503`）；`reportNotSpam`/`reportSpam`（另误将 TTL 降为 7 天）及 `setCustomLabels`/`updateProfile`/`revokeProviderSessions` 改为通过 `session-auth-store.js` 增量合并保留并发令牌；`account-service` 补充 `404/403` 防越权/防空指针崩溃；13 处 API 统一使用 `readJsonObject(c)` 拦截非对象 JSON 返回 `400 INVALID_JSON`；`restricted-notice.vue` 补全 `useRouter` 与严格 DOMPurify 标签黑名单；修复 `pnpm@12.4.2` 覆盖导致的 `deepmerge` 补丁失效。
+    - **[P1·残余风险/待运维跟进]**: (1) CF 账号未订购 `workers_paid`（10ms CPU 上限），虽新写操作已配置 `PBKDF2_WRITER_ITERATIONS="100000"`，但生产库仍有 **2 名历史用户** 为 `pbkdf2:210000:` 散列存在登录 CPU 边缘波动；(2) 生产环境已将 9 项凭证全面升级为 `secret_text`（保值保留 `totp_enc_key` 兼容 135 封历史密文邮件与 1 名 2FA 用户，旋转 6 位明文弱 `jwt_secret`），但 `setting.oauth_providers.github` 仍残存禁用态的 `clientId: "admin@epomail.bond"` 对外回显，且 3 条 `oauth_app` 与 135 封历史邮件等待站长后台重置与密钥迁移；(3) `EMAIL_OUTBOUND_ENABLED` 保持 `"false"`，`resend_webhook_secret` 设为防伪造随机占位密钥，正式启用外部收发邮件前须替换真实 `whsec_...`；(4) Cloudflare KV 单键 `AUTH_INFO:<userId>` 在单账号极高并发（>10 路）下受最终一致性与 10 令牌窗口制约。
+    - **[P2·次要/环境]**: Staging D1 遗留历史角色 `p4-stress-6f5aa1a7`；容器内仅可用 `corepack pnpm@10.34.5` 并对 CF IPv6 DNS64 环境固定 IPv4 出站。
+*   **治理修复与回归结果 (Fixes & Verification)**:
+    - Staging 实网 `16/16` 全功能 + 2 轮压力测试通过（`371e907c`：`16c` 解密爆发 `159/160` 200 & `0 5xx/1102`，`12c` PBKDF2 并发登录 `0 5xx/1102`，`60s` 长稳 `226/226` 200），测试用户/邮件 `leftovers=0` 且已复锁 Access（`HTTP 302`）。
+    - Production 实网零污染校验全绿：三域名 `/api/version` 200 对齐 `d320ffb`，`verify-production-readiness` `11/11 PASS`，`check-privacy-readiness` `ready`，`prod-baseline/burst/soak-30s` 共 `256` 次只读请求 `256/256` HTTP 200（`0` 错误/`1102`），Chromium 桌面/移动端（`375px overflow=0px`）渲染与官方合规条款链接正常，临时备份及探针 `rate_limit_counter` 已彻底清零（D1 123 用户 / 201 邮件 / 6 角色 / 3 应用零损耗）。
+
+---
+
+
 ### EpoMail — P0 加固交接复验与 Turnstile CSP 浏览器回归修复报告 (2026-11-15)
 *   **关联提交 (Git Commit)**: `d2b813b967e52efb6a6b7e3685714f816c9ff7cb` (原样补丁提交) -> `e49a987ab63a9d76346538225827f94fc0b39a55` (Turnstile CSP 修复提交)
 *   **专项文档索引 (Detailed Doc)**: [doc/release/P0-HARDENING-2026-11-15.md](doc/release/P0-HARDENING-2026-11-15.md)、[reports/p0/limited-beta.json](reports/p0/limited-beta.json)、[reports/p0/capacity.json](reports/p0/capacity.json)
