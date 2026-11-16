@@ -242,7 +242,7 @@ app.post('/oauth/callback/:provider', handleOAuthCallback);
 
 // Backwards compatibility for LinuxDo
 app.post('/oauth/linuxDo/login', async (c) => {
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	await oauthService.assertProviderEnabled(c, 'linuxdo');
 	if (!body?.state || typeof body.state !== 'string') {
 		throw new BizError('Missing OAuth state', 400, 'oauth_state_required');
@@ -258,6 +258,6 @@ app.post('/oauth/linuxDo/login', async (c) => {
 
 // Bind user with email
 app.put('/oauth/bindUser', async (c) => {
-	const loginInfo = await oauthService.bindUser(c, await c.req.json());
+	const loginInfo = await oauthService.bindUser(c, await readJsonObject(c));
 	return c.json(result.ok(loginInfo));
 });

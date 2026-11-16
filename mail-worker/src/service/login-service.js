@@ -39,7 +39,7 @@ import { authVersionOf, hashToken } from '../utils/one-time-credential.js';
 import { getUserDb } from '../utils/db-accessor.js';
 import legalPolicyService from './legal-policy-service.js';
 import safeLogger from '../utils/safe-logger.js';
-import { removeSessionToken } from '../utils/session-auth-store.js';
+import { mergeSessionRecords, removeSessionToken } from '../utils/session-auth-store.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -122,35 +122,28 @@ function loginFailWindow() {
 	return { start, expires: start + LOGIN_FAIL_WINDOW_SECONDS };
 }
 
-function mergeSessionAuthInfo(current, incoming) {
-	const currentTokens = Array.isArray(current?.tokens) ? current.tokens : [];
-	const incomingTokens = Array.isArray(incoming?.tokens) ? incoming.tokens : [];
-	const tokens = [...new Set([...currentTokens, ...incomingTokens])].slice(-10);
-	const tokenMeta = { ...(current?.tokenMeta || {}), ...(incoming?.tokenMeta || {}) };
-	for (const key of Object.keys(tokenMeta)) {
-		if (!tokens.includes(key)) delete tokenMeta[key];
-	}
-	return {
-		...(current || {}),
-		...(incoming || {}),
-		tokens,
-		tokenMeta,
-		refreshTime: incoming?.refreshTime || current?.refreshTime || dayjs().toISOString()
-	};
-}
-
-/**
- * KV has no compare-and-swap primitive. Re-read after writing and merge a
- * concurrent token when another login won the read/modify/write race.
- */
 export async function persistSessionAuthInfo(c, userId, authInfo, token) {
 	const key = KvConst.AUTH_INFO + userId;
-	let candidate = authInfo;
-	for (let attempt = 0; attempt < 3; attempt++) {
+	const latest = await c.env.kv.get(key, { type: 'json' });
+	const sameUserLatest = latest && (!latest.user?.email || !authInfo?.user?.email || latest.user.email === authInfo.user.email)
+		? latest
+		: null;
+	let candidate = mergeSessionRecords(sameUserLatest, authInfo);
+	for (let attempt = 0; attempt < 6; attempt++) {
 		await c.env.kv.put(key, JSON.stringify(candidate), { expirationTtl: constant.TOKEN_EXPIRE });
 		const observed = await c.env.kv.get(key, { type: 'json' });
-		if (Array.isArray(observed?.tokens) && observed.tokens.includes(token)) return observed;
-		candidate = mergeSessionAuthInfo(observed, candidate);
+		if (Array.isArray(observed?.tokens) && observed.tokens.includes(token)) {
+			const missed = candidate.tokens.filter(item => !observed.tokens.includes(item));
+			const shiftedByCapacity = missed.length > 0 && observed.tokens.length >= 10
+				&& missed.length <= Math.max(0, candidate.tokens.length + observed.tokens.length - 10);
+			if (missed.length === 0 || shiftedByCapacity) return observed;
+		}
+		if (attempt < 5) {
+			const jitterMs = 25 + Math.floor(Math.random() * 65 * (attempt + 1));
+			await new Promise(resolve => setTimeout(resolve, jitterMs));
+		}
+		const refreshed = await c.env.kv.get(key, { type: 'json' });
+		candidate = mergeSessionRecords(refreshed || observed, candidate);
 	}
 	throw new BizError('Session persistence conflict, please retry', 503, 'session_persistence_conflict');
 }
@@ -734,7 +727,7 @@ const loginService = {
 			// Perform a comparable PBKDF2 derivation so the response time does
 			// not reveal whether the account exists.
 			try {
-				await cryptoUtils.genHashPassword(inputPassword, 'epomail-timing-equalization-salt');
+				await cryptoUtils.genHashPassword(inputPassword, 'epomail-timing-equalization-salt', c.env);
 			} catch (_) {}
 			throw new BizError(t('IncorrectPwd'));
 		}
@@ -743,7 +736,7 @@ const loginService = {
 			// Same generic message as a wrong password to avoid account
 			// enumeration via the login endpoint.
 			try {
-				await cryptoUtils.genHashPassword(inputPassword, 'epomail-timing-equalization-salt');
+				await cryptoUtils.genHashPassword(inputPassword, 'epomail-timing-equalization-salt', c.env);
 			} catch (_) {}
 			throw new BizError(t('IncorrectPwd'));
 		}
@@ -906,7 +899,7 @@ const loginService = {
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
-		if (authInfo && (authInfo.user.email === userRow.email)) {
+		if (authInfo && authInfo.user?.email === userRow.email && Array.isArray(authInfo.tokens)) {
 
 			if (authInfo.tokens.length >= 10) {
 				authInfo.tokens.shift();
@@ -1180,7 +1173,7 @@ const loginService = {
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
-		if (authInfo && (authInfo.user.email === userRow.email)) {
+		if (authInfo && authInfo.user?.email === userRow.email && Array.isArray(authInfo.tokens)) {
 			if (authInfo.tokens.length >= 10) {
 				authInfo.tokens.shift();
 			}

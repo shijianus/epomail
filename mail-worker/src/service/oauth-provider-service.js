@@ -345,8 +345,10 @@ const oauthProviderService = {
 			auth_time: Number(authData.authTime) || Math.floor((Number(authData.createdAt) || Date.now()) / 1000)
 		};
 		if (authData.nonce) idClaims.nonce = authData.nonce;
-		const plainSecretForIdToken = clientSecret || (await decryptClientSecret(c.env, app.clientId, app.clientSecret).catch(() => ''));
-		const idToken = await jwtUtils.generateTokenWithSecret(c, plainSecretForIdToken || app.clientSecret, idClaims, 7200);
+		const idTokenSecret = (!authData.codeChallenge && clientSecret)
+			? String(clientSecret)
+			: await decryptClientSecret(c.env, app.clientId, app.clientSecret);
+		const idToken = await jwtUtils.generateTokenWithSecret(c, idTokenSecret, idClaims, 7200);
 
 		return {
 			access_token: accessToken,

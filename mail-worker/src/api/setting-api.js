@@ -10,9 +10,10 @@ import rbacGuard from '../service/rbac-guard-service.js';
 import byoStorageMigrationService from '../service/byo-storage-migration-service.js';
 import emailKeyMigrationService from '../service/email-key-migration-service.js';
 import BizError from '../error/biz-error.js';
+import { readJsonObject } from '../utils/request-body.js';
 
 const handleSetSetting = async (c) => {
-	await settingService.set(c, await c.req.json());
+	await settingService.set(c, await readJsonObject(c));
 	return c.json(result.ok());
 };
 app.put('/setting/set', handleSetSetting);
@@ -29,7 +30,7 @@ app.get('/setting/websiteConfig', async (c) => {
 })
 
 app.put('/setting/setBackground', async (c) => {
-	const key = await settingService.setBackground(c, await c.req.json());
+	const key = await settingService.setBackground(c, await readJsonObject(c));
 	return c.json(result.ok(key));
 });
 
@@ -39,17 +40,17 @@ app.delete('/setting/deleteBackground', async (c) => {
 });
 
 app.put('/setting/setBlacklist', async (c) => {
-	const setting = await settingService.setBlacklist(c, await c.req.json());
+	const setting = await settingService.setBlacklist(c, await readJsonObject(c));
 	return c.json(result.ok(setting));
 });
 
 app.post('/setting/sendWelcomeEmail', async (c) => {
-	const res = await settingService.sendWelcomeEmailToAll(c, await c.req.json());
+	const res = await settingService.sendWelcomeEmailToAll(c, await readJsonObject(c));
 	return c.json(result.ok(res));
 });
 
 app.post('/setting/sendGlobalEmail', async (c) => {
-	const res = await settingService.sendGlobalBroadcastEmail(c, await c.req.json());
+	const res = await settingService.sendGlobalBroadcastEmail(c, await readJsonObject(c));
 	return c.json(result.ok(res));
 });
 
@@ -59,7 +60,7 @@ app.get('/setting/globalEmailConfig', async (c) => {
 });
 
 app.post('/setting/s3/test', async (c) => {
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const testResult = await s3Service.testConnection(body);
 	return c.json(result.ok(testResult));
 });

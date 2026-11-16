@@ -10,6 +10,7 @@ import BizError from '../error/biz-error';
 import { getUserDb } from '../utils/db-accessor';
 import { isPenaltyLinkedToCase, normalizeCaseReference } from '../utils/audit-case-link';
 import rateLimit from '../utils/rate-limit.js';
+import { readJsonObject } from '../utils/request-body.js';
 
 async function sha256Hex(str) {
 	const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -280,7 +281,7 @@ app.post('/notice/restricted/appeal', async (c) => {
 	c.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
 	c.header('Pragma', 'no-cache');
 
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const appealReason = (body.appealReason || body.appeal_reason || '').trim();
 
 	if (!appealReason || appealReason.length < 5) {

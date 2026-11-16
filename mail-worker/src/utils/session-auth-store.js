@@ -9,7 +9,7 @@ function normalizeTokens(value) {
 	return Array.isArray(value) ? [...new Set(value.filter(token => typeof token === 'string' && token))] : [];
 }
 
-function mergeSessionRecords(current, incoming) {
+export function mergeSessionRecords(current, incoming) {
 	const currentTokens = normalizeTokens(current?.tokens);
 	const incomingTokens = normalizeTokens(incoming?.tokens);
 	const tokens = [...new Set([...currentTokens, ...incomingTokens])].slice(-10);
@@ -52,6 +52,64 @@ export async function refreshSessionAuthInfo(c, userId, authInfo) {
 }
 
 /**
+ * Patch cached session user fields (e.g. profile/labels) on the latest KV record
+ * without overwriting tokens written concurrently or truncating session TTL.
+ */
+export async function updateSessionUserFields(c, userId, userPatch) {
+	if (!c?.env?.kv || !userPatch || typeof userPatch !== 'object') return null;
+	const key = sessionKey(userId);
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const latest = await c.env.kv.get(key, { type: 'json' });
+		if (!latest || !latest.user) return null;
+		const candidate = {
+			...latest,
+			user: {
+				...latest.user,
+				...userPatch
+			}
+		};
+		await c.env.kv.put(key, JSON.stringify(candidate), { expirationTtl: constant.TOKEN_EXPIRE });
+		const observed = await c.env.kv.get(key, { type: 'json' });
+		if (!observed || sameTokenSet(observed, candidate)) return observed || candidate;
+	}
+	return null;
+}
+
+/**
+ * Remove any tokens matching a predicate while preserving concurrent logins.
+ */
+export async function removeSessionTokens(c, userId, shouldDrop) {
+	if (!c?.env?.kv || typeof shouldDrop !== 'function') return 0;
+	const key = sessionKey(userId);
+	let removed = 0;
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const current = await c.env.kv.get(key, { type: 'json' });
+		if (!current || !Array.isArray(current.tokens)) return removed;
+		const metaMap = current.tokenMeta && typeof current.tokenMeta === 'object' ? current.tokenMeta : {};
+		const drop = new Set();
+		for (const token of normalizeTokens(current.tokens)) {
+			if (shouldDrop(token, metaMap[token] || null)) drop.add(token);
+		}
+		if (drop.size === 0) return removed;
+		removed += drop.size;
+		const tokens = normalizeTokens(current.tokens).filter(token => !drop.has(token));
+		const nextMeta = { ...metaMap };
+		for (const token of drop) delete nextMeta[token];
+		if (tokens.length === 0 && Object.keys(nextMeta).length === 0) {
+			await c.env.kv.delete(key);
+		} else {
+			const next = { ...current, tokens, tokenMeta: nextMeta };
+			await c.env.kv.put(key, JSON.stringify(next), { expirationTtl: constant.TOKEN_EXPIRE });
+		}
+		const observed = await c.env.kv.get(key, { type: 'json' });
+		if (!observed) return removed;
+		const stillPresent = normalizeTokens(observed.tokens).some(token => drop.has(token));
+		if (!stillPresent) return removed;
+	}
+	return removed;
+}
+
+/**
  * Remove one bearer token without overwriting sessions created concurrently.
  * A token is UUID-backed and cannot be legitimately reissued, so a reread
  * after the write is sufficient to detect a stale read and retry safely.
@@ -76,4 +134,10 @@ export async function removeSessionToken(c, userId, token) {
 	throw new Error('Session logout conflict');
 }
 
-export default { refreshSessionAuthInfo, removeSessionToken };
+export default {
+	mergeSessionRecords,
+	refreshSessionAuthInfo,
+	updateSessionUserFields,
+	removeSessionTokens,
+	removeSessionToken
+};

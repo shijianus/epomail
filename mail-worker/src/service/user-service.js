@@ -38,6 +38,7 @@ import { encryptByoStorageConfig } from '../utils/storage-credential-crypto.js';
 import { deleteKvKeys, deleteKvMatching, forEachKvPage } from '../utils/kv-revocation.js';
 import { assertStorageCanChange, beginAccountDeletion, deleteAccountEvidence, getObjectDeletionCounts,
 	isActiveUser, readPrivacyState, revokeAccountAccess, revokeTelegramLinks, setDeletionStatus } from './privacy-revocation-service.js';
+import { updateSessionUserFields } from '../utils/session-auth-store.js';
 
 const userService = {
 
@@ -86,12 +87,7 @@ const userService = {
 			throw new BizError(err.message || 'Invalid custom labels');
 		}
 		await orm(c).update(user).set({ customLabels: sanitizedLabels }).where(eq(user.userId, userId));
-		
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo && authInfo.user) {
-			authInfo.user.customLabels = sanitizedLabels;
-			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		}
+		await updateSessionUserFields(c, userId, { customLabels: sanitizedLabels });
 	},
 
 	async updateProfile(c, params, userId) {
@@ -342,18 +338,16 @@ const userService = {
             }
         }
 
-        const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo && authInfo.user) {
-            // Only sync safe UI/profile attributes to session cache.
-            // NEVER allow mutating security identity fields (userId, email, type, roleId, status, isDel, etc.)!
-            const safeSessionFields = ['nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels', 'signature', 'personalForwarding', 'lang'];
-            for (const f of safeSessionFields) {
-                if (safeParams[f] !== undefined) {
-                    authInfo.user[f] = safeParams[f];
-                }
+        const safeSessionFields = ['nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels', 'signature', 'personalForwarding', 'lang'];
+        const userPatch = {};
+        for (const f of safeSessionFields) {
+            if (safeParams[f] !== undefined) {
+                userPatch[f] = safeParams[f];
             }
-			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		}
+        }
+        if (Object.keys(userPatch).length > 0) {
+            await updateSessionUserFields(c, userId, userPatch);
+        }
 	},
 	
 	async uploadImage(c, userId) {
@@ -407,7 +401,10 @@ const userService = {
         }
 
         const storageQuotaService = (await import('./storage-quota-service')).default;
-        await storageQuotaService.checkQuotaAvailable(c, userId, arrayBuffer.byteLength);
+        const quotaCheck = await storageQuotaService.checkQuotaAvailable(c, userId, arrayBuffer.byteLength);
+        if (!quotaCheck?.allowed) {
+            throw new BizError(quotaCheck?.reason || 'Storage quota exceeded', 413, 'storage_quota_exceeded');
+        }
 
         const buffHash = await fileUtils.getBuffHash(arrayBuffer);
         const ext = fileUtils.imageExtensionForMime(detectedMime);

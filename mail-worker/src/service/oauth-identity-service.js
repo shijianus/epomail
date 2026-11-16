@@ -48,6 +48,7 @@ import { t } from '../i18n/i18n.js';
 import reqUtils from '../utils/req-utils.js';
 import totpService from './totp-service.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
+import { removeSessionTokens } from '../utils/session-auth-store.js';
 
 const STEP_UP_TTL_SECONDS = 300;
 const STEP_UP_TTL_MS = STEP_UP_TTL_SECONDS * 1000;
@@ -649,36 +650,16 @@ const oauthIdentityService = {
 	 * using would be a usability regression without a security gain.
 	 */
 	async revokeProviderSessions(c, userId, provider, keepToken) {
-		let revoked = 0;
 		try {
-			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-			if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokenMeta) return 0;
-
-			const drop = new Set();
-			for (const token of authInfo.tokens) {
-				if (token === keepToken) continue;
-				const meta = authInfo.tokenMeta[token];
-				if (meta && meta.method === 'oauth' && meta.provider === provider) {
-					drop.add(token);
-				}
-			}
-			if (drop.size === 0) return 0;
-
-			authInfo.tokens = authInfo.tokens.filter(token => !drop.has(token));
-			for (const token of drop) delete authInfo.tokenMeta[token];
-			revoked = drop.size;
-
-			if (authInfo.tokens.length === 0 && Object.keys(authInfo.tokenMeta).length === 0) {
-				await c.env.kv.delete(KvConst.AUTH_INFO + userId);
-			} else {
-				await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), {
-					expirationTtl: constant.TOKEN_EXPIRE
-				});
-			}
+			return await removeSessionTokens(
+				c,
+				userId,
+				(token, meta) => token !== keepToken && meta?.method === 'oauth' && meta?.provider === provider
+			);
 		} catch (err) {
 			console.error('Failed to revoke sessions for unbound OAuth provider:', err);
+			return 0;
 		}
-		return revoked;
 	}
 };
 

@@ -138,13 +138,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { Icon } from '@iconify/vue';
 import DOMPurify from 'dompurify';
 
 const route = useRoute();
+const router = useRouter();
 const { t } = useI18n();
 
 const loading = ref(true);
@@ -154,8 +155,9 @@ const safeNoticeHtml = computed(() => {
   const html = noticeData.value?.htmlContent;
   if (!html) return '';
   return DOMPurify.sanitize(html, {
-    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
-    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus']
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'style', 'link', 'meta', 'base', 'svg', 'math'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'autofocus']
   });
 });
 const appealText = ref('');

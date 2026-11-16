@@ -236,12 +236,15 @@ const oauthAppService = {
 
 			// 保留站长自建或关联的应用，杜绝硬编码删除；将历史硬编码 secret 转换为独立随机安全 secret
 			try {
-				const legacyRows = await userDb.prepare(`SELECT id, client_secret FROM oauth_app`).all();
+				const legacyRows = await userDb.prepare(`SELECT id, client_id, client_secret FROM oauth_app`).all();
 				for (const row of (legacyRows.results || [])) {
 					if (!row.client_secret) continue;
 					if (!LEGACY_SECRET_HASHES.has(await sha256Hex(row.client_secret))) continue;
 					const rotatedSecret = `epo_sec_${genSecureSecret(32)}`;
-					await userDb.prepare(`UPDATE oauth_app SET client_secret = ? WHERE id = ?`).bind(rotatedSecret, row.id).run();
+					const storedSecret = c?.env?.oauth_client_enc_key
+						? await encryptClientSecret(c.env, row.client_id, rotatedSecret)
+						: rotatedSecret;
+					await userDb.prepare(`UPDATE oauth_app SET client_secret = ? WHERE id = ?`).bind(storedSecret, row.id).run();
 				}
 			} catch (_) {}
 		} catch (e) {

@@ -42,6 +42,7 @@ import mailLifecycleService from './mail-lifecycle-service.js';
 import { reserveInboundQuota } from './mail-reliability-service.js';
 import rateLimit from '../utils/rate-limit.js';
 import { RESERVED_SYSTEM_LABELS } from '../email/rule-engine.js';
+import { updateSessionUserFields } from '../utils/session-auth-store.js';
 
 export function isOfficialEmailRow(item) {
 	if (!item || typeof item !== 'object') return false;
@@ -510,13 +511,9 @@ const emailService = {
 			whitelistLabel.actions = { priority: 1, stopProcessing: true };
 
 			// Save back
-			await userOrm(c).update(user).set({ customLabels: JSON.stringify(labelsObj) }).where(eq(user.userId, userId)).run();
-			
-			const authInfo = await c.env.kv.get(kvConst.AUTH_INFO + userId, { type: 'json' });
-			if (authInfo && authInfo.user) {
-				authInfo.user.customLabels = JSON.stringify(labelsObj);
-				await c.env.kv.put(kvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: 60 * 60 * 24 * 7 });
-			}
+			const serialized = JSON.stringify(labelsObj);
+			await userOrm(c).update(user).set({ customLabels: serialized }).where(eq(user.userId, userId)).run();
+			await updateSessionUserFields(c, userId, { customLabels: serialized });
 		}
 
 		// In Mode 0 (Privacy Mail Mode): Restored emails are back in Inbox, so encrypt them
@@ -637,11 +634,7 @@ const emailService = {
 				bCond.value = existingBlackSenders.join(',');
 				const serialized = JSON.stringify(labelsObj);
 				await userOrm(c).update(user).set({ customLabels: serialized }).where(eq(user.userId, userId)).run();
-				const authInfo = await c.env.kv.get(kvConst.AUTH_INFO + userId, { type: 'json' });
-				if (authInfo && authInfo.user) {
-					authInfo.user.customLabels = serialized;
-					await c.env.kv.put(kvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: 60 * 60 * 24 * 7 });
-				}
+				await updateSessionUserFields(c, userId, { customLabels: serialized });
 			}
 		}
 
