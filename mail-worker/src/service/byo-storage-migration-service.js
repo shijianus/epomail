@@ -1,5 +1,6 @@
 import { getUserDb } from '../utils/db-accessor.js';
 import safeLogger from '../utils/safe-logger.js';
+import { migrationCursor, migrationLimit, migrationUserId, migrationIds, migrationPage } from '../utils/migration-page.js';
 import {
 	STORAGE_KEY_DOMAINS,
 	resolveStorageKeyEnv,
@@ -7,33 +8,34 @@ import {
 	decryptByoStorageConfig
 } from '../utils/storage-credential-crypto.js';
 
-async function scanByoCandidateRows(userDb, { limit = 5000 } = {}) {
+async function scanByoCandidateRows(userDb, { limit = 5000, cursor = 0, userIds = null } = {}) {
+	limit = migrationLimit(limit);
+	cursor = migrationCursor(cursor);
+	userIds = migrationIds(userIds);
+	if (userIds?.length === 0) return migrationPage([], limit, cursor, 'user_id');
 	const rows = [];
-	let lastUserId = 0;
-	while (rows.length < limit) {
-		const pageSize = Math.min(200, limit - rows.length);
-		const res = await userDb.prepare(`
-			SELECT user_id, byo_storage_enabled, byo_storage_config
-			FROM user
-			WHERE user_id > ?
-			  AND (byo_storage_enabled = 1 OR (byo_storage_config IS NOT NULL AND byo_storage_config <> '' AND byo_storage_config <> '{}'))
-			ORDER BY user_id ASC
-			LIMIT ?
-		`).bind(lastUserId, pageSize).all();
+	let lastUserId = cursor;
+	while (rows.length < limit + 1) {
+		const pageSize = Math.min(200, limit + 1 - rows.length);
+		const scope = userIds ? `AND user_id IN (${userIds.map(() => '?').join(',')})` : '';
+		const res = await userDb.prepare(`SELECT user_id, byo_storage_enabled, byo_storage_config
+			FROM user WHERE user_id > ? ${scope}
+			AND (byo_storage_enabled = 1 OR (byo_storage_config IS NOT NULL AND byo_storage_config <> '' AND byo_storage_config <> '{}'))
+			ORDER BY user_id ASC LIMIT ?`).bind(lastUserId, ...(userIds || []), pageSize).all();
 		const batch = res?.results || [];
-		if (batch.length === 0) break;
+		if (!batch.length) break;
 		rows.push(...batch);
 		lastUserId = Number(batch[batch.length - 1].user_id);
 		if (batch.length < pageSize) break;
 	}
-	return rows;
+	return migrationPage(rows, limit, cursor, 'user_id');
 }
 
 const byoStorageMigrationService = {
-	async inspectState(c, { limit = 5000 } = {}) {
+	async inspectState(c, options = {}) {
 		const userDb = getUserDb(c);
 		const keyInfo = resolveStorageKeyEnv(c?.env);
-		const rows = await scanByoCandidateRows(userDb, { limit });
+		const { rows, ...page } = await scanByoCandidateRows(userDb, options);
 
 		const stats = {
 			scannedRows: rows.length,
@@ -79,6 +81,7 @@ const byoStorageMigrationService = {
 		}
 
 		return {
+			...page,
 			keyReadiness: {
 				activeWriteDomain: activeDomain,
 				dedicatedKeyConfigured: keyInfo.dedicatedKeyConfigured,
@@ -89,10 +92,11 @@ const byoStorageMigrationService = {
 		};
 	},
 
-	async preDeployCheck(c) {
-		const inspection = await this.inspectState(c);
+	async preDeployCheck(c, options = {}) {
+		const inspection = await this.inspectState(c, options);
 		const blockers = [];
 		const warnings = [];
+		if (!inspection.inspectionComplete) warnings.push('Inspection is partial; complete all pages before key removal');
 
 		if (!inspection.keyReadiness.activeWriteDomain) {
 			blockers.push('No encryption key configured (set byo_storage_enc_key, storage_enc_key, or totp_enc_key)');
@@ -108,20 +112,23 @@ const byoStorageMigrationService = {
 
 		return {
 			ok: blockers.length === 0,
-			readyForStrictKeyDomain: inspection.keyReadiness.dedicatedKeyConfigured && blockers.length === 0,
+			readyForStrictKeyDomain: inspection.inspectionComplete && inspection.keyReadiness.dedicatedKeyConfigured && blockers.length === 0,
 			blockers,
 			warnings,
 			...inspection
 		};
 	},
 
-	async postDeployVerify(c) {
-		const inspection = await this.inspectState(c);
+	async postDeployVerify(c, options = {}) {
+		const inspection = await this.inspectState(c, options);
 		const blockers = [];
 		if (inspection.stats.byoEnabledUndecryptableRows > 0) {
 			blockers.push(`Found ${inspection.stats.byoEnabledUndecryptableRows} undecryptable active BYO rows after deploy`);
 		}
-		const fullyMigrated = inspection.stats.needsMigrationRows === 0
+		const fullyMigrated = inspection.inspectionComplete && Boolean(inspection.keyReadiness.activeWriteDomain)
+			&& inspection.stats.invalidRows === 0 && inspection.stats.undecryptableRows === 0
+			&& inspection.stats.otherDomainEncryptedRows === 0
+			&& inspection.stats.needsMigrationRows === 0
 			&& inspection.stats.legacyPlaintextRows === 0
 			&& inspection.stats.byoEnabledUndecryptableRows === 0;
 
@@ -178,7 +185,10 @@ const byoStorageMigrationService = {
 		};
 	},
 
-	async migrateBatch(c, { limit = 500, dryRun = false, requireDedicatedKey = false } = {}) {
+	async migrateBatch(c, { limit = 500, cursor = 0, userIds = null, dryRun = false, requireDedicatedKey = false } = {}) {
+		limit = migrationLimit(limit);
+		cursor = migrationCursor(cursor);
+		userIds = migrationIds(userIds);
 		const userDb = getUserDb(c);
 		const keyInfo = resolveStorageKeyEnv(c?.env, { requireDedicatedKey });
 		if (!keyInfo.active) {
@@ -195,8 +205,9 @@ const byoStorageMigrationService = {
 			};
 		}
 
-		const rows = await scanByoCandidateRows(userDb, { limit });
+		const { rows, ...page } = await scanByoCandidateRows(userDb, { limit, cursor, userIds });
 		const result = {
+			...page,
 			ok: true,
 			dryRun,
 			scanned: rows.length,
@@ -243,7 +254,10 @@ const byoStorageMigrationService = {
 		return result;
 	},
 
-	async rollbackMigration(c, { userIds = null, targetMode = 'previous_key' } = {}) {
+	async rollbackMigration(c, { userIds = null, limit = 500, cursor = 0, targetMode = 'previous_key' } = {}) {
+		userIds = migrationIds(userIds);
+		limit = migrationLimit(limit);
+		cursor = migrationCursor(cursor);
 		const userDb = getUserDb(c);
 		const keyInfo = resolveStorageKeyEnv(c?.env);
 
@@ -266,11 +280,7 @@ const byoStorageMigrationService = {
 			return { ok: false, rolledBack: 0, failed: 0, reason: 'missing_rollback_key' };
 		}
 
-		let rows = await scanByoCandidateRows(userDb);
-		if (Array.isArray(userIds) && userIds.length > 0) {
-			const allowSet = new Set(userIds.map(Number));
-			rows = rows.filter(r => allowSet.has(Number(r.user_id)));
-		}
+		const { rows, ...page } = await scanByoCandidateRows(userDb, { userIds, limit, cursor });
 
 		let rolledBack = 0;
 		let skipped = 0;
@@ -327,6 +337,7 @@ const byoStorageMigrationService = {
 		}
 
 		return {
+			...page,
 			ok: failed === 0,
 			targetMode,
 			targetKeyDomain,

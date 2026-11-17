@@ -1198,8 +1198,12 @@ const loginService = {
 	},
 
 	async logout(c, userId) {
-		const token = await userContext.getToken(c);
-		await removeSessionToken(c, userId, token);
+		const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('token');
+		const session = await JwtUtils.verifyToken(c, jwt);
+		if (!session || session.purpose || session.userId !== userId || !session.token) {
+			throw new BizError('Authentication expired', 401, 'auth_expired');
+		}
+		await removeSessionToken(c, userId, session.token, { expiresAt: session.exp });
 	}
 
 };

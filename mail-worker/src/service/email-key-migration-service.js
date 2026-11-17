@@ -1,6 +1,7 @@
 import { getMailDb } from '../utils/db-accessor.js';
 import emailCryptoUtils, { EMAIL_KEY_DOMAINS } from '../utils/email-crypto-utils.js';
 import safeLogger from '../utils/safe-logger.js';
+import { migrationCursor, migrationLimit, migrationUserId, migrationIds, migrationPage } from '../utils/migration-page.js';
 
 const { CIPHER_PREFIX, ENCRYPTED_FIELDS } = emailCryptoUtils;
 
@@ -24,22 +25,28 @@ function resolveKeyReadiness(env) {
 	};
 }
 
-async function scanEncryptedCandidateEmails(mailDb, { limit = 5000, userId = null } = {}) {
+async function scanEncryptedCandidateEmails(mailDb, { limit = 5000, cursor = 0, userId = null, emailIds = null } = {}) {
+	limit = migrationLimit(limit);
+	cursor = migrationCursor(cursor);
+	userId = migrationUserId(userId);
+	emailIds = migrationIds(emailIds);
+	if (emailIds?.length === 0) return migrationPage([], limit, cursor, 'email_id');
 	const rows = [];
-	let lastEmailId = 0;
+	let lastEmailId = cursor;
 	const hasUserFilter = Number.isSafeInteger(Number(userId)) && Number(userId) > 0;
-	while (rows.length < limit) {
-		const pageSize = Math.min(200, limit - rows.length);
+	while (rows.length < limit + 1) {
+		const pageSize = Math.min(200, limit + 1 - rows.length);
 		const whereUser = hasUserFilter ? 'AND user_id = ?' : '';
+		const whereEmails = emailIds ? `AND email_id IN (${emailIds.map(() => '?').join(',')})` : '';
 		const sql = `
 			SELECT email_id, user_id, subject, content, text, code
 			FROM email
-			WHERE email_id > ? ${whereUser}
+			WHERE email_id > ? ${whereUser} ${whereEmails}
 			  AND (subject LIKE 'enc:v1:%' OR content LIKE 'enc:v1:%' OR text LIKE 'enc:v1:%' OR code LIKE 'enc:v1:%')
 			ORDER BY email_id ASC
 			LIMIT ?
 		`;
-		const bindings = hasUserFilter ? [lastEmailId, Number(userId), pageSize] : [lastEmailId, pageSize];
+		const bindings = [lastEmailId, ...(hasUserFilter ? [userId] : []), ...(emailIds || []), pageSize];
 		const res = await mailDb.prepare(sql).bind(...bindings).all();
 		const batch = res?.results || [];
 		if (batch.length === 0) break;
@@ -47,16 +54,16 @@ async function scanEncryptedCandidateEmails(mailDb, { limit = 5000, userId = nul
 		lastEmailId = Number(batch[batch.length - 1].email_id);
 		if (batch.length < pageSize) break;
 	}
-	return rows;
+	return migrationPage(rows, limit, cursor, 'email_id');
 }
 
 const emailKeyMigrationService = {
 	resolveKeyReadiness,
 
-	async inspectState(c, { limit = 5000, userId = null } = {}) {
+	async inspectState(c, options = {}) {
 		const mailDb = getMailDb(c);
 		const keyReadiness = resolveKeyReadiness(c?.env);
-		const rows = await scanEncryptedCandidateEmails(mailDb, { limit, userId });
+		const { rows, ...page } = await scanEncryptedCandidateEmails(mailDb, options);
 
 		const stats = {
 			scannedEncryptedRows: rows.length,
@@ -127,13 +134,14 @@ const emailKeyMigrationService = {
 
 		stats.distinctUsers = userIds.size;
 
-		return { keyReadiness, stats };
+		return { keyReadiness, stats, ...page };
 	},
 
 	async preDeployCheck(c, options = {}) {
 		const inspection = await this.inspectState(c, options);
 		const blockers = [];
 		const warnings = [];
+		if (!inspection.inspectionComplete) warnings.push('Inspection is partial; complete all pages before key removal');
 
 		if (!inspection.keyReadiness.activeDomain) {
 			blockers.push('No email encryption root key is configured (set email_enc_key or totp_enc_key)');
@@ -149,7 +157,7 @@ const emailKeyMigrationService = {
 
 		return {
 			ok: blockers.length === 0,
-			readyForDedicatedEmailKey: inspection.keyReadiness.dedicatedKeyConfigured && blockers.length === 0,
+			readyForDedicatedEmailKey: inspection.inspectionComplete && inspection.keyReadiness.dedicatedKeyConfigured && blockers.length === 0,
 			blockers,
 			warnings,
 			...inspection
@@ -162,9 +170,11 @@ const emailKeyMigrationService = {
 		if (inspection.stats.undecryptableRows > 0) {
 			blockers.push(`Found ${inspection.stats.undecryptableRows} undecryptable email rows after deployment`);
 		}
-		const fullyMigrated = inspection.stats.needsMigrationRows === 0
+		const fullyMigrated = inspection.inspectionComplete && Boolean(inspection.keyReadiness.activeDomain)
+			&& inspection.stats.needsMigrationRows === 0
 			&& inspection.stats.legacyV1Rows === 0
 			&& inspection.stats.compatDomainRows === 0
+			&& inspection.stats.otherDomainRows === 0
 			&& inspection.stats.undecryptableRows === 0;
 
 		return {
@@ -256,7 +266,10 @@ const emailKeyMigrationService = {
 		};
 	},
 
-	async migrateBatch(c, { limit = 500, dryRun = false, userId = null, requireDedicatedKey = false } = {}) {
+	async migrateBatch(c, { limit = 500, cursor = 0, dryRun = false, userId = null, requireDedicatedKey = false } = {}) {
+		limit = migrationLimit(limit);
+		cursor = migrationCursor(cursor);
+		userId = migrationUserId(userId);
 		const mailDb = getMailDb(c);
 		const keyReadiness = resolveKeyReadiness(c?.env);
 		if (!keyReadiness.activeDomain || (requireDedicatedKey && !keyReadiness.dedicatedKeyConfigured)) {
@@ -273,8 +286,9 @@ const emailKeyMigrationService = {
 			};
 		}
 
-		const rows = await scanEncryptedCandidateEmails(mailDb, { limit, userId });
+		const { rows, ...page } = await scanEncryptedCandidateEmails(mailDb, { limit, cursor, userId });
 		const result = {
+			...page,
 			ok: true,
 			dryRun,
 			scanned: rows.length,
@@ -324,7 +338,11 @@ const emailKeyMigrationService = {
 		return result;
 	},
 
-	async rollbackMigration(c, { emailIds = null, userId = null, targetDomain = EMAIL_KEY_DOMAINS.TOTP_COMPAT } = {}) {
+	async rollbackMigration(c, { emailIds = null, userId = null, limit = 500, cursor = 0, targetDomain = EMAIL_KEY_DOMAINS.TOTP_COMPAT } = {}) {
+		emailIds = migrationIds(emailIds);
+		userId = migrationUserId(userId);
+		limit = migrationLimit(limit);
+		cursor = migrationCursor(cursor);
 		const mailDb = getMailDb(c);
 		const keyReadiness = resolveKeyReadiness(c?.env);
 		if (targetDomain === EMAIL_KEY_DOMAINS.TOTP_COMPAT && !keyReadiness.compatKeyConfigured) {
@@ -334,11 +352,7 @@ const emailKeyMigrationService = {
 			return { ok: false, rolledBack: 0, skipped: 0, failed: 0, reason: 'missing_previous_email_key', errors: [] };
 		}
 
-		let rows = await scanEncryptedCandidateEmails(mailDb, { userId });
-		if (Array.isArray(emailIds) && emailIds.length > 0) {
-			const allowSet = new Set(emailIds.map(Number));
-			rows = rows.filter(r => allowSet.has(Number(r.email_id)));
-		}
+		const { rows, ...page } = await scanEncryptedCandidateEmails(mailDb, { userId, emailIds, limit, cursor });
 
 		let rolledBack = 0;
 		let skipped = 0;
@@ -383,6 +397,7 @@ const emailKeyMigrationService = {
 		}
 
 		return {
+			...page,
 			ok: failed === 0,
 			targetDomain,
 			rolledBack,

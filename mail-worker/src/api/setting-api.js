@@ -12,6 +12,7 @@ import emailKeyMigrationService from '../service/email-key-migration-service.js'
 import oauthAppService from '../service/oauth-app-service.js';
 import BizError from '../error/biz-error.js';
 import { readJsonObject } from '../utils/request-body.js';
+import { migrationCursor, migrationLimit, migrationUserId, migrationIds } from '../utils/migration-page.js';
 
 const handleSetSetting = async (c) => {
 	await settingService.set(c, await readJsonObject(c));
@@ -107,13 +108,13 @@ app.post('/setting/ai/models', async (c) => {
 
 app.get('/setting/security/encryption-status', async (c) => {
 	await rbacGuard.assertAdmin(c, userContext.getUserId(c));
-	const userIdParam = c.req.query('userId');
-	const parsedUserId = userIdParam ? Number(userIdParam) : null;
-	const userId = Number.isInteger(parsedUserId) && parsedUserId > 0 ? parsedUserId : null;
-	const sampleLimit = Math.max(1, Math.min(Number(c.req.query('sampleLimit')) || 20, 50));
+	const userId = migrationUserId(c.req.query('userId'));
+	const limit = migrationLimit(c.req.query('limit') ?? 5000);
+	const cursor = migrationCursor(c.req.query('cursor'));
+	const byoCursor = migrationCursor(c.req.query('byoCursor'));
 	const [emailKeys, byoStorage, oauthApps] = await Promise.all([
-		emailKeyMigrationService.preDeployCheck(c, { userId, sampleLimit }),
-		byoStorageMigrationService.preDeployCheck(c),
+		emailKeyMigrationService.preDeployCheck(c, { userId, limit, cursor }),
+		byoStorageMigrationService.preDeployCheck(c, { userIds: userId === null ? null : [userId], limit, cursor: byoCursor }),
 		oauthAppService.inspectSecretState(c)
 	]);
 	return c.json(result.ok({ emailKeys, byoStorage, oauthApps }));
@@ -130,34 +131,38 @@ app.post('/setting/security/oauth-apps/migrate', async (c) => {
 
 app.post('/setting/security/email-key/migrate', async (c) => {
 	await rbacGuard.assertAdmin(c, userContext.getUserId(c));
-	const body = await c.req.json().catch(() => ({}));
-	const userId = body?.userId ? Number(body.userId) : null;
-	const limit = Math.max(1, Math.min(Number(body?.limit) || 100, 500));
+	const body = await readJsonObject(c);
+	const userId = migrationUserId(body.userId);
+	const limit = migrationLimit(body.limit === undefined ? 100 : body.limit);
+	const cursor = migrationCursor(body.cursor);
 	const dryRun = body?.dryRun === true;
 	const requireDedicatedKey = body?.requireDedicatedKey !== false;
 	const migration = await emailKeyMigrationService.migrateBatch(c, {
-		userId: Number.isInteger(userId) && userId > 0 ? userId : null,
+		userId,
 		limit,
+		cursor,
 		dryRun,
 		requireDedicatedKey
 	});
 	const verification = await emailKeyMigrationService.postDeployVerify(c, {
-		userId: Number.isInteger(userId) && userId > 0 ? userId : null
+		userId
 	});
 	return c.json(result.ok({ migration, verification }));
 });
 
 app.post('/setting/security/email-key/rollback', async (c) => {
 	await rbacGuard.assertAdmin(c, userContext.getUserId(c));
-	const body = await c.req.json().catch(() => ({}));
+	const body = await readJsonObject(c);
 	if (body?.confirmRollback !== true) {
 		throw new BizError('Rollback requires explicit confirmRollback: true confirmation', 400, 'rollback_confirmation_required');
 	}
-	const userId = body?.userId ? Number(body.userId) : null;
-	const emailIds = Array.isArray(body?.emailIds) ? body.emailIds.map(Number).filter(id => Number.isInteger(id) && id > 0) : null;
+	const userId = migrationUserId(body.userId);
+	const emailIds = migrationIds(body.emailIds);
 	const rollback = await emailKeyMigrationService.rollbackMigration(c, {
-		emailIds: emailIds?.length ? emailIds : null,
-		userId: Number.isInteger(userId) && userId > 0 ? userId : null,
+		emailIds,
+		limit: migrationLimit(body.limit),
+		cursor: migrationCursor(body.cursor),
+		userId,
 		targetDomain: body?.targetDomain
 	});
 	return c.json(result.ok(rollback));
@@ -165,23 +170,28 @@ app.post('/setting/security/email-key/rollback', async (c) => {
 
 app.post('/setting/security/byo-storage/migrate', async (c) => {
 	await rbacGuard.assertAdmin(c, userContext.getUserId(c));
-	const body = await c.req.json().catch(() => ({}));
+	const body = await readJsonObject(c);
 	const dryRun = body?.dryRun === true;
-	const userIds = Array.isArray(body?.userIds) ? body.userIds.map(Number).filter(id => Number.isInteger(id) && id > 0) : null;
-	const migration = await byoStorageMigrationService.migrateBatch(c, { dryRun, userIds });
-	const verification = await byoStorageMigrationService.postDeployVerify(c);
+	const userIds = migrationIds(body.userIds);
+	const migration = await byoStorageMigrationService.migrateBatch(c, {
+		dryRun, userIds, limit: migrationLimit(body.limit), cursor: migrationCursor(body.cursor),
+		requireDedicatedKey: body.requireDedicatedKey !== false
+	});
+	const verification = await byoStorageMigrationService.postDeployVerify(c, { userIds });
 	return c.json(result.ok({ migration, verification }));
 });
 
 app.post('/setting/security/byo-storage/rollback', async (c) => {
 	await rbacGuard.assertAdmin(c, userContext.getUserId(c));
-	const body = await c.req.json().catch(() => ({}));
+	const body = await readJsonObject(c);
 	if (body?.confirmRollback !== true) {
 		throw new BizError('Rollback requires explicit confirmRollback: true confirmation', 400, 'rollback_confirmation_required');
 	}
-	const userIds = Array.isArray(body?.userIds) ? body.userIds.map(Number).filter(id => Number.isInteger(id) && id > 0) : null;
+	const userIds = migrationIds(body.userIds);
 	const rollback = await byoStorageMigrationService.rollbackMigration(c, {
 		userIds,
+		limit: migrationLimit(body.limit),
+		cursor: migrationCursor(body.cursor),
 		targetMode: body?.targetMode,
 		targetKeyDomain: body?.targetKeyDomain
 	});

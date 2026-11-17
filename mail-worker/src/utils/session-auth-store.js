@@ -1,6 +1,8 @@
 import KvConst from '../const/kv-const.js';
 import constant from '../const/constant.js';
 import { getUserDb } from './db-accessor.js';
+import { revokeSessionToken, withoutRevokedTokens, isSessionRevoked } from './session-revocation.js';
+import safeLogger from './safe-logger.js';
 
 const USER_SESSION_LIMIT = 10;
 const ensuredSessionDbs = new WeakSet();
@@ -27,7 +29,6 @@ function normalizeTokens(value) {
 }
 
 function resolveSessionDb(c) {
-	if (!c?.env?.USER_DB && !c?.env?.db) return null;
 	const db = getUserDb(c);
 	return db && typeof db.prepare === 'function' ? db : null;
 }
@@ -156,6 +157,7 @@ function sameTokenSet(left, right) {
  * sessions to KV eventual consistency, then updates KV edge cache.
  */
 export async function persistSessionRecord(c, userId, authInfo, token) {
+	if (resolveSessionDb(c) && await isSessionRevoked(c, userId, token)) return null;
 	const key = sessionKey(userId);
 	const db = resolveSessionDb(c);
 	if (db) {
@@ -200,6 +202,12 @@ export async function persistSessionRecord(c, userId, authInfo, token) {
 				? latestKv
 				: null;
 			const merged = mergeSessionRecords(sameUserKv, dbRecord);
+			if (merged.tokens.length > 0) {
+				merged.tokens = await withoutRevokedTokens(c, userId, merged.tokens);
+				for (const tok of Object.keys(merged.tokenMeta || {})) {
+					if (!merged.tokens.includes(tok)) delete merged.tokenMeta[tok];
+				}
+			}
 			await c.env.kv.put(key, JSON.stringify(merged), { expirationTtl: constant.TOKEN_EXPIRE }).catch(() => {});
 			return merged;
 		}
@@ -236,6 +244,7 @@ export async function persistSessionRecord(c, userId, authInfo, token) {
  * self-healing KV when D1 confirms the session is active.
  */
 export async function readAuthorizedSession(c, userId, token) {
+	if (token && resolveSessionDb(c) && await isSessionRevoked(c, userId, token)) return null;
 	if (!c?.env?.kv) return null;
 	const key = sessionKey(userId);
 	const authInfo = await c.env.kv.get(key, { type: 'json' });
@@ -282,7 +291,12 @@ export async function refreshSessionAuthInfo(c, userId, authInfo) {
 	let candidate = { ...authInfo, refreshTime };
 	for (let attempt = 0; attempt < 3; attempt++) {
 		const latest = await c.env.kv.get(key, { type: 'json' });
-		candidate = mergeSessionRecords(latest, candidate);
+		if (!latest) return null;
+		candidate = { ...latest, tokens: normalizeTokens(latest.tokens), tokenMeta: { ...(latest.tokenMeta || {}) }, refreshTime };
+		if (db) candidate.tokens = await withoutRevokedTokens(c, userId, candidate.tokens);
+		for (const token of Object.keys(candidate.tokenMeta)) {
+			if (!candidate.tokens.includes(token)) delete candidate.tokenMeta[token];
+		}
 		await c.env.kv.put(key, JSON.stringify(candidate), { expirationTtl: constant.TOKEN_EXPIRE });
 		const observed = await c.env.kv.get(key, { type: 'json' });
 		if (!observed || sameTokenSet(observed, candidate)) return observed || candidate;
@@ -387,33 +401,38 @@ export async function removeSessionTokens(c, userId, shouldDrop) {
 /**
  * Remove one bearer token from D1 and KV without overwriting concurrent logins.
  */
-export async function removeSessionToken(c, userId, token) {
+export async function removeSessionToken(c, userId, token, { expiresAt = 0 } = {}) {
 	if (!token) return null;
 	const db = resolveSessionDb(c);
-	if (db) {
-		try {
-			await db.prepare('DELETE FROM user_session WHERE user_id = ? AND token = ?')
-				.bind(Number(userId), token).run();
-		} catch (err) {
-			if (!isMissingSessionTableError(err)) throw err;
+	if (db) await revokeSessionToken(c, userId, token, expiresAt);
+	try {
+		if (db) {
+			try {
+				await db.prepare('DELETE FROM user_session WHERE user_id = ? AND token = ?')
+					.bind(Number(userId), token).run();
+			} catch (err) {
+				if (!isMissingSessionTableError(err)) throw err;
+			}
 		}
-	}
-	const key = sessionKey(userId);
-	for (let attempt = 0; attempt < 3; attempt++) {
-		const current = await c.env.kv.get(key, { type: 'json' });
-		if (!current || !Array.isArray(current.tokens)) return null;
-		const tokens = normalizeTokens(current.tokens).filter(item => item !== token);
-		const next = { ...current, tokens };
-		if (tokens.length === 0) {
-			await c.env.kv.delete(key);
-		} else {
-			if (next.tokenMeta && typeof next.tokenMeta === 'object') delete next.tokenMeta[token];
-			await c.env.kv.put(key, JSON.stringify(next), { expirationTtl: constant.TOKEN_EXPIRE });
+		const key = sessionKey(userId);
+		for (let attempt = 0; attempt < 3; attempt++) {
+			const current = await c.env.kv.get(key, { type: 'json' });
+			if (!current || !Array.isArray(current.tokens)) return null;
+			const tokens = normalizeTokens(current.tokens).filter(item => item !== token);
+			const next = { ...current, tokens };
+			if (tokens.length === 0) {
+				await c.env.kv.delete(key);
+			} else {
+				if (next.tokenMeta && typeof next.tokenMeta === 'object') delete next.tokenMeta[token];
+				await c.env.kv.put(key, JSON.stringify(next), { expirationTtl: constant.TOKEN_EXPIRE });
+			}
+			const observed = await c.env.kv.get(key, { type: 'json' });
+			if (!observed || !normalizeTokens(observed.tokens).includes(token)) return observed;
 		}
-		const observed = await c.env.kv.get(key, { type: 'json' });
-		if (!observed || !normalizeTokens(observed.tokens).includes(token)) return observed;
+	} catch (error) {
+		safeLogger.warn('session_revoked_cleanup_failed', { userId, error });
 	}
-	throw new Error('Session logout conflict');
+	return null;
 }
 
 /** Delete all D1 `user_session` rows for a user without touching KV. */

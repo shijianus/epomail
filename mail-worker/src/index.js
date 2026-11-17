@@ -323,6 +323,10 @@ export default {
 		});
 		// Keep this separate: a pre-migration database without the new table must
 		// not roll back the auth-table cleanup above.
+		await run('session_revocation_cleanup', async () => {
+			await getUserDb({ env }).prepare(`DELETE FROM session_revocation WHERE rowid IN
+				(SELECT rowid FROM session_revocation WHERE expires_at < unixepoch() LIMIT 500)`).run();
+		});
 		await run('rate_limit_cleanup', async () => {
 			const db = getUserDb({ env });
 			for (let round = 0; round < 10; round++) {

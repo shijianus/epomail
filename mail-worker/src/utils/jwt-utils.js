@@ -1,4 +1,5 @@
 import safeLogger from './safe-logger.js';
+import { isSessionRevoked } from './session-revocation.js';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -108,6 +109,10 @@ const jwtUtils = {
 			// 无 exp 的令牌一律拒绝：本系统签发的所有 JWT（会话/受限通知/分享/访问令牌）
 			// 都携带 exp，缺失即异常构造，绝不给"永不过期"留任何通道。
 			if (!payload.exp || payload.exp < now) return null;
+
+			// Durable revocation wins over stale KV hits and D1 positive-session fallback.
+			if (!payload.purpose && payload.userId && payload.token
+				&& await isSessionRevoked(c, payload.userId, payload.token)) return null;
 
 			return payload;
 

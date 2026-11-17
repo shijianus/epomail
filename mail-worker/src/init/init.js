@@ -9,6 +9,7 @@ import { ensureMailReliabilitySchema } from '../utils/mail-reliability-schema.js
 import { ensureNoticeDeliverySchema } from '../utils/notice-delivery-schema.js';
 import { ensureAuthSecurityOperationSchema } from '../utils/auth-security-operation.js';
 import { ensureUserSessionTable } from '../utils/session-auth-store.js';
+import { ensureSessionRevocationSchema } from '../utils/session-revocation.js';
 
 function timingSafeEqual(a, b) {
 	if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
@@ -122,12 +123,17 @@ const dbInit = {
 		await this.v3_24DB(c);
 		await this.v3_25DB(c);
 		await this.v3_26DB(c);
+		await this.v3_27DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
 			return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
 		}
 		return c.text('success');
+	},
+
+	async v3_27DB(c) {
+		await ensureSessionRevocationSchema(c);
 	},
 
 	async v3_26DB(c) {
@@ -2251,6 +2257,7 @@ const dbInit = {
 		await ensureNoticeDeliverySchema(c);
 		await ensureAuthSecurityOperationSchema(c);
 		await ensureUserSessionTable(userDb);
+		await ensureSessionRevocationSchema(c);
 	},
 
 	async receiveEmailToRecipient(c) {

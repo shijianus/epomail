@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { env as workerEnv } from 'cloudflare:test';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import hashUtils from '../src/utils/hash-utils.js';
 import emailCryptoUtils from '../src/utils/email-crypto-utils.js';
@@ -47,7 +48,7 @@ async function signRs256(privateKey, header, payload) {
 }
 
 describe('JWT session tokens', () => {
-	const c = { env: { jwt_secret: 'unit-test-jwt-secret-32-bytes-minimum' } };
+	const c = { env: { db: workerEnv.db, jwt_secret: 'unit-test-jwt-secret-32-bytes-minimum' } };
 
 	it('round-trips a signed token and rejects tampering', async () => {
 		const token = await jwtUtils.generateToken(c, { userId: 7, token: 'session-id' }, 60);
