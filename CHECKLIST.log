@@ -1,3 +1,19 @@
+### F1–F3 修复同步、补充加固与全真栈验收 (2026-11-16)
+*   **关联提交 (Git Commit)**: `fe7373ced14ce60f0aa92634207d199ec6889a52` (Short: `fe7373c`)
+*   **部署环境 (Deployment)**: 仅本地隔离 workerd / D1 / KV / Chromium；未部署 Staging / Production。
+*   **基线与来源**: `fix/public-beta-go-blockers-2026-11-07` / 远端基线 `89fbedf4fd1f49823a60ec3793cdb5cd5785aa07`（合入并复核交接包 `0a70ac62abb4b31b669cbf2eaf09699766727ccf` / `189dd6d367e2a7943ddbfc8fe55babdbda0282b9`）。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 保留远端 D1 `user_session` / 并发 batch / 10 会话限制 / KV miss 自愈 / OAuth 脱敏与凭证迁移入口；新增 `v3_27DB` + `intDB` 持久哈希撤销表 `session_revocation`，阻止旧 KV/刷新恢复已登出单会话，并在 `persistSessionRecord` KV 写回时过滤已撤销令牌。
+    - [x] BYO / 邮件迁移及回滚范围在 SQL WHERE (`LIMIT` 前) 生效；严格校验 ID、游标与上限，显式 `[]` 保持空范围，`dryRun` 零写入。
+    - [x] 迁移、检查与回滚支持主键 cursor 续跑（`hasMore`/`nextCursor`/`inspectionComplete`），`encryption-status` 分离邮件 `cursor` 与 `byoCursor`；局部页与含非目标域记录时禁止声明 `fullyMigrated` 或可退役旧密钥。
+    - [x] 补齐真实 HTTP (`SELF.fetch`) `/api/logout` + 陈旧 KV 401/200、3 页 BYO/邮件回滚续跑与 `encryption-status` 双游标/400 参数校验测试。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] `mail-worker` Vitest（Node `24.13.0` / pnpm `10.34.5`）：干净独立全量运行 `57/57` 文件 `684/684` 通过 (`517.19s`)；定向 F1–F3 `5/5` 文件 `58/58` 通过 (`44.12s`)。（首次与历史密钥扫描并发时出现 1 例 20s 超时，单跑 `34/34` 与干净全量均通过）。
+    - [x] Node 明确范围 `270/270` (`5.73s`)、登录前端 `tsc` + `29/29`、双前端构建 + `wrangler deploy --dry-run` (438 assets)、i18n 四门禁、三包 `pnpm audit --prod --audit-level=high` (0 漏洞)、工作树密钥扫描 (1337 文件 0 命中) 与暂存文件检查全绿。
+    - [x] 本地全真栈与 Chromium 回归：`fullstack-smoke` `22/22`、`privacy-fullstack` `11/11`、`fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13`、`limited-beta` 3m 压测 `1800` 请求 0 非预期错误 (`readP95=51ms`, `authP95=565.65ms`)，进程与临时目录清理完成。
+    - [ ] 未通过/未执行项：`secret-scan --history --baseline .secret-scan-baseline.json` 命中远端既有 `d320ffb` 测试文件 `security-audit-fixes-2026-11-16.spec.js` 3 条未登记夹具指纹（本轮零新增）；CI 固定 Node `24.14.0`、`>=15m` 容量长稳、真实云环境与邮件服务商验收未执行；`userService.setType` / `removeSessionTokens` 全吊销一致性独立风险已单独登记。
+*   **追溯材料**: `doc/FIX-SESSION-AND-MIGRATIONS-2026-11-16.md`、`doc/DEVELOPMENT-AUDIT-2026-11-16.md`、`doc/verification-current.json`。
+
 ### EpoMail 顽固风险优化、D1+KV 并发会话闭环与生产历史密文全量迁移上线 (2026-11-16)
 *   **关联提交 (Git Commit)**: `c3c434ddc375d40fe95adcc11f5fde827293cd1e` (Short: `c3c434d`)
 *   **部署环境 (Deployment)**:

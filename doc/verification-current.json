@@ -1,0 +1,239 @@
+{
+  "schema": "epomail.handoff-verification.v1",
+  "reportDate": "2026-11-16",
+  "reportTimezone": "America/Los_Angeles",
+  "repository": "https://github.com/shijianus/epomail.git",
+  "branch": "fix/public-beta-go-blockers-2026-11-07",
+  "remoteBaseline": "89fbedf4fd1f49823a60ec3793cdb5cd5785aa07",
+  "codeCommit": "fe7373ced14ce60f0aa92634207d199ec6889a52",
+  "handoffSource": {
+    "reconstructedHandoffCodeCommit": "0a70ac62abb4b31b669cbf2eaf09699766727ccf",
+    "reconstructedHandoffRecordCommit": "189dd6d367e2a7943ddbfc8fe55babdbda0282b9",
+    "handoffZipSha256": "d2ef0a28ffe77f106287cc0277d083e7be90390432aeaa5f3c6b947d8fec45b1",
+    "oldCommitsUnavailable": [
+      "539c2a662f901cc361b8bdf598f46ff679fcfc5d",
+      "d7d3172b533f3268c4c149bbc41a1f1b81601316"
+    ],
+    "testedWorkerInputsSha256": "08cbb7bc3f6f95f67b891d3570e10d95242797c23404507b9161ebd3a505ca23",
+    "testedWorkerInputsAlgorithm": "sha256(JSON sorted relative-path -> file sha256 mapping for every file under mail-worker/src and mail-worker/test; compact separators)",
+    "changedCodeFilesSha256": [
+      { "path": "mail-worker/src/api/setting-api.js", "sha256": "5f4f44e1d5789cacacf342f6b59f3396ad3b52044080f6e93994b7a7b9900193" },
+      { "path": "mail-worker/src/index.js", "sha256": "c4c9f578583bcc6c229b07dc896bb21929669a859aac3391e6558f90b121f237" },
+      { "path": "mail-worker/src/init/init.js", "sha256": "cb2b0187e78606960068ae1b2c93b1ffb17f053bd09263ab155fa990bf90dc1c" },
+      { "path": "mail-worker/src/service/byo-storage-migration-service.js", "sha256": "776668e50e1ae26ac81679f49b0e7b87fe35827d823403ec108a6cd54467b1b4" },
+      { "path": "mail-worker/src/service/email-key-migration-service.js", "sha256": "6da2bf5e081654c8ebf7ed284007168927fc0239f7c21f27cef1ec95a8ae2851" },
+      { "path": "mail-worker/src/service/login-service.js", "sha256": "b701e4af84c4952e9eb283fa97027bd2d3a2d3ac058b2d3865e607d5ccfce986" },
+      { "path": "mail-worker/src/utils/jwt-utils.js", "sha256": "acf45262ed399d57e8c48443b2c2826f058df412bc1c58572c5059069e75f396" },
+      { "path": "mail-worker/src/utils/migration-page.js", "sha256": "7f5c786f07020415b229d003fe890587748d48089ac5e4a2ee02340c9297df5a" },
+      { "path": "mail-worker/src/utils/session-auth-store.js", "sha256": "14e82b0c91bb792ca94d6402e488090d60dc1290e53a5c86f51aa01334062059" },
+      { "path": "mail-worker/src/utils/session-revocation.js", "sha256": "73b023b70b8d4465a26e7c7cc023ab79f7a3011e80054af7706cecc35531bf2c" },
+      { "path": "mail-worker/test/migration-pagination.spec.js", "sha256": "135f86dad8f82d47974c2363e1c06debe4d50dbc469fd72054314aedb69e0499" },
+      { "path": "mail-worker/test/security-hardening.spec.js", "sha256": "6ead9bcc12b15544804beaf42508996a2f7f4152f3d0a8035c6466a000ffc51e" },
+      { "path": "mail-worker/test/session-revocation-handoff.spec.js", "sha256": "dbc93cfbe1661b437a8d4da176b3b25e1284f693eaba74e5a029d6ca51442adf" },
+      { "path": "mail-worker/test/setup-network.js", "sha256": "ebe0920e05c0c4f68e8c205ecb40d97480855ccff8cea9cbc79a29a212330ff8" }
+    ]
+  },
+  "environment": {
+    "node": "24.13.0",
+    "pnpm": "10.34.5",
+    "ciNodePinned": "24.14.0",
+    "ciRuntimeExactMatch": false,
+    "backend": "isolated local workerd/Miniflare D1 and KV",
+    "productionCredentialsUsed": false
+  },
+  "checks": [
+    {
+      "name": "frozen-installs",
+      "status": "PASS",
+      "commands": [
+        "corepack pnpm@10.34.5 install --frozen-lockfile",
+        "corepack pnpm@10.34.5 --dir mail-worker install --frozen-lockfile",
+        "corepack pnpm@10.34.5 --dir mail-vue install --frozen-lockfile",
+        "corepack pnpm@10.34.5 --dir temp_login_ui install --frozen-lockfile"
+      ]
+    },
+    {
+      "name": "worker-targeted-F1-F3",
+      "status": "PASS",
+      "command": "corepack pnpm@10.34.5 --dir mail-worker exec vitest run test/session-revocation-handoff.spec.js test/session-persistence.spec.js test/migration-pagination.spec.js test/security-hardening-p3.spec.js test/security-hardening.spec.js",
+      "files": 5,
+      "tests": 58,
+      "failed": 0,
+      "durationSeconds": 44.12
+    },
+    {
+      "name": "worker-full",
+      "status": "PASS",
+      "command": "corepack pnpm@10.34.5 --dir mail-worker test",
+      "files": 57,
+      "tests": 684,
+      "failed": 0,
+      "durationSeconds": 517.19,
+      "note": "Includes 13 F1-F3 regressions (5 in session-revocation-handoff.spec.js, 8 in migration-pagination.spec.js). Prior run overlapped with secret-scan --history and hit 1 20000ms timeout in oauth-identity-management.spec.js; standalone oauth-identity-management.spec.js passed 34/34 (94.09s) and clean full run passed 57/57 (684/684)."
+    },
+    {
+      "name": "node-regressions-explicit",
+      "status": "PASS",
+      "command": "TMPDIR=/tmp/epomail-verify-tmpdir node --test tests/*.test.mjs tests/helpers/*.test.mjs tests/test-i18n-gates.mjs",
+      "tests": 270,
+      "failed": 0,
+      "durationMs": 5731.230167
+    },
+    {
+      "name": "login-typecheck-and-tests",
+      "status": "PASS",
+      "commands": [
+        "corepack pnpm@10.34.5 --dir temp_login_ui run typecheck",
+        "corepack pnpm@10.34.5 --dir temp_login_ui test"
+      ],
+      "tests": 29,
+      "failed": 0,
+      "durationMs": 162.00444
+    },
+    {
+      "name": "frontend-build-and-worker-dry-run",
+      "status": "PASS_WITH_WARNINGS",
+      "command": "corepack pnpm@10.34.5 --dir mail-worker exec wrangler deploy --dry-run --outdir /tmp/epomail-verify-tmpdir/worker-dry-run",
+      "assets": 438,
+      "warnings": [
+        "Multiple Wrangler environments; no target environment specified"
+      ]
+    },
+    {
+      "name": "i18n-four-gates",
+      "status": "PASS_WITH_WARNING",
+      "commands": [
+        "node scripts/i18n-symmetry.mjs",
+        "node scripts/i18n-audit.mjs",
+        "node scripts/i18n-hardcoded.mjs",
+        "node scripts/i18n-auth-locale.mjs"
+      ],
+      "warnings": [
+        "11 login dictionary entries are unused in current code; gate still passes."
+      ]
+    },
+    {
+      "name": "fullstack-smoke",
+      "status": "PASS",
+      "command": "node tests/fullstack-smoke.mjs",
+      "tests": 22,
+      "cleanup": "complete"
+    },
+    {
+      "name": "privacy-fullstack",
+      "status": "PASS",
+      "command": "node tests/privacy-fullstack.mjs",
+      "tests": 11,
+      "cleanup": "complete"
+    },
+    {
+      "name": "fullstack-browser",
+      "status": "PASS",
+      "command": "node tests/fullstack-browser-e2e.mjs",
+      "tests": 11,
+      "cleanup": "complete"
+    },
+    {
+      "name": "oauth-login-browser-specific-suite",
+      "status": "PASS",
+      "command": "node tests/oauth-bind-login-ui-e2e.mjs",
+      "tests": 13
+    },
+    {
+      "name": "limited-beta-stress",
+      "status": "PASS",
+      "command": "node tests/backend-stress.mjs --profile=limited-beta --soak=3m --out=/tmp/epomail-verify-logs/backend-stress-limited-beta.json",
+      "soakMs": 180000,
+      "requests": 1800,
+      "errorCounts": {
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0
+      },
+      "slo": {
+        "readP95": {
+          "status": "pass",
+          "pass": true,
+          "p95": 51,
+          "thresholdMs": 2000
+        },
+        "auth": {
+          "p95": 565.65,
+          "thresholdMs": 8000,
+          "elapsedMs": 2632,
+          "pass": true,
+          "status": "positive-login-bounded-five-requests"
+        }
+      },
+      "cleanup": {
+        "processTreeStopped": true,
+        "temporaryDirectoryRemoved": true
+      }
+    },
+    {
+      "name": "dependency-audit-prod",
+      "status": "PASS",
+      "commands": [
+        "corepack pnpm@10.34.5 --dir mail-worker audit --registry=https://registry.npmjs.org --prod --audit-level=high",
+        "corepack pnpm@10.34.5 --dir mail-vue audit --registry=https://registry.npmjs.org --prod --audit-level=high",
+        "corepack pnpm@10.34.5 --dir temp_login_ui audit --registry=https://registry.npmjs.org --prod --audit-level=high"
+      ],
+      "findings": 0
+    },
+    {
+      "name": "working-tree-secret-scan",
+      "status": "PASS",
+      "command": "node scripts/secret-scan.mjs",
+      "filesScanned": 1337,
+      "findings": 0
+    },
+    {
+      "name": "history-secret-scan",
+      "status": "FAIL",
+      "command": "node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json",
+      "blobsScanned": 5023,
+      "findings": 3,
+      "note": "3 pre-existing findings in remote d320ffb test fixture file mail-worker/test/security-audit-fixes-2026-11-16.spec.js (fp=34d68a33646f2211, fp=8ee08e0289f74131) not registered in .secret-scan-baseline.json; 0 findings in F1-F3 commits."
+    },
+    {
+      "name": "staged-file-policy-and-secrets",
+      "status": "PASS",
+      "commands": [
+        "node scripts/check-staged-files.mjs",
+        "node scripts/scan-staged-secrets.mjs --self-test",
+        "node scripts/scan-staged-secrets.mjs --staged",
+        "git diff --cached --check"
+      ]
+    },
+    {
+      "name": "ci-pinned-Node-24.14.0",
+      "status": "NOT_RUN",
+      "reason": "Local environment provides Node 24.13.0 (/usr/bin/node) and Node 22.18.0 (/opt/nodejs); exact 24.14.0 unavailable."
+    },
+    {
+      "name": "capacity-soak-at-least-15-minutes",
+      "status": "NOT_RUN"
+    },
+    {
+      "name": "staging-production-real-provider-validation",
+      "status": "NOT_RUN",
+      "reason": "No real Cloudflare Staging/Production API calls, email provider validation, remote DB migration, deploy or key retirement performed."
+    }
+  ],
+  "unsuccessfulAttemptsPreserved": [
+    {
+      "name": "worker-full-with-concurrent-history-scan",
+      "status": "FAILED_UNDER_CPU_CONTENTION_THEN_PASSED",
+      "files": 57,
+      "passed": 683,
+      "failed": 1,
+      "cause": "oauth-identity-management.spec.js concurrent bind test hit 20000ms timeout while secret-scan.mjs --history was simultaneously scanning 5023 git blobs.",
+      "resolution": "Standalone oauth-identity-management.spec.js passed 34/34 (94.09s) and clean non-contended worker-full run passed 57/57 (684/684, 517.19s)."
+    }
+  ],
+  "releaseGate": "INCOMPLETE: CI-pinned Node 24.14.0, history secret baseline cleanup, >=15m capacity soak, and real Staging/Production/provider acceptance remain; local full-stack and browser verification pass."
+}
