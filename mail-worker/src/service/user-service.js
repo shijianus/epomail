@@ -1352,14 +1352,12 @@ const userService = {
 
 		await orm(c)
 			.update(user)
-			.set({ type })
+			.set({ type, authVersion: sql`coalesce(${user.authVersion}, 0) + 1` })
 			.where(eq(user.userId, userId))
 			.run();
 
 		await this.updateUserInfo(c, userId, true);
-		try {
-			await revokeAllUserSessions(c, userId, { ignoreKvError: true });
-		} catch (e) {}
+		await revokeAllUserSessions(c, userId, { ignoreKvError: true });
 	},
 
 	async getBlogLevelInfo(c, userId) {

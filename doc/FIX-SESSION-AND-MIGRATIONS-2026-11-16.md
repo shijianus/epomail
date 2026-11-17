@@ -23,9 +23,10 @@
 - 新令牌持久化拒绝重新插入已撤销 token，并在 KV 回写合并时过滤已撤销 token 与对应 `tokenMeta`，同时保留原有 D1 并发登录、容量裁剪和 KV 自愈能力。
 - 撤销至少保留默认会话寿命，并覆盖签名 JWT 实际 exp；仅对已过期记录进行维护清理。
 - 生产没有权威撤销库/表时会拒绝会话。纯内存 KV 的无 DB 测试辅助路径不构成生产认证降级。
-- **全吊销路径一致性核查说明**：
-  - 密码修改 (`resetPassword` / `setInitialPassword` / `adminSetPwd`)、OAuth 绑定/解绑及 TOTP/Passkey 变更均会递增 D1 `user.auth_version` 并调用 `revokeAllUserSessions`；账号封禁 (`setStatus(BAN)` / `audit-service`) 与删除会在 D1 更新 `status`/`is_del`，由 `security.js` 与 `userContext.requireSession` 直接校验 D1 状态。
-  - **独立风险留存**：`userService.setType`（角色变更）调用 `revokeAllUserSessions` 且吞掉异常、未递增 `auth_version`；`removeSessionTokens`（供 `oauthIdentityService.revokeProviderSessions` 使用）仅清理 `user_session` 与 KV，未写入 `session_revocation`；`revokeAllUserSessions` 亦不写入 `session_revocation`。若无 `auth_version` 递增保护（如 `setType`），陈旧 KV 副本仍可能被 `readAuthorizedSession` 命中而保留旧会话。该风险已独立登记，不得因单端登出通过而宣称全部吊销路径均已持久封堵。
+- **全吊销路径一致性加固与剩余边界**：
+  - 密码修改 (`resetPassword` / `setInitialPassword` / `adminSetPwd`)、OAuth 绑定/解绑、TOTP/Passkey 变更及**角色变更 (`userService.setType`)** 均已递增 D1 `user.auth_version` 并调用 `revokeAllUserSessions`；账号封禁 (`setStatus(BAN)` / `audit-service`) 与删除会在 D1 更新 `status`/`is_del`，由 `security.js` 与 `userContext.requireSession` 直接校验 D1 状态。
+  - `removeSessionTokens`（供 `oauthIdentityService.revokeProviderSessions` 使用）现已同步调用 `revokeSessionToken` 将被吊销的令牌写入 `session_revocation`，不再仅依赖 KV 删除。
+  - 边界说明：`revokeAllUserSessions` 仍通过清理 `user_session` + KV 与调用方的 `auth_version`/`status`/`is_del` 变更生效，未逐条展开写入 `session_revocation`；仅当未来存在“调用 `revokeAllUserSessions` 却既不改 `auth_version` 也不改 `status`/`is_del`”的新路径时才需额外补入。
 
 ## F2：范围在 SQL 层生效
 

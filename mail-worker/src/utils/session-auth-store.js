@@ -363,6 +363,7 @@ export async function removeSessionTokens(c, userId, shouldDrop) {
 				}
 			}
 			for (const tok of dbDrops) {
+				await revokeSessionToken(c, userId, tok);
 				await db.prepare('DELETE FROM user_session WHERE user_id = ? AND token = ?')
 					.bind(Number(userId), tok).run();
 			}
@@ -381,6 +382,11 @@ export async function removeSessionTokens(c, userId, shouldDrop) {
 			}
 		}
 		if (drop.size === 0) return droppedSet.size;
+		if (db) {
+			for (const token of drop) {
+				await revokeSessionToken(c, userId, token);
+			}
+		}
 		const tokens = normalizeTokens(current.tokens).filter(token => !drop.has(token));
 		const nextMeta = { ...metaMap };
 		for (const token of drop) delete nextMeta[token];

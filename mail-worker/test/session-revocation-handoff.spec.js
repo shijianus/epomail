@@ -2,7 +2,7 @@ import { env, SELF } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import { ensureSessionRevocationSchema, isSessionRevoked } from '../src/utils/session-revocation.js';
-import { persistSessionRecord, readAuthorizedSession, refreshSessionAuthInfo, removeSessionToken } from '../src/utils/session-auth-store.js';
+import { persistSessionRecord, readAuthorizedSession, refreshSessionAuthInfo, removeSessionToken, removeSessionTokens } from '../src/utils/session-auth-store.js';
 import { dbInit } from '../src/init/init.js';
 
 const uid = 885100;
@@ -137,6 +137,75 @@ describe('durable revocation over remote D1+KV hybrid sessions', () => {
 			await env.db.prepare('DELETE FROM session_revocation WHERE user_id=?').bind(apiUid).run().catch(() => {});
 			await env.db.prepare('DELETE FROM user_session WHERE user_id=?').bind(apiUid).run().catch(() => {});
 			await env.db.prepare('DELETE FROM user WHERE user_id=?').bind(apiUid).run().catch(() => {});
+		}
+	});
+
+	it('durably revokes removeSessionTokens drops and increments auth_version on userService.setType', async () => {
+		const { kv, snapshot } = cache();
+		const c = { env: { ...env, kv } };
+		const stale = snapshot();
+		await persistSessionRecord(c, uid, stale, 'test-old-token');
+		await persistSessionRecord(c, uid, stale, 'test-keep-token');
+		const oldJwt = await jwtUtils.generateToken(c, { userId: uid, token: 'test-old-token' });
+		const dropped = await removeSessionTokens(c, uid, token => token === 'test-old-token');
+		expect(dropped).toBe(1);
+		await kv.put('ignored', JSON.stringify(stale));
+		expect(await isSessionRevoked(c, uid, 'test-old-token')).toBe(true);
+		expect(await jwtUtils.verifyToken(c, oldJwt)).toBeNull();
+		expect(await readAuthorizedSession(c, uid, 'test-old-token')).toBeNull();
+		expect(await readAuthorizedSession(c, uid, 'test-keep-token')).toBeTruthy();
+
+		const roleUid = 885102;
+		const kvKey = `auth-uid:${roleUid}`;
+		const state = new Map();
+		await dbInit.init({
+			env: { ...env, admin_initial_password: 'test-bootstrap-password-only' },
+			req: { method: 'POST', header: () => env.jwt_secret },
+			get: key => state.get(key),
+			set: (key, value) => state.set(key, value),
+			text: text => text
+		});
+		const roles = await env.db.prepare('SELECT role_id FROM role ORDER BY role_id ASC LIMIT 2').all();
+		const adminRow = await env.db.prepare("SELECT user_id, email, type, auth_version FROM user WHERE email=?").bind(String(env.admin || 'admin@example.com').trim().toLowerCase()).first();
+		const adminTok = 'test-role-admin-tok';
+		const adminKvKey = `auth-uid:${adminRow.user_id}`;
+		try {
+			await env.db.prepare(
+				"INSERT INTO user(user_id,email,type,password,salt,status,is_del,auth_version) VALUES (?,?,?,'test-unused','test-unused',0,0,0)"
+			).bind(roleUid, 'role-revoke@example.test', roles.results[0].role_id).run();
+			const tok = 'test-role-change-tok';
+			const sessionPayload = {
+				tokens: [tok],
+				user: { userId: roleUid, email: 'role-revoke@example.test', type: roles.results[0].role_id, status: 0, isDel: 0, authVersion: 0 },
+				refreshTime: new Date().toISOString()
+			};
+			await persistSessionRecord({ env }, roleUid, sessionPayload, tok);
+			await persistSessionRecord({ env }, adminRow.user_id, {
+				tokens: [adminTok],
+				user: { userId: adminRow.user_id, email: adminRow.email, type: adminRow.type, status: 0, isDel: 0, authVersion: adminRow.auth_version || 0 },
+				refreshTime: new Date().toISOString()
+			}, adminTok);
+			const staleKv = await env.kv.get(kvKey);
+			const jwt = await jwtUtils.generateToken({ env }, { userId: roleUid, token: tok, authVersion: 0 });
+			const adminJwt = await jwtUtils.generateToken({ env }, { userId: adminRow.user_id, token: adminTok, authVersion: adminRow.auth_version || 0 });
+			const setTypeRes = await SELF.fetch('https://example.test/api/user/setType', {
+				method: 'PUT',
+				headers: { Authorization: `Bearer ${adminJwt}`, 'Content-Type': 'application/json' },
+				body: JSON.stringify({ userId: roleUid, type: roles.results[1]?.role_id || roles.results[0].role_id })
+			});
+			expect((await setTypeRes.json()).code).toBe(200);
+			// Restore stale KV even if kv.delete succeeded; auth_version bump must still block old JWT.
+			await env.kv.put(kvKey, staleKv);
+			const afterRoleChange = await SELF.fetch('https://example.test/api/my/loginUserInfo', {
+				headers: { Authorization: `Bearer ${jwt}` }
+			});
+			expect((await afterRoleChange.json()).code).toBe(401);
+		} finally {
+			await env.kv.delete(kvKey).catch(() => {});
+			await env.kv.delete(adminKvKey).catch(() => {});
+			await env.db.prepare('DELETE FROM session_revocation WHERE user_id IN (?, ?)').bind(roleUid, adminRow.user_id).run().catch(() => {});
+			await env.db.prepare('DELETE FROM user_session WHERE user_id IN (?, ?)').bind(roleUid, adminRow.user_id).run().catch(() => {});
+			await env.db.prepare('DELETE FROM user WHERE user_id=?').bind(roleUid).run().catch(() => {});
 		}
 	});
 });

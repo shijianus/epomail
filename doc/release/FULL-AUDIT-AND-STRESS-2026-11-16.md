@@ -1,7 +1,7 @@
 # Epocanvas Mail — 深度安全审计、Cloudflare 真实环境全链路验证与生产上线报告 (2026-11-16)
 
-> **代码加固提交 (Code Commit)**: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0` (`d320ffb`, Branch: `fix/public-beta-go-blockers-2026-11-07`)  
-> **线上生产部署 (Production Worker `epomail`)**: Version ID `a0408c1a-0234-4b1a-8dd9-ca805ab59767` (Tag: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0`)  
+> **代码加固提交 (Code Commit)**: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0` (`d320ffb`, Branch: `fix/public-beta-go-blockers-2026-11-07`)
+> **线上生产部署 (Production Worker `epomail`)**: Version ID `a0408c1a-0234-4b1a-8dd9-ca805ab59767` (Tag: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0`)
 > **预发布沙箱验证 (Staging Worker `epomail-staging`)**: Version IDs `62912e7c-1593-4cc6-95a4-de64e1694096`（全功能+4阶段压测） / `371e907c-c853-44f9-855b-c81c36c8aef2`（抖动重试优化复测与浏览器E2E）
 
 ---
