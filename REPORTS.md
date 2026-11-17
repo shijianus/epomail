@@ -9,20 +9,20 @@
 
 ---
 
-### EpoMail — F1–F3 交接同步、补充加固与全真栈验收审计 (2026-11-16)
-*   **关联提交 (Git Commit)**: `fe7373ced14ce60f0aa92634207d199ec6889a52` (Short: `fe7373c`)
+### EpoMail — F1–F3 交接同步、全吊销路径加固与 CI 门禁清零审计 (2026-11-16)
+*   **关联提交 (Git Commit)**: `e861810a867f911456a7d759a220cfeb13254449` (Short: `e861810`；前置代码提交 `fe7373ced14ce60f0aa92634207d199ec6889a52`)
 *   **专项文档索引 (Detailed Doc)**: [远端开发状态复核](doc/DEVELOPMENT-AUDIT-2026-11-16.md)、[修复与迁移说明](doc/FIX-SESSION-AND-MIGRATIONS-2026-11-16.md)、[本轮验证明细](doc/verification-current.json)。
 *   **体检/审计范围与方法 (Scope & Methodology)**:
-    1. 接收时远端最新分支仍为 `fix/public-beta-go-blockers-2026-11-07` (`89fbedf4fd1f49823a60ec3793cdb5cd5785aa07`)；完整校验并合入交接包 (`0a70ac6` / `189dd6d`)，保留 `c3c434d` 全部 D1+KV 会话与 OAuth/凭证迁移能力。
-    2. 本轮在 Node `24.13.0` / pnpm `10.34.5` 的隔离本地环境独立复验（`testedWorkerInputsSha256: 08cbb7bc3f6f95f67b891d3570e10d95242797c23404507b9161ebd3a505ca23`）。
+    1. 接收时远端最新分支为 `fix/public-beta-go-blockers-2026-11-07` (`89fbedf4fd1f49823a60ec3793cdb5cd5785aa07`)；完整校验并合入交接包 (`0a70ac6` / `189dd6d`)，保留 `c3c434d` 全部 D1+KV 会话与 OAuth/凭证迁移能力。
+    2. 针对初次推送 (`84f09a0`) 暴露的远端 CI 两项失败（`Quality Gates / Diff hygiene` 与 `Security Audit / secret-scan --history`）及全吊销路径一致性风险进行专项修复与复验（Worker 输入指纹 `a7a952c351f1179c3e3722bd0562fe25732fb8ed6c1db5cc3cb159243ea0edf0`）。
 *   **核心发现与缺陷矩阵 (Key Findings & Matrix)**:
-    - **[F1·已合入并补充]**: 权威 SHA-256 撤销 (`v3_27DB` + `intDB`) 优先于旧 KV / D1 正向自愈，真实 HTTP `/api/logout` 实测返回 `401`（另端保活 `200`）；已补充 `persistSessionRecord` KV 写回过滤。**独立风险**：`userService.setType` 未递增 `auth_version` 且吞掉 `revokeAllUserSessions` 异常、`removeSessionTokens` 不写 `session_revocation`，仍需后续收敛。
+    - **[F1·已合入并加固]**: 权威 SHA-256 撤销 (`v3_27DB` + `intDB`) 优先于旧 KV / D1 正向自愈，真实 HTTP `/api/logout` 返回 `401`（另端保活 `200`）；已补充 `persistSessionRecord` KV 写回过滤、`userService.setType` 递增 `auth_version` 及 `removeSessionTokens` 写入 `session_revocation`。
     - **[F2·已合入]**: BYO `userIds` 与邮件 `userId`/`emailIds` 在 SQL WHERE 先筛选再 `LIMIT`，严格校验与显式 `[]` 零误扩范围。
-    - **[F3·已合入并补充]**: 主键游标续跑、`encryption-status` 独立双游标、3 页回滚续跑与 `otherDomainRows`/`otherDomainEncryptedRows` 完成态约束全部到位。
-    - **[P1·历史扫描阻断项]**: `secret-scan --history` 命中远端既有 `d320ffb` 测试文件 `mail-worker/test/security-audit-fixes-2026-11-16.spec.js` 的 3 条未登记夹具指纹（本轮零新增）。
+    - **[F3·已合入并加固]**: 主键游标续跑、`encryption-status` 独立双游标、3 页回滚续跑与 `otherDomainRows`/`otherDomainEncryptedRows` 完成态约束全部到位。
+    - **[CI·已修复]**: 清理 `doc/release/FULL-AUDIT-AND-STRESS-2026-11-16.md` 尾随空格消除 PR #2 `Diff hygiene` 失败；在 `.secret-scan-baseline.json` 合规登记 `d320ffb` 中已被 `c3c434d` 中和的 `security-audit-fixes-2026-11-16.spec.js` 2 条测试夹具指纹，全历史扫描 `5023` blobs 转绿。
 *   **治理修复与回归结果 (Fixes & Verification)**:
-    - Worker `57/57` (`684/684`)、Node `270/270`、登录 `tsc` + `29/29`、构建/dry-run (438 assets)、i18n 四门禁、三包 `pnpm audit` (0 漏洞)、工作树密钥扫描、冒烟 `22/22`、隐私 `11/11`、**Chromium `fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13`** 与 `limited-beta` 3m 压测 `1800` 请求 (0 非预期错误) 全部通过。
-    - CI 固定 Node `24.14.0`、`>=15m` 容量长稳、真实 Cloudflare Staging/Production 与邮件服务商验收仍未执行；本轮未执行线上部署与密钥退役。
+    - Worker `57/57` (`685/685`)、Node `270/270`、登录 `tsc` + `29/29`、构建/dry-run (438 assets)、i18n 四门禁、三包 `pnpm audit` (0 漏洞)、工作树与全历史密钥扫描 (5023 blobs 0 命中)、`git diff --check f01db11...HEAD`、冒烟 `22/22`、隐私 `11/11`、Chromium `fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13` 与 `limited-beta` 3m 压测 `1800` 请求 (0 非预期错误) 全部通过。
+    - CI 固定 Node `24.14.0`（待远端 Actions 完成确认）、`>=15m` 容量长稳、真实 Cloudflare Staging/Production 与邮件服务商验收仍未执行；本轮未执行线上部署与密钥退役。
 
 ---
 

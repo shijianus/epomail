@@ -5,8 +5,9 @@
   "repository": "https://github.com/shijianus/epomail.git",
   "branch": "fix/public-beta-go-blockers-2026-11-07",
   "remoteBaseline": "89fbedf4fd1f49823a60ec3793cdb5cd5785aa07",
-  "codeCommit": "fe7373ced14ce60f0aa92634207d199ec6889a52",
+  "codeCommit": "e861810a867f911456a7d759a220cfeb13254449",
   "handoffSource": {
+    "priorLocalCodeCommit": "fe7373ced14ce60f0aa92634207d199ec6889a52",
     "reconstructedHandoffCodeCommit": "0a70ac62abb4b31b669cbf2eaf09699766727ccf",
     "reconstructedHandoffRecordCommit": "189dd6d367e2a7943ddbfc8fe55babdbda0282b9",
     "handoffZipSha256": "d2ef0a28ffe77f106287cc0277d083e7be90390432aeaa5f3c6b947d8fec45b1",
@@ -14,7 +15,7 @@
       "539c2a662f901cc361b8bdf598f46ff679fcfc5d",
       "d7d3172b533f3268c4c149bbc41a1f1b81601316"
     ],
-    "testedWorkerInputsSha256": "08cbb7bc3f6f95f67b891d3570e10d95242797c23404507b9161ebd3a505ca23",
+    "testedWorkerInputsSha256": "a7a952c351f1179c3e3722bd0562fe25732fb8ed6c1db5cc3cb159243ea0edf0",
     "testedWorkerInputsAlgorithm": "sha256(JSON sorted relative-path -> file sha256 mapping for every file under mail-worker/src and mail-worker/test; compact separators)",
     "changedCodeFilesSha256": [
       { "path": "mail-worker/src/api/setting-api.js", "sha256": "5f4f44e1d5789cacacf342f6b59f3396ad3b52044080f6e93994b7a7b9900193" },
@@ -23,13 +24,14 @@
       { "path": "mail-worker/src/service/byo-storage-migration-service.js", "sha256": "776668e50e1ae26ac81679f49b0e7b87fe35827d823403ec108a6cd54467b1b4" },
       { "path": "mail-worker/src/service/email-key-migration-service.js", "sha256": "6da2bf5e081654c8ebf7ed284007168927fc0239f7c21f27cef1ec95a8ae2851" },
       { "path": "mail-worker/src/service/login-service.js", "sha256": "b701e4af84c4952e9eb283fa97027bd2d3a2d3ac058b2d3865e607d5ccfce986" },
+      { "path": "mail-worker/src/service/user-service.js", "sha256": "8a24c70688a90ddab7cde9d8318ba36e2900e08a7563d893854d0ebbe9c487e0" },
       { "path": "mail-worker/src/utils/jwt-utils.js", "sha256": "acf45262ed399d57e8c48443b2c2826f058df412bc1c58572c5059069e75f396" },
       { "path": "mail-worker/src/utils/migration-page.js", "sha256": "7f5c786f07020415b229d003fe890587748d48089ac5e4a2ee02340c9297df5a" },
-      { "path": "mail-worker/src/utils/session-auth-store.js", "sha256": "14e82b0c91bb792ca94d6402e488090d60dc1290e53a5c86f51aa01334062059" },
+      { "path": "mail-worker/src/utils/session-auth-store.js", "sha256": "e446f0cd572f3064fd1827ceb0836362a966d74addfa5830963d2e426f2e53a9" },
       { "path": "mail-worker/src/utils/session-revocation.js", "sha256": "73b023b70b8d4465a26e7c7cc023ab79f7a3011e80054af7706cecc35531bf2c" },
       { "path": "mail-worker/test/migration-pagination.spec.js", "sha256": "135f86dad8f82d47974c2363e1c06debe4d50dbc469fd72054314aedb69e0499" },
       { "path": "mail-worker/test/security-hardening.spec.js", "sha256": "6ead9bcc12b15544804beaf42508996a2f7f4152f3d0a8035c6466a000ffc51e" },
-      { "path": "mail-worker/test/session-revocation-handoff.spec.js", "sha256": "dbc93cfbe1661b437a8d4da176b3b25e1284f693eaba74e5a029d6ca51442adf" },
+      { "path": "mail-worker/test/session-revocation-handoff.spec.js", "sha256": "d3283b22cc26f49da530a5c1a14c904da8e49128ef94a1da762f830ecd91e932" },
       { "path": "mail-worker/test/setup-network.js", "sha256": "ebe0920e05c0c4f68e8c205ecb40d97480855ccff8cea9cbc79a29a212330ff8" }
     ]
   },
@@ -66,10 +68,10 @@
       "status": "PASS",
       "command": "corepack pnpm@10.34.5 --dir mail-worker test",
       "files": 57,
-      "tests": 684,
+      "tests": 685,
       "failed": 0,
-      "durationSeconds": 517.19,
-      "note": "Includes 13 F1-F3 regressions (5 in session-revocation-handoff.spec.js, 8 in migration-pagination.spec.js). Prior run overlapped with secret-scan --history and hit 1 20000ms timeout in oauth-identity-management.spec.js; standalone oauth-identity-management.spec.js passed 34/34 (94.09s) and clean full run passed 57/57 (684/684)."
+      "durationSeconds": 522.32,
+      "note": "Includes 14 F1-F3 regressions (6 in session-revocation-handoff.spec.js, 8 in migration-pagination.spec.js)."
     },
     {
       "name": "node-regressions-explicit",
@@ -77,7 +79,7 @@
       "command": "TMPDIR=/tmp/epomail-verify-tmpdir node --test tests/*.test.mjs tests/helpers/*.test.mjs tests/test-i18n-gates.mjs",
       "tests": 270,
       "failed": 0,
-      "durationMs": 5731.230167
+      "durationMs": 6807.044765
     },
     {
       "name": "login-typecheck-and-tests",
@@ -188,16 +190,16 @@
       "name": "working-tree-secret-scan",
       "status": "PASS",
       "command": "node scripts/secret-scan.mjs",
-      "filesScanned": 1337,
+      "filesScanned": 1344,
       "findings": 0
     },
     {
       "name": "history-secret-scan",
-      "status": "FAIL",
+      "status": "PASS",
       "command": "node scripts/secret-scan.mjs --history --baseline .secret-scan-baseline.json",
       "blobsScanned": 5023,
-      "findings": 3,
-      "note": "3 pre-existing findings in remote d320ffb test fixture file mail-worker/test/security-audit-fixes-2026-11-16.spec.js (fp=34d68a33646f2211, fp=8ee08e0289f74131) not registered in .secret-scan-baseline.json; 0 findings in F1-F3 commits."
+      "findings": 0,
+      "note": "Registered the 2 neutralized synthetic dummy fixture fingerprints from d320ffb (mail-worker/test/security-audit-fixes-2026-11-16.spec.js) in .secret-scan-baseline.json."
     },
     {
       "name": "staged-file-policy-and-secrets",
