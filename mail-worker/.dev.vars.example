@@ -6,6 +6,8 @@
 jwt_secret=<your-strong-random-secret>
 # TOTP 两步验证密钥加密主键 (建议 32 字节以上强随机字符串)
 totp_enc_key=<your-strong-random-totp-master-key>
+# OAuth Client Secret 独立信封加密主键 (生产/Staging 必需)
+oauth_client_enc_key=<your-strong-random-oauth-client-encryption-key>
 # 首次 /init 创建站长账号时使用；生产环境必须设置，禁用固定弱默认口令
 admin_initial_password=<your-strong-initial-admin-password>
 # 可选的独立初始化门禁密钥；不设置时回退到 jwt_secret。建议生产单独设置。
@@ -16,5 +18,7 @@ scheduled_secret=<your-strong-scheduled-secret>
 resend_webhook_secret=<whsec_your_webhook_signing_secret>
 # 可选：允许跨域访问 API 的前端源（逗号分隔）。未设置时仅允许同源。
 CORS_ORIGINS=
-# 可选：邮件静态加密主键；不设置时回退到 totp_enc_key
+# 可选：邮件静态加密主键（强建议生产独立配置，不与 jwt_secret/totp_enc_key 混用）
 email_enc_key=<your-optional-email-encryption-key>
+# 可选：BYO S3 凭据独立 AEAD 加密主键（生产强建议单独配置）
+storage_enc_key=<your-optional-byo-storage-encryption-key>

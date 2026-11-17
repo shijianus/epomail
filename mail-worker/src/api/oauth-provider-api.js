@@ -2,6 +2,36 @@ import app from '../hono/hono';
 import result from '../model/result';
 import oauthProviderService from '../service/oauth-provider-service';
 import rateLimit from '../utils/rate-limit.js';
+import safeLogger from '../utils/safe-logger.js';
+import BizError from '../error/biz-error.js';
+import readJsonObject from '../utils/request-body.js';
+
+const OAUTH_ERROR_DESCRIPTIONS = {
+	invalid_request: 'The request is invalid',
+	invalid_client: 'Client authentication failed',
+	invalid_grant: 'The authorization grant is invalid or expired',
+	invalid_token: 'The access token is invalid or expired',
+	unauthorized_client: 'The client is not authorized',
+	unsupported_grant_type: 'The grant type is not supported',
+	unsupported_token_type: 'The token type is not supported',
+	invalid_scope: 'The requested scope is invalid'
+};
+
+function safeOauthError(err, fallbackCode = 'invalid_request') {
+	const raw = typeof err?.message === 'string' ? err.message : '';
+	const match = raw.match(/^(invalid_request|invalid_client|invalid_grant|invalid_token|unauthorized_client|unsupported_grant_type|unsupported_token_type|invalid_scope)\b/i);
+	const code = (match?.[1] || fallbackCode).toLowerCase();
+	if (!match || !OAUTH_ERROR_DESCRIPTIONS[code]) {
+		safeLogger.error('oauth_provider_endpoint_error', {
+			errorName: typeof err?.name === 'string' ? err.name : 'Error',
+			status: Number.isInteger(err?.status) ? err.status : (Number.isInteger(err?.code) ? err.code : 500)
+		});
+	}
+	return {
+		error: OAUTH_ERROR_DESCRIPTIONS[code] ? code : fallbackCode,
+		error_description: OAUTH_ERROR_DESCRIPTIONS[code] || 'Request failed'
+	};
+}
 
 // 1. 获取待授权应用信息与用户状态 (内部前端 /oauth/authorize 页面使用)
 app.get('/oauth/authorize/info', async (c) => {
@@ -12,7 +42,7 @@ app.get('/oauth/authorize/info', async (c) => {
 
 // 2. 确认授权并签发临时 code
 app.post('/oauth/authorize', async (c) => {
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const authRes = await oauthProviderService.authorize(c, body);
 	return c.json(result.ok(authRes));
 });
@@ -32,6 +62,9 @@ async function parseTokenParams(c) {
 			const form = await c.req.parseBody().catch(() => ({}));
 			params = { ...form };
 		}
+	}
+	if (!params || typeof params !== 'object' || Array.isArray(params)) {
+		throw new BizError('JSON request body must be an object', 400, 'INVALID_JSON');
 	}
 
 	// 兼容 Basic Auth (Authorization: Basic base64(client_id:client_secret))
@@ -59,10 +92,11 @@ const handleToken = async (c) => {
 		const tokenData = await oauthProviderService.token(c, params);
 		return c.json(tokenData);
 	} catch (err) {
-		const status = err.status || (err.message && err.message.includes('invalid_client') ? 401 : 400);
+		const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 500
+			? err.status
+			: (String(err?.message || '').startsWith('invalid_client') ? 401 : 400);
 		return c.json({
-			error: err.message?.split(':')[0] || 'invalid_request',
-			error_description: err.message || 'Token exchange failed'
+			...safeOauthError(err, 'invalid_request')
 		}, status);
 	}
 };
@@ -78,10 +112,7 @@ const handleUserInfo = async (c) => {
 		const userInfo = await oauthProviderService.userInfo(c, token);
 		return c.json(userInfo);
 	} catch (err) {
-		return c.json({
-			error: 'invalid_token',
-			error_description: err.message || 'Invalid or expired token'
-		}, 401);
+		return c.json(safeOauthError(err, 'invalid_token'), 401);
 	}
 };
 

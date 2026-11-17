@@ -10,6 +10,7 @@ import app from '../hono/hono';
 import { isAdminUser } from '../utils/admin-utils';
 import { getUserDb } from '../utils/db-accessor.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
+import { refreshSessionAuthInfo, readAuthorizedSession, revokeAllUserSessions } from '../utils/session-auth-store.js';
 
 const exclude = [
 	'/login',
@@ -86,6 +87,12 @@ const requirePerms = [
 	'/setting/storage/scan',
 	'/setting/storage/cleanup',
 	'/setting/storage/orphans/cleanup',
+	'/setting/security/encryption-status',
+	'/setting/security/email-key/migrate',
+	'/setting/security/email-key/rollback',
+	'/setting/security/byo-storage/migrate',
+	'/setting/security/byo-storage/rollback',
+	'/setting/security/oauth-apps/migrate',
 	'/oauth/verify',
 	'/my/delete',
 	'/audit/list',
@@ -118,12 +125,15 @@ const premKey = {
 	'user:delete': ['/user/delete','/user/deleteAccount', '/user/purgeEmails'],
 	'all-email:query': ['/allEmail/list','/allEmail/latest','/allEmail/outbound/unknown'],
 	'all-email:delete': ['/allEmail/delete','/allEmail/batchDelete','/allEmail/outbound/resolve'],
-	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig', '/audit/list', '/audit/circuit-breaker', '/audit/outbox/list'],
+	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig', '/setting/security/encryption-status', '/audit/list', '/audit/circuit-breaker', '/audit/outbox/list'],
 	'setting:set': [
 		'/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist',
 		'/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status', '/admin/oauthApp/delete',
 		'/setting/sendWelcomeEmail', '/setting/sendGlobalEmail', '/setting/globalEmailConfig',
 		'/setting/ai/test', '/setting/ai/models', '/setting/s3/test', '/setting/db/test', '/setting/storage/scan', '/setting/storage/cleanup', '/setting/storage/orphans/cleanup',
+		'/setting/security/email-key/migrate', '/setting/security/email-key/rollback',
+		'/setting/security/byo-storage/migrate', '/setting/security/byo-storage/rollback',
+		'/setting/security/oauth-apps/migrate',
 		'/oauth/verify',
 		'/audit/action', '/audit/adjudicate', '/audit/purge', '/audit/circuit-breaker',
 		'/audit/outbox/list', '/audit/outbox/retry', '/audit/outbox/process'
@@ -180,7 +190,7 @@ app.use('*', async (c, next) => {
 	if (loginEmail) {
 		c.set('loginEmail', loginEmail);
 	}
-	const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+	let authInfo = await readAuthorizedSession(c, userId, token);
 
 	if (!authInfo || !authInfo.user || !Array.isArray(authInfo.tokens)) {
 		throw new BizError(t('authExpired'), 401);
@@ -194,7 +204,7 @@ app.use('*', async (c, next) => {
 	if (authInfo.maxSessionEpoch) {
 		const nowSec = Math.floor(Date.now() / 1000);
 		if (nowSec >= authInfo.maxSessionEpoch) {
-			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+			await revokeAllUserSessions(c, userId);
 			throw new BizError(t('authExpired'), 401);
 		}
 	}
@@ -204,7 +214,7 @@ app.use('*', async (c, next) => {
 	).bind(userId).first();
 
 	if (!currentUser || Number(currentUser.is_del) !== 0) {
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId).catch(() => {});
+		await revokeAllUserSessions(c, userId, { ignoreKvError: true });
 		throw new BizError(t('authExpired'), 401);
 	}
 
@@ -213,7 +223,7 @@ app.use('*', async (c, next) => {
 	}
 
 	if (Number(currentUser.status) !== 0) {
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId).catch(() => {});
+		await revokeAllUserSessions(c, userId, { ignoreKvError: true });
 		throw new BizError(t('isBanUser'), 403);
 	}
 
@@ -249,7 +259,8 @@ app.use('*', async (c, next) => {
 	if (!nowTime.isSame(refreshTime)) {
 		authInfo.refreshTime = dayjs().toISOString();
 		await userService.updateUserInfo(c, authInfo.user.userId);
-		await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		const refreshed = await refreshSessionAuthInfo(c, userId, authInfo);
+		if (refreshed?.user) authInfo = refreshed;
 	}
 
 	c.set('user', authInfo.user)

@@ -7,7 +7,7 @@ const authKey = `auth-uid:${userId}`;
 
 beforeAll(async () => {
 	await env.db.prepare(`CREATE TABLE IF NOT EXISTS user (
-		user_id INTEGER PRIMARY KEY, email TEXT NOT NULL, type INTEGER NOT NULL DEFAULT 1,
+		user_id INTEGER PRIMARY KEY, email TEXT NOT NULL, password TEXT NOT NULL DEFAULT 'dummy', salt TEXT NOT NULL DEFAULT 'dummy', type INTEGER NOT NULL DEFAULT 1,
 		is_del INTEGER NOT NULL DEFAULT 0, status INTEGER NOT NULL DEFAULT 0,
 		auth_version INTEGER NOT NULL DEFAULT 0
 	)`).run();
@@ -20,7 +20,7 @@ afterEach(async () => {
 
 async function createSession({ deleted = 0, disabled = 0, exists = true } = {}) {
 	if (exists) {
-		await env.db.prepare('INSERT INTO user (user_id, email, type, is_del, status) VALUES (?, ?, 1, ?, ?)')
+		await env.db.prepare('INSERT INTO user (user_id, email, password, salt, type, is_del, status) VALUES (?, ?, "dummy_pw", "dummy_salt", 1, ?, ?)')
 			.bind(userId, 'session-privacy@example.com', deleted, disabled).run();
 	}
 	await env.kv.put(authKey, JSON.stringify({

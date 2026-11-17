@@ -149,7 +149,10 @@ async function scenario(name, fn) {
   }
 }
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+        headless: true,
+        executablePath: process.env.EPOMAIL_CHROMIUM_PATH || undefined
+    });
 try {
   await scenario('valid bind return builds a proof-bound request and signs in', async () => {
     const { context, page, requests } = await openPage(browser, {

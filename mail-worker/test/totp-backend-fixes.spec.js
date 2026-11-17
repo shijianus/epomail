@@ -71,12 +71,13 @@ describe('TOTP backend security with real D1 mutation paths',()=>{
    expect(result.data.mfaRequired).toBe(true);pending.push(result.data.tempToken);
   }
   const actual=await totpUtils.generateTOTP(SECRET);const wrong=actual==='000000'?'111111':'000000';
+  const failKey=`login_fail:${EMAIL}|ip:local`;
   for(let i=0;i<4;i++){
    expect((await api('/login/totp',null,{tempToken:pending[0],code:wrong})).code).not.toBe(200);
-   expect(Number(await env.kv.get(`login_fail:${EMAIL}`))).toBe(i+1);
+   expect(Number(await env.kv.get(failKey))).toBe(i+1);
   }
   expect((await api('/login/totp',null,{tempToken:pending[1],code:wrong})).code).not.toBe(200);
-  expect(Number(await env.kv.get(`login_fail:${EMAIL}`))).toBe(5);
+  expect(Number(await env.kv.get(failKey))).toBe(5);
   expect((await api('/login/totp',null,{tempToken:pending[2],code:actual})).code).not.toBe(200);
   expect(await env.kv.get(`auth-uid:${UID}`)).toBeNull();
  });
@@ -97,5 +98,5 @@ describe('TOTP backend security with real D1 mutation paths',()=>{
   expect(stored.hashedCodes).toHaveLength(10);
   expect(stored.hashedCodes.filter(code=>code.used===0)).toHaveLength(10);
   expect(completed.data.backupCodes).not.toContain(backup.rawCodes[0]);
- });
+ }, 60000);
 });

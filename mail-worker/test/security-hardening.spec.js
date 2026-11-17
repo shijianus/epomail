@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { env as workerEnv } from 'cloudflare:test';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import hashUtils from '../src/utils/hash-utils.js';
 import emailCryptoUtils from '../src/utils/email-crypto-utils.js';
@@ -19,6 +20,7 @@ import accountService from '../src/service/account-service.js';
 import loginService from '../src/service/login-service.js';
 import rateLimit from '../src/utils/rate-limit.js';
 import cryptoUtils from '../src/utils/crypto-utils.js';
+import { isConfiguredDomain } from '../src/utils/email-utils.js';
 
 const enc = new TextEncoder();
 
@@ -46,7 +48,7 @@ async function signRs256(privateKey, header, payload) {
 }
 
 describe('JWT session tokens', () => {
-	const c = { env: { jwt_secret: 'unit-test-jwt-secret-32-bytes-minimum' } };
+	const c = { env: { db: workerEnv.db, jwt_secret: 'unit-test-jwt-secret-32-bytes-minimum' } };
 
 	it('round-trips a signed token and rejects tampering', async () => {
 		const token = await jwtUtils.generateToken(c, { userId: 7, token: 'session-id' }, 60);
@@ -325,6 +327,11 @@ describe('RBAC privileged permission set', () => {
 });
 
 describe('Freeze convergence regressions (P1/P2)', () => {
+	it('matches configured domains exactly for JSON and scalar environment values', () => {
+		expect(isConfiguredDomain('["epomail.bond"]', 'epomail.bond')).toBe(true);
+		expect(isConfiguredDomain('["epomail.bond"]', 'mail.bond')).toBe(false);
+		expect(isConfiguredDomain('epomail.bond', 'epomail.bond')).toBe(true);
+	});
 	it('only grants isOfficial badge to genuine system rows without inbound/outbound claim keys and blocks reserved labels in rules', () => {
 		expect(isOfficialEmailRow({
 			sendEmail: 'announcement@epocanvas.com',
@@ -481,8 +488,13 @@ describe('Freeze convergence regressions (P1/P2)', () => {
 
 		// The 6th attempt via a brand-new alias is blocked because canonical@example.com reached 5 failures
 		await expect(loginService.login(c, { email: 'alias6@example.com', password: 'wrong' })).rejects.toThrow();
-		expect(kvStore.get('login_fail:canonical@example.com')).toBe('5');
+		expect(kvStore.get('login_fail:canonical@example.com|ip:local')).toBe('5');
 		expect(verifySpy).toHaveBeenCalledTimes(5);
+
+		// A different source must not inherit the account-wide lockout.
+		c.req.header = (name) => name === 'CF-Connecting-IP' ? '203.0.113.2' : '';
+		await expect(loginService.login(c, { email: 'alias7@example.com', password: 'wrong' })).rejects.toThrow();
+		expect(verifySpy).toHaveBeenCalledTimes(6);
 
 		rlSpy.mockRestore();
 		userByEmailSpy.mockRestore();

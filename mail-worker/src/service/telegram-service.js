@@ -13,6 +13,7 @@ import { t } from '../i18n/i18n.js';
 import r2Service from './r2-service.js';
 import fileUtils from '../utils/file-utils.js';
 import rateLimit from '../utils/rate-limit.js';
+import safeLogger from '../utils/safe-logger.js';
 
 const telegramService = {
 
@@ -123,10 +124,11 @@ const telegramService = {
 					})
 				});
 				if (!res.ok) {
-					console.error(`转发 Telegram 失败 status: ${res.status} response: ${await res.text()}`);
+					await res.text().catch(() => '');
+					safeLogger.error('telegram_forward_failed', { status: res.status });
 				}
 			} catch (e) {
-				console.error(`转发 Telegram 失败:`, e.message);
+				safeLogger.error('telegram_forward_failed', { error: e });
 			}
 		}));
 
@@ -189,13 +191,15 @@ const telegramService = {
 			});
 
 			if (!res.ok) {
-				const errText = await res.text();
-				throw new BizError(`Telegram API 返回错误 (${res.status}): ${errText}`);
+				await res.text().catch(() => '');
+				safeLogger.warn('telegram_test_failed', { userId, status: res.status });
+				throw new BizError(`Telegram API 返回错误 (${res.status})`);
 			}
 			return { success: true };
 		} catch (e) {
 			if (e instanceof BizError) throw e;
-			throw new BizError(`发送 Telegram 测试消息失败: ${e.message}`);
+			safeLogger.error('telegram_test_request_error', { userId, error: e });
+			throw new BizError('发送 Telegram 测试消息失败');
 		}
 	},
 
@@ -277,9 +281,9 @@ const telegramService = {
 			const res = await fetch(`https://api.telegram.org/bot${current.botToken}/sendMessage`, {
 				method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 			});
-			if (!res.ok) console.error(`Personal Telegram Bot send failed: status ${res.status}`);
+			if (!res.ok) safeLogger.error('personal_telegram_send_failed', { status: res.status });
 		} catch (_) {
-			console.error('Personal Telegram Bot send failed');
+			safeLogger.error('personal_telegram_send_failed');
 		}
 	}
 };

@@ -1609,6 +1609,8 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     storageQuota: '存储配额',
     sendLimit: '发件上限',
     sendEmailsPerDay: '{count} 封/天',
+    composeOutboundDisabled: '站外邮件暂未开放。你可以修改收件人，或保留草稿。',
+    composeRecipientNotAllowed: '此收件人不在允许发送的范围内。请检查地址，或保留草稿。',
     internalOnly: '仅限站内',
     cumulativeEmails: '累计 {count} 封',
     attachmentPermission: '附件权限',

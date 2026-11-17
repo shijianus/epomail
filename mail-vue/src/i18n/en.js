@@ -1609,6 +1609,8 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     storageQuota: 'Storage Quota',
     sendLimit: 'Sending Limit',
     sendEmailsPerDay: '{count} emails/day',
+    composeOutboundDisabled: 'External sending is currently disabled. Change the recipients or keep the draft.',
+    composeRecipientNotAllowed: 'This recipient is outside the allowed sending scope. Check the address or keep the draft.',
     internalOnly: 'Internal only',
     cumulativeEmails: 'Total {count} emails',
     attachmentPermission: 'Attachment Permission',

@@ -4,6 +4,9 @@ compatibility_date = "2025-06-04"
 compatibility_flags = ["nodejs_als"]
 keep_vars = true
 
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
 [observability]
 enabled = true
 
@@ -53,6 +56,9 @@ crons = ["0 16 * * *", "*/5 * * * *"]	#每天夜间例行任务 + 每5分钟通�
 
 
 [vars]
+ENVIRONMENT = "production"
+ALLOW_URL_INIT = "false"
+EMAIL_OUTBOUND_ENABLED = "false"
 #ai_model = ""			#ai模型,不填默认使用@cf/meta/llama-3.1-8b-instruct
 #analysis_cache = false			#是否开启分析数据缓存
 #orm_log = false			#是否sql日志
@@ -61,11 +67,12 @@ admin = "admin@epomail.bond"				#管理员的邮箱	示例: admin@example.com
 #AVATAR_UPLOAD_URL = ""			#头像外部图床(可选)。不配置时头像落实例自有对象存储(KV)；配置示例: "https://img.example.com"
 #CORS_ORIGINS = ""			#允许跨域访问 API 的前端源(逗号分隔)。留空时仅允许同源；OAuth token/userinfo 端点始终允许第三方调用。
 
-# ⚠️ 安全约束：jwt_secret、totp_enc_key、admin_initial_password、init_secret、resend_webhook_secret、email_enc_key
+# ⚠️ 安全约束：jwt_secret、totp_enc_key、oauth_client_enc_key、admin_initial_password、init_secret、resend_webhook_secret、email_enc_key
 # 均属机密变量，严禁写入本文件（本仓库为公开仓库，写入即泄漏）！
 # 正确做法（Cloudflare Secrets，一次设置持久生效，部署不丢失）：
 #   npx wrangler secret put jwt_secret
 #   npx wrangler secret put totp_enc_key
+#   npx wrangler secret put oauth_client_enc_key
 #   npx wrangler secret put admin_initial_password   # 首次 /init 创建站长账号时必需
 #   npx wrangler secret put init_secret              # 生产/Staging 必需；仅本地/测试回退 jwt_secret
 #   npx wrangler secret put resend_webhook_secret    # 使用 Resend Webhook 时必需
@@ -88,6 +95,9 @@ command = "node ./build.mjs"
 name = "epomail-staging"
 compatibility_date = "2025-06-04"
 compatibility_flags = ["nodejs_als"]
+
+[env.staging.version_metadata]
+binding = "CF_VERSION_METADATA"
 
 [env.staging.observability]
 enabled = true

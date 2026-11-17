@@ -6,6 +6,9 @@ import constant from '../const/constant';
 import KvConst from '../const/kv-const';
 import { isAdminUser } from '../utils/admin-utils';
 import oneTimeCredential, { OTC_PURPOSE, authVersionOf } from '../utils/one-time-credential.js';
+import { encryptClientSecret, decryptClientSecret, verifyClientSecret } from '../utils/oauth-secret-crypto.js';
+import safeLogger from '../utils/safe-logger.js';
+import { readAuthorizedSession } from '../utils/session-auth-store.js';
 
 const encoder = new TextEncoder();
 
@@ -117,7 +120,7 @@ const oauthProviderService = {
 		if (jwt) {
 			const payload = await jwtUtils.verifyToken(c, jwt);
 			if (payload && payload.userId) {
-				const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
+				const authInfo = await readAuthorizedSession(c, payload.userId, payload.token);
 				if (authInfo && Array.isArray(authInfo.tokens) && authInfo.tokens.includes(payload.token)
 					&& sessionWithinAbsoluteCap(authInfo)) {
 					const userRow = await userService.selectById(c, payload.userId);
@@ -180,7 +183,7 @@ const oauthProviderService = {
 			throw new BizError('登录会话已过期，请重新登录', 401);
 		}
 
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
+		const authInfo = await readAuthorizedSession(c, payload.userId, payload.token);
 		if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(payload.token)
 			|| !sessionWithinAbsoluteCap(authInfo)) {
 			throw new BizError('登录会话已过期，请重新登录', 401);
@@ -229,7 +232,7 @@ const oauthProviderService = {
 				detail: `App: ${app.name || app.clientId} (Scopes: ${scope || 'openid profile email'})`
 			});
 		} catch (e) {
-			console.error('Failed to send OAuth authorized notice:', e);
+			safeLogger.error('oauth_authorized_notice_failed', { userId: user?.userId, error: e });
 		}
 
 		const finalUrl = new URL(redirect_uri);
@@ -261,25 +264,23 @@ const oauthProviderService = {
 			throw new BizError('invalid_request: 缺少 code 参数', 400);
 		}
 
-		// 单次消费由 D1 原子条件更新保证。无论后续校验是否通过，码都已被
-		// 标记消费，重放请求无法再次兑换。
-		const record = await oneTimeCredential.consume(c, {
+		// 1. 先进行只读安全预检，绝不提前核销授权码
+		const unconsumed = await oneTimeCredential.inspect(c, {
 			purpose: OTC_PURPOSE.AUTHORIZATION_CODE,
 			token: code
 		});
-		const authData = record?.payload;
 
-		if (!authData) {
+		if (!unconsumed || unconsumed.consumed || unconsumed.expired || !unconsumed.payload) {
 			throw new BizError('invalid_grant: 授权码已失效或已被使用', 400);
 		}
+		const authData = unconsumed.payload;
 
 		if (clientId && clientId !== authData.clientId) {
 			throw new BizError('invalid_client: client_id 不匹配', 400);
 		}
 
-		const cleanRedirectUri = (redirectUri || '').replace(/\/+$/, '');
-		const cleanAuthRedirectUri = (authData.redirectUri || '').replace(/\/+$/, '');
-		if (cleanRedirectUri && cleanRedirectUri !== cleanAuthRedirectUri) {
+		// RFC 6749 Section 3.1.2.4: 严格全等匹配，严禁去除末尾斜杠或路径模糊匹配
+		if (redirectUri && redirectUri !== authData.redirectUri) {
 			throw new BizError('invalid_grant: redirect_uri 与授权时不一致', 400);
 		}
 
@@ -298,7 +299,7 @@ const oauthProviderService = {
 				throw new BizError('invalid_grant: PKCE code_verifier 校验失败', 400);
 			}
 		} else {
-			if (!clientSecret || !(await timingSafeEqualStr(String(clientSecret), String(app.clientSecret || '')))) {
+			if (!clientSecret || !(await verifyClientSecret(c.env, app.clientId, String(clientSecret), app.clientSecret))) {
 				throw new BizError('invalid_client: client_secret 验证失败', 401);
 			}
 		}
@@ -306,6 +307,15 @@ const oauthProviderService = {
 		const user = await userService.selectById(c, authData.userId);
 		if (!user || user.status !== 0 || user.isDel !== 0 || authVersionOf(authData) !== authVersionOf(user)) {
 			throw new BizError('invalid_grant: 用户不存在或已被封禁', 400);
+		}
+
+		// 2. 全部校验严格通过后，执行原子条件核销 (UPDATE ... WHERE consumed=0)
+		const consumedRecord = await oneTimeCredential.consume(c, {
+			purpose: OTC_PURPOSE.AUTHORIZATION_CODE,
+			token: code
+		});
+		if (!consumedRecord) {
+			throw new BizError('invalid_grant: 授权码已失效或已被并发兑换', 400);
 		}
 
 		const origin = new URL(c.req.url).origin;
@@ -336,7 +346,10 @@ const oauthProviderService = {
 			auth_time: Number(authData.authTime) || Math.floor((Number(authData.createdAt) || Date.now()) / 1000)
 		};
 		if (authData.nonce) idClaims.nonce = authData.nonce;
-		const idToken = await jwtUtils.generateTokenWithSecret(c, app.clientSecret, idClaims, 7200);
+		const idTokenSecret = (!authData.codeChallenge && clientSecret)
+			? String(clientSecret)
+			: await decryptClientSecret(c.env, app.clientId, app.clientSecret);
+		const idToken = await jwtUtils.generateTokenWithSecret(c, idTokenSecret, idClaims, 7200);
 
 		return {
 			access_token: accessToken,

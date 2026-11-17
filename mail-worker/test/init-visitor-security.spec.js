@@ -202,6 +202,20 @@ describe('Module B: Fixed visitor account removal, userId=1 de-escalation, and i
 		expect(afterRepeat[0].password).toBe(allUsers[0].password);
 	});
 
+	it('repairs legacy databases with duplicate default roles deterministically', async () => {
+		await resetTables();
+		const initCtx = { env: { ...env, dev: undefined, DEV: undefined }, get: () => undefined, set: () => {} };
+		await prepareBaseSchema(initCtx);
+		await dbInit.v3_13DB(initCtx);
+		await env.db.prepare(`UPDATE role SET is_default = 1 WHERE role_code = 'user_lv0'`).run();
+		const before = await env.db.prepare(`SELECT COUNT(*) AS count FROM role WHERE is_default = 1`).first();
+		expect(Number(before?.count)).toBeGreaterThan(1);
+		await dbInit.v3_13DB(initCtx);
+		const defaults = (await env.db.prepare(`SELECT role_code FROM role WHERE is_default = 1`).all()).results || [];
+		expect(defaults).toHaveLength(1);
+		expect(defaults[0].role_code).toBe('user_base');
+	});
+
 	it('isolates pre-existing installations where a legacy visitor occupies user_id=1 and site owner is user_id=2 without deleting or resurrecting accounts', async () => {
 		await resetTables();
 

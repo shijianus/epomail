@@ -86,6 +86,7 @@ import {t} from '../i18n/i18n'
 import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
 import { isDualDbMode, getDbModeInfo } from '../utils/db-accessor';
+import { encryptProviderSecret } from '../utils/oauth-secret-crypto.js';
 
 const settingService = {
 
@@ -580,6 +581,13 @@ const settingService = {
 					const nextValue = incoming[secretField];
 					if (!nextValue || String(nextValue).includes('******')) {
 						merged[secretField] = previous[secretField] || '';
+					}
+					const plaintext = typeof merged[secretField] === 'string'
+						&& merged[secretField]
+						&& !merged[secretField].startsWith('v1:');
+					const productionLike = ['production', 'staging'].includes(String(c.env?.ENVIRONMENT || '').toLowerCase());
+					if (plaintext && (c.env?.oauth_client_enc_key || productionLike)) {
+						merged[secretField] = await encryptProviderSecret(c.env, key, secretField, merged[secretField]);
 					}
 				}
 				if (merged.enabled !== 1 && merged.enabled !== true) {
@@ -1134,15 +1142,7 @@ const settingService = {
 			allMailMode: settingRow.allMailMode ?? 0,
 			totp: settingRow.totp ?? 1,
 			forceTotp: settingRow.forceTotp ?? 0,
-			forwardEmail: settingRow.forwardEmail || '',
 			forwardStatus: settingRow.forwardStatus ?? 1,
-			welcomeSubject: settingRow.welcomeSubject || '',
-			welcomeExpireDays: settingRow.welcomeExpireDays ?? 7,
-			welcomeAutoSend: settingRow.welcomeAutoSend ?? 1,
-			welcomeLastBroadcast: settingRow.welcomeLastBroadcast || '',
-			welcomeTemplates: settingRow.welcomeTemplates || {},
-			welcomeLang: settingRow.welcomeLang || 'zh',
-			globalEmailConfig: settingRow.globalEmailConfig || {},
 			userTgForward: settingRow.userTgForward ?? 1,
 			userEmailForward: settingRow.userEmailForward ?? 1,
 			userApiSupport: settingRow.userApiSupport ?? 1,
@@ -1175,6 +1175,9 @@ const settingService = {
 				contentProcessing: normalizeContentProcessing(settingRow.contentProcessing, c),
 				oauthLoginEnabled: settingRow.oauthLoginEnabled ?? 0,
 			oauthProviders: (() => {
+				if (Number(settingRow.oauthLoginEnabled) !== 1) {
+					return {};
+				}
 				let p = settingRow.oauthProviders;
 				if (typeof p === 'string') {
 					try { p = JSON.parse(p); } catch (_) { p = {}; }
@@ -1182,13 +1185,18 @@ const settingService = {
 					p = {};
 				}
 				const sanitized = {};
+				const envName = String(c?.env?.ENVIRONMENT || '').toLowerCase();
+				const productionLike = ['staging', 'production', 'prod'].includes(envName);
 				for (const [k, v] of Object.entries(p)) {
 					if (v && typeof v === 'object') {
+						const isEnabled = v.enabled === 1 || v.enabled === true;
+						if (!isEnabled) continue;
 						const hasClientId = Boolean(v.clientId && typeof v.clientId === 'string' && v.clientId.trim() !== '');
 						const hasClientSecret = Boolean(v.clientSecret && typeof v.clientSecret === 'string' && v.clientSecret.trim() !== '');
-						const isConfigured = (hasClientId && hasClientSecret) ? 1 : 0;
+						const unmigratedSecret = productionLike && hasClientSecret && !String(v.clientSecret).startsWith('v1:');
+						const isConfigured = (hasClientId && hasClientSecret && !unmigratedSecret) ? 1 : 0;
 						sanitized[k] = {
-							enabled: (v.enabled === 1 || v.enabled === true) ? 1 : 0,
+							enabled: 1,
 							configured: isConfigured,
 							clientId: v.clientId || '',
 							name: v.name || '',

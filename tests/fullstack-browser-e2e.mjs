@@ -46,7 +46,10 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 	const password = (initBody.match(/Initial admin password:\s*(\S+)/) || [])[1];
 	assert.ok(password, 'init did not return the one-time admin password');
 
-	const browser = await chromium.launch({ headless: true });
+	const browser = await chromium.launch({
+		headless: true,
+		executablePath: process.env.EPOMAIL_CHROMIUM_PATH || undefined
+	});
 	addCleanup(() => browser.close());
 	const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 	const page = await context.newPage();

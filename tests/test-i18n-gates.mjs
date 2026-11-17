@@ -23,6 +23,7 @@ function authSource(entries = () => "  known: 'Known {name}',\n  indirect: 'Mapp
 }
 
 function fixture(callback) {
+  mkdirSync(tmpdir(), { recursive: true });
   const dir = mkdtempSync(join(tmpdir(), 'epomail-i18n-gates-'));
   const write = (relative, text) => {
     const file = join(dir, relative);

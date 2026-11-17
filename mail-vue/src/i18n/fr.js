@@ -1609,6 +1609,8 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     storageQuota: 'Quota de stockage',
     sendLimit: 'Limite d\'envoi',
     sendEmailsPerDay: '{count} e-mails/jour',
+    composeOutboundDisabled: 'L’envoi externe est désactivé. Modifiez les destinataires ou conservez le brouillon.',
+    composeRecipientNotAllowed: 'L’envoi à ce destinataire est indisponible. Vérifiez l’adresse ou conservez le brouillon.',
     internalOnly: 'Interne uniquement',
     cumulativeEmails: 'Total {count} e-mails',
     attachmentPermission: 'Permission de pièces jointes',

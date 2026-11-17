@@ -1,3 +1,6 @@
+import safeLogger from './safe-logger.js';
+import { isSessionRevoked } from './session-revocation.js';
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -107,10 +110,14 @@ const jwtUtils = {
 			// 都携带 exp，缺失即异常构造，绝不给"永不过期"留任何通道。
 			if (!payload.exp || payload.exp < now) return null;
 
+			// Durable revocation wins over stale KV hits and D1 positive-session fallback.
+			if (!payload.purpose && payload.userId && payload.token
+				&& await isSessionRevoked(c, payload.userId, payload.token)) return null;
+
 			return payload;
 
 		} catch (err) {
-			console.log(err)
+			safeLogger.warn('jwt_verify_failed', { error: err });
 			return null;
 		}
 	}

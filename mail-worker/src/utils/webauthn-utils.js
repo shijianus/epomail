@@ -168,7 +168,14 @@ export const webauthnUtils = {
 		}
 		const signCount = await this.verifyCeremony({ ...expected, clientDataJSON: params.clientDataJSON,
 			authenticatorData: params.authenticatorData, type: 'webauthn.get' });
-		if ((key.signCount || signCount) && signCount <= (key.signCount || 0)) throw new Error('WebAuthn signature counter did not advance');
+		if ((key.signCount || signCount) && signCount <= (key.signCount || 0)) {
+			// A stale authenticator counter is an expected concurrency/replay
+			// outcome. Keep a stable marker so the API layer can return a
+			// controlled authentication conflict instead of HTTP 500.
+			const error = new Error('WebAuthn signature counter did not advance');
+			error.code = 'webauthn_counter_conflict';
+			throw error;
+		}
 		if (!await this.verifyAuthenticationSignature({ clientDataJSONBase64: params.clientDataJSON,
 			authenticatorDataBase64: params.authenticatorData, signatureBase64: params.signature,
 			publicKeyJwk: key.publicKeyJwk, publicKeyRaw: key.publicKeyRaw })) throw new Error('WebAuthn signature invalid');

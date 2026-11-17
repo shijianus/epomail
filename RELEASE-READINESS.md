@@ -1,8 +1,18 @@
 # Epocanvas Mail - 上线就绪度与环境检查报告 (RELEASE-READINESS.md)
 
-> **发布批次标识**：`release/2026-10-31`
-> **候选发布基线 (RC SHA)**：`4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
-> **生产投产目标**：Cloudflare Workers / D1 Database (`epomail`) / KV Namespace (`kv`) / Cloudflare Pages/Assets
+> [!CAUTION]
+> **当前准入结论 (2026-11-15 更新)**：
+> - **当前分支与代码基线**：`fix/public-beta-go-blockers-2026-11-07` @ `e75305491edf9300475ab45ddc8cc2450c48addf` (Short: `e753054`，详细证据见 [PUBLIC-BETA-AUDIT-2026-11-14.md](doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md))
+> - **受控公测 (Controlled Public Beta)**：**`NO-GO (BLOCKED)`** —— 代码与本地自动化测试/恢复演练已完成，但隔离 Staging (`598171bf` @ `6c0c010`) 尚缺本轮提交、`legalNotice` 为空 (`notReady`)、`crons=[]`、缺少 `oauth_client_enc_key` / `email_enc_key` / `storage_enc_key` / `scheduled_secret` / `resend_webhook_secret`，真实外部集成（OAuth、Resend/Mailjet 外发、Svix Webhook、BYO S3、Cloudflare Cron）、历史凭据轮换与外部告警/值班体制尚未人工闭环。
+> - **无条件公开发布 (Unconditional GA)**：**`NO-GO`** —— 尚受官方 `capacity` (`ramp-16` 464/640 FAIL)、单实例 PBKDF2 并发瓶颈 (~1.6 auth/s)、存量密文迁移及上述公测阻断制约。
+>
+> 下方第 1–4 节保留 `release/2026-10-31` (`4d9d9d8`) 历史上线手册模板与结构参考，**不再作为当前 `GO` 凭据**。
+
+---
+
+> **历史发布批次标识**：`release/2026-10-31`
+> **历史候选发布基线 (RC SHA)**：`4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
+> **生产投产目标**：Cloudflare Workers / D1 Database (`epomail`, ID: `542cbca1-fce5-41c5-93f2-c1d04fa919e8`) / KV Namespace (`kv`, ID: `e708c64d291e42c3a03b896914d42575`) / Cloudflare Assets (本轮零接触生产)
 > **生产服务域名**：
 > - 主服务入口：`https://mail.epocanvas.com`
 > - 备用/多租户域名：`https://mail.epomail.bond`、`https://mail.epomail.cyou`
@@ -108,3 +118,11 @@ $ node scripts/verify-production-readiness.mjs
 5. **冒烟回归测试**：
    - 使用主管理员账号登录，确认两步验证、控制台展示正常。
    - 验证收信入站、附件下载及转发功能无异常报错。
+# 当前版本与准入控制矩阵 (2026-11-15)
+
+1. **必须补齐的非源码 Secrets（Staging & Production）**：除 `jwt_secret`, `totp_enc_key`, `init_secret`, `admin_initial_password` 外，必须独立注入 `email_enc_key`, `storage_enc_key` (`byo_storage_enc_key`), `oauth_client_enc_key`, `scheduled_secret`, `resend_webhook_secret`。
+2. **Staging 实测现状 (`https://epomail-staging.epocanvas.workers.dev`)**：
+   - D1 (`epomail-staging-db`, `c3a49885-603e-4387-b4df-82a1117e963a`) 与 KV (`c5a59d7cfc6a4091b792238ec569e315`) 已验证与生产物理隔离；`EMAIL_OUTBOUND_ENABLED="false"` 与 `ALLOW_URL_INIT="false"` Fail-Closed 生效。
+   - **D1 备份恢复演练通过 (`2026-11-15T06:54:45Z–06:54:46Z`)**：导出 `390,011 bytes` (SHA256 `9c45048c98acd5a61a92881e99e2bcd61245a28c8336ef62357134bd1bcf0c38`) 并完整恢复至独立 SQLite（`restore_rc=0`, `PRAGMA integrity_check = ok`, 37 表 / 行数核对无误后物理清理）。
+   - **版本回滚记录**：Cloudflare Staging 历史已记录 `598171bf` -> `a1a24b3f` -> `598171bf` 秒级切换验证（`2026-11-14T21:37–21:38Z`）。
+3. **当前未关闭准入阻断**：Staging 重新部署对齐 `e753054`、配置 `legalNotice`、开启受控 `crons`、修复双重 `is_default=1` 角色、完成有账号态 Staging/IdP/邮件/Webhook/BYO 验收、完成历史密钥与旧会话轮换、配置 5xx/429/Cron 外部告警与值班/回滚负责人名录。详细全量证据与逐项裁决见 [PUBLIC-BETA-AUDIT-2026-11-14.md](doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md)。

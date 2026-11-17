@@ -416,8 +416,7 @@ const decisionNoticeService = {
 		const payloadStr = JSON.stringify({ restrictedToken, user: user || null, caseId: caseId || null });
 
 		if (userDb) {
-			try {
-				await userDb.prepare(`
+			await userDb.prepare(`
 					INSERT INTO one_time_exchange_code (code_hash, user_id, email, case_id, token_payload, consumed, expires_at)
 					VALUES (?, ?, ?, ?, ?, 0, ?)
 				`).bind(
@@ -427,20 +426,11 @@ const decisionNoticeService = {
 					caseId ? String(caseId) : null,
 					payloadStr,
 					expiresAt
-				).run();
-			} catch (_) {
-				console.warn('Restricted exchange code persistence failed');
-			}
+			).run();
+			return rawCode;
 		}
 
-		// 辅助 KV 兼容
-		if (c?.env?.kv) {
-			try {
-				await c.env.kv.put(`restricted_code:${rawCode}`, payloadStr, { expirationTtl: ttlSeconds });
-			} catch (_) {}
-		}
-
-		return rawCode;
+		throw new Error('Restricted exchange code requires authoritative D1 storage');
 	},
 
 	/**

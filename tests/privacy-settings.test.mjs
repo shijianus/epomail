@@ -9,6 +9,7 @@ import {
   isLocalSessionEnded
 } from '../mail-vue/src/utils/device-privacy.js';
 import { prepareMailContent, safeMailStyle } from '../mail-vue/src/utils/mail-content-privacy.js';
+import { sanitizeImageUrl, getWallpaperCssById } from '../mail-vue/src/utils/theme-presets.js';
 import { privacyPreferences, verificationCodeNotice, withVerificationCodePreference } from '../mail-vue/src/utils/privacy-preferences.js';
 import { createSessionManager, TAB_IDENTITY_KEY } from '../mail-vue/src/utils/tab-session.js';
 
@@ -338,6 +339,20 @@ test('storage/cache allowlists leave other applications alone', () => {
   for (const key of ['email', 'writer', 'epo_sessions', 'DEV_TRUST', 'dev_trust:fixture']) assert.equal(isAppStorageKey(key), true);
   for (const key of ['otherApp', 'another_token', 'theme']) assert.equal(isAppStorageKey(key), false);
   assert.equal(isAppCacheName(`workbox-precache-v2-${origin}/other-app/`, origin), false);
+});
+
+test('custom wallpaper URLs cannot inject CSS or active URL schemes', () => {
+  assert.equal(sanitizeImageUrl('https://cdn.example.test/wallpaper.png'), 'https://cdn.example.test/wallpaper.png');
+  assert.equal(sanitizeImageUrl('/uploads/wallpaper.png'), '/uploads/wallpaper.png');
+  for (const value of [
+    'javascript:alert(1)',
+    'data:text/html,<svg onload=alert(1)>',
+    'https://cdn.example.test/\');color:red;/*',
+    '//cdn.example.test/wallpaper.png'
+  ]) {
+    assert.equal(sanitizeImageUrl(value), '');
+    assert.equal(getWallpaperCssById(value), '');
+  }
 });
 
 for (const locale of ['zh', 'zh-Hant', 'en', 'es', 'fr', 'nl']) {

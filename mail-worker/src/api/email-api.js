@@ -5,6 +5,7 @@ import userContext from '../security/user-context';
 import attService from '../service/att-service';
 import aiService from '../service/ai-service';
 import hashUtils from '../utils/hash-utils';
+import { readJsonObject } from '../utils/request-body.js';
 
 const handleEmailList = async (c) => {
 	const query = c.req.method === 'GET' ? c.req.query() : (await c.req.json().catch(() => ({})));
@@ -40,7 +41,7 @@ app.get('/email/attList', async (c) => {
 });
 
 app.post('/email/send', async (c) => {
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const headerKey = c.req.header('Idempotency-Key');
 	if (headerKey && !body.idempotencyKey) body.idempotencyKey = headerKey;
 	const email = await emailService.send(c, body, userContext.getUserId(c));
@@ -48,32 +49,32 @@ app.post('/email/send', async (c) => {
 });
 
 app.put('/email/read', async (c) => {
-	await emailService.read(c, await c.req.json(), userContext.getUserId(c));
+	await emailService.read(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/email/spam', async (c) => {
-	await emailService.setSpam(c, await c.req.json(), userContext.getUserId(c));
+	await emailService.setSpam(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/email/reportNotSpam', async (c) => {
-	await emailService.reportNotSpam(c, await c.req.json(), userContext.getUserId(c));
+	await emailService.reportNotSpam(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/email/reportSpam', async (c) => {
-	await emailService.reportSpam(c, await c.req.json(), userContext.getUserId(c));
+	await emailService.reportSpam(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/email/labels', async (c) => {
-	await emailService.updateLabels(c, await c.req.json(), userContext.getUserId(c));
+	await emailService.updateLabels(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.post('/email/translate', async (c) => {
-	const res = await aiService.translate(c, await c.req.json());
+	const res = await aiService.translate(c, await readJsonObject(c));
 	if (typeof res === 'string') {
 		return c.json(result.ok({ translatedText: res, translatedHtml: '', isHtml: false }));
 	}
@@ -81,12 +82,12 @@ app.post('/email/translate', async (c) => {
 });
 
 app.put('/email/snooze', async (c) => {
-	await emailService.setSnooze(c, await c.req.json(), userContext.getUserId(c));
+	await emailService.setSnooze(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/email/restore', async (c) => {
-	await emailService.restore(c, await c.req.json(), userContext.getUserId(c));
+	await emailService.restore(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 

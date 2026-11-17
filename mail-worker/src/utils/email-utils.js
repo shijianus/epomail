@@ -1,4 +1,5 @@
 import { parseHTML } from 'linkedom';
+import safeLogger from './safe-logger.js';
 
 /**
  * 公共保留本地部分（统一小写比较）。注册与别名创建不得占用官方/合规身份地址，
@@ -11,6 +12,26 @@ export const RESERVED_EMAIL_LOCAL_NAMES = new Set([
 	'dmarc', 'spf', 'dkim', 'root', 'hostmaster', 'webmaster',
 	'billing', 'legal', 'privacy', 'contact', 'info', 'sales', 'hr', 'jobs'
 ]);
+
+export function configuredDomains(value) {
+	let raw = value;
+	if (typeof raw === 'string') {
+		try {
+			raw = JSON.parse(raw);
+		} catch (_) {
+			raw = raw.split(',');
+		}
+	}
+	if (!Array.isArray(raw)) return new Set();
+	return new Set(raw
+		.map(item => String(item || '').trim().toLowerCase().replace(/^@/, ''))
+		.filter(Boolean));
+}
+
+export function isConfiguredDomain(value, domain) {
+	const normalized = String(domain || '').trim().toLowerCase().replace(/^@/, '');
+	return Boolean(normalized) && configuredDomains(value).has(normalized);
+}
 
 const emailUtils = {
 
@@ -51,7 +72,7 @@ const emailUtils = {
 			let text = document.body.innerText;
 			return this.formatText(text);
 		} catch (e) {
-			console.error(e)
+			safeLogger.error('email_html_to_text_failed', { error: e });
 			return ''
 		}
 	}

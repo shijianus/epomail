@@ -6,6 +6,7 @@ import accountEntity from '../entity/account';
 import emailEntity from '../entity/email';
 import attEntity from '../entity/att';
 import { isSafePublicUrl, assertSafePublicUrl } from '../utils/url-utils';
+import { safeFetch } from '../utils/safe-fetch';
 
 const dbService = {
 	/**
@@ -218,7 +219,7 @@ const dbService = {
 				};
 				if (testBody) fetchOptions.body = testBody;
 
-				const res = await fetch(testUrl, fetchOptions);
+				const res = await safeFetch(testUrl, fetchOptions);
 				externalDbLatencyMs = Date.now() - extStart;
 
 				if (res.ok || res.status === 401 || res.status === 403 || res.status === 404) {

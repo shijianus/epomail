@@ -1698,7 +1698,7 @@ const handlePrintAll = () => {
 
 const printSingleMsg = (msg) => {
   const target = msg || email;
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open('', '_blank', 'noopener,noreferrer');
   if (!printWindow) {
     window.print();
     return;

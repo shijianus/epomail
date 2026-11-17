@@ -192,6 +192,19 @@ describe('authentication service convergence over real D1 HTTP', () => {
   const row = await env.db.prepare('SELECT security_keys,passkey_history,auth_version FROM user WHERE user_id=?').bind(UID).first();
   expect(row.security_keys).toBe('[]'); expect(row.passkey_history).toBe(1); expect(row.auth_version).toBe(1);
  }),
+ it('returns a validation response instead of HTTP 500 when passkey delete has no body', async () => {
+  await env.db.prepare('UPDATE user SET security_keys=?,passkey_history=1 WHERE user_id=?')
+   .bind(JSON.stringify([{ id: 'empty-body-key', credentialId: 'empty-body-credential', status: 'active' }]), UID).run();
+  const token = await session();
+  const response = await SELF.fetch('https://example.com/api/my/passkey/empty-body-key', {
+   method: 'DELETE',
+   headers: { Authorization: token }
+  });
+  expect(response.status).not.toBe(500);
+  const body = await response.json();
+  expect(body.code).toBeGreaterThanOrEqual(400);
+  expect(body.errorCode || body.message).toBeTruthy();
+ }),
  it('keeps passkey history after deleting the last factor and never re-enrolls a genesis device', async () => {
   const backup = await totpUtils.generateBackupCodes(10, env);
   await env.db.prepare('UPDATE user SET security_keys=?,passkey_history=1,totp_enabled=1,totp_backup_codes=? WHERE user_id=?')

@@ -26,12 +26,14 @@ import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
 import emailCryptoUtils from '../utils/email-crypto-utils';
+import emailKeyMigrationService from './email-key-migration-service.js';
 import { DEFAULT_WELCOME_SUBJECT, DEFAULT_WELCOME_CONTENT, getWelcomeTemplate, getGlobalAnnouncementTemplate, getLocaleByLang, getSenderNameByLang, getUserFallbackNameByLang, formatDateByLang, normalizeLangKey } from '../const/welcome-template';
 import { isAdminEmail, isAdminUser } from '../utils/admin-utils';
 import hashUtils from '../utils/hash-utils';
 import verifyUtils from '../utils/verify-utils';
 import storageQuotaService from './storage-quota-service';
 import { assertOutboundAllowed } from '../utils/outbound-policy.js';
+import safeLogger from '../utils/safe-logger.js';
 import { mailSha256, normalizeMailAddress, assertMailRowSize, buildBoundedInserts, prepareMailQuery } from '../utils/mail-pipeline.js';
 import { mailTransactionGuard } from '../utils/mail-transaction.js';
 import mailOutboundService from './mail-outbound-service.js';
@@ -40,6 +42,7 @@ import mailLifecycleService from './mail-lifecycle-service.js';
 import { reserveInboundQuota } from './mail-reliability-service.js';
 import rateLimit from '../utils/rate-limit.js';
 import { RESERVED_SYSTEM_LABELS } from '../email/rule-engine.js';
+import { updateSessionUserFields } from '../utils/session-auth-store.js';
 
 export function isOfficialEmailRow(item) {
 	if (!item || typeof item !== 'object') return false;
@@ -508,13 +511,9 @@ const emailService = {
 			whitelistLabel.actions = { priority: 1, stopProcessing: true };
 
 			// Save back
-			await userOrm(c).update(user).set({ customLabels: JSON.stringify(labelsObj) }).where(eq(user.userId, userId)).run();
-			
-			const authInfo = await c.env.kv.get(kvConst.AUTH_INFO + userId, { type: 'json' });
-			if (authInfo && authInfo.user) {
-				authInfo.user.customLabels = JSON.stringify(labelsObj);
-				await c.env.kv.put(kvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: 60 * 60 * 24 * 7 });
-			}
+			const serialized = JSON.stringify(labelsObj);
+			await userOrm(c).update(user).set({ customLabels: serialized }).where(eq(user.userId, userId)).run();
+			await updateSessionUserFields(c, userId, { customLabels: serialized });
 		}
 
 		// In Mode 0 (Privacy Mail Mode): Restored emails are back in Inbox, so encrypt them
@@ -635,11 +634,7 @@ const emailService = {
 				bCond.value = existingBlackSenders.join(',');
 				const serialized = JSON.stringify(labelsObj);
 				await userOrm(c).update(user).set({ customLabels: serialized }).where(eq(user.userId, userId)).run();
-				const authInfo = await c.env.kv.get(kvConst.AUTH_INFO + userId, { type: 'json' });
-				if (authInfo && authInfo.user) {
-					authInfo.user.customLabels = serialized;
-					await c.env.kv.put(kvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: 60 * 60 * 24 * 7 });
-				}
+				await updateSessionUserFields(c, userId, { customLabels: serialized });
 			}
 		}
 
@@ -1051,30 +1046,6 @@ const emailService = {
 		const resendToken = resendTokens[domain];
 		const useCloudflareEmail = !!c.env.email;
 
-		// 分级外发闸门：对站外收件人强制校验 EMAIL_OUTBOUND_ENABLED 与 staging OUTBOUND_WHITELIST
-		if (!allInternal) {
-			const outboundDisabled = String(c.env?.EMAIL_OUTBOUND_ENABLED || '').trim().toLowerCase() === 'false';
-			if (outboundDisabled) {
-				throw new BizError('External email outbound is disabled in this environment (EMAIL_OUTBOUND_ENABLED=false)', 403, 'outbound_disabled');
-			}
-
-			const externalRecipients = receiveEmail.filter(addr => !domainList.includes('@' + emailUtils.getDomain(addr)));
-			const customWhitelist = String(c.env?.OUTBOUND_WHITELIST || '')
-				.split(',')
-				.map(s => s.trim().toLowerCase())
-				.filter(Boolean);
-			const isStaging = c.env?.ENVIRONMENT === 'staging';
-
-			if (isStaging || String(c.env?.OUTBOUND_WHITELIST_ENFORCE || '').toLowerCase() === 'true') {
-				const officialResendSandbox = ['delivered@resend.dev', 'bounced@resend.dev', 'complained@resend.dev'];
-				const allowedSet = new Set([...officialResendSandbox, ...customWhitelist]);
-				const blockedRecipient = externalRecipients.find(addr => !allowedSet.has(String(addr || '').trim().toLowerCase()));
-				if (blockedRecipient) {
-					throw new BizError(`External recipient (${blockedRecipient}) is not in OUTBOUND_WHITELIST`, 403, 'outbound_recipient_blocked');
-				}
-			}
-		}
-
 		//如果接收方存在站外邮箱，又没有发信服务
 		if (!useCloudflareEmail && !resendToken && !allInternal) {
 			throw new BizError(t('noSendProvider'));
@@ -1457,7 +1428,10 @@ const emailService = {
 		}
 
 		// 仅记录状态与消息数量，不记录收件人、正文或完整供应商响应
-		console.log(`Mailjet response status=${response.status} messages=${Array.isArray(result?.Messages) ? result.Messages.length : 0}`);
+		safeLogger.info('mailjet_send_response', {
+			status: response.status,
+			messageCount: Array.isArray(result?.Messages) ? result.Messages.length : 0
+		});
 
 		if (!response.ok) {
 			return { data: null, error: { statusCode: response.status, message: `Mailjet returned HTTP ${response.status}` } };
@@ -2054,6 +2028,9 @@ const emailService = {
 			emailRow.isStar = emailRow.starId != null ? 1 : 0;
 			if (emailRow.userId) {
 				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, emailRow.userId);
+				if (emailCryptoUtils.needsEmailRecordMigration(emailRow, cryptoKey)) {
+					await emailKeyMigrationService.lazyReencryptEmailRow(c, emailRow, cryptoKey).catch(() => {});
+				}
 				emailRow = await emailCryptoUtils.decryptEmailRecord(emailRow, cryptoKey);
 			}
 			const isOfficial = emailRow.sendEmail === 'announcement@epocanvas.com' || emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
@@ -3042,7 +3019,7 @@ const emailService = {
 			}).sort((a,b) => b.count - a.count).slice(0, 5);
 			
 		} catch (e) {
-			console.error('Analytics error:', e);
+			safeLogger.error('email_analytics_failed', { error: e });
 		}
 		return result;
 	}

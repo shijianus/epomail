@@ -13,7 +13,7 @@ import emailService from './email-service';
 import dayjs from 'dayjs';
 import permService from './perm-service';
 import roleService from './role-service';
-import emailUtils from '../utils/email-utils';
+import emailUtils, { isConfiguredDomain } from '../utils/email-utils';
 import fileUtils from '../utils/file-utils';
 import kvObjService from './kv-obj-service';
 import saltHashUtils from '../utils/crypto-utils';
@@ -33,9 +33,12 @@ import userContext from '../security/user-context.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import { mailSha256 } from '../utils/mail-pipeline.js';
+import safeLogger from '../utils/safe-logger.js';
+import { encryptByoStorageConfig } from '../utils/storage-credential-crypto.js';
 import { deleteKvKeys, deleteKvMatching, forEachKvPage } from '../utils/kv-revocation.js';
 import { assertStorageCanChange, beginAccountDeletion, deleteAccountEvidence, getObjectDeletionCounts,
 	isActiveUser, readPrivacyState, revokeAccountAccess, revokeTelegramLinks, setDeletionStatus } from './privacy-revocation-service.js';
+import { updateSessionUserFields, deleteUserSessionsFromDb, revokeAllUserSessions } from '../utils/session-auth-store.js';
 
 const userService = {
 
@@ -49,7 +52,7 @@ const userService = {
 			.returning({ authVersion: user.authVersion }).get();
 		if (!changed) throw new BizError(t('authExpired'), 409, 'auth_changed');
 		// D1 is authoritative even if a concurrent stale KV writer restores a token.
-		await c.env.kv.delete(KvConst.AUTH_INFO + row.userId).catch(() => {});
+		await revokeAllUserSessions(c, row.userId, { ignoreKvError: true });
 		return changed.authVersion;
 	},
 
@@ -84,12 +87,7 @@ const userService = {
 			throw new BizError(err.message || 'Invalid custom labels');
 		}
 		await orm(c).update(user).set({ customLabels: sanitizedLabels }).where(eq(user.userId, userId));
-		
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo && authInfo.user) {
-			authInfo.user.customLabels = sanitizedLabels;
-			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		}
+		await updateSessionUserFields(c, userId, { customLabels: sanitizedLabels });
 	},
 
 	async updateProfile(c, params, userId) {
@@ -260,17 +258,33 @@ const userService = {
         // Bound every free-form field so one request cannot fill a 25 MB KV
         // value or force oversized public responses.
         const boundedString = (value, max) => typeof value === 'string' ? value.slice(0, max) : '';
-        const profileImageUrl = (value) => {
+        const profileImageUrl = (value, { allowGradient = false } = {}) => {
             if (value === undefined || value === null || value === '') return '';
             const text = String(value).trim();
             if (!text) return '';
+            if (/[\u0000-\u001f\u007f"'\\<>]/.test(text) || text.startsWith('//')) {
+                throw new BizError('Invalid profile image URL', 400, 'invalid_profile_url');
+            }
+            // Allow small legacy inline images, but never a multi-megabyte data URL.
+            if (/^data:image\/(?:png|jpe?g|gif|webp|avif|bmp);base64,[a-z0-9+/=\s]+$/i.test(text) && text.length <= 512 * 1024) {
+                return text;
+            }
             if (text.length > 2048) {
                 throw new BizError('Profile image URL is too long', 400, 'invalid_profile_url');
             }
-            if (/^https?:\/\//i.test(text) || text.startsWith('/')) return text;
-            // Allow small legacy inline images, but never a multi-megabyte data URL.
-            if (/^data:image\/(?:png|jpe?g|gif|webp|avif|bmp);base64,/i.test(text) && text.length <= 512 * 1024) {
+            if (allowGradient && /^(?:linear|radial)-gradient\(\s*[a-z0-9#%,.\s-]+\)$/i.test(text) && !/\b(?:url|var|attr|expression)\b/i.test(text)) {
                 return text;
+            }
+            if (text.startsWith('/')) {
+                return text;
+            }
+            if (/^https?:\/\//i.test(text)) {
+                try {
+                    const parsed = new URL(text);
+                    if (['http:', 'https:'].includes(parsed.protocol) && !parsed.username && !parsed.password) {
+                        return text;
+                    }
+                } catch (_) {}
             }
             throw new BizError('Invalid profile image URL', 400, 'invalid_profile_url');
         };
@@ -278,9 +292,9 @@ const userService = {
         if (safeParams.nickname !== undefined) safeParams.nickname = boundedString(safeParams.nickname, 64);
         if (safeParams.bio !== undefined) safeParams.bio = boundedString(safeParams.bio, 2000);
         if (safeParams.signature !== undefined) safeParams.signature = boundedString(safeParams.signature, 500);
-        if (safeParams.background !== undefined) safeParams.background = boundedString(safeParams.background, 2048);
+        if (safeParams.background !== undefined) safeParams.background = profileImageUrl(safeParams.background, { allowGradient: true });
         if (safeParams.avatarUrl !== undefined) safeParams.avatarUrl = profileImageUrl(safeParams.avatarUrl);
-        if (safeParams.backgroundUrl !== undefined) safeParams.backgroundUrl = profileImageUrl(safeParams.backgroundUrl);
+        if (safeParams.backgroundUrl !== undefined) safeParams.backgroundUrl = profileImageUrl(safeParams.backgroundUrl, { allowGradient: true });
         if (safeParams.themeMode !== undefined) {
             safeParams.themeMode = ['auto', 'light', 'dark', 'system'].includes(safeParams.themeMode)
                 ? safeParams.themeMode : 'auto';
@@ -306,7 +320,7 @@ const userService = {
                         : 'Auto-forwarding disabled'
                 });
             } catch (e) {
-                console.error('Failed to send forwarding notice:', e);
+                safeLogger.error('forwarding_notice_failed', { userId, error: e });
             }
         }
 
@@ -320,22 +334,20 @@ const userService = {
                         : 'Telegram Bot disabled'
                 });
             } catch (e) {
-                console.error('Failed to send telegram notice:', e);
+                safeLogger.error('telegram_notice_failed', { userId, error: e });
             }
         }
 
-        const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo && authInfo.user) {
-            // Only sync safe UI/profile attributes to session cache.
-            // NEVER allow mutating security identity fields (userId, email, type, roleId, status, isDel, etc.)!
-            const safeSessionFields = ['nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels', 'signature', 'personalForwarding', 'lang'];
-            for (const f of safeSessionFields) {
-                if (safeParams[f] !== undefined) {
-                    authInfo.user[f] = safeParams[f];
-                }
+        const safeSessionFields = ['nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels', 'signature', 'personalForwarding', 'lang'];
+        const userPatch = {};
+        for (const f of safeSessionFields) {
+            if (safeParams[f] !== undefined) {
+                userPatch[f] = safeParams[f];
             }
-			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		}
+        }
+        if (Object.keys(userPatch).length > 0) {
+            await updateSessionUserFields(c, userId, userPatch);
+        }
 	},
 	
 	async uploadImage(c, userId) {
@@ -367,7 +379,8 @@ const userService = {
 
             const res = await fetch(`${externalHost}/upload`, {
                 method: 'POST',
-                body: newFormData
+                body: newFormData,
+                signal: AbortSignal.timeout(15000)
             });
 
             if (!res.ok) {
@@ -388,7 +401,10 @@ const userService = {
         }
 
         const storageQuotaService = (await import('./storage-quota-service')).default;
-        await storageQuotaService.checkQuotaAvailable(c, userId, arrayBuffer.byteLength);
+        const quotaCheck = await storageQuotaService.checkQuotaAvailable(c, userId, arrayBuffer.byteLength);
+        if (!quotaCheck?.allowed) {
+            throw new BizError(quotaCheck?.reason || 'Storage quota exceeded', 413, 'storage_quota_exceeded');
+        }
 
         const buffHash = await fileUtils.getBuffHash(arrayBuffer);
         const ext = fileUtils.imageExtensionForMime(detectedMime);
@@ -626,12 +642,12 @@ const userService = {
 		try {
 			await getUserDb(c).prepare("UPDATE user SET initial_password_hash = '' WHERE user_id = ?").bind(userId).run();
 		} catch (err) {
-			console.warn('Failed to clear initial password marker:', err.message);
+			safeLogger.warn('initial_password_marker_clear_failed', { userId, error: err });
 		}
 
 		// Password changes invalidate every existing session. The user must log
 		// in again with the new credential.
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		await revokeAllUserSessions(c, userId);
 
 		try {
 			let profile = {};
@@ -642,7 +658,7 @@ const userService = {
 			profile.passwordUpdatedAt = new Date().toISOString();
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 		} catch (e) {
-			console.error('Failed to update password timestamp', e);
+			safeLogger.error('password_timestamp_update_failed', { userId, error: e });
 		}
 
 		try {
@@ -650,7 +666,7 @@ const userService = {
 			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
 			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSWORD_CHANGED);
 		} catch (e) {
-			console.error('Failed to send password changed notice:', e);
+			safeLogger.error('password_changed_notice_failed', { userId, error: e });
 		}
 	},
 
@@ -682,7 +698,7 @@ const userService = {
 			).bind(passwordHash, userId, passwordHash).run();
 			return Number(result?.meta?.changes ?? 0) > 0;
 		} catch (err) {
-			console.error('Failed to persist initial password marker:', err);
+			safeLogger.error('initial_password_marker_persist_failed', { userId, error: err });
 			return false;
 		}
 	},
@@ -764,7 +780,7 @@ const userService = {
 				generatedHash,
 				authVersion: authVersionOf(userRow)			};
 		} catch (err) {
-			console.error('Failed to evaluate initial password eligibility:', err);
+			safeLogger.error('initial_password_eligibility_failed', { userId, error: err });
 			return status;
 		}
 	},
@@ -813,13 +829,13 @@ const userService = {
 		try {
 			await c.env.kv.delete(KvConst.INITIAL_PASSWORD + userId);
 		} catch (err) {
-			console.error('Failed to clear initial password marker:', err);
+			safeLogger.error('initial_password_kv_clear_failed', { userId, error: err });
 		}
 
 		// Invalidate every session, including this one, exactly like a normal
 		// password change: the user signs in again with the credential they
 		// just chose.
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		await revokeAllUserSessions(c, userId);
 
 		try {
 			let profile = {};
@@ -830,7 +846,7 @@ const userService = {
 			profile.passwordUpdatedAt = new Date().toISOString();
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 		} catch (e) {
-			console.error('Failed to update password timestamp', e);
+			safeLogger.error('initial_password_timestamp_update_failed', { userId, error: e });
 		}
 
 		try {
@@ -838,7 +854,7 @@ const userService = {
 			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
 			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSWORD_CHANGED);
 		} catch (e) {
-			console.error('Failed to send password changed notice:', e);
+			safeLogger.error('initial_password_changed_notice_failed', { userId, error: e });
 		}
 
 		return { success: true };
@@ -1047,6 +1063,7 @@ const userService = {
 		try {
 			const kv = c.env.kv;
 			for (const id of userIds) {
+				await deleteUserSessionsFromDb(c, id);
 				await deleteKvKeys(kv, [KvConst.AUTH_INFO + id, 'USER_PROFILE_' + id,
 					'HAS_WELCOME_' + id, 'USER_KNOWN_ENV_' + id]);
 				for (const prefix of [`REVOKED_GRANT_${id}_`, `HAS_GLOBAL_EMAIL_${id}_`, `static/avatar/${id}/`]) {
@@ -1276,7 +1293,7 @@ const userService = {
 		await rbacGuard.assertCanManageUser(c, callerUserId, Number(userId));
 		await this.assertAdminStepUp(c, callerUserId, operatorPassword);
 		await this.resetPassword(c, { password }, userId);
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		await revokeAllUserSessions(c, userId);
 	},
 
 	async setStatus(c, params, callerUserId) {
@@ -1297,7 +1314,7 @@ const userService = {
 			.run();
 
 		if (nextStatus === userConst.status.BAN) {
-			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+			await revokeAllUserSessions(c, userId);
 		}
 	},
 
@@ -1335,14 +1352,12 @@ const userService = {
 
 		await orm(c)
 			.update(user)
-			.set({ type })
+			.set({ type, authVersion: sql`coalesce(${user.authVersion}, 0) + 1` })
 			.where(eq(user.userId, userId))
 			.run();
 
 		await this.updateUserInfo(c, userId, true);
-		try {
-			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
-		} catch (e) {}
+		await revokeAllUserSessions(c, userId, { ignoreKvError: true });
 	},
 
 	async getBlogLevelInfo(c, userId) {
@@ -1474,14 +1489,21 @@ const userService = {
 
 	async add(c, params, callerUserId) {
 
-		const { email, type, password } = params;
+		let { email, type, password } = params;
+		email = typeof email === 'string' ? email.trim().toLowerCase() : '';
+		if (!verifyUtils.isEmail(email) || email.length > 254) {
+			throw new BizError(t('notEmail'));
+		}
+		if (typeof password !== 'string') {
+			throw new BizError(t('pwdMinLength'));
+		}
 
 		// Creating an account is a role grant: the new user receives `type`.
 		// Without this guard any holder of `user:add` (e.g. a moderator) could
 		// mint an account with a more privileged role and use it to escalate.
 		await rbacGuard.assertCanAssignRole(c, callerUserId, Number(type));
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!isConfiguredDomain(c.env.domain, emailUtils.getDomain(email))) {
 			throw new BizError(t('notEmailDomain'));
 		}
 
@@ -1548,7 +1570,7 @@ const userService = {
 					await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
 				}
 			} catch (err) {
-				console.error('Failed to deliver welcome email on user add:', err);
+				safeLogger.error('user_add_welcome_email_failed', { userId, error: err });
 			}
 		} catch (err) {
 			// The user row, profile KV entry and primary account are separate
@@ -1559,6 +1581,7 @@ const userService = {
 					orm(c).delete(user).where(eq(user.userId, userId)).run(),
 					getMailDb(c).prepare('DELETE FROM account WHERE user_id = ? AND email = ?').bind(userId, email).run(),
 					c.env.kv.delete('USER_PROFILE_' + userId),
+					deleteUserSessionsFromDb(c, userId),
 					c.env.kv.delete(KvConst.AUTH_INFO + userId)
 				]);
 			}
@@ -1684,7 +1707,7 @@ const userService = {
 			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
 			decryptedEmails = await Promise.all(userEmails.map(em => emailCryptoUtils.decryptEmailRecord(em, cryptoKey)));
 		} catch (err) {
-			console.error('Decryption during export:', err);
+			safeLogger.error('export_decryption_failed', { userId, error: err });
 		}
 
 		return {
@@ -1835,7 +1858,7 @@ const userService = {
 				detail: `Token: ${tokenObj.name} (${days ? days + 'd' : 'never'})`
 			});
 		} catch (e) {
-			console.error('Failed to send PAT notice:', e);
+			safeLogger.error('pat_created_notice_failed', { userId, error: e });
 		}
 
 		// The plaintext value is returned exactly once. Only its SHA-256 hash is
@@ -1924,12 +1947,14 @@ const userService = {
 			customDomain: (customDomain || '').trim()
 		};
 
+		const encryptedConfig = await encryptByoStorageConfig(cleanConfig, c.env, userId);
+
 		const userDb = (await import('../utils/db-accessor')).getUserDb(c);
 		await userDb.prepare(`
 			UPDATE user 
 			SET byo_storage_enabled = 1, byo_storage_config = ? 
 			WHERE user_id = ?
-		`).bind(JSON.stringify(cleanConfig), userId).run();
+		`).bind(encryptedConfig, userId).run();
 
 		return {
 			ok: true,
@@ -1955,7 +1980,7 @@ const userService = {
 				detail: 'BYO Storage unlinked and reset to system default'
 			});
 		} catch (e) {
-			console.error('Failed to send storage purged notice:', e);
+			safeLogger.error('storage_purged_notice_failed', { userId, error: e });
 		}
 
 		return {

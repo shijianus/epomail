@@ -1,5 +1,6 @@
 import { env, SELF } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import worker from '../src/index.js';
 import settingService from '../src/service/setting-service.js';
 import { buildSignedObjectUrl } from '../src/utils/object-token.js';
 import { ensureOtcTable, seedOtc } from './helpers/one-time-credential.js';
@@ -177,6 +178,39 @@ describe('Public object storage isolation', () => {
 });
 
 describe('Public API hardening', () => {
+	it('redirects HTTP to HTTPS for staging and production requests', async () => {
+		const response = await worker.fetch(
+			new Request('http://staging.example/api/version'),
+			{
+				ENVIRONMENT: 'staging',
+				CF_VERSION_METADATA: { tag: 'a'.repeat(40), id: 'staging-version' }
+			},
+			{}
+		);
+
+		expect(response.status).toBe(308);
+		expect(response.headers.get('Location')).toBe('https://staging.example/api/version');
+		expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+	});
+
+	it('adds transport and browser isolation headers to HTTPS responses', async () => {
+		const response = await SELF.fetch('https://example.com/api/webhooks', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ type: 'email.delivered', data: { email_id: 'x' } })
+		});
+
+		expect(response.status).toBe(401);
+		expect(response.headers.get('Strict-Transport-Security')).toBe('max-age=31536000; includeSubDomains');
+		expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+		expect(response.headers.get('X-Frame-Options')).toBe('DENY');
+		expect(response.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+		const csp = response.headers.get('Content-Security-Policy');
+		expect(csp).toContain("frame-ancestors 'none'");
+		expect(csp).toContain('https://challenges.cloudflare.com');
+		expect(csp).toContain("frame-src 'self' https://challenges.cloudflare.com");
+	});
+
 	it('rejects unsigned Resend webhooks', async () => {
 		const response = await SELF.fetch('http://example.com/api/webhooks', {
 			method: 'POST',

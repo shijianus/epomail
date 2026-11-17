@@ -1,6 +1,6 @@
 import BizError from '../error/biz-error.js';
 import userService from './user-service.js';
-import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES } from '../utils/email-utils.js';
+import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES, isConfiguredDomain } from '../utils/email-utils.js';
 import { isDel, settingConst, userConst } from '../const/entity-const.js';
 import JwtUtils from '../utils/jwt-utils.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,6 +26,7 @@ import totpUtils from '../utils/totp-utils.js';
 import webauthnUtils from '../utils/webauthn-utils.js';
 import orm from '../entity/orm.js';
 import user from '../entity/user.js';
+import account from '../entity/account.js';
 import { auditLog } from '../entity/audit-log.js';
 import { eq, and, desc } from 'drizzle-orm';
 import riskService from './risk-service.js';
@@ -37,6 +38,8 @@ import authOperation from '../utils/auth-security-operation.js';
 import { authVersionOf, hashToken } from '../utils/one-time-credential.js';
 import { getUserDb } from '../utils/db-accessor.js';
 import legalPolicyService from './legal-policy-service.js';
+import safeLogger from '../utils/safe-logger.js';
+import { mergeSessionRecords, persistSessionRecord, removeSessionToken, revokeAllUserSessions } from '../utils/session-auth-store.js';
 
 function getSafeSessionUser(userRow) {
 	if (!userRow) return null;
@@ -104,10 +107,25 @@ function attachSessionMeta(authInfo, token, meta) {
 
 const LOGIN_FAIL_WINDOW_SECONDS = 12 * 60 * 60;
 
+function loginFailSubject(c, email) {
+	const ip = rateLimit.clientIp(c) || 'local';
+	return `${email}|ip:${ip}`;
+}
+
+function loginFailKvKey(c, email) {
+	return KvConst.LOGIN_FAIL + loginFailSubject(c, email);
+}
+
 function loginFailWindow() {
 	const now = Math.floor(Date.now() / 1000);
 	const start = Math.floor(now / LOGIN_FAIL_WINDOW_SECONDS) * LOGIN_FAIL_WINDOW_SECONDS;
 	return { start, expires: start + LOGIN_FAIL_WINDOW_SECONDS };
+}
+
+export async function persistSessionAuthInfo(c, userId, authInfo, token) {
+	const persisted = await persistSessionRecord(c, userId, authInfo, token);
+	if (persisted) return persisted;
+	throw new BizError('Session persistence conflict, please retry', 503, 'session_persistence_conflict');
 }
 
 async function readLoginFail(c, email) {
@@ -118,7 +136,7 @@ async function readLoginFail(c, email) {
 		const window = loginFailWindow();
 		const row = await db.prepare(`SELECT count FROM rate_limit_counter
 			WHERE scope = 'login-fail' AND subject = ? AND window_start = ?`)
-			.bind(`email:${email}`, window.start).first();
+			.bind(`email:${loginFailSubject(c, email)}`, window.start).first();
 		return Number(row?.count) || 0;
 	} catch (_) {
 		return null;
@@ -137,7 +155,7 @@ async function incrementLoginFail(c, email) {
 			ON CONFLICT(scope, subject, window_start)
 			DO UPDATE SET count = count + 1
 			RETURNING count
-		`).bind(`email:${email}`, window.start, window.expires).first();
+		`).bind(`email:${loginFailSubject(c, email)}`, window.start, window.expires).first();
 		return Number(row?.count) || 0;
 	} catch (_) {
 		return null;
@@ -150,11 +168,12 @@ async function clearLoginFail(c, email) {
 			const db = getUserDb(c);
 			if (db?.prepare) {
 				await db.prepare(`DELETE FROM rate_limit_counter
-					WHERE scope = 'login-fail' AND subject = ?`).bind(`email:${email}`).run();
+					WHERE scope = 'login-fail' AND subject = ?`).bind(`email:${loginFailSubject(c, email)}`).run();
 			}
 		} catch (_) {}
 	}
 	try {
+		await c.env.kv.delete(loginFailKvKey(c, email));
 		await c.env.kv.delete(KvConst.LOGIN_FAIL + email);
 	} catch (_) {}
 }
@@ -230,7 +249,7 @@ const loginService = {
 			throw new BizError(t('pwdMinLength'), undefined, 'password_too_short');
 		}
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!isConfiguredDomain(c.env.domain, emailUtils.getDomain(email))) {
 			throw new BizError(t('notEmailDomain'), undefined, 'domain_not_allowed');
 		}
 
@@ -338,22 +357,32 @@ const loginService = {
 			await (await import('../utils/db-accessor.js')).getUserDb(c)
 				.prepare('DELETE FROM legal_acceptance WHERE user_id = ?').bind(id).run();
 		} catch (error) {
-			console.error('Failed to roll back registration acceptance:', error);
+			safeLogger.error('rollback_registration_acceptance_failed', { userId: id, error });
 		}
 		try {
 			await accountService.physicsDeleteByUserIds(c, [id]);
 		} catch (err) {
-			console.error('Failed to roll back OAuth registration account rows:', err);
+			safeLogger.error('rollback_oauth_registration_accounts_failed', { userId: id, error: err });
+			// Storage cleanup can fail before accountService reaches its D1
+			// delete. Never remove the user while leaving a live mailbox row that
+			// permanently reserves the address. A direct row cleanup is safe here
+			// because this user id was created by the current registration.
+			try {
+				await orm(c).delete(account).where(eq(account.userId, id)).run();
+			} catch (accountCleanupError) {
+				safeLogger.error('rollback_oauth_registration_account_row_failed', { userId: id, error: accountCleanupError });
+				throw new Error('Registration rollback incomplete', { cause: accountCleanupError });
+			}
 		}
 
 		try {
 			await orm(c).delete(user).where(eq(user.userId, id)).run();
 		} catch (err) {
-			console.error('Failed to roll back OAuth registration user row:', err);
+			safeLogger.error('rollback_oauth_registration_user_failed', { userId: id, error: err });
 		}
 
 		try {
-			await c.env.kv.delete(KvConst.AUTH_INFO + id);
+			await revokeAllUserSessions(c, id, { ignoreKvError: true });
 		} catch (_) {}
 	},
 
@@ -430,7 +459,7 @@ const loginService = {
 				await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
 			}
 		} catch (err) {
-			console.error('Failed to deliver welcome email on register:', err);
+			safeLogger.error('register_welcome_email_failed', { userId, error: err });
 		}
 
 		const extra = oauth ? { userId, email, reservedRegKey } : {};
@@ -552,7 +581,7 @@ const loginService = {
 			const { salt, hash } = await cryptoUtils.hashPassword(plainPassword, c.env);
 			await orm(c).update(user).set({ password: hash, salt }).where(and(eq(user.userId, row.userId), eq(user.password, row.password), eq(user.salt, row.salt), eq(user.authVersion, authVersionOf(row)))).run();
 		} catch (err) {
-			console.error('Lazy password migration failed:', err);
+			safeLogger.error('lazy_password_migration_failed', { userId: row?.userId, error: err });
 		}
 	},
 
@@ -581,7 +610,7 @@ const loginService = {
 			if (!identifier) return 0;
 			const durable = await readLoginFail(c, identifier);
 			if (durable !== null) return durable;
-			const str = await c.env.kv.get(KvConst.LOGIN_FAIL + identifier);
+			const str = await c.env.kv.get(loginFailKvKey(c, identifier));
 			return str ? parseInt(str) : 0;
 		};
 
@@ -592,7 +621,7 @@ const loginService = {
 			// Pre-migration / test fallback. The D1 counter is authoritative when
 			// the rate_limit_counter table is present.
 			try {
-				const key = KvConst.LOGIN_FAIL + identifier;
+				const key = loginFailKvKey(c, identifier);
 				const latest = await c.env.kv.get(key);
 				const current = latest ? parseInt(latest) : 0;
 				const nextCount = current + 1;
@@ -612,13 +641,18 @@ const loginService = {
 		const notifyLocked = async () => {
 			if (!userRow || !userRow.userId) return;
 			try {
+				const noticeKey = `login-lock-notified:${userRow.userId}`;
+				if (c?.env?.kv) {
+					if (await c.env.kv.get(noticeKey)) return;
+					await c.env.kv.put(noticeKey, '1', { expirationTtl: LOGIN_FAIL_WINDOW_SECONDS });
+				}
 				const securityNoticeService = (await import('./security-notice-service.js')).default;
 				const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
 				await securityNoticeService.sendNotice(c, userRow.userId, SECURITY_EVENT_TYPES.ACCOUNT_LOCKED, {
-					detail: '12 hours lockdown (5 consecutive failed attempts)'
+						detail: '12 hours source-bound login throttle (5 consecutive failed attempts)'
 				});
 			} catch (e) {
-				console.error('Failed to send account locked notice:', e);
+				safeLogger.error('account_locked_notice_failed', { userId: userRow?.userId, error: e });
 			}
 		};
 
@@ -673,7 +707,7 @@ const loginService = {
 			// Perform a comparable PBKDF2 derivation so the response time does
 			// not reveal whether the account exists.
 			try {
-				await cryptoUtils.genHashPassword(inputPassword, 'epomail-timing-equalization-salt');
+				await cryptoUtils.genHashPassword(inputPassword, 'epomail-timing-equalization-salt', c.env);
 			} catch (_) {}
 			throw new BizError(t('IncorrectPwd'));
 		}
@@ -681,6 +715,9 @@ const loginService = {
 		if (userRow.isDel === isDel.DELETE) {
 			// Same generic message as a wrong password to avoid account
 			// enumeration via the login endpoint.
+			try {
+				await cryptoUtils.genHashPassword(inputPassword, 'epomail-timing-equalization-salt', c.env);
+			} catch (_) {}
 			throw new BizError(t('IncorrectPwd'));
 		}
 
@@ -842,9 +879,9 @@ const loginService = {
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
-		if (authInfo && (authInfo.user.email === userRow.email)) {
+		if (authInfo && authInfo.user?.email === userRow.email && Array.isArray(authInfo.tokens)) {
 
-			if (authInfo.tokens.length > 10) {
+			if (authInfo.tokens.length >= 10) {
 				authInfo.tokens.shift();
 			}
 
@@ -885,7 +922,7 @@ const loginService = {
 			console.warn('Failed to check login environment notice:', e.message);
 		}
 
-		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		await persistSessionAuthInfo(c, userRow.userId, authInfo, uuid);
 		const legalAcceptance = await legalPolicyService.getLegalAcceptanceStatus(c, userRow.userId);
 		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, legalAcceptance };
 	},
@@ -926,7 +963,7 @@ const loginService = {
 		const operation=await authOperation.inspect(c,binding);
 		const pendingData=operation.payload;
 		const targetEmail = pendingData.email;
-		const failKey = targetEmail ? KvConst.LOGIN_FAIL + targetEmail.toLowerCase() : null;
+		const failKey = targetEmail ? loginFailKvKey(c, targetEmail.toLowerCase()) : null;
 		let failCount = 0;
 		if (failKey) {
 			const durable = await readLoginFail(c, targetEmail.toLowerCase());
@@ -1116,8 +1153,8 @@ const loginService = {
 
 		let authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userRow.userId, { type: 'json' });
 
-		if (authInfo && (authInfo.user.email === userRow.email)) {
-			if (authInfo.tokens.length > 10) {
+		if (authInfo && authInfo.user?.email === userRow.email && Array.isArray(authInfo.tokens)) {
+			if (authInfo.tokens.length >= 10) {
 				authInfo.tokens.shift();
 			}
 			authInfo.tokens.push(uuid);
@@ -1154,26 +1191,19 @@ const loginService = {
 			console.warn('Failed to check login environment notice on TOTP login:', e.message);
 		}
 
-		await c.env.kv.put(KvConst.AUTH_INFO + userRow.userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		await persistSessionAuthInfo(c, userRow.userId, authInfo, uuid);
 		const legalAcceptance = await legalPolicyService.getLegalAcceptanceStatus(c, userRow.userId);
 		return { token: jwt, email: activeLoginEmail, userId: userRow.userId, trustedDeviceToken: issuedTrustToken,
 			legalAcceptance, ...(recoveredBackupCodes ? { backupCodes: recoveredBackupCodes } : {}) };
 	},
 
 	async logout(c, userId) {
-		const token = await userContext.getToken(c);
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo && authInfo.tokens) {
-			const index = authInfo.tokens.findIndex(item => item === token);
-			if (index > -1) {
-				authInfo.tokens.splice(index, 1);
-			}
-			if (authInfo.tokens.length === 0) {
-				await c.env.kv.delete(KvConst.AUTH_INFO + userId);
-			} else {
-				await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-			}
+		const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('token');
+		const session = await JwtUtils.verifyToken(c, jwt);
+		if (!session || session.purpose || session.userId !== userId || !session.token) {
+			throw new BizError('Authentication expired', 401, 'auth_expired');
 		}
+		await removeSessionToken(c, userId, session.token, { expiresAt: session.exp });
 	}
 
 };

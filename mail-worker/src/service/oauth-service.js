@@ -10,10 +10,13 @@ import regKeyService from "./reg-key-service";
 import { verifyAppleIdToken } from "../utils/oauth-jwt-utils";
 import rateLimit from '../utils/rate-limit.js';
 import { isSafePublicUrl } from '../utils/url-utils.js';
+import { safeFetch } from '../utils/safe-fetch.js';
 import { getUserDb } from '../utils/db-accessor.js';
 import oneTimeCredential, { OTC_PURPOSE } from '../utils/one-time-credential.js';
 import oauthBindClaim from '../utils/oauth-bind-claim.js';
 import KvConst from '../const/kv-const.js';
+import safeLogger from '../utils/safe-logger.js';
+import { decryptProviderSecret } from '../utils/oauth-secret-crypto.js';
 
 const OAUTH_STATE_TTL_SECONDS = 600;
 const OAUTH_LOGIN_CODE_TTL_SECONDS = 60;
@@ -47,6 +50,21 @@ function resolveAllowedRedirectUri(c, providerKey, redirectUri, config) {
 
 const OIDC_NONCE_PROVIDERS = new Set(['google', 'microsoft', 'apple', 'custom']);
 const PKCE_PROVIDERS = new Set(['github', 'google', 'microsoft', 'apple', 'custom', 'linuxdo']);
+
+async function decryptStoredProviderSecret(c, providerKey, field, value) {
+	if (typeof value !== 'string' || !value.startsWith('v1:')) return value || '';
+	try {
+		return await decryptProviderSecret(c.env, providerKey, field, value);
+	} catch (error) {
+		safeLogger.warn('oauth_provider_secret_unavailable', {
+			provider: providerKey,
+			field,
+			errorName: typeof error?.name === 'string' ? error.name : 'Error',
+			errorCode: typeof error?.errorCode === 'string' ? error.errorCode : 'secret_decrypt_failed'
+		});
+		throw new BizError('OAuth provider secret is unavailable', 503, 'oauth_provider_secret_unavailable');
+	}
+}
 
 function generateCodeVerifier() {
 	const bytes = new Uint8Array(32);
@@ -170,6 +188,8 @@ const oauthService = {
 			config.clientSecret = config.clientSecret || c.env?.linuxdo_client_secret || '';
 			config.callbackUrl = config.callbackUrl || c.env?.linuxdo_callback_url || '';
 		}
+		config.clientSecret = await decryptStoredProviderSecret(c, providerKey, 'clientSecret', config.clientSecret);
+		config.privateKey = await decryptStoredProviderSecret(c, providerKey, 'privateKey', config.privateKey);
 		return config;
 	},
 
@@ -179,6 +199,18 @@ const oauthService = {
 		if (Number(settingData?.oauthLoginEnabled) !== 1) {
 			throw new BizError('OAuth login is currently disabled', 403, 'oauth_disabled');
 		}
+		let providers = settingData?.oauthProviders;
+		if (typeof providers === 'string') {
+			try { providers = JSON.parse(providers); } catch (_) { providers = {}; }
+		} else if (!providers || typeof providers !== 'object') {
+			providers = {};
+		}
+		const rawCfg = providers[normalizedKey];
+		const rawSecret = typeof rawCfg?.clientSecret === 'string' ? rawCfg.clientSecret : '';
+		const rawPrivateKey = typeof rawCfg?.privateKey === 'string' ? rawCfg.privateKey : '';
+		const productionLike = ['production', 'staging'].includes(String(c.env?.ENVIRONMENT || '').toLowerCase());
+		const secretNeedsMigration = productionLike && [rawSecret, rawPrivateKey]
+			.some(value => value && !value.startsWith('v1:'));
 
 		if (normalizedKey === 'linuxdo') {
 			const linuxdoOn = settingData?.linuxdoSwitch === true
@@ -186,6 +218,9 @@ const oauthService = {
 				|| c.env?.linuxdo_switch === 'true';
 			if (!linuxdoOn) {
 				throw new BizError('Provider linuxdo is disabled', 403, 'oauth_provider_disabled');
+			}
+			if (secretNeedsMigration) {
+				throw new BizError('OAuth provider secret requires encrypted-at-rest migration', 503, 'oauth_provider_secret_migration_required');
 			}
 			const cfg = await this.getProviderConfig(c, 'linuxdo');
 			if (!cfg.clientId || !cfg.clientSecret || !cfg.callbackUrl) {
@@ -198,20 +233,15 @@ const oauthService = {
 			throw new BizError(`Unsupported provider: ${providerKey}`, 400, 'oauth_provider_unsupported');
 		}
 
-		let providers = settingData?.oauthProviders;
-		if (typeof providers === 'string') {
-			try { providers = JSON.parse(providers); } catch (_) { providers = {}; }
-		} else if (!providers || typeof providers !== 'object') {
-			providers = {};
-		}
-
-		const rawCfg = providers[normalizedKey];
 		const isExplicitlyEnabled = Boolean(rawCfg && (rawCfg.enabled === 1 || rawCfg.enabled === true));
 		if (!isExplicitlyEnabled) {
 			throw new BizError(`Provider ${normalizedKey} is disabled`, 403, 'oauth_provider_disabled');
 		}
 
 		const config = await this.getProviderConfig(c, normalizedKey);
+		if (secretNeedsMigration) {
+			throw new BizError(`Provider ${normalizedKey} secret requires encrypted-at-rest migration`, 503, 'oauth_provider_secret_migration_required');
+		}
 		const hasClientId = Boolean(config?.clientId && String(config.clientId).trim());
 		const hasClientSecret = Boolean(config?.clientSecret && String(config.clientSecret).trim());
 		if (!hasClientId || !hasClientSecret) {
@@ -246,6 +276,10 @@ const oauthService = {
 			const rawCfg = providers[key];
 			const isExplicitlyEnabled = Boolean(rawCfg && (rawCfg.enabled === 1 || rawCfg.enabled === true));
 			if (!isExplicitlyEnabled) continue;
+			const rawSecret = typeof rawCfg?.clientSecret === 'string' ? rawCfg.clientSecret : '';
+			const rawPrivateKey = typeof rawCfg?.privateKey === 'string' ? rawCfg.privateKey : '';
+			if (['production', 'staging'].includes(String(c.env?.ENVIRONMENT || '').toLowerCase())
+				&& [rawSecret, rawPrivateKey].some(value => value && !value.startsWith('v1:'))) continue;
 
 			const cfg = await this.getProviderConfig(c, key);
 			const hasClientId = Boolean(cfg?.clientId && String(cfg.clientId).trim());
@@ -520,8 +554,9 @@ const oauthService = {
 				body: formBody.toString()
 			});
 			if (!tokenRes.ok) {
-				const errText = await tokenRes.text();
-				throw new BizError(`Google token exchange failed: ${errText}`);
+				await tokenRes.text().catch(() => '');
+				safeLogger.warn('oauth_token_exchange_failed', { provider: 'google', status: tokenRes.status });
+				throw new BizError(`Google token exchange failed (HTTP ${tokenRes.status})`);
 			}
 			const tokenData = await tokenRes.json();
 			const userRes = await fetch(meta.userInfoUrl, {
@@ -558,8 +593,9 @@ const oauthService = {
 				body: formBody.toString()
 			});
 			if (!tokenRes.ok) {
-				const errText = await tokenRes.text();
-				throw new BizError(`Microsoft token exchange failed: ${errText}`);
+				await tokenRes.text().catch(() => '');
+				safeLogger.warn('oauth_token_exchange_failed', { provider: 'microsoft', status: tokenRes.status });
+				throw new BizError(`Microsoft token exchange failed (HTTP ${tokenRes.status})`);
 			}
 			const tokenData = await tokenRes.json();
 			const userRes = await fetch(meta.userInfoUrl, {
@@ -644,7 +680,7 @@ const oauthService = {
 			formBody.append('grant_type', 'authorization_code');
 			if (codeVerifier) formBody.append('code_verifier', codeVerifier);
 
-			const tokenRes = await fetch(config.tokenUrl, {
+			const tokenRes = await safeFetch(config.tokenUrl, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/x-www-form-urlencoded',
@@ -653,13 +689,14 @@ const oauthService = {
 				body: formBody.toString()
 			});
 			if (!tokenRes.ok) {
-				const errText = await tokenRes.text();
-				throw new BizError(`Custom token exchange failed: ${errText}`);
+				await tokenRes.text().catch(() => '');
+				safeLogger.warn('oauth_token_exchange_failed', { provider: 'custom', status: tokenRes.status });
+				throw new BizError(`Custom token exchange failed (HTTP ${tokenRes.status})`);
 			}
 			const tokenData = await tokenRes.json();
 			const accessToken = tokenData.access_token;
 
-			const userRes = await fetch(config.userInfoUrl, {
+			const userRes = await safeFetch(config.userInfoUrl, {
 				headers: {
 					'Authorization': `Bearer ${accessToken}`,
 					'Accept': 'application/json'
@@ -769,7 +806,7 @@ const oauthService = {
 			}
 			// Probe connectivity to tokenUrl host
 			try {
-				const testRes = await fetch(config.tokenUrl, {
+				const testRes = await safeFetch(config.tokenUrl, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 					body: 'grant_type=client_credentials'
@@ -790,7 +827,7 @@ const oauthService = {
 		const url = testUrls[providerKey];
 		if (url) {
 			try {
-				const res = await fetch(url, { method: 'GET', headers: { 'User-Agent': 'Epocanvas-Mail' } });
+				const res = await safeFetch(url, { method: 'GET', headers: { 'User-Agent': 'Epocanvas-Mail' } });
 				if (!res.ok && res.status >= 500) {
 					throw new BizError(`Provider endpoint responded with status ${res.status}`);
 				}
@@ -919,7 +956,7 @@ const oauthService = {
 						proofConsumed: false
 					});
 			}
-			console.error('OAuth bind preflight failed:', err);
+			safeLogger.error('oauth_bind_preflight_failed', { provider: boundProvider, error: err });
 			throw new BizError('OAuth binding failed; retry with the same proof', 400, 'bind_failed');
 		}
 
@@ -998,7 +1035,7 @@ const oauthService = {
 					code: typeof code === 'string' ? code : ''
 				});
 			} catch (err) {
-				console.error('Failed to record OAuth bind claim account:', err);
+				safeLogger.error('oauth_bind_claim_record_failed', { userId, error: err });
 			}
 
 			// Atomic association: lease still ours AND identity still unbound.
@@ -1026,11 +1063,11 @@ const oauthService = {
 					try {
 						await c.env.kv.put(KvConst.INITIAL_PASSWORD + userId, createdRow.password);
 					} catch (kvErr) {
-						console.error('Failed to cache initial password marker:', kvErr);
+						safeLogger.error('oauth_initial_password_kv_cache_failed', { userId, error: kvErr });
 					}
 				}
 			} catch (err) {
-				console.error('Failed to mark initial password for OAuth account:', err);
+				safeLogger.error('oauth_initial_password_mark_failed', { userId, error: err });
 			}
 		} catch (err) {
 			if (!proofSpent) {
@@ -1046,13 +1083,13 @@ const oauthService = {
 				// new flow. Preserve the user-facing message.
 				throw new BizError(err.message, 409, err.errorCode || 'bind_failed');
 			}
-			console.error('OAuth binding failed after proof consumption:', err);
+			safeLogger.error('oauth_bind_after_proof_failed', { provider: boundProvider, error: err });
 			throw new BizError('OAuth binding failed; restart the OAuth login flow', 409, 'bind_failed');
 		} finally {
 			try {
 				await oauthBindClaim.release(c, { oauthUserId, claimToken });
 			} catch (err) {
-				console.error('Failed to release OAuth bind claim:', err);
+				safeLogger.error('oauth_bind_claim_release_failed', { provider: boundProvider, error: err });
 			}
 		}
 
@@ -1069,7 +1106,7 @@ const oauthService = {
 			});
 			return { userInfo: oauthRow, ...splitLoginResult(loginResult) }
 		} catch (err) {
-			console.error('OAuth binding committed but session creation failed:', err);
+			safeLogger.error('oauth_bind_session_create_failed', { provider: boundProvider, error: err });
 			return { userInfo: oauthRow, token: null, alreadyBound: true };
 		}
 	},
@@ -1085,7 +1122,7 @@ const oauthService = {
 			try {
 				await regKeyService.restoreOne(c, code);
 			} catch (err) {
-				console.error('Failed to restore invite slot after OAuth bind rollback:', err);
+				safeLogger.error('oauth_bind_rollback_invite_restore_failed', { userId, error: err });
 			}
 		}
 	},

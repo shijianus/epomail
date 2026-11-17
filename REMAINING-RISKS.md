@@ -1,6 +1,9 @@
 # Epocanvas Mail - 剩余风险评估与接受理由 (REMAINING-RISKS.md)
 
-> **评估基线**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
+> [!WARNING]
+> **基线更新说明 (2026-11-15)**：第 1–10 项为历史 `release/2026-10-31` (`4d9d9d8`) 评估条目；当前有效评估基线已更新至 **`fix/public-beta-go-blockers-2026-11-07` @ `e75305491edf9300475ab45ddc8cc2450c48addf`**。因新增未关闭的外部集成、凭据加密、容量瓶颈及运维监控风险（见文末 `RISK-11` 至 `RISK-17`），当前 **受控公测与 GA 均维持 `NO-GO (BLOCKED)`**，下文历史签字建议已废止。
+
+> **历史评估基线**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
 > **适用阶段**：受控公测阶段 (Controlled Public Beta)
 > **风险管理原则**：知悉风险、受控容灾、透明记录、不留隐患。禁止在无证据支撑的情况下宣称“系统 100% 绝对安全”。
 
@@ -117,6 +120,42 @@
 
 ## 2. 运营与管理团队签字确认建议 (Sign-off Recommendation)
 
-上述 10 项 P2 残余风险均处于严格的技术受控与缓解状态，**不存在导致系统瘫痪、跨租户数据泄漏或权限提权的漏洞隐患**。
+上述 10 项 P2 残余风险仅反映 `4d9d9d8` 历史快照；在以下 2026-11-15 实测新增风险闭环或取得人工签字前，**禁止开启 Public Beta 或 GA**。
 
-**Release Engineer 建议：公测管理委员会准予签字接受，正式开启 Public Beta 封测上线。**
+---
+
+## 3. 2026-11-15 公测收尾新检出与未关闭风险 (`e753054`)
+
+### 11. [RISK-11] 传递依赖 `deepmerge@4.3.1` 供应链告警 (`1243505` / `CVE-2026-93753`)
+- **等级**：`Low / 本地已修补`
+- **事实**：`COREPACK_ENABLE_STRICT=0 corepack pnpm@10.34.5 --dir mail-worker audit --prod --registry=https://registry.npmjs.org` 检出 1 项低危（`GHSA-gcqx-w48m-w2h4`, `CWE-1321`, `patched_versions: <0.0.0`，链路 `.>resend>@react-email/render>html-to-text>deepmerge@4.3.1`）。
+- **缓解与退出条件**：已通过 `mail-worker/patches/deepmerge@4.3.1.patch`（SHA256 `32f828ea97e1db4f62a6b9035cfae843ee56b2bee3c1b28589f3b33eed3b014e`）与 `deepmerge-hardening.test.mjs`（6/6）在运行时阻断原型污染；待上游 `resend`/`html-to-text` 更新或官方发布修补版 `deepmerge` 后，按 `patchedDependencies` 移除补丁并重跑冻结安装与回归即可。
+
+### 12. [RISK-12] 第三方登录 `setting.oauthProviders` 凭据存储与开关/PKCE 缺口
+- **等级**：`P1·高风险（开启外部 IdP 前阻塞）`
+- **事实**：尽管 `oauth_app`（EpoMail OIDC IdP）已改用 `oauth_client_enc_key` AES-GCM 加密，但管理员通过后台保存的 Google/GitHub/LinuxDo 等三方登录凭据仍在 D1 `setting.oauthProviders` 与 KV 设置缓存以明文 JSON 存储（仅响应掩码与支持 env 变量覆写），且 `oauthLoginEnabled` 仅隐藏前端按钮未校验 `/api/oauth/authorize` 全部路径、`authorize` 无 PKCE 也没有速率限制、Apple `.p8` 无法自动派生 `clientSecret`。
+- **缓解与前置条件**：公测首发保持 `oauthLoginEnabled=0`；任何时候若拟启用任意外部 IdP，必须仅通过 Worker Secrets 注入密钥并补齐服务端主开关拦截与真实三方验收。
+
+### 13. [RISK-13] 专有加密密钥缺失与存量密文双读迁移未在云端执行
+- **等级**：`P1·高风险（云端生效前需补齐）`
+- **事实**：Staging 当前未设置 `oauth_client_enc_key`、`email_enc_key`、`storage_enc_key`（以及 `scheduled_secret`、`resend_webhook_secret`）。缺省 `email_enc_key`/`storage_enc_key` 时当前代码通过 HKDF 域隔离回退兼容 `totp_enc_key`，虽阻断 `jwt_secret` 明文域混淆，但未完成真实多域独立密钥隔离与存量 `byo:v1` / `email_enc_key` 批量迁移及部署后核验。
+
+### 14. [RISK-14] 单实例 D1 吞吐天花板、PBKDF2 认证饱和与并发登录 KV 竞态
+- **等级**：`P1/P2·容量阻塞 GA`
+- **事实**：官方 `backend-stress --profile=capacity` 在 `ramp-16` 阶段以 `464/640`（低于下限 `480`）失败（单实例 Miniflare SQLite D1 在 ~46–50 RPS 饱和，`ramp-32` `p95=1583.92ms`）；PBKDF2 100k 轮单 Isolate 并发极限约 1.6 次/秒（`task-645`/`657` 40 并发纯认证突发全部 >15s 超时）；16 路同账号并行登录因 KV 读改写非原子竞态最终留存 `2` 个会话（不越过 10 会话上限但会互相覆盖）。
+
+### 15. [RISK-15] 同源 IP 登录限流 (`30次/900s`) 触发 429 与 NAT 共享 IP 影响
+- **等级**：`P2·运维观测风险`
+- **事实**：15.39 分钟长稳测试中，`login-service.js:572` 的 `scope='login'` (`limit: 30, windowSeconds: 900`) 在同 IP 连续错密测试第 10 分钟后准确触发 34 次 `HTTP 429`。校园/公司 NAT 出口若并发失败登录较多易误伤正常用户，需配齐 429 阈值告警。
+
+### 16. [RISK-16] Staging 环境偏移、`crons=[]`、`legalNotice` 缺失与双默认角色异常
+- **等级**：`P0·Staging 阻塞`
+- **事实**：Staging 当前线上 SHA 为 `6c0c010`（落后当前 `e753054`）、`crons=[]`、未设 `legalNotice`（`check-privacy-readiness` 返回 `notReady`）、且 `epomail-staging-db` 中 `role_id=1 (custom)` 与 `role_id=2 (visitor)` 同时具备 `is_default=1`。
+
+### 17. [RISK-17] 历史凭据轮换、旧会话吊销与外部告警/值班体制未落地
+- **等级**：`P0·公测准入阻塞`
+- **事实**：历史 JWT、TOTP、Mailjet、测试账号凭据轮换及全量旧会话失效操作因无交互权限尚未验证落地；`wrangler.toml` 虽启用 `[observability]`，但缺少针对 5xx 突发、429 激增、Cron 心跳丢失（如 `maintenance_failed`）及 Resend/Mailjet 失败率的外部自动告警通知通道、值班人员名录与回滚授权人。
+
+# 当前审计基线说明 (2026-11-15)
+
+本风险清单已于 2026-11-15 基于 `fix/public-beta-go-blockers-2026-11-07` @ `e75305491edf9300475ab45ddc8cc2450c48addf` 全面更新，详见 `doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md`。

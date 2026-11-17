@@ -2,9 +2,10 @@ import app from '../hono/hono';
 import starService from '../service/star-service';
 import userContext from '../security/user-context';
 import result from '../model/result';
+import { readJsonObject } from '../utils/request-body.js';
 
 app.post('/star/add', async (c) => {
-	await starService.add(c, await c.req.json(), userContext.getUserId(c));
+	await starService.add(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 

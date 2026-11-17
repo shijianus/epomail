@@ -150,12 +150,22 @@ const totpService = {
 		if (params.isPasskey === true) {
 			const keys = keysOf(row);
 			const key = keys.find(k => k.credentialId === params.credentialId && k.status !== 'pending_verification');
-			const signCount = await webauthnUtils.verifyAssertion(params, key, expected);
+			let signCount;
+			try {
+				signCount = await webauthnUtils.verifyAssertion(params, key, expected);
+			} catch (error) {
+				if (error?.code === 'webauthn_counter_conflict') {
+					throw new BizError(t('passkeyTestFailed'), 409, 'passkey_counter_conflict', { retryAfter: 1 });
+				}
+				// Parsing, binding and signature failures are client verification
+				// failures and must never escape as HTTP 500.
+				throw new BizError(t('passkeyTestFailed'), 403, 'passkey_verification_failed');
+			}
 			key.signCount = signCount;
 			const updated = await orm(c).update(user).set({ securityKeys: JSON.stringify(keys) })
 				.where(and(eq(user.userId, row.userId), eq(user.authVersion, authVersionOf(row)), eq(user.securityKeys, row.securityKeys)))
 				.returning({ id: user.userId }).get();
-			if (!updated) reject();
+			if (!updated) throw new BizError(t('passkeyTestFailed'), 409, 'passkey_counter_conflict', { retryAfter: 1 });
 			return;
 		}
 		const code = typeof params.code === 'string' ? params.code.trim() : '';
