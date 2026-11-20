@@ -432,6 +432,71 @@ describe('Production inbound email handler with local D1 and stubbed providers',
 });
 
 describe('Real D1 mail reliability transactions', () => {
+	it('waits for the matching provider configuration before querying an earlier send', async () => {
+		const taskId = crypto.randomUUID();
+		const settings = { resendTokens: { 'configured.test': 'mailjet:fixture:fixture' } };
+		vi.spyOn(settingService, 'query').mockResolvedValue(settings);
+		vi.spyOn(accountService, 'selectById').mockResolvedValue({ email: 'sender@configured.test' });
+		try {
+			await db.prepare(`INSERT INTO mail_outbound_task
+				(task_id,user_id,account_id,idempotency_key,content_hash,state,provider,payload_json,provider_id,updated_at)
+				VALUES (?,42,7,?,'hash','UNKNOWN','external','{"providerName":"resend"}',?,datetime('now','-1 hour'))`)
+				.bind(taskId, taskId, taskId).run();
+			expect(await emailService.reconcileUnknownOutbound(c)).toMatchObject({ checked: 0, accepted: 0, failed: 0 });
+			settings.resendTokens['configured.test'] = 'fixture';
+			await db.prepare("UPDATE mail_outbound_task SET updated_at=datetime('now','-1 minute') WHERE task_id=?")
+				.bind(taskId).run();
+			fetchMock.get('https://api.resend.com').intercept({ path: '/emails/' + taskId, method: 'GET' })
+				.reply(200, { last_event: 'delivered' });
+			expect(await emailService.reconcileUnknownOutbound(c)).toMatchObject({ checked: 1, accepted: 1, failed: 0 });
+		} finally {
+			await db.prepare('DELETE FROM mail_outbound_task WHERE task_id=?').bind(taskId).run();
+		}
+	});
+
+	it('rotates stalled UNKNOWN lookups so a later healthy task can complete', async () => {
+		const group = crypto.randomUUID();
+		const id = i => group + '-' + i;
+		const insert = (i, accountId, provider, age) => db.prepare(`INSERT INTO mail_outbound_task
+			(task_id,user_id,account_id,idempotency_key,content_hash,state,provider,payload_json,provider_id,updated_at)
+			VALUES (?,42,?,?,'hash','UNKNOWN','external',?,?,datetime('now',?))`)
+			.bind(id(i), accountId, id(i), JSON.stringify({ providerName: provider }), id(i), age);
+		vi.spyOn(settingService, 'query').mockResolvedValue({ resendTokens: { 'configured.test': 'fixture' } });
+		vi.spyOn(accountService, 'selectById').mockImplementation(async (_c, accountId) =>
+			({ email: accountId === 1 ? 'sender@unconfigured.test' : 'sender@configured.test' }));
+		const provider = fetchMock.get('https://api.resend.com');
+		const receipt = i => ({ path: '/emails/' + id(i), method: 'GET' });
+		try {
+			await db.batch([
+				insert('manual', 2, 'cloudflare', '-3 hours'),
+				...Array.from({ length: 19 }, (_, i) => insert(i, 1, 'resend', '-2 hours')),
+				insert(19, 2, 'resend', '-2 hours'),
+				insert(20, 2, 'resend', '-1 hour')
+			]);
+			provider.intercept(receipt(19)).reply(503);
+			expect(await emailService.reconcileUnknownOutbound(c)).toMatchObject({ checked: 1, accepted: 0, failed: 0 });
+
+			// Advance the age of all rows so failures are eligible *again*. The unattempted task must still win.
+			await db.prepare("UPDATE mail_outbound_task SET updated_at=datetime(updated_at,'-5 minutes') WHERE task_id LIKE ?")
+				.bind(group + '-%').run();
+			provider.intercept(receipt(20)).reply(200, { last_event: 'delivered' });
+			const status = await emailService.reconcileUnknownOutbound(c, { limit: 1 });
+			expect(status).toMatchObject({ checked: 1, accepted: 1, failed: 0 });
+			expect(await db.prepare("SELECT task_id FROM mail_outbound_task WHERE task_id LIKE ? AND state='ACCEPTED'")
+				.bind(group + '-%').first('task_id')).toBe(id(20));
+			expect(await db.prepare("SELECT COUNT(*) FROM mail_outbound_task WHERE task_id LIKE ? AND state='UNKNOWN'")
+				.bind(group + '-%').first('COUNT(*)')).toBe(21);
+
+			// Other workers may select the same due rows, but only one should perform the provider lookup.
+			provider.intercept(receipt(19)).reply(200, { last_event: 'sent' });
+			const runs = await Promise.all([emailService.reconcileUnknownOutbound(c), emailService.reconcileUnknownOutbound(c)]);
+			expect(runs[0].checked + runs[1].checked).toBe(1);
+			expect(runs[0].accepted + runs[1].accepted).toBe(1);
+		} finally {
+			await db.prepare('DELETE FROM mail_outbound_task WHERE task_id LIKE ?').bind(group + '-%').run();
+		}
+	});
+
 	it('upgrades legacy deferred cleanup once and uses the due and manual review indexes', async () => {
 		const legacy = env.NOTICE_MAIL_DB;
 		const legacyContext = { env: { MAIL_DB: legacy, USER_DB: env.NOTICE_USER_DB } };

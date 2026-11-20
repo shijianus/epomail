@@ -2303,11 +2303,13 @@ const emailService = {
 		// Provider queries are sequential; cap the total wall-clock budget so a
 		// slow/unreachable provider cannot delay the rest of the cron chain.
 		const deadline = Date.now() + 15000;
-		const candidates = await db.prepare(`SELECT task_id, user_id, account_id, provider_id, payload_json
+		// Cloudflare Email has no status lookup. Keep those tasks available for manual resolution.
+		const candidates = await db.prepare(`SELECT task_id, account_id, provider_id, updated_at,
+				CASE WHEN json_valid(payload_json) THEN json_extract(payload_json,'$.providerName') END AS provider_name
 			FROM mail_outbound_task
-			WHERE state='UNKNOWN' AND provider='external' AND provider_id IS NOT NULL
+			WHERE state='UNKNOWN' AND provider='external' AND provider_id <> '' AND provider_name IS NOT 'cloudflare'
 				AND updated_at < datetime('now','-30 seconds')
-			ORDER BY updated_at ASC LIMIT ?`).bind(bound).all();
+			ORDER BY updated_at, rowid LIMIT ?`).bind(bound).all();
 		const rows = candidates.results || [];
 		if (rows.length === 0) return { checked: 0, accepted: 0, failed: 0, stoppedEarly: false };
 
@@ -2321,18 +2323,19 @@ const emailService = {
 				stoppedEarly = true;
 				break;
 			}
+			// Rotate only the row we actually attempt. Missing credentials, failed lookups
+			// and worker restarts then leave older, unattempted tasks first in line.
+			const claim = await db.prepare(`UPDATE mail_outbound_task SET updated_at=CURRENT_TIMESTAMP
+				WHERE task_id=? AND state='UNKNOWN' AND provider='external' AND provider_id=? AND updated_at=?`)
+				.bind(row.task_id, row.provider_id, row.updated_at).run();
+			if (!claim.meta.changes) continue;
 			const account = await accountService.selectById(c, row.account_id);
 			const domain = emailUtils.getDomain(account?.email || '');
 			const token = settings?.resendTokens?.[domain];
 			if (!token) continue;
-			let providerName = '';
-			try {
-				providerName = String(JSON.parse(row.payload_json || '{}')?.providerName || '');
-			} catch (_) {}
-			if (!providerName) providerName = String(token).startsWith('mailjet:') ? 'mailjet' : 'resend';
-			// Cloudflare Email exposes no status lookup API; those tasks stay in
-			// the administrator queue rather than being queried against Resend.
-			if (providerName === 'cloudflare') continue;
+			const providerName = String(token).startsWith('mailjet:') ? 'mailjet' : 'resend';
+			// A domain can switch providers while an earlier lookup is still pending.
+			if (row.provider_name && row.provider_name !== providerName) continue;
 
 			const accept = async (providerId, event) => {
 				const status = ['delivered', 'opened', 'clicked'].includes(event) ? emailConst.status.DELIVERED : emailConst.status.SENT;
