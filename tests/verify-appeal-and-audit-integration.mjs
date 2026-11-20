@@ -267,8 +267,8 @@ async function main() {
     await page.screenshot({ path: 'tests/verify_prod_audit_console_pm_aesthetic.png' });
     console.log('📸 Captured screenshot: tests/verify_prod_audit_console_pm_aesthetic.png');
 
-    // Switch to Mode 2 (加密模式 [E2EE]) via mode selector dropdown
-    console.log('--- Switching to Mode 2 (Encrypted Mode [E2EE]) ---');
+    // Switch to Mode 2 (加密模式) via mode selector dropdown
+    console.log('--- Switching to Mode 2 (Encrypted Mode) ---');
     await modeSelect.click();
     await page.waitForTimeout(400);
     const mode2Option = page.locator('.el-select-dropdown__item:has-text("加密模式"), .el-select-dropdown__item:has-text("Level 3")').first();

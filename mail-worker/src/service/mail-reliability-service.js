@@ -7,6 +7,7 @@ import { mailSha256, normalizeMailAddress } from '../utils/mail-pipeline.js';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const LEASE_SECONDS = 30 * 60;
+const RAW_CLEANUP_RETRY_SECONDS = 5 * 60;
 const RAW_V2_PREFIX = encoder.encode('raw:v2:');
 const RAW_V2_OVERHEAD = RAW_V2_PREFIX.byteLength + 12 + 16;
 const KV_VALUE_LIMIT = 25 * 1024 * 1024;
@@ -217,20 +218,32 @@ export async function acquireInboundClaim(c, {
 	const rawSha256 = await mailSha256(rawBytes);
 	const contentSha256 = await inboundContentSha256(rawBytes);
 	const baseIdentity = normalizedMessageId ? `message:${normalizedMessageId}` : `raw:${contentSha256}`;
-	let identity = baseIdentity;
-	let claimKey = await mailSha256(`${normalizedRecipient}\n${identity}`);
+	let claimKey = await mailSha256(`${normalizedRecipient}\n${baseIdentity}`);
 	const input = { rawSha256, contentSha256, userId, accountId };
-	let existingClaim = await mailDb.prepare(`SELECT * FROM mail_receive_claim WHERE claim_key = ?`).bind(claimKey).first();
-	if (existingClaim?.state === 'COMPLETE' && !await completedClaimStillAuthoritative(mailDb, existingClaim)) {
-		// A new delivery after permanent deletion (or after the bounded tombstone
-		// window) gets a stable reissue identity, so its own retries still dedupe.
-		identity = `${baseIdentity}:reissue:${existingClaim.updated_at || existingClaim.claim_key}`;
-		claimKey = await mailSha256(`${normalizedRecipient}\n${identity}`);
-		existingClaim = await mailDb.prepare(`SELECT * FROM mail_receive_claim WHERE claim_key = ?`).bind(claimKey).first();
+	// Older reissues carry the same recipient and identity, but all pre-upgrade
+	// rows start at generation zero. Their insertion order selects the last one.
+	const lookup = normalizedMessageId
+		? mailDb.prepare(`SELECT * FROM mail_receive_claim WHERE recipient = ? AND message_id = ?
+			ORDER BY generation DESC, rowid DESC LIMIT 1`).bind(normalizedRecipient, normalizedMessageId)
+		: mailDb.prepare(`SELECT * FROM mail_receive_claim WHERE recipient = ? AND message_id = '' AND content_sha256 = ?
+			ORDER BY generation DESC, rowid DESC LIMIT 1`).bind(normalizedRecipient, contentSha256);
+	let existingClaim = await lookup.first();
+	if (!existingClaim && !normalizedMessageId) {
+		// Legacy no-ID claims may lack a canonical digest; their original key is still valid.
+		existingClaim = await mailDb.prepare('SELECT * FROM mail_receive_claim WHERE claim_key = ?').bind(claimKey).first();
 	}
+	let generation = existingClaim?.generation ?? 0;
 	if (existingClaim) {
-		await verifyClaim(c, existingClaim, input);
-		if (existingClaim.state === 'COMPLETE') return { complete: true, claimKey, emailId: existingClaim.email_id };
+		claimKey = existingClaim.claim_key;
+		if (existingClaim.state === 'COMPLETE' && !await completedClaimStillAuthoritative(mailDb, existingClaim)) {
+			// All contenders derive exactly one successor from the immutable prior key.
+			// A cleanup, a second deletion or two deliveries in the same second cannot fork it.
+			claimKey = await mailSha256(`inbound-reissue:v2\n${claimKey}`);
+			generation++;
+		} else {
+			await verifyClaim(c, existingClaim, input);
+			if (existingClaim.state === 'COMPLETE') return { complete: true, claimKey, emailId: existingClaim.email_id };
+		}
 	}
 	const now = Math.floor(Date.now() / 1000);
 	// Unknown-recipient callers opt out; their parsed email row is enough.
@@ -242,10 +255,10 @@ export async function acquireInboundClaim(c, {
 	const inserted = await mailDb.prepare(`
 		INSERT OR IGNORE INTO mail_receive_claim (
 			claim_key, recipient, message_id, raw_sha256, content_sha256, raw_object_key, raw_expires_at,
-			account_id, user_id, state, lease_token, lease_until, attempts
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'CLAIMED', ?, ?, 1)
+			account_id, user_id, state, lease_token, lease_until, attempts, generation
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'CLAIMED', ?, ?, 1, ?)
 	`).bind(claimKey, normalizedRecipient, normalizedMessageId, rawSha256, contentSha256, rawObjectKey,
-		rawExpiresAt, Number(accountId) || 0, Number(userId) || 0, leaseToken, now + LEASE_SECONDS).run();
+		rawExpiresAt, Number(accountId) || 0, Number(userId) || 0, leaseToken, now + LEASE_SECONDS, generation).run();
 
 	if (Number(inserted.meta?.changes || 0) === 0) {
 		const existing = await mailDb.prepare(`SELECT * FROM mail_receive_claim WHERE claim_key = ?`).bind(claimKey).first();
@@ -389,23 +402,31 @@ export async function cleanupExpiredInboundClaims(c, { limit = 100 } = {}) {
 	const mailDb = getMailDb(c);
 	const rows = await mailDb.prepare(`
 		SELECT claim_key FROM mail_receive_claim
-		WHERE raw_object_key <> '' AND raw_expires_at <= unixepoch() AND lease_until <= unixepoch() ORDER BY raw_expires_at LIMIT ?
+		WHERE raw_object_key <> '' AND MAX(raw_expires_at, cleanup_retry_at) <= unixepoch() AND lease_until <= unixepoch()
+		ORDER BY MAX(raw_expires_at, cleanup_retry_at), rowid LIMIT ?
 	`).bind(Math.max(1, Math.min(Number(limit) || 100, 500))).all();
 	let deleted = 0;
+	let failed = 0;
 	for (const row of rows.results || []) {
 		const token = `cleanup:${crypto.randomUUID()}`;
-		const claimed = await mailDb.prepare(`UPDATE mail_receive_claim SET lease_token = ?, lease_until = unixepoch() + ?
-			WHERE claim_key = ? AND raw_object_key <> '' AND raw_expires_at <= unixepoch() AND lease_until <= unixepoch() RETURNING *`)
-			.bind(token, LEASE_SECONDS, row.claim_key).first();
-		if (!claimed) continue;
 		try {
+			const claimed = await mailDb.prepare(`UPDATE mail_receive_claim SET lease_token = ?, lease_until = unixepoch() + ?
+				WHERE claim_key = ? AND raw_object_key <> '' AND MAX(raw_expires_at, cleanup_retry_at) <= unixepoch()
+					AND lease_until <= unixepoch() RETURNING *`)
+				.bind(token, LEASE_SECONDS, row.claim_key).first();
+			if (!claimed) continue;
 			// Preserve completed identity after raw retention ends, or a replay
 			// would collide with the still-published receive_claim_key email row.
-			let contentSha256 = claimed.content_sha256;
-			if (claimed.state === 'COMPLETE' && !contentSha256) {
+			if (claimed.state === 'COMPLETE' && !claimed.content_sha256) {
 				const raw = await readStoredRaw(c, claimed);
 				if (!raw) throw new Error('Legacy completed claim has no raw MIME to bind its content');
-				contentSha256 = await inboundContentSha256(raw);
+				const contentSha256 = await inboundContentSha256(raw);
+				// Remote deletion and D1 finalization cannot be atomic. Save the only
+				// reproducible digest before removing the object used to compute it.
+				const checkpoint = await mailDb.prepare(`UPDATE mail_receive_claim SET content_sha256 = ?
+					WHERE claim_key = ? AND lease_token = ? AND lease_until > unixepoch() AND state = 'COMPLETE'`)
+					.bind(contentSha256, row.claim_key, token).run();
+				if (checkpoint.meta?.changes !== 1) throw new Error('Inbound cleanup lease expired');
 			}
 			const attachments = await mailDb.prepare(`SELECT a.key, a.user_id AS userId FROM attachments a JOIN email e ON e.email_id = a.email_id
 				WHERE e.receive_claim_key = ? AND e.status = ?`).bind(row.claim_key, emailConst.status.SAVING).all();
@@ -425,19 +446,30 @@ export async function cleanupExpiredInboundClaims(c, { limit = 100 } = {}) {
 					.bind(row.claim_key, emailConst.status.SAVING),
 				mailDb.prepare(`DELETE FROM email WHERE receive_claim_key = ? AND status = ?`).bind(row.claim_key, emailConst.status.SAVING),
 				claimed.state === 'COMPLETE'
-					? mailDb.prepare(`UPDATE mail_receive_claim SET raw_object_key = '', raw_expires_at = 0, content_sha256 = ?,
-						lease_token = NULL, lease_until = 0, reserved_bytes = 0, reserved_count = 0, updated_at = CURRENT_TIMESTAMP
-						WHERE claim_key = ? AND lease_token = ? AND state = 'COMPLETE'`).bind(contentSha256, row.claim_key, token)
+					? mailDb.prepare(`UPDATE mail_receive_claim SET raw_object_key = '', raw_expires_at = 0, cleanup_retry_at = 0,
+						lease_token = NULL, lease_until = 0, reserved_bytes = 0, reserved_count = 0, last_error = NULL
+						WHERE claim_key = ? AND lease_token = ? AND state = 'COMPLETE'`).bind(row.claim_key, token)
 					: mailDb.prepare(`DELETE FROM mail_receive_claim WHERE claim_key = ? AND lease_token = ?`).bind(row.claim_key, token),
 				mailDb.prepare(`DELETE FROM mail_transaction_guard WHERE token = ?`).bind(token)
 			]);
 			deleted += Number(result[result.length - 2]?.meta?.changes || 0);
-		} catch (error) {
-			// A failed delete leaves the recovery record available for the next run.
-			await mailDb.prepare(`UPDATE mail_receive_claim SET lease_until = 0, last_error = ? WHERE claim_key = ? AND lease_token = ?`)
-				.bind(String(error?.message || error).slice(0, 500), row.claim_key, token).run().catch(() => {});
-			throw error;
+		} catch {
+			failed++;
+			// Redelivery can acquire its normal lease immediately. Only the next
+			// cleanup attempt is deferred, behind claims already due for this sweep.
+			await mailDb.prepare(`UPDATE mail_receive_claim SET lease_until = 0, lease_token = NULL,
+				cleanup_retry_at = unixepoch() + ?, last_error = 'raw_cleanup_failed'
+				WHERE claim_key = ? AND raw_object_key <> '' AND (lease_token = ? OR lease_until <= unixepoch())`)
+				.bind(RAW_CLEANUP_RETRY_SECONDS, row.claim_key, token).run().catch(() => {
+					// The claim remains durable and any held lease expires. Report the
+					// batch failure below and still give the other selected rows a turn.
+				});
 		}
+	}
+	if (failed) {
+		const error = new Error(`Inbound raw cleanup failed for ${failed} claim(s)`);
+		error.summary = { processed: rows.results.length, deleted, failed };
+		throw error;
 	}
 	return { processed: rows.results?.length || 0, deleted };
 }

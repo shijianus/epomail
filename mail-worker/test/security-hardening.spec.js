@@ -3,6 +3,7 @@ import { env as workerEnv } from 'cloudflare:test';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import hashUtils from '../src/utils/hash-utils.js';
 import emailCryptoUtils from '../src/utils/email-crypto-utils.js';
+import { emailConst } from '../src/const/entity-const.js';
 import { isSafePublicUrl, assertSafePublicUrl } from '../src/utils/url-utils.js';
 import fileUtils from '../src/utils/file-utils.js';
 import { isAllowedObjectKey, normalizeObjectKey } from '../src/utils/object-key-utils.js';
@@ -332,8 +333,20 @@ describe('Freeze convergence regressions (P1/P2)', () => {
 		expect(isConfiguredDomain('["epomail.bond"]', 'mail.bond')).toBe(false);
 		expect(isConfiguredDomain('epomail.bond', 'epomail.bond')).toBe(true);
 	});
-	it('only grants isOfficial badge to genuine system rows without inbound/outbound claim keys and blocks reserved labels in rules', () => {
+	it('applies the storage policy to delivered, unclaimed, spam and trashed records', () => {
+		const delivered = { status: emailConst.status.DELIVERED };
+		const unclaimed = { status: emailConst.status.NOONE };
+		expect(emailCryptoUtils.shouldEncryptEmail(0, delivered)).toBe(true);
+		for (const row of [unclaimed, { ...delivered, isSpam: 1 }, { ...delivered, isDel: 1 }]) {
+			expect(emailCryptoUtils.shouldEncryptEmail(0, row)).toBe(false);
+			expect(emailCryptoUtils.shouldEncryptEmail(2, row)).toBe(true);
+		}
+		expect(emailCryptoUtils.shouldEncryptEmail(1, delivered)).toBe(false);
+	});
+	it('requires the persistent system writer marker for official mail and blocks reserved labels in rules', () => {
+		expect(isOfficialEmailRow({ sendEmail: 'announcement@epocanvas.com', labels: '["官方"]' })).toBe(false);
 		expect(isOfficialEmailRow({
+			isOfficial: 1,
 			sendEmail: 'announcement@epocanvas.com',
 			receiveClaimKey: null,
 			outboundTaskId: null

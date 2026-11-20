@@ -1,3 +1,4 @@
+import { openPersonalBotToken } from '../utils/oauth-secret-crypto.js';
 import settingService from './setting-service';
 import emailMsgTemplate from '../template/email-msg';
 import emailUtils from '../utils/email-utils.js';
@@ -135,13 +136,8 @@ const telegramService = {
 	},
 
 	async testPersonalBot(c, params, userId = null) {
-		const { botToken, chatId, topicId } = params;
-		if (!botToken || !chatId) {
-			throw new BizError('Bot Token 和 Chat ID 不能为空');
-		}
-		if (typeof botToken !== 'string' || !/^\d{5,20}:[A-Za-z0-9_-]{20,100}$/.test(botToken.trim())) {
-			throw new BizError('Bot Token 格式无效');
-		}
+		const { chatId, topicId } = params;
+		let botToken = typeof params.botToken === 'string' ? params.botToken.trim() : '';
 		await rateLimit.check(c, {
 			scope: 'telegram-test',
 			limit: 10,
@@ -153,25 +149,25 @@ const telegramService = {
 		// saved. Otherwise this endpoint is a generic Telegram send proxy for any
 		// valid bot token. Administrators keep the system-bot test path.
 		if (userId) {
-			try {
-				const [{ default: userService }, { isAdminUser }] = await Promise.all([
-					import('./user-service.js'),
-					import('../utils/admin-utils.js')
-				]);
-				const userRow = await userService.selectById(c, userId);
-				if (userRow && !isAdminUser(c, userRow)) {
-					const raw = await c.env.kv.get('USER_PROFILE_' + userId);
-					const saved = raw ? JSON.parse(raw)?.personalTelegram : null;
-					if (saved?.botToken && saved?.chatId
-						&& (saved.botToken !== botToken.trim() || String(saved.chatId) !== String(chatId).trim())) {
+			const [{ default: userService }, { isAdminUser }] = await Promise.all([
+				import('./user-service.js'), import('../utils/admin-utils.js')
+			]);
+			const actor = await userService.selectById(c, userId);
+			if (!actor) throw new BizError(t('authExpired'), 401);
+			if (!botToken || !isAdminUser(c, actor)) {
+				const saved = (await c.env.kv.get('USER_PROFILE_' + userId, { type: 'json' }))?.personalTelegram;
+				const savedToken = await openPersonalBotToken(c.env, userId, saved?.botToken);
+				if (savedToken) {
+					if ((botToken && botToken !== savedToken) || String(saved.chatId) !== String(chatId).trim()
+						|| String(saved.topicId || '') !== String(topicId || '')) {
 						throw new BizError('请先保存新的 Telegram 配置后再测试', 400, 'telegram_config_mismatch');
 					}
+					botToken = savedToken;
 				}
-			} catch (error) {
-				if (error instanceof BizError) throw error;
-				// Legacy/partial schemas must not turn a test into a 500.
 			}
 		}
+		if (!botToken || !chatId) throw new BizError('Bot Token 和 Chat ID 不能为空');
+		if (!/^\d{5,20}:[A-Za-z0-9_-]{20,100}$/.test(botToken)) throw new BizError('Bot Token 格式无效');
 
 		const body = {
 			chat_id: chatId,
@@ -278,7 +274,8 @@ const telegramService = {
 		// assembled it. The final gate also catches a concurrent D1 revocation.
 		if (await c.env.kv.get(profileKey) !== raw || !await authorizeTelegramRead(c, jwtToken)) return;
 		try {
-			const res = await fetch(`https://api.telegram.org/bot${current.botToken}/sendMessage`, {
+			const botToken = await openPersonalBotToken(c.env, email.userId, current.botToken);
+			const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
 				method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 			});
 			if (!res.ok) safeLogger.error('personal_telegram_send_failed', { status: res.status });

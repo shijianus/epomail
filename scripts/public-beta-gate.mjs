@@ -121,12 +121,20 @@ async function sha256File(filename) {
   return digest.digest('hex');
 }
 
-export async function verifyLiveStaging(evidence, rawOrigin, fetchImpl = fetch) {
+export async function verifyLiveStaging(evidence, rawOrigin, fetchImpl = fetch, access = {}) {
   const origin = assertSafeBaseUrl(validateBaseOrigin(rawOrigin));
   if (origin !== evidence.stagingOrigin) throw new Error('Staging origin differs from the evidence');
+  const headers = { Accept: 'application/json' };
+  if (access.clientId || access.clientSecret) {
+    if (!access.clientId || !access.clientSecret || access.trustedOrigin !== origin) {
+      throw new Error('Staging Access credentials require a complete pair and an exactly matching trusted origin');
+    }
+    headers['CF-Access-Client-Id'] = access.clientId;
+    headers['CF-Access-Client-Secret'] = access.clientSecret;
+  }
   async function get(path) {
     const response = await fetchImpl(new URL(path, origin), {
-      redirect: 'error', signal: AbortSignal.timeout(8000)
+      headers, redirect: 'error', signal: AbortSignal.timeout(8000)
     });
     if (!response.ok || !response.headers.get('Content-Type')?.includes('application/json')) {
       throw new Error('Staging response did not match the expected JSON contract');
@@ -188,7 +196,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
         result.blocking.push({ id: 'artifact', reason: 'Archive checksum differs from accepted candidate' });
       }
       try {
-        await verifyLiveStaging(evidence, values['staging-origin']);
+        await verifyLiveStaging(evidence, values['staging-origin'], fetch, {
+          trustedOrigin: process.env.EPOMAIL_TRUSTED_STAGING_ORIGIN,
+          clientId: process.env.CF_ACCESS_CLIENT_ID,
+          clientSecret: process.env.CF_ACCESS_CLIENT_SECRET
+        });
       } catch (error) {
         result.blocking.push({ id: 'staging', reason: error.message });
       }

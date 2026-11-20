@@ -3,6 +3,7 @@ import verifyUtils from '../utils/verify-utils';
 import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES, isConfiguredDomain } from '../utils/email-utils';
 import userService from './user-service';
 import emailService from './email-service';
+import { purgeOwnedMail } from './mail-lifecycle-service.js';
 import { mailOrm as orm } from '../entity/orm';
 import account from '../entity/account';
 import { and, asc, eq, gt, inArray, count, sql, ne, or, lt, desc } from 'drizzle-orm';
@@ -338,19 +339,13 @@ const accountService = {
 		if (aid === 1) {
 			throw new BizError('系统主站长信箱（Account 1）禁止物理删除！', 403);
 		}
-		let targetAcc = null;
-		try {
-			targetAcc = await orm(c).select().from(account).where(eq(account.accountId, aid)).get();
-		} catch (e) {}
+		if (!Number.isSafeInteger(aid) || aid <= 0) throw new BizError(t('noUserAccount'), 400);
+		const targetAcc = await orm(c).select().from(account).where(eq(account.accountId, aid)).get();
+		if (!targetAcc) throw new BizError(t('noUserAccount'), 404);
+		await rbacGuard.assertCanManageUser(c, callerUserId, targetAcc.userId);
+		await purgeOwnedMail(c, targetAcc.userId, aid);
 
-		if (targetAcc?.userId) {
-			await rbacGuard.assertCanManageUser(c, callerUserId, targetAcc.userId);
-		}
-
-		await emailService.physicsDeleteByAccountId(c, aid);
-		await orm(c).delete(account).where(eq(account.accountId, aid)).run();
-
-		if (targetAcc && c.env?.kv) {
+		if (c.env?.kv) {
 			try {
 				if (targetAcc.email) {
 					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.email.trim().toLowerCase()).catch(() => {});

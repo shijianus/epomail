@@ -93,7 +93,7 @@ import assert from 'node:assert';
 
   // 严格断言 Mode 2 (中文固定宽度 210px，字体 12px)
   assert.strictEqual(metricsMode2.isTruncated, false, 'Mode 2 文字绝不允许被截断！');
-  assert.ok(metricsMode2.textContent.includes('加密邮件模式 (Level 3 [E2EE])'), `文本必须完整包含 '加密邮件模式 (Level 3 [E2EE])'`);
+  assert.ok(metricsMode2.textContent.includes('加密邮件模式 (Level 3)'), `文本必须完整包含 '加密邮件模式 (Level 3)'`);
   assert.strictEqual(metricsMode2.selectWidth, 210, `中文环境下宽度必须严格固定为 210px，当前: ${metricsMode2.selectWidth}px`);
   assert.strictEqual(metricsMode2.fontSize, '12px', `Mode 2 字体必须自适应微调为 12px，当前: ${metricsMode2.fontSize}`);
 

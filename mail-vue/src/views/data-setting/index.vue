@@ -631,11 +631,12 @@
           <span class="d-label">{{ $t('tgBotToken') || 'Bot Token' }} <span style="color: var(--el-color-danger)">*</span></span>
           <el-input 
             v-model="tgForm.botToken" 
-            placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz" 
+            :placeholder="tgForm.botTokenConfigured ? $t('configured') : $t('tgBotToken')"
             type="password"
             show-password
             clearable
           />
+          <el-button v-if="tgForm.botTokenConfigured" link @click="clearSavedBotToken">{{ $t('clear') }}</el-button>
         </div>
 
         <div class="dialog-field">
@@ -1116,6 +1117,7 @@ const testingTg = ref(false)
 const savingTg = ref(false)
 const tgForm = reactive({
   enabled: false,
+  botTokenConfigured: false,
   botToken: '',
   chatId: '',
   topicId: '',
@@ -1598,7 +1600,7 @@ async function copyText(text) {
 function initDataFromUserStore() {
   const user = userStore.user
   if (user && user.personalTelegram) {
-    Object.assign(tgForm, user.personalTelegram)
+    Object.assign(tgForm, user.personalTelegram, { botToken: '' })
   }
   tgForm.notifyCodeOnly = user?.personalTelegram?.notifyCodeOnly === true
   tgForm.includePreview = user?.personalTelegram?.includePreview === true
@@ -1607,23 +1609,31 @@ function initDataFromUserStore() {
   }
 }
 
+function clearSavedBotToken() {
+  tgForm.botToken = ''
+  tgForm.botTokenConfigured = false
+  tgForm.enabled = false
+}
+
 function openTgSettingDialog() {
   initDataFromUserStore()
   tgSettingDialogShow.value = true
 }
 
 async function saveTgSettingsFromModal() {
-  await saveTgSettings(true)
-  tgSettingDialogShow.value = false
+  if (await saveTgSettings(true)) tgSettingDialogShow.value = false
 }
 
 async function saveTgSettings(showToast = true) {
   savingTg.value = true
   try {
-    await updateProfile({
-      personalTelegram: { ...tgForm }
-    })
-    userStore.user.personalTelegram = { ...tgForm }
+    const { botToken, botTokenConfigured, ...settings } = tgForm
+    const token = botToken.trim()
+    const credential = token || !botTokenConfigured ? { botToken: token } : {}
+    await updateProfile({ personalTelegram: { ...settings, ...credential } })
+    tgForm.botTokenConfigured = Boolean(token || botTokenConfigured)
+    tgForm.botToken = ''
+    userStore.user.personalTelegram = { ...settings, botTokenConfigured: tgForm.botTokenConfigured }
     if (showToast) {
       ElMessage({
         message: t('tgSavedSuccess'),
@@ -1631,6 +1641,7 @@ async function saveTgSettings(showToast = true) {
         plain: true
       })
     }
+    return true
   } catch (err) {
     ElMessage({
       message: err.message || t('saveFailed'),
@@ -1643,7 +1654,7 @@ async function saveTgSettings(showToast = true) {
 }
 
 async function handleTestTelegram() {
-  if (!tgForm.botToken || !tgForm.chatId) {
+  if ((!tgForm.botToken && !tgForm.botTokenConfigured) || !tgForm.chatId) {
     ElMessage({
       message: t('fillTgBotTokenChatId'),
       type: 'warning',
@@ -1721,7 +1732,7 @@ async function handleExportFullBackup() {
     const jsonStr = JSON.stringify(dataObj, null, 2)
     triggerFileDownload(
       jsonStr,
-      `epomail-full-backup-${userStore.user.email?.split('@')[0] || 'me'}-${Date.now()}.json`,
+      `epomail-profile-mail-archive-${userStore.user.email?.split('@')[0] || 'me'}-${Date.now()}.json`,
       'application/json'
     )
     ElMessage({
@@ -1837,7 +1848,7 @@ async function handleExportContacts() {
     }
     triggerFileDownload(
       JSON.stringify(payload, null, 2),
-      `epomail-contacts-settings-${Date.now()}.json`,
+      `epomail-profile-labels-${Date.now()}.json`,
       'application/json'
     )
     ElMessage({

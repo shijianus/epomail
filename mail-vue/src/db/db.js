@@ -13,11 +13,16 @@ export function closeDraftDatabase() {
 registerDatabaseCloser(closeDraftDatabase);
 
 function createDB() {
-    closeDraftDatabase();
     const identity = resolveTabSession();
     const email = identity?.userId ? `user-${identity.userId}` : identity?.email;
-    if (!email || isLocalSessionEnded()) return;
+    if (!email || isLocalSessionEnded()) {
+        closeDraftDatabase();
+        db.value = {};
+        return;
+    }
     const databaseName = `epomail-drafts-${email}`;
+    if (db.value.name === databaseName && db.value.isOpen()) return;
+    closeDraftDatabase();
     const database = new Dexie(databaseName);
     database.version(1).stores({
         draft: '++draftId,createTime',
@@ -34,7 +39,7 @@ function createDB() {
 }
 
 createDB();
-watch(() => [userStore.user.email, userStore.user.userId], createDB);
+watch([() => userStore.user.email, () => userStore.user.userId], createDB);
 
 export const listDraftDatabaseNames = () => Dexie.getDatabaseNames();
 export default db;

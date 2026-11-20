@@ -32,6 +32,7 @@ export const email = sqliteTable('email', {
 	trashedAt: text('trashed_at'),
 	spamAt: text('spam_at'),
 	receiveClaimKey: text('receive_claim_key'),
-	outboundTaskId: text('outbound_task_id')
+	outboundTaskId: text('outbound_task_id'),
+	isOfficial: integer('is_official').default(0).notNull()
 });
 export default email

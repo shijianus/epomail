@@ -24,7 +24,7 @@ import {
 import type { CanvasHandle } from "./CanvasBackground";
 import { cameraState } from "./cameraStore";
 import { createT, resolveAuthLang } from "../../i18n/authLocale";
-import { registrationErrorKey } from "../../registration-legal";
+import { registrationErrorKey, registrationNoticeUrl } from "../../registration-legal";
 import { useRegistrationLegal } from "../../use-registration-legal";
 import { RegistrationNotice } from "./RegistrationNotice";
 import { persistLoginSession } from '../../session';
@@ -564,20 +564,15 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const bindFlowRef = useRef(false);
 
   const lang = useMemo(() => resolveAuthLang(), []);
-  const getAppealUrl = (targetEmail?: string) => {
-    let langCode = 'zh';
-    if (lang === 'zh-Hant') langCode = 'zh-tw';
-    else if (lang === 'en') langCode = 'en';
-    else if (lang === 'es') langCode = 'es';
-    else if (lang === 'fr') langCode = 'fr';
-    else if (lang === 'nl') langCode = 'nl';
-    const base = 'https://docs.epocanvas.com/epomail/appeal/';
-    const params = new URLSearchParams();
-    params.set('type', 'password');
-    params.set('lang', langCode);
-    if (targetEmail) params.set('email', targetEmail);
-    return `${base}?${params.toString()}`;
-  };
+  const appealUrl = useMemo(() => {
+    const docs = new URL(registrationNoticeUrl(sysConfig?.docsUrl) || 'https://docs.epocanvas.com/epomail');
+    docs.search = '';
+    docs.hash = '';
+    docs.pathname = docs.pathname.replace(/\/+$/, '') + '/appeal/';
+    docs.searchParams.set('type', 'password');
+    docs.searchParams.set('lang', lang === 'zh-Hant' ? 'zh-tw' : lang);
+    return docs;
+  }, [sysConfig?.docsUrl, lang]);
   const t = useMemo(() => createT(lang), [lang]);
   const bindLegal = useRegistrationLegal(sysConfig, lang, stage === 'bind');
   const reduceMotion = !!useReducedMotion();
@@ -1838,12 +1833,12 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     <h3 className="text-base font-semibold text-white tracking-wide">
                       {tr('forgotPasswordModalTitle')}
                     </h3>
-                    <p className="text-[12px] text-cyan-300/80">epomail-docs</p>
+                    <p className="text-[12px] text-cyan-300/80">{appealUrl.hostname}</p>
                   </div>
                 </div>
 
                 <p className="text-[13px] leading-relaxed text-[#c7d2fe] mb-4">
-                  {tr('forgotPasswordModalDesc')}
+                  {t('forgotPasswordModalDesc')}
                 </p>
 
                 {email && (
@@ -1855,7 +1850,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
                 <div className="flex flex-col gap-2.5">
                   <a
-                    href={getAppealUrl(email)}
+                    href={appealUrl.href}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex h-11 w-full items-center justify-center gap-2 rounded-xl text-[14px] font-medium text-white transition-all duration-200 hover:brightness-110 cursor-pointer shadow-lg"
@@ -1865,7 +1860,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     }}
                     onClick={() => setShowForgotModal(false)}
                   >
-                    <span>{tr('forgotPasswordModalGo')}</span>
+                    <span>{t('forgotPasswordModalGo')}</span>
                     <ExternalLink size={15} />
                   </a>
 
@@ -1984,7 +1979,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     {tr('stayInOrbit')}
                   </label>
                   <a
-                    href={getAppealUrl(email)}
+                    href={appealUrl.href}
                     onClick={(e) => {
                       e.preventDefault();
                       setShowForgotModal(true);

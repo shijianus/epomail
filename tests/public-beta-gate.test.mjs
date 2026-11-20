@@ -81,3 +81,23 @@ test('a new template has all default gates and cannot be approved without real e
   assert.equal(evidence.gates.length, candidateIds.length + stagingIds.length + fullOnly.length);
   assert.equal(evaluateBetaEvidence(evidence, { sha, scope: evidence.scope }).decision, 'BLOCK');
 });
+
+test('Access service tokens are scoped to the independently configured staging origin', async () => {
+  const evidence = manifest();
+  const origin = evidence.stagingOrigin;
+  const access = { clientId: 'fixture-id', clientSecret: 'fixture-value', trustedOrigin: origin };
+  let calls = 0;
+  const request = async (url, options) => {
+    calls++;
+    assert.equal(url.origin, origin);
+    assert.equal(options.redirect, 'error');
+    assert.equal(options.headers['CF-Access-Client-Id'], access.clientId);
+    assert.equal(options.headers['CF-Access-Client-Secret'], access.clientSecret);
+    return Response.json(url.pathname === '/api/version' ? { sha, versionId: stagingVersionId }
+      : { code: 200, data: { oauthLoginEnabled: 0, oauthProviders: {} } });
+  };
+  await assert.rejects(verifyLiveStaging(evidence, origin, request, { ...access, trustedOrigin: '' }), /trusted origin/);
+  assert.equal(calls, 0);
+  await verifyLiveStaging(evidence, origin, request, access);
+  assert.equal(calls, 3);
+});

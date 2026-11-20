@@ -5,6 +5,7 @@ import {
   assessSlo,
   assertLoopbackBase,
   createLoopbackClient,
+  planSoak,
   runStage,
   runStages
 } from './load-runner.mjs';
@@ -146,4 +147,40 @@ test('assessSlo applies one strict threshold', () => {
   assert.deepEqual(assessSlo(null, { nominalMs: 200 }), {
     status: 'unavailable', pass: false, p95: null, thresholdMs: 200
   });
+});
+
+test('15- and 30-minute local soaks retain each profile rate within a finite stage budget', () => {
+  for (const minutes of [3, 15, 30]) {
+    for (const limited of [true, false]) {
+      const soak = planSoak(minutes * 60_000, limited);
+      const rate = limited ? 8 : 32;
+      assert.equal(soak.ratePerSecond, rate);
+      assert.equal(soak.concurrency, limited ? 4 : 8);
+      assert.equal(soak.maxRequests, minutes * 60 * rate + 1);
+      assert.ok(soak.maxRequests <= HARD_LIMITS.maxRequestsPerStage);
+      assert.ok(soak.durationMs + 75_000 < HARD_LIMITS.maxTotalMs);
+      assert.equal(soak.requireFullDuration, true);
+    }
+  }
+  assert.throws(() => planSoak(30 * 60_000 + 1, true), /soak duration/);
+});
+
+test('a full-duration stage cannot pass by reaching an undersized request cap', async () => {
+  const result = await runStage({
+    ...planSoak(15 * 60_000, true), maxRequests: 1,
+    operation: async () => ({ status: 200, code: 200 })
+  });
+  assert.equal(result.stats.requests, 1);
+  assert.equal(result.stopReason, 'request_limit');
+  assert.equal(result.stageCompleted, false);
+  assert.ok(result.schedulingMs < result.durationMs);
+});
+
+test('a short remaining total budget cannot silently shorten the requested soak', async () => {
+  const result = await runStages([{
+    ...planSoak(15 * 60_000, true),
+    operation: () => assert.fail('no partial soak should start')
+  }], { limits: { ...HARD_LIMITS, maxTotalMs: 60_000 } });
+  assert.equal(result.stopped, true);
+  assert.equal(result.results.length, 0);
 });

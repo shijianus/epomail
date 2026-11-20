@@ -3,6 +3,7 @@ import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { ensureMailReliabilitySchema } from '../src/utils/mail-reliability-schema.js';
 import { getMailDb } from '../src/utils/db-accessor.js';
 import emailService from '../src/service/email-service.js';
+import { cascadeDeleteEmails } from '../src/service/mail-lifecycle-service.js';
 import attService from '../src/service/att-service.js';
 import r2Service from '../src/service/r2-service.js';
 import { acquireInboundClaim, failInboundClaim, reserveInboundQuota, cleanupExpiredInboundClaims, getInboundRawMaxBytes, inboundContentSha256 } from '../src/service/mail-reliability-service.js';
@@ -73,6 +74,7 @@ function attachments(n, emailId = 0) {
 
 beforeAll(async () => {
 	await db.prepare(`CREATE TABLE IF NOT EXISTS email (
+		is_official INTEGER NOT NULL DEFAULT 0,
 		email_id INTEGER PRIMARY KEY AUTOINCREMENT,send_email TEXT,name TEXT,
 		account_id INTEGER NOT NULL,user_id INTEGER NOT NULL,subject TEXT,code TEXT NOT NULL DEFAULT '',
 		text TEXT,content TEXT,cc TEXT DEFAULT '[]',bcc TEXT DEFAULT '[]',recipient TEXT,
@@ -84,6 +86,7 @@ beforeAll(async () => {
 		labels TEXT NOT NULL DEFAULT '[]',trashed_at TEXT,spam_at TEXT,receive_claim_key TEXT,outbound_task_id TEXT
 	)`).run();
 	await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_receive_claim_key ON email(receive_claim_key) WHERE receive_claim_key IS NOT NULL`).run();
+	await db.prepare('CREATE TABLE IF NOT EXISTS star (email_id INTEGER NOT NULL, user_id INTEGER NOT NULL)').run();
 	await db.prepare(`CREATE TABLE IF NOT EXISTS attachments (
 		att_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,email_id INTEGER NOT NULL,
 		account_id INTEGER NOT NULL,key TEXT NOT NULL,filename TEXT,mime_type TEXT,size INTEGER,
@@ -260,6 +263,31 @@ describe('Production inbound email handler with local D1 and stubbed providers',
 			expect(incoming.forward).not.toHaveBeenCalled();
 			expect(emailService.send).not.toHaveBeenCalled();
 			expect((await rows()).results).toHaveLength(1);
+		});
+	});
+
+	it.each(['<three-deliveries@local.test>', ''])('deduplicates each delivery generation after repeated deletion (%s)', async (id) => {
+		await handlerFixture(async ({ localEnv, recipient, userId, message, rows, claims, publish }) => {
+			const deliver = (trace = '') => handleInbound(message(inboundMime(recipient, { id, trace })), localEnv, {});
+			const generations = [];
+			for (let generation = 0; generation < 3; generation++) {
+				await deliver();
+				const [row] = (await rows()).results;
+				expect(row).toBeDefined();
+				generations.push(row.receive_claim_key);
+				await deliver('Received: retry');
+				expect((await rows()).results.map(mail => mail.email_id)).toEqual([row.email_id]);
+				if (generation !== 2) {
+					expect(await cascadeDeleteEmails({ env: localEnv }, userId, [row.email_id])).toHaveLength(1);
+				}
+				if (generation === 1) {
+					// A pre-upgrade reissue has no stored generation number.
+					await db.prepare('UPDATE mail_receive_claim SET generation = 0 WHERE claim_key = ?').bind(row.receive_claim_key).run();
+				}
+			}
+			expect(new Set(generations).size).toBe(3);
+			expect((await claims()).results).toHaveLength(3);
+			expect(publish).toHaveBeenCalledTimes(3);
 		});
 	});
 
@@ -524,20 +552,26 @@ describe('Real D1 mail reliability transactions', () => {
 			try {
 				claim = await acquireInboundClaim(c, input);
 				await db.prepare('UPDATE mail_receive_claim SET state=?,lease_until=0 WHERE claim_key=?').bind(state, claim.claimKey).run();
-				let reads = 0;
+				let generationReads = 0;
+				let winnerReads = 0;
 				// Reproduce a missed initial read followed by an INSERT conflict on
 				// the real D1 winner, rather than mocking acquireInboundClaim itself.
 				const racingDb = new Proxy(db, { get(target, property) {
 					if (property !== 'prepare') return typeof target[property] === 'function' ? target[property].bind(target) : target[property];
 					return sql => {
 						const statement = target.prepare(sql);
-						if (!sql.includes('SELECT * FROM mail_receive_claim WHERE claim_key = ?') || reads++ > 0) return statement;
-						return { bind: () => ({ first: async () => null }) };
+						if (sql.includes('SELECT * FROM mail_receive_claim WHERE claim_key = ?')) winnerReads++;
+						if (sql.includes('SELECT * FROM mail_receive_claim WHERE recipient = ? AND message_id = ?') && generationReads++ === 0) {
+							return { bind: () => ({ first: async () => null }) };
+						}
+						return statement;
 					};
 				} });
 				await expect(acquireInboundClaim({ env: { ...c.env, MAIL_DB: racingDb } }, {
 					...input, rawBytes: encoder.encode('Subject: changed\r\n\r\nchanged body')
 				})).rejects.toMatchObject({ code: 'inbound_content_conflict' });
+				expect(generationReads).toBe(1);
+				expect(winnerReads).toBe(1);
 				expect(r2Service.putInboundRawObj).toHaveBeenCalledTimes(1);
 				expect((await db.prepare('SELECT state,raw_sha256 FROM mail_receive_claim WHERE claim_key=?').bind(claim.claimKey).first()))
 					.toMatchObject({ state, raw_sha256: claim.rawSha256 });
@@ -683,15 +717,53 @@ describe('Real D1 mail reliability transactions', () => {
 				await emailService.completeInboundReceive(c, { ...claim, emailId, status: 0, isDel: 0, isSpam: 0 });
 				await db.prepare('UPDATE mail_receive_claim SET raw_expires_at=0 WHERE claim_key=?').bind(claim.claimKey).run();
 				r2Service.deleteInboundRawObj.mockRejectedValueOnce(new Error('local deletion unavailable'));
-				await expect(cleanupExpiredInboundClaims(c)).rejects.toThrow('local deletion unavailable');
+				await expect(cleanupExpiredInboundClaims(c)).rejects.toMatchObject({ summary: { processed: 1, deleted: 0, failed: 1 } });
 				expect(store.has(claim.rawObjectKey)).toBe(true);
 				expect((await db.prepare('SELECT state,lease_until FROM mail_receive_claim WHERE claim_key=?').bind(claim.claimKey).first())).toEqual({ state: 'COMPLETE', lease_until: 0 });
+				expect(await cleanupExpiredInboundClaims(c)).toEqual({ processed: 0, deleted: 0 });
+				await db.prepare('UPDATE mail_receive_claim SET cleanup_retry_at=0 WHERE claim_key=?').bind(claim.claimKey).run();
 				expect(await cleanupExpiredInboundClaims(c)).toEqual({ processed: 1, deleted: 1 });
 				expect(store.has(claim.rawObjectKey)).toBe(false);
 				expect((await db.prepare('SELECT state,raw_object_key FROM mail_receive_claim WHERE claim_key=?').bind(claim.claimKey).first())).toEqual({ state: 'COMPLETE', raw_object_key: '' });
 				expect(await acquireInboundClaim(c, { ...input, rawBytes: encoder.encode('Received: replay hop\r\nSubject: expiry\r\n\r\nbody') })).toMatchObject({ complete: true, emailId });
 				expect(await cleanupExpiredInboundClaims(c)).toEqual({ processed: 0, deleted: 0 });
 			} finally { if (claim) await clean([claim.claimKey], emailId ? [emailId] : []); store.clear(); }
+		});
+
+		it('continues past a failed D1 finalization and retries after deleting the legacy raw object', async () => {
+			const store = objects();
+			const keys = [];
+			const inputs = [0, 1, 2].map(i => ({
+				recipient: `${crypto.randomUUID()}@local.test`,
+				rawBytes: encoder.encode(`Subject: cleanup ${i}\r\n\r\nbody`)
+			}));
+			try {
+				for (const [i, input] of inputs.entries()) {
+					const claim = await acquireInboundClaim(c, input);
+					keys.push(claim.claimKey);
+					const emailId = await seedSaving(claim);
+					await emailService.completeInboundReceive(c, { ...claim, emailId, status: 0, isDel: 0, isSpam: 0 });
+					await db.prepare('UPDATE mail_receive_claim SET content_sha256=NULL, raw_expires_at=? WHERE claim_key=?').bind(i, claim.claimKey).run();
+				}
+				// Fail only the final D1 change for the first row, after its object is gone.
+				await db.prepare(`CREATE TRIGGER fail_first_cleanup BEFORE UPDATE OF raw_object_key ON mail_receive_claim
+					WHEN OLD.claim_key = '${keys[0]}' AND NEW.raw_object_key = ''
+					BEGIN SELECT RAISE(ABORT, 'test cleanup write unavailable'); END`).run();
+				await expect(cleanupExpiredInboundClaims(c, { limit: 2 })).rejects.toMatchObject({ summary: { processed: 2, deleted: 1, failed: 1 } });
+				const blocked = await db.prepare('SELECT raw_object_key, content_sha256, cleanup_retry_at FROM mail_receive_claim WHERE claim_key=?').bind(keys[0]).first();
+				expect(store.has(blocked.raw_object_key)).toBe(false);
+				expect(blocked.content_sha256).toBe(await inboundContentSha256(inputs[0].rawBytes));
+				expect(blocked.cleanup_retry_at).toBeGreaterThan(0);
+				expect(await cleanupExpiredInboundClaims(c, { limit: 1 })).toEqual({ processed: 1, deleted: 1 });
+				await db.prepare('DROP TRIGGER fail_first_cleanup').run();
+				await db.prepare('UPDATE mail_receive_claim SET cleanup_retry_at=0 WHERE claim_key=?').bind(keys[0]).run();
+				expect(await cleanupExpiredInboundClaims(c, { limit: 1 })).toEqual({ processed: 1, deleted: 1 });
+				expect(await acquireInboundClaim(c, inputs[0])).toMatchObject({ complete: true, claimKey: keys[0] });
+			} finally {
+				await db.prepare('DROP TRIGGER IF EXISTS fail_first_cleanup').run();
+				await clean(keys);
+				store.clear();
+			}
 		});
 
 		it('re-delivers a completed message after its email row is permanently deleted', async () => {
@@ -711,6 +783,35 @@ describe('Real D1 mail reliability transactions', () => {
 				expect(again.claimKey).not.toBe(claim.claimKey);
 			} finally {
 				await clean([claim?.claimKey, again?.claimKey].filter(Boolean), emailId ? [emailId] : []);
+				store.clear();
+			}
+		});
+
+		it('keeps the delivery clock through raw cleanup and elects one successor after the retry window', async () => {
+			const store = objects();
+			const input = { recipient: `${crypto.randomUUID()}@local.test`, messageId: '<rotation@local.test>', rawBytes: encoder.encode('body') };
+			const keys = [];
+			try {
+				const first = await acquireInboundClaim(c, input);
+				keys.push(first.claimKey);
+				const firstId = await seedSaving(first);
+				await emailService.completeInboundReceive(c, { ...first, emailId: firstId, status: 0, isDel: 0, isSpam: 0 });
+				await db.prepare(`UPDATE mail_receive_claim SET raw_expires_at=0, updated_at=datetime('now','-31 days') WHERE claim_key=?`).bind(first.claimKey).run();
+				expect(await cleanupExpiredInboundClaims(c)).toEqual({ processed: 1, deleted: 1 });
+				const attempts = await Promise.allSettled([acquireInboundClaim(c, input), acquireInboundClaim(c, input)]);
+				const winners = attempts.filter(result => result.status === 'fulfilled').map(result => result.value);
+				keys.push(...winners.map(winner => winner.claimKey));
+				expect(winners).toHaveLength(1);
+				const [next] = winners;
+				expect(next).toMatchObject({ complete: false });
+				expect(next.claimKey).not.toBe(first.claimKey);
+				expect(attempts.find(result => result.status === 'rejected').reason.code).toBe('inbound_claim_busy');
+				const secondId = await seedSaving(next);
+				await emailService.completeInboundReceive(c, { ...next, emailId: secondId, status: 0, isDel: 0, isSpam: 0 });
+				expect(await acquireInboundClaim(c, input)).toMatchObject({ complete: true, claimKey: next.claimKey, emailId: secondId });
+				expect(await db.prepare('SELECT email_id FROM email WHERE email_id=?').bind(firstId).first()).not.toBeNull();
+			} finally {
+				await clean(keys);
 				store.clear();
 			}
 		});

@@ -10,6 +10,7 @@ import { emailConst } from '../src/const/entity-const.js';
 import r2Service from '../src/service/r2-service.js';
 import attService from '../src/service/att-service.js';
 import emailCryptoUtils from '../src/utils/email-crypto-utils.js';
+import { setForwardPolicy, forwardPlan, forwardIntentStatements } from '../src/service/forward-consent.js';
 import forwardService from '../src/service/mail-forward-service.js';
 import { acquireInboundClaim, failInboundClaim, cleanupExpiredInboundClaims, clearRawForUser } from '../src/service/mail-reliability-service.js';
 import { buildSignedObjectUrl } from '../src/utils/object-token.js';
@@ -879,19 +880,19 @@ describe('Module C: Core mail pipeline, isolation, outbound gates, and webhook c
 		const sendSpy = vi.spyOn(emailService, 'send').mockResolvedValue([{ emailId: 999 }]);
 		try {
 			const target = `forward-${crypto.randomUUID()}@external.example`;
-			const task = await forwardService.enqueueForwardTask({ env }, {
-				userId: victim.userId,
-				accountId: victim.accountId,
-				emailId,
-				target,
-				addPrefix: true
-			});
+			const optedIn = { env: { ...env, PERSONAL_FORWARDING_ENABLED: 'true' } };
+			await setForwardPolicy(optedIn, victim.userId, { enabled: true, targets: target, mode: 'all', addPrefix: true });
+			const plan = await forwardPlan(optedIn, { userEmailForward: 1 }, { userId: victim.userId, accountId: victim.accountId });
+			const claimKey = crypto.randomUUID();
+			await env.db.prepare('UPDATE email SET receive_claim_key=? WHERE email_id=?').bind(claimKey, emailId).run();
+			await env.db.batch(forwardIntentStatements(optedIn, plan, claimKey));
+			const task = await env.db.prepare('SELECT * FROM mail_forward_task WHERE email_id=?').bind(emailId).first();
 			expect(task).toMatchObject({ target, state: 'PENDING' });
-			await expect(forwardService.processForwardTask({ env }, task.task_id))
+			await expect(forwardService.processForwardTask(optedIn, task.task_id))
 				.resolves.toMatchObject({ sent: true });
 			expect(sendSpy).toHaveBeenCalledTimes(1);
 			const [context, params] = sendSpy.mock.calls[0];
-			expect(context.env).toBe(env);
+			expect(context.env).toBe(optedIn.env);
 			expect(params).toMatchObject({
 				accountId: victim.accountId,
 				receiveEmail: [target],
@@ -905,7 +906,13 @@ describe('Module C: Core mail pipeline, isolation, outbound gates, and webhook c
 			expect([...params.attachments[0].content]).toEqual([7, 8, 9]);
 			expect(await env.db.prepare('SELECT state FROM mail_forward_task WHERE task_id=?')
 				.bind(task.task_id).first()).toEqual({ state: 'SENT' });
+			// A queued forward must not send to the former recipient after opt-out.
+			await env.db.prepare("UPDATE mail_forward_task SET state='PENDING' WHERE task_id=?").bind(task.task_id).run();
+			await setForwardPolicy(optedIn, victim.userId, { enabled: false, targets: '' });
+			expect(await forwardService.processForwardTask(optedIn, task.task_id)).toMatchObject({ terminal: true });
+			expect(sendSpy).toHaveBeenCalledTimes(1);
 		} finally {
+			await env.db.prepare('DELETE FROM mail_forward_policy WHERE user_id=?').bind(victim.userId).run();
 			sendSpy.mockRestore();
 		}
 	});

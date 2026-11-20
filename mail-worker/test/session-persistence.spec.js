@@ -11,6 +11,8 @@ import {
 } from '../src/utils/session-auth-store.js';
 import { env } from 'cloudflare:test';
 import constant from '../src/const/constant.js';
+import jwtUtils from '../src/utils/jwt-utils.js';
+import userContext from '../src/security/user-context.js';
 
 function racingKv() {
 	let value = null;
@@ -205,4 +207,35 @@ describe('session persistence convergence', () => {
 		const afterRevoke = await readAuthorizedSession(ctx, uid, 'conc-tok-10');
 		expect(afterRevoke).toBeNull();
 	});
+	it('applies trust horizons to the individual bearer across cache hits, stale legacy KV and D1 recovery', async () => {
+		const uid = 987655;
+		const key = `auth-uid:${uid}`;
+		const ctx = { env };
+		const now = Math.floor(Date.now() / 1000);
+		const base = { user: { userId: uid }, refreshTime: new Date().toISOString() };
+		try {
+			for (const [token, end] of [['older-device', now - 1], ['newer-device', now + 300]]) {
+				await persistSessionRecord(ctx, uid, { ...base, tokens: [token], sessionHorizons: { [token]: end } }, token);
+			}
+			const currentUser = { userId: uid, authVersion: 0, status: 0, isDel: 0 };
+			const request = async token => {
+				const jwt = await jwtUtils.generateToken(ctx, { userId: uid, token, authVersion: 0 });
+				return { ...ctx, req: { header: () => jwt } };
+			};
+			const older = await request('older-device');
+			const newer = await request('newer-device');
+			const legacy = { ...base, tokens: ['older-device', 'newer-device'], maxSessionEpoch: now - 10 };
+			for (const cache of [await env.kv.get(key), JSON.stringify(legacy), null]) {
+				if (cache) await env.kv.put(key, cache);
+				else await env.kv.delete(key);
+				expect(await readAuthorizedSession(ctx, uid, 'older-device')).toBeNull();
+				expect((await readAuthorizedSession(ctx, uid, 'newer-device')).tokens).toContain('newer-device');
+				await expect(userContext.requireSession(older, uid, currentUser)).rejects.toMatchObject({ code: 401 });
+				expect((await userContext.requireSession(newer, uid, currentUser)).token).toBe('newer-device');
+			}
+		} finally {
+			await revokeAllUserSessions(ctx, uid);
+		}
+	});
+
 });

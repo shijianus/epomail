@@ -219,6 +219,16 @@ export async function decryptProviderSecret(env, providerKey, field, storedSecre
 	return decryptClientSecret(env, `provider:${String(providerKey).toLowerCase()}:${field}`, storedSecret);
 }
 
+// Use the existing deployment credential key and bind each bot to its owner.
+// Legacy plaintext is accepted by decryptClientSecret until the next settings save.
+export function sealPersonalBotToken(env, userId, token) {
+	return encryptClientSecret(env, `personal-telegram:uid=${userId}:bot-token`, token);
+}
+
+export function openPersonalBotToken(env, userId, token) {
+	return decryptClientSecret(env, `personal-telegram:uid=${userId}:bot-token`, token);
+}
+
 export default {
 	encryptClientSecret,
 	decryptClientSecret,

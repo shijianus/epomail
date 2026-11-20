@@ -238,30 +238,45 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Cold-start full-stack smoke (local D1/KV, disposable secrets)
-        run: node tests/fullstack-smoke.mjs
-
-      - name: Full-stack browser regression (local Worker)
-        run: node tests/fullstack-browser-e2e.mjs
-
       - name: Release preflight and evidence contract
         run: |
           node scripts/verify-production-readiness.mjs
-          node --test tests/verify-production-readiness.test.mjs tests/public-beta-gate.test.mjs
+          node --test tests/verify-production-readiness.test.mjs tests/public-beta-gate.test.mjs tests/release-promotion.test.mjs
 
-      - name: Package the tested Worker and static assets
+      - name: Package the Worker and static assets
         shell: bash
         run: |
           candidate="$RUNNER_TEMP/epomail-candidate"
           mkdir -p "$candidate"
           cp -R "$RUNNER_TEMP/worker-dry-run" "$candidate/bundle"
           cp -R mail-worker/dist "$candidate/dist"
-          # The archive is deployed without invoking the source checkout's build hook.
-          sed '/^\[build\]$/,/^\[env\.staging\]$/{ /^\[env\.staging\]$/!d; }' mail-worker/wrangler.toml > "$candidate/wrangler.toml"
+          node scripts/candidate-config.mjs mail-worker/wrangler.toml "$candidate/wrangler.toml"
           git rev-parse HEAD > "$candidate/SOURCE_SHA"
           tar -czf "$RUNNER_TEMP/epomail-candidate.tar.gz" -C "$candidate" .
           cd "$RUNNER_TEMP"
           sha256sum epomail-candidate.tar.gz > epomail-candidate.tar.gz.sha256
+
+      - name: Verify and dry-run the extracted staging candidate
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          sha256sum -c epomail-candidate.tar.gz.sha256
+          extracted="$RUNNER_TEMP/extracted-candidate"
+          mkdir "$extracted"
+          tar -xzf epomail-candidate.tar.gz -C "$extracted"
+          test "$(cat "$extracted/SOURCE_SHA")" = "$GITHUB_SHA"
+          cd "$extracted"
+          "$GITHUB_WORKSPACE/mail-worker/node_modules/.bin/wrangler" deploy --dry-run --env staging --no-bundle --config wrangler.toml --outdir "$RUNNER_TEMP/candidate-deploy"
+          cmp bundle/index.js "$RUNNER_TEMP/candidate-deploy/index.js"
+          echo "EPOMAIL_CANDIDATE_DIR=$extracted" >> "$GITHUB_ENV"
+
+      - name: Cold-start full-stack smoke (extracted candidate, local D1/KV)
+        run: node tests/fullstack-smoke.mjs
+
+      - name: Full-stack browser regression (extracted candidate)
+        run: |
+          node tests/fullstack-browser-e2e.mjs
+          node --test tests/compose-draft-browser.mjs
 
       - name: Upload candidate package
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
@@ -310,7 +325,9 @@ jobs:
           (cd "$package" && sha256sum -c epomail-candidate.tar.gz.sha256)
           tar -xzf "$package/epomail-candidate.tar.gz" -C "$package"
           test "$(cat "$package/SOURCE_SHA")" = "$(git rev-parse HEAD)"
-          cp -R "$package/dist" mail-worker/dist
+          test -s "$package/bundle/index.js"
+          test -s "$package/dist/login/index.html"
+          echo "EPOMAIL_CANDIDATE_DIR=$package" >> "$GITHUB_ENV"
 
       - name: Bounded local backend load and recovery
         run: node tests/backend-stress.mjs --profile=limited-beta --soak=3m --out=tests/artifacts/backend-stress.json

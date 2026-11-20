@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import emailService from '../src/service/email-service.js';
-import mailOutboundService from '../src/service/mail-outbound-service.js';
+import mailOutboundService, { readSendStatus } from '../src/service/mail-outbound-service.js';
 import settingService from '../src/service/setting-service.js';
 import userService from '../src/service/user-service.js';
 import roleService from '../src/service/role-service.js';
@@ -36,6 +36,7 @@ beforeAll(async () => {
 		user_id INTEGER NOT NULL,all_receive INTEGER NOT NULL DEFAULT 0,sort INTEGER DEFAULT 0,is_del INTEGER DEFAULT 0
 	)`).run();
 	await db.prepare(`CREATE TABLE IF NOT EXISTS email (
+		is_official INTEGER NOT NULL DEFAULT 0,
 		email_id INTEGER PRIMARY KEY AUTOINCREMENT,send_email TEXT,name TEXT,
 		account_id INTEGER NOT NULL,user_id INTEGER NOT NULL,subject TEXT,code TEXT NOT NULL DEFAULT '',
 		text TEXT,content TEXT,cc TEXT DEFAULT '[]',bcc TEXT DEFAULT '[]',recipient TEXT,
@@ -220,9 +221,38 @@ describe('Outbound send integration and replay', () => {
 			await expect(emailService.send(c, structuredClone(params), userId)).rejects.toMatchObject({ errorCode: 'provider_unknown' });
 			expect((await task()).state).toBe('UNKNOWN');
 			expect(await count()).toBe(1);
+			expect(await readSendStatus(c, userId, params.accountId, params.idempotencyKey)).toEqual({ state: 'UNKNOWN' });
+			expect(await readSendStatus(c, userId, params.accountId + 1, params.idempotencyKey)).toEqual({ state: 'NOT_FOUND' });
 			await expect(emailService.send(c, structuredClone(params), userId)).rejects.toMatchObject({ errorCode: 'provider_unknown' });
 			expect(provider).toHaveBeenCalledTimes(1);
 			expect(await count()).toBe(1);
+		});
+	});
+
+	it('lists only external unknowns, and rolls back manual resolution when the sender archive cannot be updated', async () => {
+		await fixture(async ({ c, params, userId, provider, task, count }) => {
+			provider.mockRejectedValueOnce(new Error('Temporary transport ambiguity'));
+			await expect(emailService.send(c, params, userId)).rejects.toMatchObject({ errorCode: 'provider_unknown' });
+			const row = await task();
+			expect((await emailService.listUnknownOutbound(c)).some(item => item.task_id === row.task_id && item.create_time)).toBe(true);
+			await db.prepare("UPDATE mail_outbound_task SET provider='local' WHERE task_id=?").bind(row.task_id).run();
+			expect((await emailService.listUnknownOutbound(c)).some(item => item.task_id === row.task_id)).toBe(false);
+			await expect(emailService.resolveUnknownOutbound(c, { taskId: row.task_id, state: 'FAILED' }))
+				.rejects.toMatchObject({ errorCode: 'outbound_task_state_changed' });
+			expect(await count()).toBe(1);
+			await db.prepare("UPDATE mail_outbound_task SET provider='external' WHERE task_id=?").bind(row.task_id).run();
+			const trigger = `test_resolve_archive_${userId}`;
+			try {
+				await db.prepare(`CREATE TRIGGER ${trigger} BEFORE UPDATE OF status ON email
+					WHEN OLD.email_id=${Number(row.email_id)} BEGIN SELECT RAISE(ABORT, 'archive unavailable'); END`).run();
+				await expect(emailService.resolveUnknownOutbound(c, { taskId: row.task_id, state: 'FAILED' })).rejects.toThrow();
+				expect((await task()).state).toBe('UNKNOWN');
+				expect(await count()).toBe(1);
+			} finally { await db.prepare(`DROP TRIGGER IF EXISTS ${trigger}`).run(); }
+			await emailService.resolveUnknownOutbound(c, { taskId: row.task_id, state: 'FAILED' });
+			expect(await readSendStatus(c, userId, params.accountId, params.idempotencyKey)).toEqual({ state: 'FAILED' });
+			expect((await db.prepare('SELECT status FROM email WHERE email_id=?').bind(row.email_id).first()).status).toBe(emailConst.status.FAILED);
+			expect(await count()).toBe(0);
 		});
 	});
 
@@ -253,6 +283,46 @@ describe('Outbound send integration and replay', () => {
 			expect(stored.results).toHaveLength(2);
 		});
 	});
+
+	it('resumes a partial local send under the same compose key and only publishes missing receipts', async () => {
+		await fixture(async ({ c, params, userId, recipientId, recipient, objects, provider, task, count }) => {
+			params.receiveEmail = [recipient, `sender-${userId}@local.test`];
+			params.attachments = [{ ...attachment }];
+			r2Service.getObj.mockImplementationOnce(async (_c, key) => new Response(objects.get(key)))
+				.mockRejectedValueOnce(new Error('Temporary local object read failure'));
+			await expect(emailService.send(c, structuredClone(params), userId)).rejects.toMatchObject({ errorCode: 'local_delivery_pending' });
+			const before = await db.prepare('SELECT email_id FROM email WHERE user_id=? AND receive_claim_key IS NOT NULL').bind(recipientId).first();
+			expect(before?.email_id).toBeTruthy();
+			const result = await emailService.send(c, structuredClone(params), userId);
+			expect(result[0].status).toBe(emailConst.status.DELIVERED);
+			expect(await count()).toBe(2);
+			expect(provider).not.toHaveBeenCalled();
+			const delivered = await db.prepare('SELECT recipient,email_id FROM mail_local_delivery WHERE task_id=?').bind((await task()).task_id).all();
+			expect(delivered.results).toHaveLength(2);
+			expect(delivered.results.find(row => row.recipient === recipient).email_id).toBe(before.email_id);
+		});
+	});
+
+	it.each([['all', 'BOUNCED'], ['some', 'PARTIALLY_BOUNCED']])('reports %s local recipients bounced consistently on send, status, and replay',
+		async (bounce, outcome) => fixture(async ({ c, params, userId, recipientId, recipient, provider, task }) => {
+			// noRecipient=CLOSE bounces this unowned local address immediately.
+			const missing = `missing-${userId}@local.test`;
+			params.receiveEmail = bounce === 'all' ? [missing] : [recipient, missing];
+			const [archive] = await emailService.send(c, structuredClone(params), userId);
+			expect(archive).toMatchObject({ status: emailConst.status.BOUNCED, deliveryOutcome: outcome });
+			const taskId = (await task()).task_id;
+			if (bounce === 'some') {
+				await db.prepare('DELETE FROM email WHERE user_id=? AND receive_claim_key IS NOT NULL').bind(recipientId).run();
+			}
+			expect(await readSendStatus(c, userId, params.accountId, params.idempotencyKey))
+				.toEqual({ state: 'ACCEPTED', emailId: archive.emailId, deliveryOutcome: outcome });
+			const [replay] = await emailService.send(c, structuredClone(params), userId);
+			expect(replay).toMatchObject({ emailId: archive.emailId, deliveryOutcome: outcome });
+			expect((await db.prepare('SELECT COUNT(*) AS n FROM mail_local_delivery WHERE task_id=?').bind(taskId).first()).n)
+				.toBe(params.receiveEmail.length);
+			expect((await db.prepare('SELECT COUNT(*) AS n FROM email WHERE user_id=? AND receive_claim_key IS NOT NULL').bind(recipientId).first()).n).toBe(0);
+			expect(provider).not.toHaveBeenCalled();
+		}));
 
 	it('never dispatches twice when the same key arrives while its provider is pending', async () => {
 		await fixture(async ({ c, params, userId, provider, count }) => {

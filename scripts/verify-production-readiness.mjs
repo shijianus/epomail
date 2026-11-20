@@ -17,7 +17,7 @@ const wranglerPath = path.join(workerDir, 'wrangler.toml');
 export const MANDATORY_SECRETS = [
   { name: 'jwt_secret', desc: 'JWT HS256 签名与对象签名主键', critical: true },
   { name: 'totp_enc_key', desc: 'TOTP 密钥与敏感凭证 AES-256-GCM 主密钥', critical: true },
-  { name: 'oauth_client_enc_key', desc: 'OAuth Client Secret AES-256-GCM 信封加密主键', critical: true },
+  { name: 'oauth_client_enc_key', desc: 'OAuth 凭证及用户 Telegram Bot Token 的 AES-256-GCM 信封密钥', critical: true },
   { name: 'email_enc_key', desc: '邮件密文静态存储加密密钥', critical: true },
   { name: 'init_secret', desc: '独立系统初始化与架构升级鉴权头 (x-init-secret)', critical: true },
   { name: 'scheduled_secret', desc: '独立的外部调度密钥', critical: false },

@@ -2,9 +2,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 export const HARD_LIMITS = Object.freeze({
   maxConcurrency: 32,
-  maxRequestsPerStage: 10_000,
-  maxStageMs: 300_000,
-  maxTotalMs: 30 * 60 * 1000,
+  maxRequestsPerStage: 32 * 30 * 60 + 1,
+  maxStageMs: 30 * 60 * 1000,
+  maxTotalMs: 32 * 60 * 1000,
   requestTimeoutMs: 8_000,
   shutdownGraceMs: 1_000
 });
@@ -41,6 +41,17 @@ export function assertLoopbackBase(base) {
   }
   integer(Number(url.port), 'local stack port', { min: 1, max: 65535 });
   return url.origin;
+}
+
+export function planSoak(durationMs, limited) {
+  integer(durationMs, 'soak duration', { min: 1, max: HARD_LIMITS.maxStageMs });
+  const ratePerSecond = limited ? 8 : 32;
+  return {
+    name: 'soak', durationMs, ratePerSecond, concurrency: limited ? 4 : 8,
+    // Allow the deadline itself (not the request limit) to close the last slot.
+    maxRequests: Math.ceil(durationMs * ratePerSecond / 1000) + 1,
+    requireFullDuration: true
+  };
 }
 
 function assertRelativePath(pathname) {
@@ -289,6 +300,7 @@ export async function runStage({
   operation,
   limits = HARD_LIMITS,
   stopOnUnexpectedStatus = true,
+  requireFullDuration = false,
   onComplete
 }) {
   const hard = validateLimits(limits);
@@ -301,6 +313,7 @@ export async function runStage({
 
   const startedAt = Date.now();
   const scheduleStarted = performance.now();
+  const scheduleDeadline = scheduleStarted + durationMs;
   const deadline = startedAt + durationMs;
   const controller = new AbortController();
   const stats = newStats();
@@ -310,6 +323,7 @@ export async function runStage({
   let scheduling = true;
   let stopReason = 'stage_deadline';
   let timedOut = false;
+  let scheduleEnded;
 
   const groupFor = kind => {
     const key = typeof kind === 'string' && kind ? kind : 'unknown';
@@ -318,6 +332,7 @@ export async function runStage({
   };
   const stopScheduling = reason => {
     if (scheduling || reason === 'request_timeout' || reason === 'transport_error') {
+      scheduleEnded ??= performance.now();
       scheduling = false;
       stopReason = reason;
     }
@@ -326,7 +341,13 @@ export async function runStage({
     stopScheduling(reason);
     if (!controller.signal.aborted) controller.abort(new Error(`stage stopped: ${reason}`));
   };
-  const timer = setTimeout(() => stopScheduling('stage_deadline'), durationMs);
+  let timer;
+  const closeAtDeadline = () => {
+    const remaining = scheduleDeadline - performance.now();
+    if (remaining > 0) timer = setTimeout(closeAtDeadline, Math.ceil(remaining));
+    else stopScheduling('stage_deadline');
+  };
+  timer = setTimeout(closeAtDeadline, durationMs);
 
   const runOne = async (workerId, requestNumber) => {
     const context = { stageName: name, workerId, requestNumber, signal: controller.signal };
@@ -362,7 +383,7 @@ export async function runStage({
       stopScheduling('request_limit');
       break;
     }
-    if (Date.now() >= deadline) {
+    if (performance.now() >= scheduleDeadline) {
       stopScheduling('stage_deadline');
       break;
     }
@@ -372,8 +393,11 @@ export async function runStage({
     }
     const scheduledAt = scheduleStarted + (nextRequest * 1000 / ratePerSecond);
     const waitMs = scheduledAt - performance.now();
-    if (waitMs > 0) await delay(waitMs);
-    if (!scheduling || controller.signal.aborted || Date.now() >= deadline) {
+    if (waitMs > 0) {
+      await delay(Math.ceil(Math.min(waitMs, scheduleDeadline - performance.now())));
+      continue;
+    }
+    if (!scheduling || controller.signal.aborted || performance.now() >= scheduleDeadline) {
       stopScheduling('stage_deadline');
       break;
     }
@@ -391,7 +415,9 @@ export async function runStage({
   for (const group of groups.values()) group.finishedAt = stats.finishedAt;
   const finishedAt = Date.now();
   const drainMs = Math.max(0, finishedAt - deadline);
+  const schedulingMs = scheduleEnded - scheduleStarted;
   const stageCompleted = (stopReason === 'stage_deadline' || stopReason === 'request_limit') &&
+    (!requireFullDuration || (stopReason === 'stage_deadline' && schedulingMs >= durationMs)) &&
     !timedOut && stats.transportError === 0 && stats.operationFailure === 0 && stats.contractFailure === 0 &&
     stats.unexpected4xx === 0 && stats.unexpected5xx === 0;
   const result = {
@@ -403,6 +429,7 @@ export async function runStage({
     startedAt,
     finishedAt,
     elapsedMs: finishedAt - startedAt,
+    schedulingMs: Number(schedulingMs.toFixed(3)),
     drainMs,
     stageCompleted,
     scheduledRequests: stats.total,
@@ -426,13 +453,12 @@ export async function runStages(stages, { limits = HARD_LIMITS, onStageComplete 
   let stopped = false;
   for (const stage of stages) {
     const remaining = totalDeadline - Date.now();
-    if (remaining <= 0) {
+    if (remaining < stage.durationMs) {
       stopped = true;
       break;
     }
     const result = await runStage({
       ...stage,
-      durationMs: Math.min(stage.durationMs, hard.maxStageMs, remaining),
       limits: hard,
       onComplete: onStageComplete
     });

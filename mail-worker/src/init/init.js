@@ -124,12 +124,31 @@ const dbInit = {
 		await this.v3_25DB(c);
 		await this.v3_26DB(c);
 		await this.v3_27DB(c);
+		await this.v3_28DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
 			return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
 		}
 		return c.text('success');
+	},
+
+	async v3_28DB(c) {
+		const db = getMailDb(c);
+		const hasMarker = () => db.prepare("SELECT 1 FROM pragma_table_info('email') WHERE name = 'is_official'").first();
+		if (!await hasMarker()) {
+			try {
+				await db.prepare('ALTER TABLE email ADD COLUMN is_official INTEGER NOT NULL DEFAULT 0').run();
+			} catch (error) {
+				if (!await hasMarker()) throw error;
+			}
+		}
+		// Only a receipt from the internal notice writer establishes provenance for legacy mail.
+		await db.prepare(`UPDATE email SET is_official = 1 WHERE is_official = 0
+			AND email_id IN (SELECT email_id FROM notice_delivery_receipt)
+			AND EXISTS (SELECT 1 FROM notice_delivery_receipt r
+				WHERE r.email_id = email.email_id AND r.user_id = email.user_id AND r.message_id = email.message_id)
+			AND receive_claim_key IS NULL AND outbound_task_id IS NULL`).run();
 	},
 
 	async v3_27DB(c) {
@@ -1913,6 +1932,7 @@ const dbInit = {
 				spam_at TEXT,
 				receive_claim_key TEXT,
 				outbound_task_id TEXT,
+				is_official INTEGER NOT NULL DEFAULT 0,
 				is_del INTEGER DEFAULT 0 NOT NULL
 			)
 		`).run();

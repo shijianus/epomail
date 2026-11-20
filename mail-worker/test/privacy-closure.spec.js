@@ -1,6 +1,8 @@
 import { env, SELF } from 'cloudflare:test';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import userService from '../src/service/user-service.js';
+import accountService from '../src/service/account-service.js';
+import permService from '../src/service/perm-service.js';
 import publicService from '../src/service/public-service.js';
 import telegramService from '../src/service/telegram-service.js';
 import deviceTrustService from '../src/service/device-trust-service.js';
@@ -47,6 +49,7 @@ const accountSql = `CREATE TABLE IF NOT EXISTS account (
  sort INTEGER NOT NULL DEFAULT 0, latest_email_time TEXT, create_time TEXT DEFAULT CURRENT_TIMESTAMP
 )`;
 const emailSql = `CREATE TABLE IF NOT EXISTS email (
+ is_official INTEGER NOT NULL DEFAULT 0,
  email_id INTEGER PRIMARY KEY, send_email TEXT, name TEXT, account_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
  subject TEXT, code TEXT NOT NULL DEFAULT '', text TEXT, content TEXT, cc TEXT DEFAULT '[]', bcc TEXT DEFAULT '[]', recipient TEXT,
  to_email TEXT NOT NULL DEFAULT '', to_name TEXT NOT NULL DEFAULT '', in_reply_to TEXT DEFAULT '', relation TEXT DEFAULT '', message_id TEXT DEFAULT '',
@@ -389,6 +392,35 @@ describe('trusted device pagination and failure reporting', () => {
 });
 
 describe('privacy input validation and active content isolation', () => {
+ it('updates write-only Telegram credentials without exposing them or old PATs through login info', async () => {
+  const token = '123456:abcdefghijklmnopqrstuvwxyz123456';
+  const config = { ...personalTelegram, botToken: token };
+  const profile = { apiTokens: [{ id: 'old', name: 'old', token: 'legacy-test-pat', tokenHash: 'internal-hash' }] };
+  await setProfile(profile);
+  await userService.updateProfile(c, { personalTelegram: config }, uid);
+  const stored = () => env.kv.get(`USER_PROFILE_${uid}`, { type: 'json' });
+  const encrypted = (await stored()).personalTelegram.botToken;
+  expect(encrypted).toMatch(/^v1:/);
+  const { openPersonalBotToken } = await import('../src/utils/oauth-secret-crypto.js');
+  expect(await openPersonalBotToken(env, uid, encrypted)).toBe(token);
+  await expect(openPersonalBotToken(env, uid + 1, encrypted)).rejects.toThrow();
+  const { botToken, ...settings } = config;
+  await userService.updateProfile(c, { personalTelegram: { ...settings, topicId: '42' } }, uid);
+  expect((await stored()).personalTelegram.botToken).toBe(encrypted);
+  vi.spyOn(userService, 'getUserQuota').mockResolvedValue({});
+  vi.spyOn(permService, 'userPermKeys').mockResolvedValue([]);
+  const me = await userService.loginUserInfo(c, uid);
+  expect(me.personalTelegram).toMatchObject({ botTokenConfigured: true, topicId: '42' });
+  expect(me.personalTelegram).not.toHaveProperty('botToken');
+  expect(me.apiTokens[0]).not.toHaveProperty('token');
+  expect(me.apiTokens[0]).not.toHaveProperty('tokenHash');
+  const newToken = '321654:zyxwvutsrqponmlkjihgfedcba654321';
+  await userService.updateProfile(c, { personalTelegram: { ...settings, botToken: newToken } }, uid);
+  expect(await openPersonalBotToken(env, uid, (await stored()).personalTelegram.botToken)).toBe(newToken);
+  await userService.updateProfile(c, { personalTelegram: { ...settings, enabled: false, botToken: '' } }, uid);
+  expect((await stored()).personalTelegram.botToken).toBe('');
+ });
+
  it('accepts only the explicit boolean AI-code preference while preserving unrelated profile fields', async () => {
   await userService.updateProfile(c, { privacyPreferences: { aiVerificationCode: true } }, uid);
   const saved = await env.kv.get(`USER_PROFILE_${uid}`, { type: 'json' });
@@ -415,5 +447,92 @@ describe('privacy input validation and active content isolation', () => {
   expect(sanitized).not.toMatch(/track\.example|javascript:|customapp:|onclick|style=|srcset|<svg|<iframe/);
   expect(SHARED_EMAIL_CSP).toContain("connect-src 'none'");
   expect(emailTextTemplate('<img src=x onerror=evil()>')).not.toContain('<img');
+ });
+});
+
+describe('administrative deletion and export contracts', () => {
+ it('stops before cleanup on lookup failure, missing mailbox and failed authorization', async () => {
+  const failedRead = { env: { MAIL_DB: { prepare() { throw new Error('read unavailable'); } } } };
+  await expect(accountService.physicsDelete(failedRead, { accountId: aid }, 1)).rejects.toThrow();
+  expect(rbacGuard.assertCanManageUser).not.toHaveBeenCalled();
+  await expect(accountService.physicsDelete(c, { accountId: aid + 1 }, 1)).rejects.toMatchObject({ code: 404 });
+  rbacGuard.assertCanManageUser.mockRejectedValueOnce(new Error('permission unavailable'));
+  await expect(accountService.physicsDelete(c, { accountId: aid }, 1)).rejects.toThrow('permission unavailable');
+  expect(await env.db.prepare('SELECT email_id FROM email WHERE email_id=?').bind(mid).first()).toBeTruthy();
+  expect((await getObjectDeletionCounts(c, uid)).total).toBe(0);
+ });
+
+ it('commits only authorized mailbox metadata and queues its storage key', async () => {
+  await env.db.prepare('INSERT INTO star(user_id,email_id) VALUES (?,?)').bind(uid, mid).run();
+  await env.db.prepare("INSERT INTO account(account_id,user_id,email) VALUES (?,?,'sibling@example.com')").bind(aid+1,uid).run();
+  await env.db.prepare('INSERT INTO email(email_id,user_id,account_id) VALUES (?,?,?)').bind(mid+1,uid,aid+1).run();
+  await env.db.prepare(`INSERT INTO attachments(att_id,user_id,email_id,account_id,key,size) VALUES
+   (?,?,?,?,'attachments/remote-owner',1),(?,?,?,?,'attachments/sibling-mail',1)`)
+   .bind(attId+1,uid+1,mid,aid,attId+2,uid,mid+1,aid).run();
+  await accountService.physicsDelete(c, { accountId: aid }, 1);
+  expect(rbacGuard.assertCanManageUser).toHaveBeenCalledWith(c, 1, uid);
+  expect(await env.db.prepare('SELECT * FROM account WHERE account_id=?').bind(aid).first()).toBeNull();
+  expect(await env.db.prepare('SELECT * FROM star WHERE email_id=?').bind(mid).first()).toBeNull();
+  expect(await env.db.prepare('SELECT email_id FROM email WHERE email_id=?').bind(mid+1).first()).toBeTruthy();
+  expect((await getObjectDeletionCounts(c, uid)).pending).toBe(1);
+  expect((await getObjectDeletionCounts(c, uid+1)).pending).toBe(1);
+  expect(await env.db.prepare('SELECT att_id FROM attachments WHERE att_id=?').bind(attId+2).first()).toBeTruthy();
+  expect(await env.kv.get(blobKey)).toBe('private-image-bytes');
+ });
+
+ it('rolls the entire scoped batch back when ownership changes or delivery is in progress', async () => {
+  rbacGuard.assertCanManageUser.mockImplementationOnce(async () => {
+   await env.db.prepare('UPDATE account SET user_id=? WHERE account_id=?').bind(uid+1,aid).run();
+  });
+  await expect(accountService.physicsDelete(c, {accountId:aid}, 1)).rejects.toMatchObject({errorCode:'mail_purge_conflict'});
+  await env.db.prepare('UPDATE account SET user_id=? WHERE account_id=?').bind(uid,aid).run();
+  await env.db.prepare('UPDATE email SET status=6 WHERE email_id=?').bind(mid).run();
+  await expect(accountService.physicsDelete(c, {accountId:aid}, 1)).rejects.toMatchObject({errorCode:'mail_purge_conflict'});
+  expect(await env.db.prepare('SELECT att_id FROM attachments WHERE att_id=?').bind(attId).first()).toBeTruthy();
+  expect((await getObjectDeletionCounts(c,uid)).total).toBe(0);
+ });
+
+ it('reports committed email, star, object work and logical bytes on purge and retry', async () => {
+  const adminId = uid+1;
+  await env.db.prepare("INSERT INTO user(user_id,email) VALUES (?,'purge-admin@example.com')").bind(adminId).run();
+  vi.spyOn(permService, 'userPermKeys').mockResolvedValue(['user:delete']);
+  await env.db.prepare('UPDATE user SET status=1 WHERE user_id=?').bind(uid).run();
+  await env.db.prepare('INSERT INTO star(user_id,email_id) VALUES (?,?),(?,?)').bind(uid, mid, uid, mid+10).run();
+  const quota = await env.db.prepare(`SELECT LENGTH(CAST(subject||text||content||code AS BLOB)) + 20 AS total FROM email WHERE email_id=?`).bind(mid).first();
+  const result = await userService.purgeUserEmails(c, { userId: uid }, adminId);
+  expect(result).toMatchObject({ releasedEmails: 1, removedStars: 2, removedAttachments: 1, queuedObjectKeys: 1, releasedQuotaBytes: quota.total });
+  expect((await getObjectDeletionCounts(c, uid)).pending).toBe(1);
+  expect(await userService.purgeUserEmails(c, { userId: uid }, adminId)).toMatchObject({ releasedEmails: 0, releasedQuotaBytes: 0, queuedObjectKeys: 0 });
+ });
+
+ it('does not open the mail database for contacts and does not export profile data in emails mode', async () => {
+  const noMailDb = { ...c, env: { ...env, MAIL_DB: { prepare() { throw new Error('unexpected mailbox read'); } } } };
+  const contacts = await userService.exportUserData(noMailDb, uid, { type: 'contacts' });
+  expect(contacts.user.profile.nickname).toBe('Visible name');
+  expect(contacts).not.toHaveProperty('emails');
+  const emails = await userService.exportUserData(c, uid, { type: 'emails' });
+  expect(emails.emails).toHaveLength(1);
+  expect(emails).not.toHaveProperty('user');
+  expect(emails).not.toHaveProperty('customLabels');
+ });
+
+ it('paginates large exports by stable ID and rejects unreadable ciphertext', async () => {
+  await env.db.batch(Array.from({ length: 25 }, (_, i) => env.db.prepare(
+   "INSERT INTO email(email_id,user_id,account_id,subject) VALUES (?,?,?,'Test')").bind(mid+i+1, uid, aid)));
+  const jwt = await makeSession();
+  const legacy = await SELF.fetch(`${base}/api/my/exportData?type=emails`, { headers: { Authorization: jwt } });
+  expect(legacy.headers.get('Cache-Control')).toContain('no-store');
+  const archive = (await legacy.json()).data;
+  expect(archive.totalEmails).toBe(26);
+  expect(archive.emails).toHaveLength(26);
+  expect(archive).not.toHaveProperty('nextBefore');
+  const first = await userService.exportUserData(c,uid,{type:'emails',paged:1});
+  expect(first.emails).toHaveLength(25);
+  await env.db.prepare("INSERT INTO email(email_id,user_id,account_id,subject) VALUES (?,?,?,'New arrival')").bind(mid+26, uid, aid).run();
+  const second = await userService.exportUserData(c,uid,{type:'emails',paged:1,before:first.nextBefore,asOf:first.asOf});
+  expect(second.emails.map(e => e.emailId)).toEqual([mid]);
+  expect(second.nextBefore).toBeNull();
+  await env.db.prepare("UPDATE email SET subject='enc:v1:invalid' WHERE email_id=?").bind(mid).run();
+  await expect(userService.exportUserData(c,uid,{type:'emails',paged:1,before:first.nextBefore})).rejects.toMatchObject({ errorCode: 'export_unreadable' });
  });
 });

@@ -1,9 +1,9 @@
-import { sql, eq } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
 import { mailOrm } from '../entity/orm.js';
 import email from '../entity/email.js';
 import account from '../entity/account.js';
 import { att } from '../entity/att.js';
-import { getMailDb } from '../utils/db-accessor.js';
+import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import { mailTransactionGuard } from '../utils/mail-transaction.js';
 import { assertMailRowSize, buildBoundedInserts, prepareMailQuery, mailSha256, normalizeMailAddress } from '../utils/mail-pipeline.js';
 import emailCryptoUtils from '../utils/email-crypto-utils.js';
@@ -17,7 +17,7 @@ import r2Service from './r2-service.js';
 import fileUtils from '../utils/file-utils.js';
 import telegramService from './telegram-service.js';
 import { applyRules } from '../email/rule-engine.js';
-import forwardService from './mail-forward-service.js';
+import { forwardIntentStatements, forwardPlan } from './forward-consent.js';
 
 const encoder = new TextEncoder();
 const bodyBytes = row => ['subject', 'text', 'content', 'code']
@@ -94,6 +94,62 @@ async function copyAttachments(c, attachments, sourceUserId, recipientUserId, re
 			related: item.related, encoding: item.encoding });
 	}
 	return { rows, replacements, stagedKeys };
+}
+
+// Resume the exact archived operation, including its sender-owned attachments.
+// Never route a recovered local task through an external transport.
+export async function resumeArchivedLocalDelivery(c, task) {
+	const payload = JSON.parse(task.payload_json);
+	let sender = await mailOrm(c).select().from(email).where(and(
+		eq(email.emailId, task.email_id), eq(email.userId, task.user_id), eq(email.accountId, task.account_id),
+		eq(email.outboundTaskId, task.task_id), eq(email.type, emailConst.type.SEND), eq(email.status, emailConst.status.SAVING)
+	)).get();
+	if (!sender) throw new Error('Local delivery archive is unavailable');
+	const recipients = JSON.parse(sender.recipient).map(item => normalizeMailAddress(item.address));
+	if (!recipients.length || recipients.some(address => !address) || !Array.isArray(payload.recipients)
+		|| JSON.stringify(payload.recipients.map(normalizeMailAddress)) !== JSON.stringify(recipients)) {
+		throw new Error('Archived local recipient list does not match the dispatch');
+	}
+	const receipts = (await getMailDb(c).prepare('SELECT recipient,state,reason FROM mail_local_delivery WHERE task_id=?')
+		.bind(task.task_id).all()).results || [];
+	if (recipients.every(address => receipts.some(row => row.recipient === address))) {
+		// Finalize recorded outcomes even if the sender has since been paused.
+		// This branch cannot publish another mailbox copy or contact a provider.
+		return finishLocalDelivery(c, receipts, sender, task.task_id, task.lease_token);
+	}
+	const db = getUserDb(c);
+	const reserved = await db.prepare("SELECT quantity FROM mail_send_quota_reservation WHERE task_id=? AND user_id=? AND state='reserved'")
+		.bind(task.task_id, task.user_id).first();
+	if (reserved?.quantity !== recipients.length) throw new Error('Local dispatch reservation requires reconciliation');
+	const setting = await settingService.query(c);
+	const domains = new Set((setting.domainList || []).map(value => String(value).replace(/^@/, '').toLowerCase()));
+	const owner = await userService.selectByIdIncludeDel(c, task.user_id);
+	const mailbox = await mailOrm(c).select().from(account).where(and(eq(account.accountId, task.account_id),
+		eq(account.userId, task.user_id), eq(account.status, 0), eq(account.isDel, 0))).get();
+	if (setting.send !== settingConst.send.OPEN || recipients.some(address => !domains.has(address.split('@').pop()))
+		|| !owner || Number(owner.status) !== 0 || Number(owner.isDel) !== 0
+		|| !mailbox || normalizeMailAddress(mailbox.email) !== normalizeMailAddress(sender.sendEmail)) {
+		throw new Error('Local dispatch is paused by current sender or domain policy');
+	}
+	const ban = await db.prepare("SELECT 1 AS banned FROM audit_log WHERE email=? AND warning_type='ban' AND status='banned' LIMIT 1")
+		.bind(mailbox.email).first();
+	if (ban) throw new Error('Local dispatch is paused by sender restrictions');
+	const files = await mailOrm(c).select().from(att).where(and(eq(att.emailId, sender.emailId), eq(att.userId, sender.userId))).all();
+	if (files.length !== payload.attachmentCount) throw new Error('Archived local attachments are incomplete');
+	if (!isAdminUser(c, owner)) {
+		const role = await roleService.selectById(c, owner.type);
+		if (!role || role.sendType === 'ban' || (files.length && Number(role.allowAttachment) === 0)
+			|| !roleService.hasAvailDomainPerm(role.availDomain || '', mailbox.email)) throw new Error('Local dispatch is paused by sender role');
+	}
+	const cipherFields = emailCryptoUtils.ENCRYPTED_FIELDS.filter(field => emailCryptoUtils.inspectEncryptedValue(sender[field]).encrypted);
+	if (cipherFields.length) {
+		const key = await emailCryptoUtils.getUserEmailCryptoKey(c.env, task.user_id);
+		sender = await emailCryptoUtils.decryptEmailRecord(sender, key);
+		if (cipherFields.some(field => emailCryptoUtils.inspectEncryptedValue(sender[field]).encrypted)) {
+			throw new Error('Local delivery archive could not be decrypted');
+		}
+	}
+	return deliverLocalMail(c, recipients, sender, files, { taskId: task.task_id, leaseToken: task.lease_token });
 }
 
 export async function deliverLocalMail(c, recipients, sender, attachments = [], { taskId, leaseToken } = {}) {
@@ -194,7 +250,9 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 		const guard = mailTransactionGuard(c, `${senderLease} AND (${quotaCheck.sql}) AND ${accountCheck} AND NOT EXISTS(
 			SELECT 1 FROM mail_local_delivery WHERE task_id=? AND recipient=?)`,
 			[taskId, leaseToken, ...quotaCheck.params, ...(userId ? [accountId, userId] : []), taskId, recipient]);
+		const plannedForward = await forwardPlan(c, setting, notificationSnapshot);
 		const statements = [guard.before, prepareMailQuery(c, mailOrm(c).insert(email).values(values)),
+			...forwardIntentStatements(c, plannedForward, deliveryKey),
 			...buildBoundedInserts(chunk => mailOrm(c).insert(att).values(chunk), copied.rows.map(row => ({ ...row,
 				emailId: sql`(SELECT email_id FROM email WHERE receive_claim_key=${deliveryKey})` }))).map(query => prepareMailQuery(c, query)),
 			db.prepare(`INSERT INTO mail_local_delivery(task_id,recipient,email_id,state)
@@ -214,51 +272,6 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 				await telegramService.sendPersonalEmailToBot(c, notificationRow, ptg)
 					.catch(err => console.warn('Local personal Telegram notification failed:', err.message));
 			}
-			const pfw = profile?.personalForwarding;
-			if (Number(setting.userEmailForward ?? 1) === 1 && pfw?.enabled === true && pfw.targets) {
-				const mode = pfw.mode || 'all';
-				const local = recipient.split('@')[0].toLowerCase();
-				const prefixes = String(pfw.aliasPrefixes || '').split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
-				const shouldForward = mode === 'all'
-					|| (mode === 'alias' && prefixes.some(p => local.startsWith(p) || local === p));
-				if (shouldForward) {
-					const localDomains = new Set((setting.domainList || [])
-						.map(value => String(value).replace(/^@/, '').toLowerCase()));
-					const targets = String(pfw.targets).split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-					const { default: emailService } = await import('./email-service.js');
-					for (const target of targets) {
-						const targetDomain = target.split('@').pop();
-						if (!target || target === recipient.toLowerCase()
-							|| target === String(sender.sendEmail || '').toLowerCase()
-							|| localDomains.has(targetDomain)) continue;
-						const forwardTask = await forwardService.enqueueForwardTask(c, {
-							userId,
-							accountId,
-							emailId: inserted.emailId,
-							target,
-							addPrefix: !!pfw.addPrefix
-						}).catch(err => {
-							console.warn('Local personal forwarding enqueue failed:', err.message);
-							return null;
-						});
-						if (forwardTask) {
-							await forwardService.processForwardTask(c, forwardTask.task_id)
-								.catch(err => console.warn('Local personal forwarding task failed:', err.message));
-						} else {
-							await emailService.send(c, {
-								receiveEmail: [target],
-								subject: notificationRow.subject,
-								content: notificationRow.content,
-								text: notificationRow.text,
-								// Forward from the recipient's own mailbox. The sender's
-								// account belongs to a different user, so emailService.send
-								// would reject it as sendEmailNotCurUser.
-								accountId
-							}, userId).catch(err => console.warn('Local personal forwarding failed:', err.message));
-						}
-					}
-				}
-			}
 		} catch (notifyError) {
 			// Notification and forwarding are secondary to the committed mailbox
 			// copy; a provider failure must not roll back a delivered message.
@@ -275,6 +288,11 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 	const result = await db.prepare('SELECT recipient,state,reason FROM mail_local_delivery WHERE task_id=?').bind(taskId).all();
 	const receipts = result.results || [];
 	if (addresses.some(address => !receipts.some(row => row.recipient === address))) throw new Error('Local delivery is incomplete');
+	return finishLocalDelivery(c, receipts, sender, taskId, leaseToken);
+}
+
+async function finishLocalDelivery(c, receipts, sender, taskId, leaseToken) {
+	const db = getMailDb(c);
 	const rejected = receipts.filter(row => row.state === 'BOUNCED');
 	const guard = mailTransactionGuard(c, senderLease, [taskId, leaseToken]);
 	await db.batch([guard.before,

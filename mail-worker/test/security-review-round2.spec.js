@@ -7,7 +7,7 @@
  */
 import { env, SELF } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import settingService from '../src/service/setting-service.js';
+import settingService, { personalTokenPolicy } from '../src/service/setting-service.js';
 import oauthService from '../src/service/oauth-service.js';
 import loginService from '../src/service/login-service.js';
 import userService from '../src/service/user-service.js';
@@ -536,6 +536,39 @@ describe('Personal access token storage hardening', () => {
 			expect(listed[0].tokenPrefix).toBe(created.token.slice(0, 16));
 		} finally {
 			settingSpy.mockRestore();
+		}
+	});
+
+	it('disables new production and staging PATs by default and preserves management of existing tokens', async () => {
+		const settings = vi.spyOn(settingService, 'query').mockResolvedValue({ userApiSupport: 1 });
+		try {
+			for (const environment of ['production', 'staging']) {
+				const gatedEnv = { ...env, ENVIRONMENT: environment, ENABLE_PAT_ISSUANCE: undefined };
+				expect(personalTokenPolicy(gatedEnv, { userApiSupport: 1 }).userApiSupport).toBe(0);
+				await expect(userService.createApiToken({ env: gatedEnv }, userId, { name: 'disabled' }))
+					.rejects.toMatchObject({ code: 403, errorCode: 'pat_issuance_disabled' });
+			}
+			const optedIn = { ...env, ENVIRONMENT: 'staging', ENABLE_PAT_ISSUANCE: 'true' };
+			expect(personalTokenPolicy(optedIn, { userApiSupport: 0 }).userApiSupport).toBe(0);
+			const created = await userService.createApiToken({ env: optedIn }, userId, { name: 'compatible', scopes: ['emails:read'] });
+			const off = { env: { ...optedIn, ENABLE_PAT_ISSUANCE: 'false' } };
+			expect(await userService.getApiTokens(off, userId)).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.id })]));
+			await userService.deleteApiToken(off, userId, created.id);
+			expect((await userService.getApiTokens(off, userId)).some(item => item.id === created.id)).toBe(false);
+		} finally {
+			settings.mockRestore();
+		}
+	});
+
+	it('rejects explicitly empty, mixed or unrecognized scopes before issuing credentials', async () => {
+		const settings = vi.spyOn(settingService, 'query').mockResolvedValue({ userApiSupport: 1 });
+		try {
+			for (const scopes of [[], null, 'emails:read', ['unknown'], ['emails:read', 'unknown']]) {
+				await expect(userService.createApiToken({ env }, userId, { name: 'scope-test', scopes }))
+					.rejects.toMatchObject({ code: 400, errorCode: 'invalid_scope' });
+			}
+		} finally {
+			settings.mockRestore();
 		}
 	});
 

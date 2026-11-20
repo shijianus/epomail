@@ -15,7 +15,7 @@ import { applyRules } from './rule-engine';
 import kvConst from '../const/kv-const';
 import mailReliabilityService, { failInboundClaim } from '../service/mail-reliability-service.js';
 import { getMailDb } from '../utils/db-accessor.js';
-import forwardService from '../service/mail-forward-service.js';
+import { forwardPlan } from '../service/forward-consent.js';
 import { assertOutboundAllowed } from '../utils/outbound-policy.js';
 import safeLogger from '../utils/safe-logger.js';
 
@@ -328,7 +328,10 @@ export async function email(message, env, ctx) {
 					status: account ? emailConst.status.RECEIVE : emailConst.status.NOONE,
 					isDel: isDelVal,
 					isSpam: isSpamVal,
-					attachmentRows: stagedAttachments.rows
+					attachmentRows: stagedAttachments.rows,
+					forwardPlan: await forwardPlan({ env }, { userEmailForward, allMailMode, domainList }, {
+						userId: account?.userId, accountId: account?.accountId, toEmail: message.to, sendEmail: email.from.address, isDel: isDelVal
+					})
 				});
 				activeInboundClaim.complete = true;
 			} catch (error) {
@@ -346,19 +349,11 @@ export async function email(message, env, ctx) {
 			const sysMailMode = Number(allMailMode ?? 0);
 
 
-		// 系统转发规则过滤 (只在非加密模式下生效，加密模式下转发规则直接失效/被删除，不起任何作用)
-		if (sysMailMode !== 2 && ruleType === settingConst.ruleType.RULE) {
-
-			const emails = ruleEmail.split(',');
-
-			if (!emails.includes(message.to)) {
-				return;
-			}
-
-		}
+		const systemRuleMatches = ruleType !== settingConst.ruleType.RULE ||
+			String(ruleEmail || '').split(',').some(addr => addr.trim().toLowerCase() === message.to.toLowerCase());
 
 		// 转发到系统管理员TG (System TG Bot for Admin)
-		if (sysMailMode !== 2 && tgBotStatus === settingConst.tgBotStatus.OPEN && tgChatId) {
+		if (systemRuleMatches && sysMailMode !== 2 && tgBotStatus === settingConst.tgBotStatus.OPEN && tgChatId) {
 			if (sysMailMode === 1) {
 				// 全部邮件模式：转发的是全部邮件
 				await telegramService.sendEmailToBot({ env }, emailRow);
@@ -371,7 +366,7 @@ export async function email(message, env, ctx) {
 		}
 
 		// 转发到其他邮箱 (系统管理员全局转发 - 严格按模式控制)
-		if (sysMailMode !== 2 && forwardStatus === settingConst.forwardStatus.OPEN && forwardEmail) {
+		if (systemRuleMatches && sysMailMode !== 2 && forwardStatus === settingConst.forwardStatus.OPEN && forwardEmail) {
 			const sysMailMode = Number(allMailMode ?? 0);
 			let allowSystemForward = false;
 			if (sysMailMode === 1) {
@@ -414,94 +409,7 @@ export async function email(message, env, ctx) {
 						await telegramService.sendPersonalEmailToBot({ env }, emailRow, ptg);
 					}
 
-					// 2. 个人规则转发与自动抄送 (个人转发不受全站邮件模式限制，由用户自主配置与系统 allowUserFw 管控)
-					const allowUserFw = Number(userEmailForward ?? 1) === 1;
-					const pfw = userProfile.personalForwarding;
-					if (allowUserFw && pfw && pfw.enabled && pfw.targets) {
-						let shouldForward = false;
-						const fwMode = pfw.mode || 'all';
 
-						// 基于规则判断该邮件是否属于用户配置的转发范围
-						if (fwMode === 'all') {
-							shouldForward = true;
-						} else if (fwMode === 'alias') {
-							const prefixes = (pfw.aliasPrefixes || '')
-								.split(',')
-								.map(p => p.trim().toLowerCase())
-								.filter(Boolean);
-							const toLocal = (message.to || '').split('@')[0].toLowerCase();
-								if (prefixes.length > 0 && prefixes.some(p => toLocal.startsWith(p) || toLocal === p)) {
-									shouldForward = true;
-								}
-
-					} else if (fwMode === 'rules') {
-						// Rule-based forwarding has no backend evaluator yet. Fail closed
-						// instead of treating an unimplemented mode as "all".
-						shouldForward = false;
-						}
-
-						if (shouldForward) {
-							const targets = pfw.targets.split(',').map(t => t.trim()).filter(Boolean);
-							const currentTo = (message.to || '').trim().toLowerCase();
-							const currentFrom = (email.from?.address || '').trim().toLowerCase();
-
-							for (const target of targets) {
-								const cleanTarget = target.trim().toLowerCase();
-								if (!cleanTarget || cleanTarget === currentTo || cleanTarget === currentFrom) {
-									safeLogger.warn('inbound_forwarding_loop_prevented');
-									continue;
-								}
-								const domains = Array.isArray(domainList) ? domainList : [];
-								try {
-									assertOutboundAllowed({ env }, [cleanTarget], { domains });
-								} catch (_) {
-									continue;
-								}
-								let cfForwardSuccess = false;
-								try {
-									// 尝试 Cloudflare 原生无损转发（若已在 CF Email Routing 中验证）
-									assertOutboundAllowed({ env }, [cleanTarget]);
-									await message.forward(cleanTarget);
-									cfForwardSuccess = true;
-								} catch (cfErr) {
-									cfForwardSuccess = false;
-								}
-
-								// 若未在 CF 验证，则通过系统邮件发送能力执行自动抄送转发（占用个人发送配额）
-								if (!cfForwardSuccess) {
-									const forwardTask = await forwardService.enqueueForwardTask({ env }, {
-										userId: emailRow.userId,
-										accountId: emailRow.accountId,
-										emailId: emailRow.emailId,
-										target: cleanTarget,
-										addPrefix: !!pfw.addPrefix
-									}).catch((err) => {
-										safeLogger.warn('personal_forward_enqueue_failed', { error: err });
-										return null;
-									});
-									if (forwardTask) {
-										await forwardService.processForwardTask({ env }, forwardTask.task_id)
-											.catch((err) => safeLogger.warn('personal_forward_task_failed', { error: err }));
-									} else {
-										try {
-											const forwardSubject = pfw.addPrefix ? `[Fwd] ${email.subject || emailRow.subject || ''}` : (email.subject || emailRow.subject || '');
-											await emailService.send({ env }, {
-												receiveEmail: [target],
-												subject: forwardSubject,
-												content: email.html || email.text || emailRow.content || '',
-												text: email.text || emailRow.text || '',
-												attachments: attachmentsIn,
-												forwarding: true,
-												accountId: emailRow.accountId
-											}, emailRow.userId);
-										} catch (sendErr) {
-											safeLogger.error('personal_cc_forwarding_failed', { error: sendErr });
-										}
-									}
-								}
-							}
-						}
-					}
 				}
 			} catch (ptgErr) {
 				safeLogger.error('personal_tg_or_forwarding_failed', { error: ptgErr });

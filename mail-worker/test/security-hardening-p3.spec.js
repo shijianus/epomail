@@ -137,6 +137,7 @@ describe('Phase 3 security hardening: BYO S3 versioned AEAD encryption & migrati
 		)`).run();
 		await env.db.prepare(`CREATE TABLE IF NOT EXISTS setting_ext (key TEXT PRIMARY KEY, value TEXT NOT NULL)`).run();
 		await env.db.prepare(`CREATE TABLE IF NOT EXISTS email (
+			is_official INTEGER NOT NULL DEFAULT 0,
 			email_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
 			account_id INTEGER NOT NULL DEFAULT 0, subject TEXT, text TEXT, content TEXT, code TEXT DEFAULT '',
 			is_del INTEGER NOT NULL DEFAULT 0, status INTEGER NOT NULL DEFAULT 0,
@@ -285,6 +286,7 @@ describe('Phase 3 security hardening: Email encryption key domain isolation & mi
 
 	beforeAll(async () => {
 		await env.db.prepare(`CREATE TABLE IF NOT EXISTS email (
+			is_official INTEGER NOT NULL DEFAULT 0,
 			email_id INTEGER PRIMARY KEY AUTOINCREMENT, send_email TEXT, name TEXT,
 			account_id INTEGER NOT NULL DEFAULT 0, user_id INTEGER NOT NULL,
 			subject TEXT, code TEXT NOT NULL DEFAULT '', text TEXT, content TEXT,
@@ -493,6 +495,7 @@ describe('Phase 3 additional security hardening: rollback key restoration, profi
 
 	it('upgrades legacy_v1 mail lazily under totp_compat and handles nullable code columns in CAS updates', async () => {
 		await env.db.prepare(`CREATE TABLE IF NOT EXISTS email (
+			is_official INTEGER NOT NULL DEFAULT 0,
 			email_id INTEGER PRIMARY KEY AUTOINCREMENT, send_email TEXT, name TEXT,
 			account_id INTEGER NOT NULL DEFAULT 0, user_id INTEGER NOT NULL,
 			subject TEXT, code TEXT NOT NULL DEFAULT '', text TEXT, content TEXT,

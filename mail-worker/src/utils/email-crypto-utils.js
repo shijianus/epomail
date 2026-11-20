@@ -5,6 +5,8 @@
  * for all new writes (never falling back to jwt_secret for encryption).
  */
 
+import { emailConst } from '../const/entity-const.js';
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const CIPHER_PREFIX = 'enc:v1:';
@@ -365,7 +367,7 @@ const emailCryptoUtils = {
 		// Mode 0: 隐私邮件模式 (垃圾箱明文存储，其余密文存储)
 		const isTrashOrSpam = Number(emailRecord.isDel) === 1 ||
 		                      Number(emailRecord.isSpam) === 1 ||
-		                      emailRecord.status === 2; // emailConst.status.NOONE = 2
+		                      emailRecord.status === emailConst.status.NOONE;
 		return !isTrashOrSpam;
 	},
 
@@ -373,13 +375,13 @@ const emailCryptoUtils = {
 		0: {
 			code: 'PRIVACY',
 			level: 2,
-			titleZh: 'Level 2: 增强隐私级 (Selective E2EE & Spam Isolation)',
-			titleEn: 'Level 2: Enhanced Privacy (Selective E2EE & Spam Isolation)',
+			titleZh: 'Level 2: 选择性静态加密',
+			titleEn: 'Level 2: Selective encryption at rest',
 			badgeZh: 'Level 2: 增强隐私',
 			badgeEn: 'Level 2: Privacy',
 			algorithm: 'AES-256-GCM + HKDF-SHA256',
 			adminPrivilegeZh: '受限：仅可审查垃圾箱、系统截断无主件，严禁查阅正常往来邮件',
-			tamperProofZh: '强制开启 2FA，普通邮件自动加密存储，收发双方密钥隔离'
+			tamperProofZh: '普通邮件指定字段使用服务端派生的用户密钥加密存储'
 		},
 		1: {
 			code: 'ALL',
@@ -395,13 +397,13 @@ const emailCryptoUtils = {
 		2: {
 			code: 'ENCRYPTED',
 			level: 3,
-			titleZh: 'Level 3: 最高绝密级 (Maximum Zero-Knowledge E2EE)',
-			titleEn: 'Level 3: Maximum Zero-Knowledge E2EE',
-			badgeZh: 'Level 3: 最高绝密',
-			badgeEn: 'Level 3: E2EE Max',
-			algorithm: 'AES-256-GCM + HKDF-SHA256 (全量100%覆盖)',
-			adminPrivilegeZh: '绝对禁止：管理员无权查看任何邮件列表或正文，全接口阻断',
-			tamperProofZh: '强制开启 2FA，强制封锁外部推送/转发通道，杜绝密文外泄'
+			titleZh: 'Level 3: 全文件夹邮件字段静态加密',
+			titleEn: 'Level 3: Mail field encryption at rest in every folder',
+			badgeZh: 'Level 3: 静态加密',
+			badgeEn: 'Level 3: Encryption at rest',
+			algorithm: 'AES-256-GCM + HKDF-SHA256',
+			adminPrivilegeZh: '管理界面限制浏览用户邮件',
+			tamperProofZh: '服务端持有邮件密钥并在授权读取时解密正文；附件与投递元数据单独管理'
 		}
 	},
 

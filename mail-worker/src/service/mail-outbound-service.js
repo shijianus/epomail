@@ -3,6 +3,13 @@ import BizError from '../error/biz-error.js';
 import { mailTransactionGuard } from '../utils/mail-transaction.js';
 
 const LEASE_SECONDS = 300;
+const legacyLocalRetry = 'Local delivery will resume from receipts';
+const hasReceipt = 'EXISTS (SELECT 1 FROM mail_local_delivery d WHERE d.task_id=mail_outbound_task.task_id)';
+const hasDelivery = "EXISTS (SELECT 1 FROM mail_local_delivery d WHERE d.task_id=mail_outbound_task.task_id AND d.state='DELIVERED')";
+// Older workers returned partially dispatched local sends to PREPARED. An archive by
+// itself is insufficient evidence of dispatch: its reservation might never have passed.
+const startedLocal = `provider='local' AND (state IN ('SENDING','UNKNOWN')
+	OR (state='PREPARED' AND (COALESCE(last_error,'')='${legacyLocalRetry}' OR ${hasReceipt})))`;
 const error = (message, code, status = 409) => new BizError(message, status, code);
 
 export async function prepareOutboundTask(c, { userId, accountId, idempotencyKey, contentHash, payload = {}, reservedBytes = 0, maxStorageBytes, maxEmails, bypassStorage = false, storageBlocked = false }) {
@@ -45,9 +52,6 @@ export async function prepareOutboundTask(c, { userId, accountId, idempotencyKey
 
 export async function claimPreparation(c, taskId) {
 	const db = getMailDb(c);
-	await db.prepare(`UPDATE mail_outbound_task SET state='PREPARED',lease_token=NULL,lease_until=0,updated_at=CURRENT_TIMESTAMP
-		WHERE task_id=? AND provider='local' AND state IN ('SENDING','UNKNOWN') AND lease_until<=unixepoch()`)
-		.bind(taskId).run();
 	const leaseToken = crypto.randomUUID();
 	const row = await db.prepare(`UPDATE mail_outbound_task SET lease_token=?,lease_until=unixepoch()+?,updated_at=CURRENT_TIMESTAMP
 		WHERE task_id=? AND state='PREPARED' AND (lease_token IS NULL OR lease_until<=unixepoch()) RETURNING *`)
@@ -55,6 +59,9 @@ export async function claimPreparation(c, taskId) {
 	if (row) return { task: row, leaseToken };
 	const task = await db.prepare('SELECT * FROM mail_outbound_task WHERE task_id=?').bind(taskId).first();
 	if (task?.state === 'ACCEPTED') return { task, leaseToken: null };
+	if (task?.provider === 'local' && ['SENDING','UNKNOWN'].includes(task.state)) {
+		throw error('Local delivery is pending under this request', 'local_delivery_pending', 503);
+	}
 	if (task?.state === 'SENDING' && task.lease_until <= Math.floor(Date.now()/1000)) {
 		await db.prepare("UPDATE mail_outbound_task SET state='UNKNOWN',lease_until=0,last_error='Provider result requires reconciliation' WHERE task_id=? AND state='SENDING' AND lease_until<=unixepoch()") .bind(taskId).run();
 	}
@@ -120,13 +127,82 @@ export async function compensateSendCount(c, { taskId }) {
 	]);
 }
 
+export async function retryLocalOutbound(c, taskId) {
+	const db = getMailDb(c);
+	const token = crypto.randomUUID();
+	const task = await db.prepare(`UPDATE mail_outbound_task SET state='SENDING',lease_token=?,lease_until=unixepoch()+?,
+		updated_at=CURRENT_TIMESTAMP WHERE task_id=? AND (${startedLocal}) AND lease_until<=unixepoch() RETURNING *`)
+		.bind(token, LEASE_SECONDS, taskId).first();
+	if (!task) return false;
+	try {
+		const { resumeArchivedLocalDelivery } = await import('./mail-local-delivery-service.js');
+		await resumeArchivedLocalDelivery(c, task);
+		return true;
+	} catch (cause) {
+		await releaseLocalDispatch(c, taskId, token);
+		throw cause;
+	}
+}
+
+export async function releaseLocalDispatch(c, taskId, token) {
+	await getMailDb(c).prepare(`UPDATE mail_outbound_task SET lease_token=NULL,lease_until=0,
+		last_error=?,updated_at=CURRENT_TIMESTAMP WHERE task_id=? AND provider='local' AND state='SENDING' AND lease_token=?`)
+		.bind(legacyLocalRetry, taskId, token).run();
+}
+
+// Publish the archive and the external task's terminal fact in one D1 batch.
+// A concurrent resolution, or a task under local receipt recovery, changes neither.
+export async function closeExternalUnknown(c, { taskId, providerId = null, state, reason, status, fromStatuses }) {
+	const db = getMailDb(c);
+	const selector = "task_id=? AND provider='external' AND state='UNKNOWN' AND (? IS NULL OR provider_id=?)";
+	const identity = [taskId, providerId, providerId];
+	const results = await db.batch([
+		db.prepare(`UPDATE email SET status=CASE WHEN status IN (${fromStatuses.map(() => '?').join(',')}) THEN ? ELSE status END,
+			resend_email_id=COALESCE(resend_email_id,?) WHERE EXISTS (SELECT 1 FROM mail_outbound_task t
+			WHERE ${selector} AND t.user_id=email.user_id AND t.email_id=email.email_id)`)
+			.bind(...fromStatuses, status, providerId, ...identity),
+		db.prepare(`UPDATE mail_outbound_task SET state=?,reserved_bytes=0,reserved_count=0,lease_until=0,last_error=?,
+			updated_at=CURRENT_TIMESTAMP WHERE ${selector} RETURNING email_id,user_id`).bind(state, reason, ...identity)
+	]);
+	return results[1].results?.[0];
+}
+
+export async function readSendStatus(c, userId, accountId, idempotencyKey) {
+	if (!Number.isSafeInteger(userId) || userId <= 0) throw error('Authentication required', 'unauthorized', 401);
+	if (!Number.isSafeInteger(accountId) || accountId <= 0 || typeof idempotencyKey !== 'string'
+		|| !/^[A-Za-z0-9_.:-]{8,128}$/.test(idempotencyKey)) throw error('Invalid send request identity', 'invalid_idempotency_key', 400);
+	const task = await getMailDb(c).prepare(`SELECT state,provider,email_id,${hasDelivery} AS delivered,
+		EXISTS(SELECT 1 FROM mail_local_delivery d WHERE d.task_id=mail_outbound_task.task_id AND d.state='BOUNCED') AS bounced
+		FROM mail_outbound_task WHERE user_id=? AND account_id=? AND idempotency_key=?`)
+		.bind(userId, accountId, idempotencyKey).first();
+	if (!task) return { state: 'NOT_FOUND' };
+	if (task.state === 'ACCEPTED') {
+		const status = { state: 'ACCEPTED', emailId: task.email_id };
+		if (task.provider === 'local' && task.bounced) status.deliveryOutcome = task.delivered ? 'PARTIALLY_BOUNCED' : 'BOUNCED';
+		return status;
+	}
+	if (task.state === 'FAILED') return { state: task.delivered ? 'PARTIAL' : 'FAILED' };
+	if (task.provider !== 'local' && task.state === 'UNKNOWN') return { state: 'UNKNOWN' };
+	return { state: 'PENDING' };
+}
+
 export async function maintainOutboundTasks(c, { limit = 100 } = {}) {
 	const db = getMailDb(c);
 	const bound = Math.max(1, Math.min(Number(limit) || 100, 200));
-	const candidates = await db.prepare(`SELECT task_id FROM mail_outbound_task WHERE state='PREPARED'
+	const pending = await db.prepare(`SELECT task_id FROM mail_outbound_task WHERE (${startedLocal})
+		AND lease_until<=unixepoch() ORDER BY updated_at,task_id LIMIT ?`).bind(Math.min(bound, 10)).all();
+	let recovered = 0;
+	let pendingErrors = 0;
+	for (const row of pending.results || []) {
+		try {
+			if (await retryLocalOutbound(c, row.task_id)) recovered++;
+		} catch (_) { pendingErrors++; }
+	}
+	if (pendingErrors) console.warn('Local mail recovery remains pending', { count: pendingErrors });
+	const candidates = await db.prepare(`SELECT task_id FROM mail_outbound_task WHERE state='PREPARED' AND NOT (${startedLocal})
 		AND lease_until<=unixepoch() AND updated_at<datetime('now','-1 day') LIMIT ?`).bind(bound).all();
 	for (const row of candidates.results || []) {
-		const guard = mailTransactionGuard(c, `EXISTS(SELECT 1 FROM mail_outbound_task WHERE task_id=? AND state='PREPARED'
+		const guard = mailTransactionGuard(c, `EXISTS(SELECT 1 FROM mail_outbound_task WHERE task_id=? AND state='PREPARED' AND NOT (${startedLocal})
 			AND lease_until<=unixepoch() AND updated_at<datetime('now','-1 day'))`, [row.task_id]);
 		try {
 			await db.batch([guard.before,
@@ -143,12 +219,12 @@ export async function maintainOutboundTasks(c, { limit = 100 } = {}) {
 		last_error='Provider result requires reconciliation',updated_at=CURRENT_TIMESTAMP
 		WHERE task_id IN (SELECT task_id FROM mail_outbound_task WHERE state='SENDING' AND provider<>'local'
 		AND lease_until<=unixepoch() LIMIT ?)`).bind(bound).run();
-	const failed = await db.prepare("SELECT task_id FROM mail_outbound_task WHERE state='FAILED' AND quota_reconciled=0 LIMIT ?").bind(bound).all();
+	const failed = await db.prepare(`SELECT task_id FROM mail_outbound_task WHERE state='FAILED' AND quota_reconciled=0 AND NOT ${hasDelivery} LIMIT ?`).bind(bound).all();
 	for (const row of failed.results || []) {
 		await compensateSendCount(c, { taskId: row.task_id });
 		await db.prepare("UPDATE mail_outbound_task SET quota_reconciled=1 WHERE task_id=? AND state='FAILED'").bind(row.task_id).run();
 	}
-	return { expired: candidates.results?.length || 0, compensated: failed.results?.length || 0 };
+	return { recovered, pendingErrors, expired: candidates.results?.length || 0, compensated: failed.results?.length || 0 };
 }
 
 export async function retireOutboundForUser(c, userId) {
@@ -166,4 +242,4 @@ export async function retireOutboundForUser(c, userId) {
 	]);
 }
 
-export default { prepareOutboundTask, claimPreparation, claimOutboundTask, releasePreparation, markOutboundUnknown, reserveSendCount, compensateSendCount, maintainOutboundTasks, retireOutboundForUser };
+export default { prepareOutboundTask, claimPreparation, claimOutboundTask, releasePreparation, markOutboundUnknown, retryLocalOutbound, releaseLocalDispatch, reserveSendCount, compensateSendCount, maintainOutboundTasks, retireOutboundForUser };

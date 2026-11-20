@@ -1,5 +1,6 @@
 import app from '../hono/hono';
 import emailService from '../service/email-service';
+import { readSendStatus } from '../service/mail-outbound-service.js';
 import result from '../model/result';
 import userContext from '../security/user-context';
 import attService from '../service/att-service';
@@ -38,6 +39,13 @@ app.delete('/email/delete', async (c) => {
 app.get('/email/attList', async (c) => {
 	const attList = await attService.list(c, c.req.query(), userContext.getUserId(c));
 	return c.json(result.ok(attList));
+});
+
+app.get('/email/send-status', async (c) => {
+	const { accountId, idempotencyKey } = c.req.query();
+	const state = await readSendStatus(c, userContext.getUserId(c), Number(accountId), idempotencyKey);
+	c.header('Cache-Control', 'private, no-store');
+	return c.json(result.ok(state));
 });
 
 app.post('/email/send', async (c) => {

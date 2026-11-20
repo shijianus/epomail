@@ -1,3 +1,4 @@
+import { forwardIntentStatements } from './forward-consent.js';
 import { mailOrm as orm, userOrm } from '../entity/orm';
 import { getUserDb, getMailDb } from '../utils/db-accessor';
 import email from '../entity/email';
@@ -36,7 +37,7 @@ import { assertOutboundAllowed } from '../utils/outbound-policy.js';
 import safeLogger from '../utils/safe-logger.js';
 import { mailSha256, normalizeMailAddress, assertMailRowSize, buildBoundedInserts, prepareMailQuery } from '../utils/mail-pipeline.js';
 import { mailTransactionGuard } from '../utils/mail-transaction.js';
-import mailOutboundService from './mail-outbound-service.js';
+import mailOutboundService, { closeExternalUnknown, readSendStatus } from './mail-outbound-service.js';
 import { deliverLocalMail } from './mail-local-delivery-service.js';
 import mailLifecycleService from './mail-lifecycle-service.js';
 import { reserveInboundQuota } from './mail-reliability-service.js';
@@ -45,12 +46,7 @@ import { RESERVED_SYSTEM_LABELS } from '../email/rule-engine.js';
 import { updateSessionUserFields } from '../utils/session-auth-store.js';
 
 export function isOfficialEmailRow(item) {
-	if (!item || typeof item !== 'object') return false;
-	if (item.receiveClaimKey || item.receive_claim_key || item.outboundTaskId || item.outbound_task_id) {
-		return false;
-	}
-	const sender = String(item.sendEmail || item.send_email || '').trim().toLowerCase();
-	return sender === 'announcement@epocanvas.com' || sender === 'admin@epocanvas.com';
+	return item?.isOfficial === 1;
 }
 
 const ENCRYPTED_SEARCH_BATCH = 100;
@@ -229,7 +225,7 @@ const emailService = {
 		} else {
 			commonConditions.push(folder === 'trash' ? eq(email.isDel, 1) : (isTrash ? eq(email.isDel, 1) : eq(email.isDel, 0)));
 			commonConditions.push(folder === 'spam' ? eq(email.isSpam, 1) : (isSpam ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0))));
-			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR (send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') AND receive_claim_key IS NULL AND outbound_task_id IS NULL))`));
+			commonConditions.push(folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR is_official = 1)`));
 			
 			if (isSent) {
 				const currentType = (folder === 'all' ? emailConst.type.RECEIVE : (type !== undefined ? type : emailConst.type.RECEIVE));
@@ -324,7 +320,7 @@ const emailService = {
 				eq(email.userId, userId),
 				folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
 				folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
-				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR (send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') AND receive_claim_key IS NULL AND outbound_task_id IS NULL))`),
+				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR is_official = 1)`),
 				(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
 			))
 			.orderBy(desc(email.emailId)).limit(1).get();
@@ -335,9 +331,7 @@ const emailService = {
 				UPDATE email 
 				SET is_del = 1, trashed_at = COALESCE(trashed_at,CURRENT_TIMESTAMP), snoozed_time = NULL, snoozed_end_time = NULL
 				WHERE user_id = ? 
-				  AND send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') 
-				  AND receive_claim_key IS NULL
-				  AND outbound_task_id IS NULL
+				  AND is_official = 1
 				  AND is_del = 0 
 				  AND datetime(create_time, '+' || ? || ' days') < datetime('now')
 			`).bind(userId, settingData.welcomeExpireDays).run().catch(() => {});
@@ -776,7 +770,7 @@ const emailService = {
 	async receive(c, params, cidAttList, r2domain, recovery = null) {
 		params.content = this.imgReplace(params.content, cidAttList, r2domain);
 		const settingRow = await settingService.query(c);
-		let dbParams = { ...params };
+		let dbParams = { ...params, isOfficial: 0 };
 		if (params.userId && emailCryptoUtils.shouldEncryptEmail(settingRow?.allMailMode, params)) {
 			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, params.userId);
 			dbParams = await emailCryptoUtils.encryptEmailRecord(dbParams, cryptoKey);
@@ -808,7 +802,7 @@ const emailService = {
 		return orm(c).select().from(email).where(eq(email.emailId, id)).get();
 	},
 
-	async completeInboundReceive(c, { claimKey, leaseToken, emailId, status, isDel: delStatus, isSpam: spamStatus, attachmentRows = [] }) {
+	async completeInboundReceive(c, { claimKey, leaseToken, emailId, status, isDel: delStatus, isSpam: spamStatus, attachmentRows = [], forwardPlan = null }) {
 		const mailDb = getMailDb(c);
 		const assertion = mailTransactionGuard(c, `EXISTS (
 			SELECT 1 FROM mail_receive_claim c JOIN email e ON e.email_id=?
@@ -863,6 +857,7 @@ const emailService = {
 				AND EXISTS (SELECT 1 FROM email WHERE email_id = ? AND receive_claim_key = ? AND status = ?)
 		`).bind(emailId, claimKey, leaseToken, emailId, claimKey, status));
 
+		statements.push(...forwardIntentStatements(c, forwardPlan, claimKey));
 		for (const row of rows) statements.push(mailDb.prepare('DELETE FROM object_deletion_queue WHERE object_key=? AND user_id=?').bind(row.key, row.userId));
 		statements.push(assertion.after);
 		await mailDb.batch(statements);
@@ -1134,6 +1129,10 @@ const emailService = {
 				row = await emailCryptoUtils.decryptEmailRecord(row, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
 			}
 			const attList = await attService.selectByEmailIds(c, [row.emailId]);
+			if (prepared.task.provider === 'local' && row.status === emailConst.status.BOUNCED) {
+				const status = await readSendStatus(c, userId, accountId, idempotencyKey);
+				if (status.deliveryOutcome) row.deliveryOutcome = status.deliveryOutcome;
+			}
 			return [{ ...row, attList }];
 		};
 		if (prepared.task.state === 'ACCEPTED') return readArchived(prepared.task);
@@ -1141,7 +1140,19 @@ const emailService = {
 			throw new BizError('This request was prepared under a different delivery route', 409, 'outbound_route_changed');
 		}
 		if (prepared.task.state === 'FAILED') {
+			if (prepared.task.provider === 'local') {
+				const delivered = await mailDb.prepare("SELECT 1 FROM mail_local_delivery WHERE task_id=? AND state='DELIVERED' LIMIT 1")
+					.bind(prepared.task.task_id).first();
+				if (delivered) throw new BizError('Some recipients already received this send; manual reconciliation required', 409, 'local_delivery_partial');
+			}
 			await mailOutboundService.compensateSendCount(c, { taskId: prepared.task.task_id });
+		}
+		if (!prepared.created && allInternal) {
+			try {
+				if (await mailOutboundService.retryLocalOutbound(c, prepared.task.task_id)) return readArchived(prepared.task);
+			} catch (_) {
+				throw new BizError('Local delivery is pending under this request', 503, 'local_delivery_pending');
+			}
 		}
 		const owned = await mailOutboundService.claimPreparation(c, prepared.task.task_id);
 		if (!owned.leaseToken) return readArchived(owned.task);
@@ -1214,7 +1225,7 @@ const emailService = {
 		} catch (cause) {
 			// Compensate only while this lease still owns PREPARED. An ambiguous
 			// SENDING commit or a replacement lease must retain its reservation.
-			const failed = await mailDb.prepare("UPDATE mail_outbound_task SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,last_error='Dispatch was not started' WHERE task_id=? AND state='PREPARED' AND lease_token=? RETURNING task_id,email_id")
+			const failed = await mailDb.prepare("UPDATE mail_outbound_task SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,last_error='Dispatch was not started' WHERE task_id=? AND state='PREPARED' AND lease_token=? AND NOT EXISTS (SELECT 1 FROM mail_local_delivery d WHERE d.task_id=mail_outbound_task.task_id) RETURNING task_id,email_id")
 				.bind(task.task_id, leaseToken).first();
 			if (failed) {
 				// The archive row was created as SAVING. Leaving it there makes it
@@ -1266,10 +1277,8 @@ const emailService = {
 			}
 		} catch (cause) {
 			if (allInternal) {
-				await mailDb.prepare(`UPDATE mail_outbound_task SET state='PREPARED',lease_token=NULL,lease_until=0,
-					last_error='Local delivery will resume from receipts',updated_at=CURRENT_TIMESTAMP
-					WHERE task_id=? AND provider='local' AND state='SENDING' AND lease_token=?`).bind(task.task_id, leaseToken).run();
-				throw new BizError('Local delivery is pending; retry the same request to resume safely', 503, 'local_delivery_pending');
+				await mailOutboundService.releaseLocalDispatch(c, task.task_id, leaseToken);
+				throw new BizError('Local delivery is pending under this request', 503, 'local_delivery_pending');
 			}
 			await mailOutboundService.markOutboundUnknown(c, { taskId: task.task_id, leaseToken, providerId }).catch(() => {});
 			if (cause.errorCode === 'provider_rejected') throw cause;
@@ -1697,8 +1706,7 @@ const emailService = {
 			const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 				and(
 					eq(email.userId, userId),
-					inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
-					sql`${email.receiveClaimKey} IS NULL AND ${email.outboundTaskId} IS NULL`
+					eq(email.isOfficial, 1)
 				)
 			).limit(1).get();
 
@@ -1715,6 +1723,7 @@ const emailService = {
 		const snoozedEndTime = expireDays > 0 ? new Date(Date.now() + expireDays * 86400000).toISOString() : null;
 
 		let welcomeData = {
+			isOfficial: 1,
 			userId: userId,
 			accountId: accountId,
 			sendEmail: 'announcement@epocanvas.com',
@@ -1784,8 +1793,7 @@ const emailService = {
 		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 			and(
 				eq(email.userId, userId),
-				inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
-				sql`${email.receiveClaimKey} IS NULL AND ${email.outboundTaskId} IS NULL`
+				eq(email.isOfficial, 1)
 			)
 		).limit(1).get();
 
@@ -1889,6 +1897,7 @@ const emailService = {
 		const resolvedSenderName = senderName || getSenderNameByLang(tplLang);
 
 		let globalEmailData = {
+			isOfficial: 1,
 			userId: userId,
 			accountId: accountId,
 			sendEmail: 'announcement@epocanvas.com',
@@ -1973,8 +1982,7 @@ const emailService = {
 		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
 			and(
 				eq(email.userId, userId),
-				inArray(email.sendEmail, ['announcement@epocanvas.com', 'admin@epocanvas.com']),
-				sql`${email.receiveClaimKey} IS NULL AND ${email.outboundTaskId} IS NULL`,
+				eq(email.isOfficial, 1),
 				eq(email.subject, globalConfig.subject),
 				eq(email.isDel, isDel.NORMAL)
 			)
@@ -2033,7 +2041,7 @@ const emailService = {
 				}
 				emailRow = await emailCryptoUtils.decryptEmailRecord(emailRow, cryptoKey);
 			}
-			const isOfficial = emailRow.sendEmail === 'announcement@epocanvas.com' || emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
+			const isOfficial = isOfficialEmailRow(emailRow);
 			if (isOfficial) {
 				emailRow.isOfficial = 1;
 				const settingData = await settingService.query(c);
@@ -2119,7 +2127,7 @@ const emailService = {
 
 		const settingData = await settingService.query(c);
 		list.forEach(item => {
-			const isOfficial = item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || (item.labels && item.labels.includes('官方'));
+			const isOfficial = isOfficialEmailRow(item);
 			if (isOfficial) {
 				item.isOfficial = 1;
 				const welcomeContent = settingData.welcomeContent || DEFAULT_WELCOME_CONTENT;
@@ -2315,37 +2323,21 @@ const emailService = {
 			if (providerName === 'cloudflare') continue;
 
 			const accept = async (providerId, event) => {
-				const updated = await db.prepare(`UPDATE mail_outbound_task
-					SET state='ACCEPTED',reserved_bytes=0,reserved_count=0,lease_until=0,
-						last_error='Reconciled from provider acceptance',updated_at=CURRENT_TIMESTAMP
-					WHERE task_id=? AND state='UNKNOWN' AND provider_id=?
-					RETURNING email_id`).bind(row.task_id, providerId).first();
+				const status = ['delivered', 'opened', 'clicked'].includes(event) ? emailConst.status.DELIVERED : emailConst.status.SENT;
+				const updated = await closeExternalUnknown(c, { taskId: row.task_id, providerId, state: 'ACCEPTED',
+					reason: 'Reconciled from provider acceptance', status, fromStatuses: [emailConst.status.SAVING] });
 				if (!updated) return;
 				accepted++;
-				if (updated.email_id) {
-					const emailStatus = event === 'delivered' || event === 'opened' || event === 'clicked'
-						? emailConst.status.DELIVERED : emailConst.status.SENT;
-					await db.prepare(`UPDATE email SET status=CASE WHEN status=? THEN ? ELSE status END,
-						resend_email_id=COALESCE(resend_email_id,?) WHERE email_id=? AND user_id=?`)
-						.bind(emailConst.status.SAVING, emailStatus, providerId, updated.email_id, row.user_id).run();
-				}
 				if (event !== 'delivered') {
 					await this.replayProviderEventsFromLedger(c, providerId).catch(() => {});
 				}
 			};
 			const fail = async (providerId, emailStatus, reason) => {
-				const updated = await db.prepare(`UPDATE mail_outbound_task
-					SET state='FAILED',reserved_bytes=0,reserved_count=0,lease_until=0,
-						last_error=?,updated_at=CURRENT_TIMESTAMP
-					WHERE task_id=? AND state='UNKNOWN' AND provider_id=?
-					RETURNING email_id`).bind(String(reason).slice(0, 500), row.task_id, providerId).first();
+				const updated = await closeExternalUnknown(c, { taskId: row.task_id, providerId, state: 'FAILED',
+					reason: String(reason).slice(0, 500), status: emailStatus,
+					fromStatuses: [emailConst.status.SAVING, emailConst.status.SENT, emailConst.status.DELAYED] });
 				if (!updated) return;
 				failed++;
-				if (updated.email_id) {
-					await db.prepare('UPDATE email SET status=? WHERE email_id=? AND user_id=? AND status IN (?,?,?)')
-						.bind(emailStatus, updated.email_id, row.user_id, emailConst.status.SAVING,
-							emailConst.status.SENT, emailConst.status.DELAYED).run();
-				}
 				await mailOutboundService.compensateSendCount(c, { taskId: row.task_id }).catch(() => {});
 			};
 
@@ -2408,8 +2400,8 @@ const emailService = {
 	async listUnknownOutbound(c, { limit = 50 } = {}) {
 		const bound = Math.max(1, Math.min(Number(limit) || 50, 100));
 		const result = await getMailDb(c).prepare(`SELECT task_id, user_id, account_id, provider_id,
-			reserved_bytes, reserved_count, last_error, create_time, updated_at
-			FROM mail_outbound_task WHERE state='UNKNOWN' ORDER BY updated_at ASC LIMIT ?`).bind(bound).all();
+			reserved_bytes, reserved_count, last_error, created_at AS create_time, updated_at
+			FROM mail_outbound_task WHERE state='UNKNOWN' AND provider='external' ORDER BY updated_at ASC LIMIT ?`).bind(bound).all();
 		return result.results || [];
 	},
 
@@ -2426,18 +2418,10 @@ const emailService = {
 		if (typeof taskId !== 'string' || !taskId.trim()) {
 			throw new BizError('Missing outbound task id', 400, 'invalid_outbound_resolution');
 		}
-		const db = getMailDb(c);
 		const reason = `Administrator resolved ${target}${note ? `: ${String(note).slice(0, 300)}` : ''}`;
-		const updated = await db.prepare(`UPDATE mail_outbound_task
-			SET state=?,reserved_bytes=0,reserved_count=0,lease_until=0,last_error=?,updated_at=CURRENT_TIMESTAMP
-			WHERE task_id=? AND state='UNKNOWN' RETURNING email_id,user_id`)
-			.bind(target, reason, taskId.trim()).first();
-		if (!updated) throw new BizError('Outbound task is not UNKNOWN or was already resolved', 409, 'outbound_task_state_changed');
-		if (updated.email_id) {
-			const emailStatus = target === 'ACCEPTED' ? emailConst.status.SENT : emailConst.status.FAILED;
-			await db.prepare('UPDATE email SET status=CASE WHEN status=? THEN ? ELSE status END WHERE email_id=? AND user_id=?')
-				.bind(emailConst.status.SAVING, emailStatus, updated.email_id, updated.user_id).run();
-		}
+		const updated = await closeExternalUnknown(c, { taskId: taskId.trim(), state: target, reason,
+			status: target === 'ACCEPTED' ? emailConst.status.SENT : emailConst.status.FAILED, fromStatuses: [emailConst.status.SAVING] });
+		if (!updated) throw new BizError('External task is not UNKNOWN or was already resolved', 409, 'outbound_task_state_changed');
 		if (target === 'FAILED') {
 			await mailOutboundService.compensateSendCount(c, { taskId: taskId.trim() });
 		}
@@ -2790,11 +2774,6 @@ const emailService = {
 		return await mailLifecycleService.cascadeDeleteSystemEmails(c, emailIds);
 	},
 
-	async physicsDeleteByAccountId(c, accountId) {
-		await attService.removeByAccountId(c, accountId);
-		await orm(c).delete(email).where(eq(email.accountId, accountId)).run();
-	},
-
 	async read(c, params, userId) {
 		const { emailIds, unread } = params;
 		const unreadValue = unread !== undefined ? Number(unread) : emailConst.unread.READ;
@@ -2884,7 +2863,7 @@ const emailService = {
 		const mailDb = getMailDb(c);
 		const stats = await mailDb.prepare(`
 			SELECT 
-				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR (send_email IN ('announcement@epocanvas.com', 'admin@epocanvas.com') AND receive_claim_key IS NULL AND outbound_task_id IS NULL)) AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
+				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR is_official = 1) AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status = 6 AND unread = 0 THEN 1 ELSE 0 END) as draftUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status != 6 AND unread = 0 THEN 1 ELSE 0 END) as sentUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 1 AND unread = 0 THEN 1 ELSE 0 END) as spamUnread,

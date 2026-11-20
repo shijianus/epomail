@@ -12,17 +12,6 @@ import { readAuthorizedSession } from '../utils/session-auth-store.js';
 
 const encoder = new TextEncoder();
 
-/**
- * The session middleware enforces the 60-day absolute cap by deleting AUTH_INFO.
- * Provider endpoints read AUTH_INFO directly, so they must apply the same cap or
- * an old session could still authorize third-party apps.
- */
-function sessionWithinAbsoluteCap(authInfo) {
-	const epoch = Number(authInfo?.maxSessionEpoch);
-	if (!Number.isFinite(epoch) || epoch <= 0) return true;
-	return Math.floor(Date.now() / 1000) < epoch;
-}
-
 function normalizeScopes(value) {
 	return String(value || '').split(/\s+/).map(item => item.trim()).filter(Boolean);
 }
@@ -121,8 +110,7 @@ const oauthProviderService = {
 			const payload = await jwtUtils.verifyToken(c, jwt);
 			if (payload && payload.userId) {
 				const authInfo = await readAuthorizedSession(c, payload.userId, payload.token);
-				if (authInfo && Array.isArray(authInfo.tokens) && authInfo.tokens.includes(payload.token)
-					&& sessionWithinAbsoluteCap(authInfo)) {
+				if (authInfo && Array.isArray(authInfo.tokens) && authInfo.tokens.includes(payload.token)) {
 					const userRow = await userService.selectById(c, payload.userId);
 					if (userRow && userRow.status === 0 && userRow.isDel === 0 && !payload.purpose && authVersionOf(payload) === authVersionOf(userRow)) {
 						currentUser = {
@@ -184,8 +172,7 @@ const oauthProviderService = {
 		}
 
 		const authInfo = await readAuthorizedSession(c, payload.userId, payload.token);
-		if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(payload.token)
-			|| !sessionWithinAbsoluteCap(authInfo)) {
+		if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(payload.token)) {
 			throw new BizError('登录会话已过期，请重新登录', 401);
 		}
 

@@ -21,6 +21,7 @@ const count = async (table, id) => (await db.prepare(`SELECT COUNT(*) AS n FROM 
 
 beforeAll(async () => {
 	await db.prepare(`CREATE TABLE IF NOT EXISTS email (
+		is_official INTEGER NOT NULL DEFAULT 0,
 		email_id INTEGER PRIMARY KEY AUTOINCREMENT, send_email TEXT, name TEXT,
 		account_id INTEGER NOT NULL, user_id INTEGER NOT NULL, subject TEXT, code TEXT NOT NULL DEFAULT '',
 		text TEXT, content TEXT, cc TEXT DEFAULT '[]', bcc TEXT DEFAULT '[]', recipient TEXT,

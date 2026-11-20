@@ -80,19 +80,31 @@ export function localEnvironment(directory, source = process.env) {
 	};
 }
 
-export async function writeLocalConfig(directory, workerDir, assetsDir = path.join(workerDir, 'dist')) {
+export async function writeLocalConfig(directory, workerDir, assetsDir = path.join(workerDir, 'dist'), workerEntry = path.join(workerDir, 'src/index.js'), prebuilt = false) {
 	const secrets = {
 		jwt_secret: randomBytes(32).toString('base64url'),
 		totp_enc_key: randomBytes(32).toString('base64'),
 		email_enc_key: randomBytes(32).toString('base64')
 	};
-	const entryPath = path.join(directory, 'isolated-worker.mjs');
-	const mainPath = path.resolve(workerDir, 'src/index.js').replaceAll('\\', '/');
+	const moduleDir = prebuilt ? path.join(directory, 'modules') : directory;
+	const entryPath = path.join(moduleDir, 'isolated-worker.mjs');
+	let mainPath = path.resolve(workerEntry).replaceAll('\\', '/');
+	if (prebuilt) {
+		await fs.mkdir(moduleDir, { recursive: true });
+		await fs.cp(path.dirname(mainPath), path.join(moduleDir, 'bundle'), { recursive: true });
+		mainPath = './bundle/' + path.basename(mainPath);
+	}
 	await fs.writeFile(entryPath, `import worker from ${JSON.stringify(mainPath)};\nObject.defineProperty(globalThis, 'fetch', { value: async () => { throw new Error('External network is disabled in the isolated test worker'); }, writable: false, configurable: false });\nexport default worker;\n`, { mode: 0o600, flag: 'wx' });
 	const configPath = path.join(directory, 'wrangler.json');
 	await fs.writeFile(configPath, JSON.stringify({
 		name: 'epomail-local-test',
 		main: entryPath,
+		...(prebuilt ? {
+			no_bundle: true,
+			base_dir: moduleDir,
+			find_additional_modules: true,
+			rules: [{ type: 'ESModule', globs: ['bundle/**/*.js'], fallthrough: true }]
+		} : {}),
 		compatibility_date: '2025-06-04',
 		compatibility_flags: ['nodejs_als'],
 		send_metrics: false,
@@ -307,7 +319,8 @@ async function waitForLogin(base, signal, timeoutMs) {
 // in finally; signals still request shutdown when no callback wrapper is used.
 export async function startLocalStack({
 	workerDir = path.join(root, 'mail-worker'),
-	assetsDir = path.join(workerDir, 'dist'),
+	assetsDir = process.env.EPOMAIL_CANDIDATE_DIR ? path.resolve(process.env.EPOMAIL_CANDIDATE_DIR, 'dist') : path.join(workerDir, 'dist'),
+	workerEntry = process.env.EPOMAIL_CANDIDATE_DIR ? path.resolve(process.env.EPOMAIL_CANDIDATE_DIR, 'bundle/index.js') : path.join(workerDir, 'src/index.js'),
 	startupTimeoutMs = 180000
 } = {}) {
 	let directory, child, state, stopPromise;
@@ -372,7 +385,7 @@ export async function startLocalStack({
 		const runtimeEntry = path.resolve(helperDir, 'local-stack-runtime.mjs');
 		await fs.mkdir(os.tmpdir(), { recursive: true });
 		directory = await fs.mkdtemp(path.join(os.tmpdir(), 'epomail-local-'));
-		const config = await writeLocalConfig(directory, workerDir, assetsDir);
+		const config = await writeLocalConfig(directory, workerDir, assetsDir, workerEntry, Boolean(process.env.EPOMAIL_CANDIDATE_DIR));
 		secrets = config.secrets;
 		controller.signal.throwIfAborted();
 		child = spawn(process.execPath, [

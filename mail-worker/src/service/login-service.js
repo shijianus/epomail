@@ -755,7 +755,6 @@ const loginService = {
 		const deviceTag = params.deviceTag || (typeof c.req.header === 'function' ? c.req.header('x-device-tag') : '') || '';
 		const trustedDeviceToken = params.trustedDeviceToken || (typeof c.req.header === 'function' ? c.req.header('x-device-trust') : '') || '';
 
-		let sessionTrustEpoch = null;
 		let sessionMaxEpoch = null;
 
 		if (isGlobalTotpEnabled && (hasActiveTotp || hasActivePasskey)) {
@@ -773,7 +772,6 @@ const loginService = {
 
 			if (canBypass2FA) {
 				// Trusted device 30-day grace bypass is active!
-				sessionTrustEpoch = trustEval.trustEpoch;
 				sessionMaxEpoch = trustEval.maxSessionEpoch;
 			} else {
 				let tempToken;
@@ -901,10 +899,7 @@ const loginService = {
 
 		attachSessionMeta(authInfo, uuid, trustedAuthContext && buildSessionMeta(trustedAuthContext.method, trustedAuthContext.provider, authVersionOf(userRow)));
 
-		if (sessionMaxEpoch) {
-			authInfo.trustEpoch = sessionTrustEpoch;
-			authInfo.maxSessionEpoch = sessionMaxEpoch;
-		}
+		authInfo.sessionHorizons = { ...authInfo.sessionHorizons, [uuid]: sessionMaxEpoch };
 
 		await userService.updateUserInfo(c, userRow.userId);
 
@@ -1136,7 +1131,6 @@ const loginService = {
 
 		// Issue trusted device token if rememberDevice was requested
 		let issuedTrustToken = null;
-		let sessionTrustEpoch = null;
 		let sessionMaxEpoch = null;
 
 		const effectiveDeviceTag = deviceTag || pendingData.deviceTag || (typeof c.req.header === 'function' ? c.req.header('x-device-tag') : '') || '';
@@ -1146,7 +1140,6 @@ const loginService = {
 			const trustResult = await deviceTrustService.issueTrust(c, userRow.userId, effectiveDeviceTag, authVersionOf(userRow));
 			if (trustResult) {
 				issuedTrustToken = trustResult.trustedDeviceToken;
-				sessionTrustEpoch = trustResult.trustEpoch;
 				sessionMaxEpoch = trustResult.maxSessionEpoch;
 			}
 		}
@@ -1170,10 +1163,7 @@ const loginService = {
 		// provenance (never the client's claim) onto the issued session.
 		attachSessionMeta(authInfo, uuid, pendingData.authContext && buildSessionMeta(pendingData.authContext.method, pendingData.authContext.provider, authVersionOf(userRow), true));
 
-		if (sessionMaxEpoch) {
-			authInfo.trustEpoch = sessionTrustEpoch;
-			authInfo.maxSessionEpoch = sessionMaxEpoch;
-		}
+		authInfo.sessionHorizons = { ...authInfo.sessionHorizons, [uuid]: sessionMaxEpoch };
 
 		await userService.updateUserInfo(c, userRow.userId);
 

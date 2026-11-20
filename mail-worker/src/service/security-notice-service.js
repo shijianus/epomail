@@ -267,7 +267,7 @@ const securityNoticeService = {
         createTime: now
       };
 
-      // Encrypt if user has E2E mailbox encryption active
+      // Apply the configured server-side encryption policy to stored notice fields
       let allMailMode = 1;
       try {
         const cachedSetting = await c.env?.kv?.get?.(KvConst.SETTING, { type: 'json' });

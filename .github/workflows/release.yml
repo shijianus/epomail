@@ -18,37 +18,57 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Require successful quality and security runs for this commit
+      - name: Resolve release scope and verify acceptance for the tagged commit
+        id: gates
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
-            const { owner, repo } = context.repo;
+            const { releaseKind, requireSuccessfulRun } = require('./scripts/lib/release-workflows.cjs');
             const sha = (await exec.getExecOutput('git', ['rev-parse', 'HEAD'])).stdout.trim();
+            const kind = releaseKind(process.env.GITHUB_REF_NAME);
+            let branch;
+            if (kind !== 'source-rc') {
+              const promotion = await requireSuccessfulRun(github, context.repo, 'public-beta-promotion.yml', sha, 'workflow_dispatch');
+              branch = promotion.head_branch;
+              core.setOutput('promotion', String(promotion.id));
+              core.setOutput('package', `public-beta-package-${sha}-${promotion.run_attempt}`);
+              core.info(promotion.html_url);
+            }
             const required = ['quality-gates.yml', 'security.yml', 'secret-scanning.yml'];
             for (const workflow_id of required) {
-              const { data } = await github.rest.actions.listWorkflowRuns({
-                owner, repo, workflow_id, head_sha: sha, event: 'push', per_page: 100
-              });
-              const runs = data.workflow_runs
-                .filter(run => run.head_sha === sha &&
-                  (['master', 'main'].includes(run.head_branch) || run.head_branch?.startsWith('release/')))
-                .sort((a, b) => b.run_number - a.run_number || b.run_attempt - a.run_attempt);
-              const latest = runs[0];
-              if (!latest || latest.status !== 'completed' || latest.conclusion !== 'success') {
-                throw new Error(`${workflow_id} has no successful latest push run for ${sha}`);
-              }
+              const latest = await requireSuccessfulRun(github, context.repo, workflow_id, sha, 'push', branch);
               core.info(`${workflow_id}: ${latest.html_url}`);
             }
+            core.setOutput('kind', kind);
+
+      - name: Download the previously accepted package
+        if: steps.gates.outputs.kind != 'source-rc'
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: ${{ steps.gates.outputs.package }}
+          path: ${{ runner.temp }}/release-package
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.gates.outputs.promotion }}
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_KIND: ${{ steps.gates.outputs.kind }}
         shell: bash
         run: |
-          if [[ "$RELEASE_TAG" == *-* ]]; then
-            gh release create "$RELEASE_TAG" --title "EpoMail $RELEASE_TAG" --notes-file RELEASE_NOTES.md --prerelease
+          set -euo pipefail
+          if [[ "$RELEASE_KIND" == source-rc ]]; then
+            gh release create "$RELEASE_TAG" --verify-tag --title "EpoMail $RELEASE_TAG (source candidate)" \
+              --notes "This release publishes the source candidate for review and testing." --prerelease
           else
-            gh release create "$RELEASE_TAG" --title "EpoMail $RELEASE_TAG" --notes-file RELEASE_NOTES.md --latest
+            package="$RUNNER_TEMP/release-package"
+            (cd "$package" && sha256sum epomail-candidate.tar.gz | cmp - epomail-candidate.tar.gz.sha256)
+            test "$(tar -xOzf "$package/epomail-candidate.tar.gz" ./SOURCE_SHA)" = "$(git rev-parse HEAD)"
+            flag=--prerelease
+            if [[ "$RELEASE_KIND" == stable ]]; then flag=--latest; fi
+            gh release create "$RELEASE_TAG" --verify-tag --title "EpoMail $RELEASE_TAG" --notes-file RELEASE_NOTES.md "$flag" \
+              "$package/epomail-candidate.tar.gz" "$package/epomail-candidate.tar.gz.sha256"
           fi

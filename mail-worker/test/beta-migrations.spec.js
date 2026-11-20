@@ -13,6 +13,26 @@ beforeAll(async () => {
 }, 60000);
 
 describe('beta schema upgrades', () => {
+	it('adds the official marker to a legacy mail DB and only restores receipt-backed notices', async () => {
+		const db = env.NOTICE_MAIL_DB;
+		const legacy = { env: { ...env, MAIL_DB: db } };
+		try {
+			await db.batch([
+				db.prepare('CREATE TABLE email (email_id INTEGER PRIMARY KEY,user_id INTEGER,message_id TEXT,send_email TEXT,receive_claim_key TEXT,outbound_task_id TEXT)'),
+				db.prepare('CREATE TABLE notice_delivery_receipt (email_id INTEGER,user_id INTEGER,message_id TEXT)'),
+				db.prepare(`INSERT INTO email(email_id,user_id,message_id,send_email) VALUES
+					(1,10,'test-notice','announcement@epocanvas.com'),(2,10,'unconfirmed','announcement@epocanvas.com'),
+					(3,20,'another-owner','announcement@epocanvas.com')`),
+				db.prepare("INSERT INTO notice_delivery_receipt VALUES (1,10,'test-notice'),(3,10,'another-owner')")
+			]);
+			await dbInit.v3_28DB(legacy);
+			await dbInit.v3_28DB(legacy);
+			const rows = await db.prepare('SELECT is_official FROM email ORDER BY email_id').all();
+			expect(rows.results.map(row => row.is_official)).toEqual([1, 0, 0]);
+		} finally {
+			await db.batch([db.prepare('DROP TABLE IF EXISTS notice_delivery_receipt'), db.prepare('DROP TABLE IF EXISTS email')]);
+		}
+	});
 	it('preserves an old deleted message for a new retention window without extending repeated migrations', async () => {
 		const marker = 'migration-retention-test';
 		let emailId;

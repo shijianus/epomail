@@ -74,7 +74,7 @@ function buildRecordFromDbRows(rows, fallbackRecord = null) {
 	const tokenMeta = {};
 	let latestUser = fallbackRecord?.user || null;
 	let refreshTime = fallbackRecord?.refreshTime || '';
-	let maxSessionEpoch = fallbackRecord?.maxSessionEpoch ?? null;
+	const sessionHorizons = {};
 
 	for (const row of rows) {
 		if (typeof row?.token !== 'string' || !row.token) continue;
@@ -88,9 +88,7 @@ function buildRecordFromDbRows(rows, fallbackRecord = null) {
 			latestUser = { ...(latestUser || {}), ...rowUser };
 		}
 		if (row.refresh_time) refreshTime = row.refresh_time;
-		if (row.max_session_epoch !== null && row.max_session_epoch !== undefined) {
-			maxSessionEpoch = Number(row.max_session_epoch);
-		}
+		sessionHorizons[row.token] = row.max_session_epoch ?? null;
 	}
 
 	if (tokens.length === 0) return null;
@@ -98,15 +96,15 @@ function buildRecordFromDbRows(rows, fallbackRecord = null) {
 		...(fallbackRecord || {}),
 		user: latestUser,
 		tokens: tokens.slice(-USER_SESSION_LIMIT),
+		sessionHorizons,
 		tokenMeta,
 		refreshTime: refreshTime || new Date().toISOString()
 	};
 	for (const key of Object.keys(record.tokenMeta)) {
 		if (!record.tokens.includes(key)) delete record.tokenMeta[key];
 	}
-	if (maxSessionEpoch !== null && Number.isFinite(maxSessionEpoch)) {
-		record.maxSessionEpoch = maxSessionEpoch;
-	}
+	delete record.maxSessionEpoch;
+	delete record.trustEpoch;
 	return record;
 }
 
@@ -128,6 +126,18 @@ async function readActiveDbRows(c, userId) {
 	}
 }
 
+// Old KV-only sessions shared one horizon. Preserve that bound until their
+// own D1 row is available. New logins explicitly record null for an uncapped token.
+function sessionHorizon(record, token) {
+	if (Object.hasOwn(record?.sessionHorizons || {}, token)) return record.sessionHorizons[token];
+	return record?.maxSessionEpoch ?? null;
+}
+
+function validAtHorizon(record, token) {
+	const horizon = sessionHorizon(record, token);
+	return horizon === null || (Number.isSafeInteger(horizon) && horizon > Math.floor(Date.now() / 1000));
+}
+
 export function mergeSessionRecords(current, incoming) {
 	const currentTokens = normalizeTokens(current?.tokens);
 	const incomingTokens = normalizeTokens(incoming?.tokens);
@@ -136,13 +146,24 @@ export function mergeSessionRecords(current, incoming) {
 	for (const token of Object.keys(tokenMeta)) {
 		if (!tokens.includes(token)) delete tokenMeta[token];
 	}
-	return {
+	const sessionHorizons = {};
+	for (const token of tokens) {
+		const source = incomingTokens.includes(token) ? incoming : current;
+		const hasHorizon = Object.hasOwn(source?.sessionHorizons || {}, token);
+		const previous = currentTokens.includes(token) ? sessionHorizon(current, token) : null;
+		sessionHorizons[token] = hasHorizon ? source.sessionHorizons[token] : (source?.maxSessionEpoch ?? previous);
+	}
+	const result = {
 		...(current || {}),
 		...(incoming || {}),
 		tokens,
+		sessionHorizons,
 		tokenMeta,
 		refreshTime: incoming?.refreshTime || current?.refreshTime || new Date().toISOString()
 	};
+	delete result.maxSessionEpoch;
+	delete result.trustEpoch;
+	return result;
 }
 
 function sameTokenSet(left, right) {
@@ -168,7 +189,7 @@ export async function persistSessionRecord(c, userId, authInfo, token) {
 		const metaJson = tokenMeta ? JSON.stringify(tokenMeta) : '{}';
 		const userJson = authInfo?.user ? JSON.stringify(authInfo.user) : '{}';
 		const refreshTime = authInfo?.refreshTime || new Date().toISOString();
-		const maxEpoch = authInfo?.maxSessionEpoch ?? null;
+		const maxEpoch = sessionHorizon(authInfo, token);
 
 		const batchResults = await withSessionTable(db, async sessionDb => {
 			return await sessionDb.batch([
@@ -244,24 +265,22 @@ export async function persistSessionRecord(c, userId, authInfo, token) {
  * self-healing KV when D1 confirms the session is active.
  */
 export async function readAuthorizedSession(c, userId, token) {
-	if (token && resolveSessionDb(c) && await isSessionRevoked(c, userId, token)) return null;
-	if (!c?.env?.kv) return null;
+	if (!c?.env?.kv || typeof token !== 'string' || !token) return null;
+	if (resolveSessionDb(c) && await isSessionRevoked(c, userId, token)) return null;
 	const key = sessionKey(userId);
 	const authInfo = await c.env.kv.get(key, { type: 'json' });
-	if (authInfo && Array.isArray(authInfo.tokens) && (!token || authInfo.tokens.includes(token))) {
-		return authInfo;
+	const cached = Array.isArray(authInfo?.tokens) && authInfo.tokens.includes(token);
+	if (cached && Object.hasOwn(authInfo.sessionHorizons || {}, token)) {
+		return validAtHorizon(authInfo, token) ? authInfo : null;
 	}
-	if (!token || typeof token !== 'string') return authInfo;
 
 	const dbRows = await readActiveDbRows(c, userId);
-	if (!dbRows || dbRows.length === 0 || !dbRows.some(row => row.token === token)) {
-		return authInfo;
+	if (!dbRows || !dbRows.some(row => row.token === token)) {
+		return cached && validAtHorizon(authInfo, token) ? authInfo : null;
 	}
 
 	const dbRecord = buildRecordFromDbRows(dbRows, authInfo);
-	if (!dbRecord || !dbRecord.tokens.includes(token)) {
-		return authInfo;
-	}
+	if (!dbRecord || !dbRecord.tokens.includes(token) || !validAtHorizon(dbRecord, token)) return null;
 
 	const sameUserKv = authInfo && (!authInfo.user?.email || !dbRecord.user?.email || authInfo.user.email === dbRecord.user.email)
 		? authInfo

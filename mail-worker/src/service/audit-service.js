@@ -567,7 +567,7 @@ const auditService = {
 			}
 		}
 
-		// Check mode: allMailMode (1: All, 0: Privacy, 2: Encrypted E2EE)
+		// Check mode: allMailMode (1: All, 0: Privacy, 2: Encrypted at rest)
 		const allMailMode = Number(settings?.allMailMode ?? 1);
 
 		// 第二轮修复：批量附加独立申诉台账轮次 (R1/R2/R3... 可区分，含各轮办理结果)。

@@ -1,3 +1,4 @@
+import { personalForwardingAvailable } from './forward-consent.js';
 import KvConst from '../const/kv-const';
 import settingEntity from '../entity/setting';
 import orm from '../entity/orm';
@@ -87,6 +88,13 @@ import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
 import { isDualDbMode, getDbModeInfo } from '../utils/db-accessor';
 import { encryptProviderSecret } from '../utils/oauth-secret-crypto.js';
+
+// A deployment must opt in only after installing and verifying a compatible
+// PAT consumer. Revoking existing credentials never requires issuance.
+export function personalTokenPolicy(env, settings) {
+	const available = env?.ENABLE_PAT_ISSUANCE === 'true' || env?.ENABLE_PAT_ISSUANCE === true;
+	return { patIssuanceAvailable: available, userApiSupport: available && Number(settings?.userApiSupport ?? 1) === 1 ? 1 : 0 };
+}
 
 const settingService = {
 
@@ -407,6 +415,7 @@ const settingService = {
 		// request still need the real provider credentials.
 		const settingRow = {
 			...cachedSetting,
+			...personalTokenPolicy(c.env, cachedSetting),
 			resendTokens: { ...(cachedSetting.resendTokens || {}) },
 			oauthProviders: this.sanitizeOAuthProviders(cachedSetting.oauthProviders)
 		};
@@ -1144,8 +1153,8 @@ const settingService = {
 			forceTotp: settingRow.forceTotp ?? 0,
 			forwardStatus: settingRow.forwardStatus ?? 1,
 			userTgForward: settingRow.userTgForward ?? 1,
-			userEmailForward: settingRow.userEmailForward ?? 1,
-			userApiSupport: settingRow.userApiSupport ?? 1,
+			userEmailForward: personalForwardingAvailable(c.env) ? (settingRow.userEmailForward ?? 1) : 0,
+			...personalTokenPolicy(c.env, settingRow),
 			aiEnabled: settingRow.aiEnabled ?? 1,
 			aiModel: settingRow.aiModel || '',
 			aiModels: settingRow.aiModels || settingRow.aiModel || '',

@@ -174,8 +174,45 @@ app.put('/my/passkey/:id', async (c) => {
 });
 
 app.get('/my/exportData', async (c) => {
-	const data = await userService.exportUserData(c, userContext.getUserId(c), c.req.query());
-	return c.json(result.ok(data));
+	const params = c.req.query();
+	const userId = userContext.getUserId(c);
+	const first = await userService.exportUserData(c, userId, params);
+	c.header('Cache-Control', 'private, no-store');
+	if (params.paged === '1' || !Array.isArray(first.emails)) return c.json(result.ok(first));
+	const { emails, totalEmails, nextBefore, asOf, ...metadata } = first;
+	if (!nextBefore) return c.json(result.ok({ ...metadata, emails, totalEmails }));
+
+	// Keep the complete JSON envelope for existing download clients. A later
+	// read/decryption failure aborts the stream instead of closing a partial archive.
+	async function* chunks() {
+		const head = JSON.stringify(result.ok(metadata));
+		yield head.slice(0, -2) + ',"emails":[';
+		let rows = emails, cursor = nextBefore, count = 0;
+		while (true) {
+			for (const row of rows) {
+				yield (count ? ',' : '') + JSON.stringify(row);
+				count++;
+			}
+			if (!cursor) break;
+			const page = await userService.exportUserData(c, userId, {
+				...params, type: 'emails', before: cursor, asOf
+			});
+			rows = page.emails;
+			cursor = page.nextBefore;
+		}
+		yield `],"totalEmails":${count}}}`;
+	}
+	const iterator = chunks();
+	const encoder = new TextEncoder();
+	const body = new ReadableStream({
+		async pull(controller) {
+			const chunk = await iterator.next();
+			if (chunk.done) controller.close();
+			else controller.enqueue(encoder.encode(chunk.value));
+		},
+		cancel() { return iterator.return(); }
+	});
+	return c.body(body, 200, { 'Content-Type': 'application/json; charset=utf-8' });
 });
 
 app.post('/my/testTelegram', async (c) => {

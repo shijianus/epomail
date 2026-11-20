@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { getMailDb, getUserDb } from '../src/utils/db-accessor.js';
 import { ensureMailReliabilitySchema } from '../src/utils/mail-reliability-schema.js';
 import { deliverLocalMail } from '../src/service/mail-local-delivery-service.js';
-import { claimPreparation, claimOutboundTask } from '../src/service/mail-outbound-service.js';
+import { claimPreparation, claimOutboundTask, maintainOutboundTasks, reserveSendCount, readSendStatus } from '../src/service/mail-outbound-service.js';
 import { attConst, emailConst, settingConst } from '../src/const/entity-const.js';
 import settingService from '../src/service/setting-service.js';
 import userService from '../src/service/user-service.js';
@@ -42,6 +42,7 @@ beforeAll(async () => {
 		is_del INTEGER NOT NULL DEFAULT 0
 	)`).run();
 	await db.prepare(`CREATE TABLE IF NOT EXISTS email (
+		is_official INTEGER NOT NULL DEFAULT 0,
 		email_id INTEGER PRIMARY KEY AUTOINCREMENT,send_email TEXT,name TEXT,
 		account_id INTEGER NOT NULL,user_id INTEGER NOT NULL,subject TEXT,code TEXT NOT NULL DEFAULT '',
 		text TEXT,content TEXT,cc TEXT DEFAULT '[]',bcc TEXT DEFAULT '[]',recipient TEXT,
@@ -62,6 +63,7 @@ beforeAll(async () => {
 		ON email(receive_claim_key) WHERE receive_claim_key IS NOT NULL`).run();
 	await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_outbound_task
 		ON email(outbound_task_id) WHERE outbound_task_id IS NOT NULL`).run();
+	await userDb.prepare("CREATE TABLE IF NOT EXISTS audit_log (email TEXT,warning_type TEXT,status TEXT)").run();
 	await ensureMailReliabilitySchema(c);
 });
 
@@ -579,6 +581,58 @@ describe('deliverLocalMail with real D1 transactions and local-only object stora
 		}
 		expect(r2Service.getObj).toHaveBeenCalledTimes(18);
 		await expectFinished(task);
+	}));
+
+	it.each(['PREPARED', 'SENDING'])('recovers an interrupted %s local dispatch from the archive after 24 hours', state => withFixture(async f => {
+		const sender = await mailbox(f, 'sender');
+		const recipients = [await mailbox(f, 'first'), await mailbox(f, 'second')];
+		const task = await sendTask(f, sender);
+		const files = await attachments(f, task, 1);
+		const addresses = recipients.map(row => row.normalized);
+		const payload = { route: 'local', recipients: addresses, attachmentCount: files.length };
+		await db.prepare('UPDATE email SET recipient=? WHERE email_id=?')
+			.bind(JSON.stringify(addresses.map(address => ({ address }))), task.sender.emailId).run();
+		await db.prepare('UPDATE mail_outbound_task SET payload_json=? WHERE task_id=?')
+			.bind(JSON.stringify(payload), task.taskId).run();
+		await reserveSendCount(c, { taskId: task.taskId, userId: sender.userId, quantity: 2, maxCount: 10 });
+		f.settings.send = settingConst.send.OPEN;
+		f.settings.domainList = ['@' + DOMAIN];
+		const fault = await trigger(f, 'partial', `BEFORE INSERT ON mail_local_delivery
+			WHEN NEW.task_id='${task.taskId}' AND NEW.recipient='${addresses[1]}'
+			BEGIN SELECT RAISE(ABORT,'retryable local publication fault'); END`);
+		await expect(deliver(task, recipients, files)).rejects.toThrow(/publication fault/);
+		const original = await inbox(recipients[0]);
+		expect(original).toHaveLength(1);
+		await db.prepare("UPDATE mail_outbound_task SET state=?,lease_until=0,updated_at=datetime('now','-25 hours') WHERE task_id=?")
+			.bind(state, task.taskId).run();
+		expect(await readSendStatus(c, sender.userId, sender.accountId, task.taskId)).toEqual({ state: 'PENDING' });
+		expect(await readSendStatus(c, recipients[0].userId, sender.accountId, task.taskId)).toEqual({ state: 'NOT_FOUND' });
+		await maintainOutboundTasks(c);
+		expect(await taskRow(task)).toMatchObject({ state: 'SENDING' });
+		expect(await receipts(task)).toHaveLength(1);
+		await dropTrigger(f, fault);
+		await Promise.all([maintainOutboundTasks(c), maintainOutboundTasks(c)]);
+		await expectFinished(task);
+		expect(await inbox(recipients[0])).toEqual(original);
+		expect(await inbox(recipients[1])).toHaveLength(1);
+		expect(await receipts(task)).toHaveLength(2);
+		expect(await readSendStatus(c, sender.userId, sender.accountId, task.taskId)).toEqual({ state: 'ACCEPTED', emailId: task.sender.emailId });
+		expect(await userDb.prepare('SELECT state,quantity FROM mail_send_quota_reservation WHERE task_id=?').bind(task.taskId).first())
+			.toEqual({ state: 'reserved', quantity: 2 });
+		expect(Number((await userDb.prepare('SELECT send_count FROM user WHERE user_id=?').bind(sender.userId).first()).send_count)).toBe(2);
+	}));
+
+	it('keeps historical failed tasks with a delivery receipt available for partial-result review', () => withFixture(async f => {
+		const sender = await mailbox(f, 'sender');
+		const task = await sendTask(f, sender);
+		await reserveSendCount(c, { taskId: task.taskId, userId: sender.userId, quantity: 2, maxCount: 10 });
+		await db.prepare("INSERT INTO mail_local_delivery(task_id,recipient,state) VALUES (?,?,'DELIVERED')")
+			.bind(task.taskId, sender.address).run();
+		await db.prepare("UPDATE mail_outbound_task SET state='FAILED',lease_until=0 WHERE task_id=?").bind(task.taskId).run();
+		await maintainOutboundTasks(c);
+		expect(await readSendStatus(c, sender.userId, sender.accountId, task.taskId)).toEqual({ state: 'PARTIAL' });
+		expect(await userDb.prepare('SELECT state FROM mail_send_quota_reservation WHERE task_id=?').bind(task.taskId).first())
+			.toEqual({ state: 'reserved' });
 	}));
 
 	it('copies normal and CID objects across distinct BYO buckets and rewrites every body placeholder to recipient keys', () => withFixture(async f => {

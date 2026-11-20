@@ -8,6 +8,7 @@
  * Usage:
  *   node tests/backend-stress.mjs
  *   node tests/backend-stress.mjs --soak=2m --out=tests/artifacts/backend-stress.json
+ *   node tests/backend-stress.mjs --profile=capacity --soak=15m --out=tests/artifacts/capacity.json
  */
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -22,20 +23,14 @@ import {
   assessSlo,
   createLoopbackClient,
   percentile,
+  planSoak,
   runStages
 } from './helpers/load-runner.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const STRESS_LIMITS = Object.freeze({
-  ...HARD_LIMITS,
-  maxConcurrency: 32,
-  maxRequestsPerStage: 10_000,
-  maxStageMs: 5 * 60 * 1000,
-  maxTotalMs: 30 * 60 * 1000,
-  requestTimeoutMs: 8_000
-});
+const STRESS_LIMITS = HARD_LIMITS;
 const DEFAULT_SOAK_MS = 3 * 60 * 1000;
-const MAX_SOAK_MS = 5 * 60 * 1000;
+const MAX_SOAK_MS = STRESS_LIMITS.maxStageMs;
 function parseDuration(value) {
   if (value === undefined || value === '') return DEFAULT_SOAK_MS;
   const match = /^(\d+)(ms|s|m)$/i.exec(String(value));
@@ -58,10 +53,10 @@ function parseArgs(argv) {
       if (!['capacity', 'limited-beta'].includes(args.profile)) throw new Error('unknown pressure profile');
     }
     else if (arg === '--help') {
-      console.log('Usage: node tests/backend-stress.mjs [--soak=3m] [--profile=limited-beta|capacity] [--out=path]');
+      console.log('Usage: node tests/backend-stress.mjs [--soak=3m] [--profile=limited-beta|capacity] [--out=path] (local only, maximum soak 30m)');
       process.exit(0);
     } else {
-      throw new Error(`unknown argument ${arg}; only --soak and --out are accepted`);
+      throw new Error(`unknown argument ${arg}; expected --soak, --profile or --out`);
     }
   }
   if (args.out && /https?:\/\//i.test(args.out)) throw new Error('--out must be a local filesystem path');
@@ -356,7 +351,7 @@ async function runPressure(fixture, soakMs, log, profile) {
     })),
     { name: 'burst', concurrency: limited ? 4 : 32, durationMs: 5_000, ratePerSecond: limited ? 8 : 32, maxRequests: limited ? 40 : 160, operation: safeOperation },
     { name: 'recovery', concurrency: 2, durationMs: 10_000, ratePerSecond: 2, maxRequests: 30, operation: safeOperation },
-    { name: 'soak', concurrency: limited ? 4 : 8, durationMs: soakMs, ratePerSecond: limited ? 8 : 32, maxRequests: STRESS_LIMITS.maxRequestsPerStage, operation: safeOperation }
+    { ...planSoak(soakMs, limited), operation: safeOperation }
   ];
   const pressure = await runStages(stages, {
     limits: STRESS_LIMITS,

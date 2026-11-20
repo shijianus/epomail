@@ -331,7 +331,7 @@ const decisionNoticeService = {
 			const key = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
 			const messageId = `<notice-${key}@epocanvas.com>`;
 			let payload = {
-				userId, accountId: accRow.account_id,
+				isOfficial: 1, userId, accountId: accRow.account_id,
 				sendEmail: 'announcement@epocanvas.com', name: 'Epocanvas Mail 官方安全中心',
 				subject, content: htmlContent, text: textContent || '',
 				toEmail: targetEmail, toName: userName,

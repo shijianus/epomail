@@ -14,6 +14,8 @@ export async function ensureMailReliabilitySchema(c) {
 		content_sha256 TEXT,
 		raw_object_key TEXT NOT NULL,
 		raw_expires_at INTEGER NOT NULL,
+		cleanup_retry_at INTEGER NOT NULL DEFAULT 0,
+		generation INTEGER NOT NULL DEFAULT 0,
 		account_id INTEGER NOT NULL DEFAULT 0,
 		user_id INTEGER NOT NULL DEFAULT 0,
 		state TEXT NOT NULL CHECK (state IN ('CLAIMED','SAVING','COMPLETE','RETRY','FAILED')),
@@ -34,8 +36,19 @@ export async function ensureMailReliabilitySchema(c) {
 	if (!(claims.results || []).some(column => column.name === 'content_sha256')) {
 		await db.prepare(`ALTER TABLE mail_receive_claim ADD COLUMN content_sha256 TEXT`).run();
 	}
+	for (const column of ['cleanup_retry_at', 'generation']) {
+		if (!(claims.results || []).some(existing => existing.name === column)) {
+			await db.prepare(`ALTER TABLE mail_receive_claim ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`).run();
+		}
+	}
 	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_lease ON mail_receive_claim(state, lease_until)`).run();
 	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_expiry ON mail_receive_claim(raw_expires_at)`).run();
+	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_cleanup
+		ON mail_receive_claim(MAX(raw_expires_at, cleanup_retry_at)) WHERE raw_object_key <> ''`).run();
+	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_message
+		ON mail_receive_claim(recipient, message_id, generation)`).run();
+	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_content
+		ON mail_receive_claim(recipient, content_sha256, generation) WHERE message_id = ''`).run();
 	await db.prepare(`CREATE TABLE IF NOT EXISTS mail_outbound_task (
 		task_id TEXT PRIMARY KEY,
 		user_id INTEGER NOT NULL,
@@ -81,6 +94,7 @@ export async function ensureMailReliabilitySchema(c) {
 	// A received message can be forwarded to several targets. Keep one durable
 	// row per target so a provider outage or a process restart cannot silently
 	// lose an attachment-bearing forwarding copy.
+	await db.prepare(`CREATE TABLE IF NOT EXISTS mail_forward_policy (user_id INTEGER PRIMARY KEY, revision TEXT NOT NULL, preferences TEXT NOT NULL)`).run();
 	await db.prepare(`CREATE TABLE IF NOT EXISTS mail_forward_task (
 		task_id TEXT PRIMARY KEY,
 		user_id INTEGER NOT NULL,
@@ -88,6 +102,7 @@ export async function ensureMailReliabilitySchema(c) {
 		email_id INTEGER NOT NULL,
 		target TEXT NOT NULL,
 		add_prefix INTEGER NOT NULL DEFAULT 0,
+		policy_revision TEXT NOT NULL DEFAULT 'legacy',
 		state TEXT NOT NULL CHECK (state IN ('PENDING','SENDING','SENT','FAILED')),
 		attempts INTEGER NOT NULL DEFAULT 0,
 		next_retry_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -98,6 +113,10 @@ export async function ensureMailReliabilitySchema(c) {
 		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(user_id, email_id, target)
 	)`).run();
+	const forwardColumns = await db.prepare("PRAGMA table_info('mail_forward_task')").all();
+	if (!(forwardColumns.results || []).some(col => col.name === 'policy_revision')) {
+		await db.prepare("ALTER TABLE mail_forward_task ADD COLUMN policy_revision TEXT NOT NULL DEFAULT 'legacy'").run();
+	}
 	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_forward_task_due
 		ON mail_forward_task(state, next_retry_at)`).run();
 	await db.prepare(`CREATE TABLE IF NOT EXISTS object_deletion_queue (

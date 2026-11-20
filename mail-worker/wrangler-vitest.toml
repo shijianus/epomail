@@ -16,6 +16,7 @@ remote = false
 
 [vars]
 ENVIRONMENT = "test"
+ENABLE_PAT_ISSUANCE = "true"
 EMAIL_OUTBOUND_ENABLED = "false"
 OUTBOUND_WHITELIST_ENFORCE = "true"
 OUTBOUND_WHITELIST = ""

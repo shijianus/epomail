@@ -1,3 +1,4 @@
+import { setForwardPolicy } from './forward-consent.js';
 import BizError from '../error/biz-error.js';
 import KvConst from '../const/kv-const.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
@@ -126,6 +127,9 @@ export async function revokeAccountAccess(c, userId) {
 		return Number(value?.userId ?? value?.user?.userId) === owner;
 	};
 	const tasks = [
+		async () => {
+			if (await tableExists(getMailDb(c), 'mail_forward_policy')) await setForwardPolicy(c, owner, { enabled: false, targets: '' });
+		},
 		() => getMailDb(c).prepare('UPDATE account SET is_del = 1, status = 1, all_receive = 0 WHERE user_id = ?')
 			.bind(owner).run(),
 		() => deleteUserSessionsFromDb(c, owner),
@@ -171,6 +175,7 @@ export async function deleteAccountEvidence(c, userId) {
 		if (await tableExists(db, table)) await db.prepare(`DELETE FROM ${table} WHERE user_id=?`).bind(userId).run();
 	}
 	const mailDb = getMailDb(c);
+	if (await tableExists(mailDb, 'mail_forward_policy')) await mailDb.prepare('DELETE FROM mail_forward_policy WHERE user_id=?').bind(userId).run();
 	if (await tableExists(mailDb, 'mail_forward_task')) {
 		await mailDb.prepare('DELETE FROM mail_forward_task WHERE user_id=?').bind(userId).run();
 	}

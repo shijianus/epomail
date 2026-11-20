@@ -29,6 +29,10 @@
     </div>
 
     <div ref="scroll" class="scroll">
+      <div v-if="loadError !== null" class="load-error" role="alert">
+        {{ t('mailListLoadFailed') }}
+        <el-button size="small" @click="getEmailList(loadError)">{{ t('mailListLoadRetry') }}</el-button>
+      </div>
       <UseVirtualList ref="scrollbarRef"
                         @scroll="onScroll"
                         :list="list"
@@ -84,7 +88,7 @@
                     >
                       {{ item.threadCount }}
                     </span>
-                    <span v-if="item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || item.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
+                    <span v-if="item.isOfficial === 1" class="official-verified-badge" :title="$t('officialVerified')">
                       <Icon icon="ri:verified-badge-fill" width="15" height="15" style="color: #0284c7; vertical-align: middle; margin-left: 3px;" />
                     </span>
                   </div>
@@ -152,7 +156,7 @@
                       <Icon icon="ic:outline-access-time" width="18" height="18" class="quick-icon" @click.stop="handleSnooze(item.emailId)" />
                     </el-tooltip>
                     <el-tooltip :content="$t('delete')" placement="top" v-if="!['trash'].includes(props.type)">
-                      <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(item.emailId)" />
+                      <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(type === 'draft' ? item.draftId : item.emailId)" />
                     </el-tooltip>
                     <el-tooltip :content="$t('permanentDelete')" placement="top" v-if="['trash', 'spam'].includes(props.type)">
                       <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(item.emailId, true)" />
@@ -195,7 +199,7 @@
                        :showStatus="showStatus"
                        :showUserInfo="showUserInfo"
                        :type="type"/>
-      <div class="empty" v-if="noLoading && emailList.length === 0 && !loading">
+      <div class="empty" v-if="loadError === null && noLoading && emailList.length === 0 && !loading">
         <el-empty :image-size="isMobile ? 120 : null" :description="$t('noMoreData')"/>
       </div>
     </div>
@@ -293,7 +297,7 @@
               </div>
             </template>
           </el-dropdown-item>
-          <el-dropdown-item v-if="!['trash'].includes(props.type)" @click="rightDelete(rightClickEmail.emailId)">
+          <el-dropdown-item v-if="!['trash'].includes(props.type)" @click="rightDelete(type === 'draft' ? rightClickEmail.draftId : rightClickEmail.emailId)">
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="uiw:delete" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
@@ -436,6 +440,7 @@ const settingStore = useSettingStore()
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const loading = ref(false);
+const loadError = ref(null);
 const followLoading = ref(false);
 const noLoading = ref(false);
 const emailList = reactive([])
@@ -711,7 +716,7 @@ const list = computed(() => {
     } else if (props.type === 'all-email') {
       isCurrent = true;
     } else {
-      isCurrent = !item.isDel && !item.isSpam && (!item.snoozedTime || item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || item.isOfficial) && item.type === 0;
+      isCurrent = !item.isDel && !item.isSpam && (!item.snoozedTime || item.isOfficial === 1) && item.type === 0;
     }
     
     if (isCurrent) {
@@ -770,7 +775,7 @@ watch(followLoading, (isFollowLoading) => {
     })
   } else {
     const index = expandList.findIndex(item => item.expand === 'loading')
-    expandList.splice(index, 1);
+    if (index >= 0) expandList.splice(index, 1);
   }
 });
 
@@ -782,14 +787,14 @@ watch(noLoading, (isNoLoading) => {
     })
   } else {
     const index = expandList.findIndex(item => item.expand === 'noMoreData')
-    expandList.splice(index, 1);
+    if (index >= 0) expandList.splice(index, 1);
   }
 })
 
 
 // 监听是否到达底部
 watch(() => arrivedState.bottom, (isBottom) => {
-  if (isBottom && !loading.value) {
+  if (isBottom && !loading.value && loadError.value === null) {
     loadData();
   }
 });
@@ -1075,6 +1080,10 @@ function localRead(emailIds) {
 }
 
 function rightDelete(emailId, physical = false) {
+  if (props.type === 'draft') {
+    emit('delete-draft', [emailId])
+    return
+  }
 
   if (props.type === 'all-email') {
     ElMessageBox.confirm(t('delOneEmailConfirm'), {
@@ -1290,9 +1299,10 @@ function getEmailList(refresh = false) {
   } else {
     followLoading.value = !refresh;
   }
+  loadError.value = null
   let start = Date.now();
 
-  props.getEmailList(emailId, queryParam.size).then(async data => {
+  Promise.resolve().then(() => props.getEmailList(emailId, queryParam.size)).then(async data => {
     if (seq !== requestSeq) return;
     let end = Date.now();
     let duration = end - start;
@@ -1318,10 +1328,19 @@ function getEmailList(refresh = false) {
     emailList.push(...list);
     if (refresh) scrollbarRef.value?.setScrollTop(0);
 
-    noLoading.value = data.list.length < queryParam.size;
-    followLoading.value = data.list.length >= queryParam.size;
+    noLoading.value = data.complete === true || data.list.length < queryParam.size;
+    followLoading.value = !noLoading.value;
 
     total.value = data.total;
+  }).catch(() => {
+    if (seq !== requestSeq) return
+    firstLoad.value = false
+    followLoading.value = false
+    if (refresh) {
+      emailList.length = 0
+      total.value = 0
+    }
+    loadError.value = refresh
   }).finally(() => {
     if (seq !== requestSeq) return;
     loading.value = false
@@ -1355,7 +1374,7 @@ function handleList(list) {
 function refresh() {
   emit('refresh-before')
   if (props.skeleton) {
-    scrollbarRef.value.setScrollTop(0)
+    scrollbarRef.value?.setScrollTop(0)
   }
   refreshList()
 }
@@ -1384,6 +1403,8 @@ function loadData() {
   overflow: hidden;
   height: 100%;
 }
+
+.load-error { padding: 8px 16px; }
 
 .scroll {
   margin: 0;

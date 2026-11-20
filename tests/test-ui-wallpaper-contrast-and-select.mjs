@@ -167,7 +167,7 @@ import assert from "node:assert";
     assert(mailModeSelectMetrics.width === 210, `邮件模式 el-select 宽度必须严格固定为 210px（固定尺寸不随内容改变），实测: ${mailModeSelectMetrics.width}px`);
     assert(!mailModeSelectMetrics.isTruncated, `邮件模式文字绝不能被截断！当前展示: '${mailModeSelectMetrics.text}'`);
     assert(
-      mailModeSelectMetrics.text.includes("加密邮件模式 (Level 3 [E2EE])") ||
+      mailModeSelectMetrics.text.includes("加密邮件模式 (Level 3)") ||
       mailModeSelectMetrics.text.includes("隐私邮件模式 (Level 2 [推荐])") ||
       mailModeSelectMetrics.text.includes("全部邮件模式 (Level 1)"),
       `邮件模式必须完整显示相应级别名称与等级，当前: '${mailModeSelectMetrics.text}'`

@@ -1,15 +1,17 @@
+import { personalForwardingAvailable, readForwardPolicy, setForwardPolicy } from './forward-consent.js';
 import BizError from '../error/biz-error';
 import accountService from './account-service';
 import { userOrm as orm, mailOrm } from '../entity/orm';
 import user from '../entity/user';
 import account from '../entity/account';
-import { and, asc, count, desc, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { emailConst, isDel, roleConst, userConst } from '../const/entity-const';
 import { email } from '../entity/email';
 import { att } from '../entity/att';
 import KvConst from '../const/kv-const';
 import cryptoUtils from '../utils/crypto-utils';
 import emailService from './email-service';
+import { purgeOwnedMail } from './mail-lifecycle-service.js';
 import dayjs from 'dayjs';
 import permService from './perm-service';
 import roleService from './role-service';
@@ -34,11 +36,29 @@ import { authVersionOf } from '../utils/one-time-credential.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import { mailSha256 } from '../utils/mail-pipeline.js';
 import safeLogger from '../utils/safe-logger.js';
+import { sealPersonalBotToken } from '../utils/oauth-secret-crypto.js';
 import { encryptByoStorageConfig } from '../utils/storage-credential-crypto.js';
 import { deleteKvKeys, deleteKvMatching, forEachKvPage } from '../utils/kv-revocation.js';
 import { assertStorageCanChange, beginAccountDeletion, deleteAccountEvidence, getObjectDeletionCounts,
 	isActiveUser, readPrivacyState, revokeAccountAccess, revokeTelegramLinks, setDeletionStatus } from './privacy-revocation-service.js';
 import { updateSessionUserFields, deleteUserSessionsFromDb, revokeAllUserSessions } from '../utils/session-auth-store.js';
+
+function apiTokenMetadata(item) {
+	return {
+		id: item.id, name: item.name,
+		tokenPrefix: typeof item.tokenPrefix === 'string' ? item.tokenPrefix.slice(0, 16) : '',
+		scopes: Array.isArray(item.scopes) ? item.scopes : [],
+		createdAt: item.createdAt || null, expiresAt: item.expiresAt || null, lastUsedAt: item.lastUsedAt || null
+	};
+}
+
+function personalTelegramSettings(stored = {}) {
+	return {
+		enabled: stored.enabled === true, botTokenConfigured: Boolean(stored.botToken),
+		chatId: stored.chatId || '', topicId: stored.topicId || '', mode: stored.mode || 'privacy',
+		notifyCodeOnly: stored.notifyCodeOnly === true, includePreview: stored.includePreview === true
+	};
+}
 
 const userService = {
 
@@ -136,9 +156,20 @@ const userService = {
                 || (tg.includePreview !== undefined && typeof tg.includePreview !== 'boolean')) {
                 throw new BizError('Invalid Telegram settings', 400, 'invalid_telegram_settings');
             }
+            const savedToken = profile.personalTelegram?.botToken || '';
+            let botToken = savedToken;
+            if (tg.botToken !== undefined) {
+                if (typeof tg.botToken !== 'string' || tg.botToken.length > 200 || tg.botToken.trim().startsWith('v1:')) {
+                    throw new BizError('Invalid Telegram bot token', 400, 'invalid_telegram_settings');
+                }
+                botToken = tg.botToken.trim();
+            }
+            if (botToken && !botToken.startsWith('v1:')) {
+                botToken = await sealPersonalBotToken(c.env, userId, botToken);
+            }
             safeParams.personalTelegram = {
                 enabled: tg.enabled,
-                botToken: typeof tg.botToken === 'string' ? tg.botToken.trim().slice(0, 200) : '',
+                botToken,
                 chatId: typeof tg.chatId === 'string' || typeof tg.chatId === 'number' ? String(tg.chatId).trim().slice(0, 100) : '',
                 topicId: typeof tg.topicId === 'string' || typeof tg.topicId === 'number' ? String(tg.topicId).trim().slice(0, 50) : '',
                 mode: tg.mode,
@@ -228,7 +259,7 @@ const userService = {
             if (!pfw || typeof pfw !== 'object' || Array.isArray(pfw) || typeof pfw.enabled !== 'boolean') {
                 throw new BizError(t('forwardingNotSupported'), 400, 'invalid_forwarding_settings');
             }
-            if (pfw.enabled && (!['all', 'alias'].includes(pfw.mode) || pfw.keepCopy === false)) {
+            if (pfw.enabled && (!personalForwardingAvailable(c.env) || !['all', 'alias'].includes(pfw.mode) || pfw.keepCopy === false)) {
                 throw new BizError(t('forwardingNotSupported'), 400, 'forwarding_option_unavailable');
             }
             if (pfw.targets !== undefined && typeof pfw.targets !== 'string') {
@@ -306,6 +337,7 @@ const userService = {
             const revocation = await revokeTelegramLinks(c, userId);
             profile.telegramShareVersion = revocation.version;
         }
+        if (safeParams.personalForwarding !== undefined) await setForwardPolicy(c, userId, safeParams.personalForwarding);
         Object.assign(profile, safeParams);
         await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 
@@ -523,16 +555,10 @@ const userService = {
         user.themeWallpaperOpacity = profile.themeWallpaperOpacity ?? 85;
         user.themeMode = profile.themeMode || 'auto';
         user.lang = profile.lang || '';
-        user.personalTelegram = profile.personalTelegram || {
-            enabled: false,
-            botToken: '',
-            chatId: '',
-            topicId: '',
-            mode: 'privacy',
-            notifyCodeOnly: false,
-            includePreview: false
-        };
-        user.personalForwarding = profile.personalForwarding || {
+        user.personalTelegram = personalTelegramSettings(profile.personalTelegram || {});
+        const forwarding = personalForwardingAvailable(c.env)
+            ? (await readForwardPolicy(c, userId, profile)).preferences : profile.personalForwarding;
+        user.personalForwarding = forwarding || {
             enabled: false,
             targets: '',
             mode: 'all',
@@ -540,7 +566,7 @@ const userService = {
             keepCopy: true,
             addPrefix: true
         };
-        user.apiTokens = Array.isArray(profile.apiTokens) ? profile.apiTokens : [];
+        user.apiTokens = Array.isArray(profile.apiTokens) ? profile.apiTokens.filter(Boolean).map(apiTokenMetadata) : [];
         user.clientCountry = c.req.header('cf-ipcountry') || c.req.raw?.cf?.country || '';
 
 		let remainingBackupCodes = 0;
@@ -1662,92 +1688,82 @@ const userService = {
 			throw new BizError(t('purgeRequireBannedMsg') || '必须先对该用户进行【封禁】处理，才能强制清空其邮件释放空间', 400);
 		}
 
-		const quota = await this.getUserQuota(c, uid);
-
-		const starService = (await import('./star-service')).default;
-		try {
-			await starService.removeByUserIds(c, [uid]);
-		} catch (e) {}
-
-		await emailService.physicsDeleteUserIds(c, [uid]);
-
-		return {
-			userId: uid,
-			releasedStorageBytes: quota.usedStorageBytes,
-			releasedEmails: quota.usedEmails
-		};
+		return purgeOwnedMail(c, uid);
 	},
 
 	async exportUserData(c, userId, options = {}) {
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) throw new BizError('User not found');
-
-		const range = typeof options?.range === 'string' ? options.range : 'all';
-		const emailConditions = [eq(email.userId, userId), eq(email.isDel, 0)];
-		if (range === '30d') {
-			emailConditions.push(gte(email.createTime, dayjs().subtract(30, 'day').format('YYYY-MM-DD HH:mm:ss')));
-		} else if (range === '1y') {
-			emailConditions.push(gte(email.createTime, dayjs().subtract(1, 'year').format('YYYY-MM-DD HH:mm:ss')));
+		const type = options.type ?? 'full';
+		const range = options.range ?? 'all';
+		if (!['full', 'emails', 'contacts'].includes(type) || !['all', '30d', '1y'].includes(range)) {
+			throw new BizError('Unknown export type or date range', 400, 'invalid_export_scope');
+		}
+		const userRow = await this.selectById(c, userId);
+		if (!userRow) throw new BizError('User not found', 404);
+		const data = { exportTime: new Date().toISOString(), version: '1.0.0' };
+		if (type !== 'emails') {
+			const stored = await c.env.kv.get('USER_PROFILE_' + userId);
+			const profile = stored ? JSON.parse(stored) : {};
+			data.user = { profile: {
+				nickname: profile.nickname || '', bio: profile.bio || '', avatarUrl: profile.avatarUrl || '',
+				backgroundUrl: profile.backgroundUrl || profile.background || '', gender: profile.gender || '',
+				birthday: profile.birthday || '', phones: profile.phones || [], addresses: profile.addresses || {}
+			} };
+			data.customLabels = userRow.customLabels ? JSON.parse(userRow.customLabels) : null;
+			if (type === 'contacts') return data;
+			const [accountRow, roleRow] = await Promise.all([
+				accountService.selectByEmailIncludeDel(c, userRow.email), roleService.selectById(c, userRow.type)
+			]);
+			Object.assign(data.user, { userId: userRow.userId, email: userRow.email, name: accountRow?.name || '',
+				createTime: userRow.createTime, role: roleRow?.name || '' });
 		}
 
-		const [account, roleRow, userEmails] = await Promise.all([
-			accountService.selectByEmailIncludeDel(c, userRow.email),
-			roleService.selectById(c, userRow.type),
-			mailOrm(c).select().from(email).where(and(...emailConditions)).all()
-		]);
-
-		let profile = {};
-		try {
-			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
-			if (profileStr) profile = JSON.parse(profileStr);
-		} catch (e) {}
-
-		let decryptedEmails = userEmails;
-		try {
-			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
-			decryptedEmails = await Promise.all(userEmails.map(em => emailCryptoUtils.decryptEmailRecord(em, cryptoKey)));
-		} catch (err) {
-			safeLogger.error('export_decryption_failed', { userId, error: err });
+		const cursor = options.before === undefined ? null : Number(options.before);
+		const asOf = options.asOf === undefined ? data.exportTime : options.asOf;
+		if ((cursor !== null && (!Number.isSafeInteger(cursor) || cursor <= 0))
+			|| typeof asOf !== 'string' || !dayjs(asOf).isValid()) {
+			throw new BizError('Invalid export cursor', 400, 'invalid_export_cursor');
 		}
-
-		return {
-			exportTime: new Date().toISOString(),
-			version: '1.0.0',
-			user: {
-				userId: userRow.userId,
-				email: userRow.email,
-				name: account?.name || '',
-				createTime: userRow.createTime,
-				role: roleRow?.name || '',
-				profile: {
-					nickname: profile.nickname || '',
-					bio: profile.bio || '',
-					avatarUrl: profile.avatarUrl || '',
-					backgroundUrl: profile.backgroundUrl || profile.background || '',
-					gender: profile.gender || '',
-					birthday: profile.birthday || '',
-					phones: profile.phones || [],
-					addresses: profile.addresses || {}
-				}
-			},
-			emails: decryptedEmails.map(em => ({
-				emailId: em.emailId,
-				messageId: em.messageId,
-				toEmail: em.toEmail,
-				recipient: em.recipient,
-				sendEmail: em.sendEmail,
-				name: em.name,
-				subject: em.subject,
-				createTime: em.createTime,
-				content: em.content,
-				text: em.text,
-				isSpam: em.isSpam,
-				unread: em.unread,
-				labels: em.labels
-			})),
-			customLabels: userRow.customLabels ? JSON.parse(userRow.customLabels) : null,
-			totalEmails: decryptedEmails.length
+		const conditions = [eq(email.userId, userId), eq(email.isDel, 0)];
+		if (cursor !== null) conditions.push(lt(email.emailId, cursor));
+		if (range !== 'all') {
+			const since = range === '30d' ? dayjs(asOf).subtract(30, 'day') : dayjs(asOf).subtract(1, 'year');
+			conditions.push(sql`datetime(${email.createTime}) >= datetime(${since.toISOString()})`);
+		}
+		// Bound both the number and estimated size of bodies loaded into one worker.
+		const candidates = await mailOrm(c).select({ id: email.emailId,
+			bytes: sql`LENGTH(CAST(IFNULL(${email.subject}, '') AS BLOB)) + LENGTH(CAST(IFNULL(${email.text}, '') AS BLOB))
+				+ LENGTH(CAST(IFNULL(${email.content}, '') AS BLOB))`
+		}).from(email).where(and(...conditions)).orderBy(desc(email.emailId)).limit(26).all();
+		const ids = [];
+		let bytes = 0;
+		for (const row of candidates) {
+			if (ids.length === 25 || (ids.length && bytes + row.bytes > 1024 * 1024)) break;
+			ids.push(row.id);
+			bytes += row.bytes;
+		}
+		const nextBefore = ids.length < candidates.length ? ids[ids.length - 1] : null;
+		const fields = {
+			emailId: email.emailId, messageId: email.messageId, toEmail: email.toEmail, recipient: email.recipient,
+			sendEmail: email.sendEmail, name: email.name, subject: email.subject, createTime: email.createTime,
+			content: email.content, text: email.text, isSpam: email.isSpam, unread: email.unread, labels: email.labels
 		};
+		data.emails = ids.length ? await mailOrm(c).select(fields).from(email)
+			.where(and(...conditions, inArray(email.emailId, ids))).orderBy(desc(email.emailId)).all() : [];
+		const encrypted = row => emailCryptoUtils.ENCRYPTED_FIELDS.some(field =>
+			emailCryptoUtils.inspectEncryptedValue(row[field]).encrypted);
+		if (data.emails.some(encrypted)) {
+			try {
+				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+				data.emails = await Promise.all(data.emails.map(row => emailCryptoUtils.decryptEmailRecord(row, cryptoKey)));
+				if (data.emails.some(encrypted)) throw new Error('Unreadable encrypted field');
+			} catch (error) {
+				safeLogger.error('export_decryption_failed', { userId, error });
+				throw new BizError('Some mail could not be decrypted for export', 503, 'export_unreadable');
+			}
+		}
+		data.totalEmails = data.emails.length;
+		Object.assign(data, { asOf, nextBefore });
+		return data;
 	},
 
 	async getApiTokens(c, userId) {
@@ -1779,15 +1795,7 @@ const userService = {
 			item.tokenHash = tokenHash;
 			item.tokenPrefix = tokenPrefix;
 			delete item.token;
-			tokens.push({
-				id: item.id,
-				name: item.name,
-				tokenPrefix,
-				scopes: Array.isArray(item.scopes) ? item.scopes : [],
-				createdAt: item.createdAt || null,
-				expiresAt: item.expiresAt || null,
-				lastUsedAt: item.lastUsedAt || null
-			});
+			tokens.push(apiTokenMetadata(item));
 		}
 		if (migrated) {
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
@@ -1797,22 +1805,20 @@ const userService = {
 
 	async createApiToken(c, userId, params) {
 		await this.assertNotVisitor(c, userId);
-		const settingService = (await import('./setting-service')).default;
+		const { default: settingService, personalTokenPolicy } = await import('./setting-service.js');
 		const settingData = await settingService.query(c);
-		if (Number(settingData.userApiSupport ?? 1) === 0) {
-			throw new BizError('第三方 API 与开发者访问功能已被管理员停用 / Third-party API support is disabled', 403);
+		if (!personalTokenPolicy(c.env, settingData).userApiSupport) {
+			throw new BizError('Personal access token issuance is disabled', 403, 'pat_issuance_disabled');
 		}
 
 		const { name, expiresInDays, scopes } = params || {};
 		const safeName = typeof name === 'string' ? name.trim().slice(0, 100) : '';
 		if (!safeName) throw new BizError('Token name is required');
 		const allowedScopes = new Set(['emails:read', 'emails:send', 'profile:read']);
-		const requestedScopes = Array.isArray(scopes)
-			? scopes.filter(scope => allowedScopes.has(scope))
-			: [];
-		const tokenScopes = requestedScopes.length > 0
-			? [...new Set(requestedScopes)]
-			: ['emails:read', 'emails:send', 'profile:read'];
+		if (scopes !== undefined && (!Array.isArray(scopes) || scopes.length === 0 || scopes.some(scope => !allowedScopes.has(scope)))) {
+			throw new BizError('Invalid personal access token scopes', 400, 'invalid_scope');
+		}
+		const tokenScopes = [...new Set(scopes === undefined ? allowedScopes : scopes)];
 		const days = expiresInDays === undefined || expiresInDays === null || expiresInDays === ''
 			? null
 			: Number(expiresInDays);

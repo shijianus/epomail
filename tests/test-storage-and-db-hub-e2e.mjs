@@ -29,6 +29,7 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
           }),
           first: async () => ({
             probe: 1,
+            pending: 0, failed: 0, oldest: null,
             totalAttachments: 0,
             totalBytes: 0,
             distinctKeys: 0,
@@ -108,11 +109,11 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
   assert.strictEqual(lvl2.code, 'PRIVACY', "Level 2 对应 PRIVACY 模式");
 
   const lvl3 = emailCryptoUtils.getProtectionLevel(2);
-  assert.strictEqual(lvl3.level, 3, "Level 3 必须为最高绝密级 (端到端加密)");
+  assert.strictEqual(lvl3.level, 3, "Level 3 必须为全文件夹邮件字段静态加密");
   assert.strictEqual(lvl3.code, 'ENCRYPTED', "Level 3 对应 ENCRYPTED 模式");
   console.log("  ✓ 三大安全加密防护等级权威定义固化并通过验证");
 
-  // 1.3 验证 Mode 2 (全量端到端加密) 下管理员接口防越权拦截逻辑
+  // 1.3 验证 Mode 2 (全文件夹邮件字段静态加密) 下管理员接口防越权拦截逻辑
   console.log("  -> 验证 Mode 2 下管理员 allList / allEmailLatest 防越权彻底拦截...");
   const mockMode2Env = {
     get: (k) => k === 'setting' ? { allMailMode: 2 } : null,
@@ -131,7 +132,7 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
   assert.strictEqual(blockedList.list.length, 0, "Mode 2 下管理员查询全站邮件列表必须直接返回空，彻底阻断越权！");
   const blockedLatest = await emailService.allEmailLatest(mockMode2Env, { emailId: 0 });
   assert.strictEqual(blockedLatest.length, 0, "Mode 2 下管理员查询最新邮件增量必须直接返回空！");
-  console.log("  ✓ Mode 2 端到端加密模式管理员全量越权阻断验证通过");
+  console.log("  ✓ Mode 2 加密存储模式管理员全量越权阻断验证通过");
 
   // ---------------------------------------------------------------------------
   // E2E Test: 生产环境 API 与 Web 前端 UI 验证

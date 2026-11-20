@@ -69,6 +69,14 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 	await page.goto(`${base}/login/`, { waitUntil: 'domcontentloaded' });
 	await page.waitForSelector('input[type="email"]', { timeout: 30000 });
 	await page.fill('input[type="email"]', 'admin@example.com');
+	const recoveryHref = await page.locator('a[href*="/appeal/"]').first().getAttribute('href');
+	check('recovery link sends only language and request type', () => {
+		const url = new URL(recoveryHref);
+		assert.equal(url.protocol, 'https:');
+		assert.deepEqual([...url.searchParams.keys()].sort(), ['lang', 'type']);
+		assert.equal(url.searchParams.get('type'), 'password');
+		assert.equal(url.hash, '');
+	});
 	await page.fill('input[type="password"]', password);
 	const listResponse = page
 		.waitForResponse(res => res.url().includes('/api/email/list'), { timeout: 90000 })
@@ -162,26 +170,28 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 	});
 	await page.unroute('**/api/my/oauthIdentities/bind/complete');
 
-	// 4. The inbox must not overflow horizontally on a phone viewport.
-	const mobile = await context.newPage();
-	await mobile.setViewportSize({ width: 375, height: 812 });
-	await mobile.goto(`${base}/mail/u/0/#inbox`, { waitUntil: 'domcontentloaded' });
-	await mobile.waitForFunction(
-		() => {
-			const root = document.querySelector('#app');
-			return Boolean(root && root.children.length > 0);
-		},
-		null,
-		{ timeout: 90000 }
-	);
-	await mobile.waitForTimeout(2500);
-	const overflow = await mobile.evaluate(
-		() => document.documentElement.scrollWidth - window.innerWidth
-	);
+	// The mobile app must authenticate and render real mail, not an error or login shell.
+	const phone = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+	const mobile = await phone.newPage();
+	await mobile.goto(`${base}/login/`, { waitUntil: 'domcontentloaded' });
+	await mobile.locator('input[type="email"]').fill('admin@example.com');
+	await mobile.locator('input[type="password"]').fill(password);
+	const [mobileList] = await Promise.all([
+		mobile.waitForResponse(res => new URL(res.url()).pathname === '/api/email/list', { timeout: 90000 }),
+		mobile.locator('button[type="submit"]').click()
+	]);
+	await mobile.waitForURL(/\/mail\/u\/0\/#inbox/, { timeout: 90000 });
+	const mobileBody = await mobileList.json();
+	check('mobile login opens the authenticated inbox at 375px', () => {
+		assert.equal(mobileList.status(), 200);
+		assert.equal(mobileBody.code, 200);
+	});
+	await mobile.evaluate(() => document.fonts.ready);
+	const overflow = await mobile.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 	check('inbox has no horizontal overflow at 375px', () => {
 		assert.ok(overflow <= 1, `scrollWidth exceeds viewport by ${overflow}px`);
 	});
-	await mobile.close();
+	await phone.close();
 
 	// 5. Expired session is forced back to the login app.
 	await page.evaluate(() => localStorage.clear());
