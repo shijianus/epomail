@@ -32,17 +32,22 @@ const userPassword = 'Local-privacy-review-26';
 const adminPassword = 'Local-admin-review-26';
 
 async function request(base, path, { token, method = 'GET', body, headers = {} } = {}) {
-  const response = await fetch(base + path, {
-    method,
-    headers: {
-      ...headers,
-      ...(token ? { Authorization: token } : {}),
-      ...(body ? { 'Content-Type': 'application/json' } : {})
-    },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-    signal: AbortSignal.timeout(30000)
-  });
-  const text = await response.text();
+  let response, text;
+  try {
+    response = await fetch(base + path, {
+      method,
+      headers: {
+        ...headers,
+        ...(token ? { Authorization: token } : {}),
+        ...(body ? { 'Content-Type': 'application/json' } : {})
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(30000)
+    });
+    text = await response.text();
+  } catch (cause) {
+    throw new Error(`Privacy check request failed (${method} ${new URL(path, base).pathname})`, { cause });
+  }
   let json;
   try { json = JSON.parse(text); } catch (_) { json = null; }
   return { response, text, json };

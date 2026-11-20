@@ -275,6 +275,9 @@ jobs:
       - name: Cold-start full-stack smoke (extracted candidate, local D1/KV)
         run: node tests/fullstack-smoke.mjs
 
+      - name: Privacy full-stack regression (extracted candidate, local D1/KV)
+        run: node tests/privacy-fullstack.mjs
+
       - name: Full-stack browser regression (extracted candidate)
         run: |
           node tests/fullstack-browser-e2e.mjs
