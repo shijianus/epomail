@@ -9,6 +9,15 @@
 
 ---
 
+### 公测修复审计（2026-11-20）
+
+修复提交为 `04144ffd9ea908e72543162ddcd87d339321b623`。信箱别名删除、站内多人投递和收件回执均有对应的本地事务回归。存储体检对不可测结果返回未知，管理员可以区分已清理数据与等待对象存储删除的数据。公测签署由受保护的发布流程执行。
+
+- [迁移、收发与回滚验收](doc/public-beta-release-operations.md)
+- [公测制品与签署流程](doc/release/PUBLIC-BETA-PROMOTION.md)
+- [开发与验证清单](CHECKLIST.log)
+
+
 ### EpoMail — F1–F3 交接同步、全吊销路径加固与 CI 门禁清零审计 (2026-11-16)
 *   **关联提交 (Git Commit)**: `e861810a867f911456a7d759a220cfeb13254449` (Short: `e861810`；前置代码提交 `fe7373ced14ce60f0aa92634207d199ec6889a52`)
 *   **专项文档索引 (Detailed Doc)**: [远端开发状态复核](doc/DEVELOPMENT-AUDIT-2026-11-16.md)、[修复与迁移说明](doc/FIX-SESSION-AND-MIGRATIONS-2026-11-16.md)、[本轮验证明细](doc/verification-current.json)。
