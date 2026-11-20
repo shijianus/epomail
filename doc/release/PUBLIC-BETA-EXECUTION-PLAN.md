@@ -90,7 +90,7 @@ sha256sum -c epomail-candidate.tar.gz.sha256
 tar -xzf epomail-candidate.tar.gz
 candidate_sha="$(cat SOURCE_SHA)"
 "$WRANGLER_BIN" deploy bundle/index.js --no-bundle --config wrangler.toml --env staging --tag "$candidate_sha"
-"$WRANGLER_BIN" deployments list --config wrangler.toml --env staging
+"$WRANGLER_BIN" deployments status --json --config wrangler.toml --env staging
 curl --fail --silent --show-error "$STAGING_ORIGIN/api/version"
 ```
 
@@ -100,18 +100,20 @@ curl --fail --silent --show-error "$STAGING_ORIGIN/api/version"
 
 平台负责人在 W1 期间提供以下非机密材料，全部关联同一发布单：已分配的测试邮件域和 Staging origin、隔离资源清单、Cron 或外部调度选项、Resend 沙箱和真实受控收件地址范围、运营告知文档及审核人、首批容量和停机恢复指标。密钥由维护者在既有授权环境设置，交接只记录名称、归属与验证日期。真实 OAuth 按首发启用清单安排独立测试，未就绪的可选登录方式先在候选配置中关闭。
 
+受保护环境需提供只读的 `EPOMAIL_STAGING_DEPLOYMENTS_TOKEN`、账户变量 `EPOMAIL_STAGING_ACCOUNT_ID` 及 Staging 探针配置。详见[公测制品放行与标签发布](PUBLIC-BETA-PROMOTION.md)。
+
 若缺少可用 MX、沙箱、授权或恢复环境，记录对应 Gate 的责任人、缺失资源和计划开通日。W1/W3 的本地工作并行推进。选择内部试点需要先通过其隔离门禁，公开邮件公测继续等待真实外部验收。
 
 ## 7. 最终裁决与阻断收敛
 
-在干净候选中运行 `node scripts/public-beta-gate.mjs --template --scope mail-public-beta > ../beta-evidence.json`，生成全部为 NOT_RUN 的模板。证据 JSON 放在 checkout 之外。顶层字段为 `schemaVersion: 1`、`scope`、`sha`、`artifactSha256`、`stagingOrigin`、`stagingVersionId`、`stagingDeploymentId`、`oauthProviders` 和 `gates`。每项 `gates` 记录含 `id`、`status`、`sha`、`environment`、`owner`、`reviewer`、`observedAt`、`reference`。CI 和产物使用 `candidate`，其余用 `staging`。除 CI 外各记录包含归档 `artifactSha256`，Staging 记录还包含 `versionId`、`deploymentId`。没有启用外部登录时显式写空数组。发布负责人或分工安排的审核人复核原始日志、摘要、工件来源、部署回执和实际运行配置，脚本只做结构、一致性及只读服务核对，不能从 URL 或操作员姓名证明报告真伪。生产放行前记录 Staging 证据与计划上线的实际生产配置差异，尤其是打开外发、收件范围、域名、Secret 名称和调度。只允许事先审查的环境差异。
+在干净候选中运行 `node scripts/public-beta-gate.mjs --template --scope mail-public-beta > ../beta-evidence.json`，生成全部为 NOT_RUN 的模板。证据 JSON 放在 checkout 之外。顶层字段为 `schemaVersion: 1`、`scope`、`sha`、`artifactSha256`、`stagingOrigin`、`stagingVersionId`、`stagingDeploymentId`、`oauthProviders` 和 `gates`。每项 `gates` 记录含 `id`、`status`、`sha`、`environment`、`owner`、`reviewer`、`observedAt`、`reference`。CI 和产物使用 `candidate`，其余用 `staging`。除 CI 外各记录包含归档 `artifactSha256`，Staging 记录还包含 `versionId`、`deploymentId`。没有启用外部登录时显式写空数组。发布负责人或分工安排的审核人复核原始日志、摘要、工件来源、部署回执和实际运行配置，工作流读取 GitHub 审批记录、受信 Staging 的运行信息及 Cloudflare 活动部署。邮件、恢复及供应商回执的内容仍须由审核人查阅。生产放行前记录 Staging 证据与计划上线的实际生产配置差异，尤其是打开外发、收件范围、域名、Secret 名称和调度。只允许事先审查的环境差异。
 
 ```bash
 node scripts/public-beta-gate.mjs --scope mail-public-beta \
   --evidence "$EVIDENCE_JSON" --artifact "$CANDIDATE_ARCHIVE" --staging-origin "$STAGING_ORIGIN"
 ```
 
-- 退出 0 对应当前范围 GO。退出 1 会列出所有缺证或失败的 Gate ID。退出 2 对应无效输入或非干净 checkout。脚本核验归档实际摘要、Staging 当前返回的完整提交和 Version ID，并检查启用的 OAuth 集合。签字人负责确认 Deployment ID、证据真实性及动态配置一致。
+- 退出 0 对应当前范围 GO。退出 1 会列出所有缺证或失败的 Gate ID。退出 2 对应无效输入或非干净 checkout。脚本核验归档摘要、Staging 当前返回的完整提交和 Version ID、启用的 OAuth 集合，以及云端活动 Deployment ID 和版本流量。签字人复核业务证据和动态配置，确保各 Staging 记录来自本次部署。
 - 每个失败 Gate 建一条记录，包含责任人、到期日、修复动作、对应证据及复验人。状态用 `OPEN → IN_PROGRESS → VERIFIED`。同一证据缺失不得用新报告关闭；已关闭项如遇相关运行代码或配置变化，记录失效原因并重开。新需求须由发布负责人明确纳入范围或进入后续 backlog。
 - 每个运行态变更重新冻结候选，重跑必需 CI，并重签受变更影响的实测门禁。未受影响的场景可复用脚本和流程，旧部署的 PASS 记录不能直接复制到新部署。把审核和进度证据放在候选之外，避免用文档补记改变待验收的 SHA。
 - 发现串租户、错误外发、密钥泄露或邮件/附件丢失立即停止扩量。首轮建议若核心链路 5 分钟内 5xx 超过 1% 或连续三次探针失败则暂停，确认已验收的回滚版本和数据兼容性后执行回滚。没有现场证据时保留 BLOCK 并给出责任人及下一次复验动作。

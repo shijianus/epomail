@@ -12,12 +12,13 @@
 
 - Environment variable `EPOMAIL_TRUSTED_STAGING_ORIGIN` 为审核确认的隔离 Staging HTTPS origin。
 - Environment secrets `CF_ACCESS_CLIENT_ID`、`CF_ACCESS_CLIENT_SECRET` 为限用于该 Staging 的短期只读探针凭据。
+- Environment variable `EPOMAIL_STAGING_ACCOUNT_ID` 指定 Staging 所在的 Cloudflare 账户。Environment secret `EPOMAIL_STAGING_DEPLOYMENTS_TOKEN` 供核验步骤读取该账户的 Worker 部署元数据。按账户和 Worker 限制读取范围。工作流从候选仓库配置读取 Staging Worker 名称。
 - Environment secret `EPOMAIL_PUBLIC_BETA_EVIDENCE` 保存本次 `mail-public-beta` 的完整 JSON 证据清单。审核人核对各项原始证据、执行人与复核人、候选 SHA、构建摘要、Staging 部署及版本 ID 后更新此值。真实收发信、Webhook、恢复、性能、调度和启用的外部登录均依照[公测执行计划](PUBLIC-BETA-EXECUTION-PLAN.md)验收。
 
 ## 发布顺序
 
-1. 候选分支完成 Quality Gates、Security Audit 和 Offline Secret Scanning Gate 三项 push CI。把 Quality Gates 产出的 `epomail-candidate.tar.gz` 按其 SHA-256 在隔离 Staging 验收。
-2. 在候选分支手动运行 **Verify public beta promotion**。两个输入分别填写完整候选 SHA 和审核过的 JSON 文件的 SHA-256。Environment secret 必须与该文件逐字节相同，包括结尾换行。独立审核人核对这两个值及原始外部测试记录后批准该次工作流。工作流核对 GitHub 记录的审核人、当前分支 SHA、原 CI 制品、包内 `SOURCE_SHA`、清单摘要和实际 Staging 身份。Staging 只接收只读核验请求。
-3. 公测验收成功后，在同一提交发布 beta 或正式标签。Release 工作流核对最新手工验收和同分支三项 CI，取回该次成功验收保留的原始归档和校验文件，复核后上传到 GitHub Release。制品保留 14 天。过期时应重新取得 CI 制品并复验其摘要。候选 SHA、制品、Staging 范围或配置发生变化时重新提交证据。
+1. 在选定发布分支上，让同一 SHA 的 Quality Gates、Security Audit 和 Offline Secret Scanning Gate 最近一次 push 检查全部通过。Quality Gates 分别预检仓库和解包后的 Staging 配置。用该次运行的 `epomail-candidate.tar.gz` 与 SHA-256 部署到隔离 Staging 并验收。
+2. 在该分支手动运行 **Verify public beta promotion**。GitHub 必须报告触发引用受保护。填写完整候选 SHA 和审核过的 JSON 文件的 SHA-256。Environment secret 必须与该文件逐字节相同，包括结尾换行。独立审核人核对原始外部测试记录后批准。工作流锁定 Quality Gates 的运行 ID 和重试序号，核对审核人、归档、`SOURCE_SHA` 和证据摘要。它在 Staging HTTP 检查前后读取 Cloudflare 的活动部署，要求 Deployment ID 与证据一致，候选 Version ID 承担全部流量。Staging 观察时间须落在该部署创建和验收之间。
+3. 归档验收包前再次检查三项 push CI。如果 Quality Gates 已重跑，请针对新的运行重新发起晋级。成功后在同一提交创建 beta 或正式标签。Release 工作流取回已批准的归档，再次核对晋级运行、同分支三项检查，以及远端标签最终指向的提交。源码 RC 同样要求一条发布分支提供全部三项结果。验收包保留 14 天，过期后须重新取得制品并完成验收。维护者应检查 release 标签保护规则，禁止在最后一次核对和发布之间移动或删除标签。
 
 GitHub Release、Cloudflare 正式部署与放量各有独立记录。部署与回滚按项目发布手册执行。
