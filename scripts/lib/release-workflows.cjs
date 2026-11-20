@@ -4,6 +4,13 @@ function isReleaseBranch(branch) {
   return branch === 'main' || branch === 'master' || Boolean(branch?.startsWith('release/'));
 }
 
+function gitleaksPushRange(branch, before, after) {
+  if (!/^[0-9a-f]{40}$/.test(after)) throw new Error('Invalid pushed commit');
+  if (!before || /^0{40}$/.test(before) || isReleaseBranch(branch)) return '--all';
+  if (!/^[0-9a-f]{40}$/.test(before)) throw new Error('Invalid previous commit');
+  return `${before}..${after}`;
+}
+
 function releaseKind(tag) {
   const match = /^v\d+\.\d+\.\d+(?:-([0-9A-Za-z.-]+))?$/.exec(tag);
   if (!match) throw new Error('Expected a version tag such as v1.2.3, v1.2.3-beta.1 or v1.2.3-rc.1');
@@ -36,4 +43,4 @@ function requireIndependentApproval(reviews, environment, actors) {
   return approval.user.login;
 }
 
-module.exports = { isReleaseBranch, releaseKind, requireSuccessfulRun, requireIndependentApproval };
+module.exports = { isReleaseBranch, gitleaksPushRange, releaseKind, requireSuccessfulRun, requireIndependentApproval };
