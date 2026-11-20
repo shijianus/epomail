@@ -600,7 +600,7 @@ const userService = {
 		return user;
 	},
 
-	async getUserQuota(c, userId) {
+	async getUserQuota(c, userId, storageUsage) {
 		try {
 			const DEFAULT_MAX_EMAILS = 5000;
 			const configuredMaxEmails = c.env.max_emails ?? DEFAULT_MAX_EMAILS;
@@ -611,9 +611,12 @@ const userService = {
 				throw new Error('Mailbox quota configuration is invalid');
 			}
 			const maxEmails = Math.min(emailLimit, DEFAULT_MAX_EMAILS);
-			const storageQuotaService = (await import('./storage-quota-service')).default;
-			const usage = await storageQuotaService.getUserStorageUsage(c, userId);
-			if (!usage || !Number.isSafeInteger(usage.emailCount) || usage.emailCount < 0
+			let usage = storageUsage;
+			if (usage === undefined) {
+				const storageQuotaService = (await import('./storage-quota-service')).default;
+				usage = await storageQuotaService.getUserStorageUsage(c, userId);
+			}
+			if (!usage || usage.userId !== userId || !Number.isSafeInteger(usage.emailCount) || usage.emailCount < 0
 				|| !Number.isSafeInteger(usage.usedBytes) || usage.usedBytes < 0
 				|| !Number.isFinite(usage.quotaMb) || usage.quotaMb < 0
 				|| !Number.isFinite(usage.quotaBytes) || usage.quotaBytes < 0

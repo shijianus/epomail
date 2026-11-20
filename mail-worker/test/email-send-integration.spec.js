@@ -129,6 +129,23 @@ const attachment = { filename: 'local.txt', type: 'text/plain', content: btoa('l
 const imageContent = '<p>body<img src="data:image/png;base64,AQIDBA=="></p>';
 
 describe('Outbound send integration and replay', () => {
+	it('reads sender storage usage once for a new send and skips the scan on accepted replay', async () => {
+		await fixture(async ({ c, params, userId, provider }) => {
+			userService.getUserQuota.mockRestore();
+			storageQuotaService.checkQuotaAvailable.mockRestore();
+			const scan = vi.spyOn(storageQuotaService, 'getUserStorageUsage').mockResolvedValue({
+				userId, emailCount: 0, usedBytes: 0, quotaMb: 5, quotaBytes: 5 * 1024 * 1024,
+				byoStorageEnabled: 0, isVisitor: false
+			});
+			const first = await emailService.send(c, params, userId);
+			const replay = await emailService.send(c, params, userId);
+			expect(scan).toHaveBeenCalledTimes(1);
+			expect(scan).toHaveBeenCalledWith(c, userId);
+			expect(replay[0].emailId).toBe(first[0].emailId);
+			expect(provider).toHaveBeenCalledTimes(1);
+		});
+	});
+
 	it('passes the server task key through Resend options without a network request', async () => {
 		const post = vi.spyOn(Resend.prototype, 'post').mockResolvedValue({ data: { id: 'local-sdk-accepted' }, error: null });
 		try {

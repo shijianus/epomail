@@ -185,6 +185,9 @@ describe('Mail quota consistency (real D1, separate identity and mail databases)
 				maxEmails: 50, maxStorageMB: 5, maxStorageBytes: 5 * MIB, usedEmails: 4, usedStorageBytes: usedBytes,
 				byoStorageEnabled: 0, bypassStorage: false, isVisitor: false, quotaStorageBlocked: false, dbFull: false
 			});
+			const checked = await storageQuotaService.checkQuotaAvailable(c, USER_ID, 1);
+			expect(await userService.getUserQuota(c, USER_ID, checked.usage)).toEqual(await userService.getUserQuota(c, USER_ID));
+			await expect(userService.getUserQuota(c, OTHER_ID, checked.usage)).rejects.toMatchObject({ code: 503, errorCode: 'quota_unavailable' });
 		});
 	});
 

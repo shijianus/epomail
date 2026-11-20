@@ -1112,7 +1112,7 @@ const emailService = {
 				.bind(userId, accountId, idempotencyKey).first() : null;
 		const storageCheck = previousTask ? null : await storageQuotaService.checkQuotaAvailable(c, userId, reserveBytes);
 		if (storageCheck && !storageCheck.allowed) throw new BizError(storageCheck.reason);
-		const quota = previousTask ? null : await userService.getUserQuota(c, userId);
+		const quota = previousTask ? null : await userService.getUserQuota(c, userId, storageCheck.usage);
 		const providerName = allInternal
 			? 'local'
 			: (useCloudflareEmail ? 'cloudflare' : (String(resendToken || '').startsWith('mailjet:') ? 'mailjet' : 'resend'));
