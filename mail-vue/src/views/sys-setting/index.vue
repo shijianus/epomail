@@ -2958,9 +2958,9 @@
                 <thead><tr><th>{{ $t('storageProbeHistory.dependency') }}</th><th>{{ $t('storageProbeHistory.current') }}</th><th>{{ $t('storageProbeHistory.last') }}</th></tr></thead>
                 <tbody>
                   <tr v-for="(probe, name) in storageScanResult.probes" :key="name">
-                    <td>{{ $t('storageProbeHistory.names.' + name) }}</td>
+                    <td>{{ probeLabels[name] ?? name }}</td>
                     <td>
-                      {{ $t('storageProbeHistory.status.' + probe.status) }}
+                      {{ probeStatuses[probe.status] ?? probeStatuses.unknown }}
                       <small v-if="name === 'deletionQueue'">{{ $t('storageProbeHistory.queue', { pending: storageScanResult.deletionQueue?.pending ?? $t('unknown'), failed: storageScanResult.deletionQueue?.failed ?? $t('unknown') }) }}</small>
                       <small v-if="name === 'inboundRawCleanup'">{{ $t('storageProbeHistory.raw', { retrying: storageScanResult.inboundRawCleanup?.retrying ?? $t('unknown'), review: storageScanResult.inboundRawCleanup?.manualReview ?? $t('unknown') }) }}</small>
                     </td>
@@ -3700,6 +3700,24 @@ const attachmentRuleForm = reactive({
 const storageScanShow = ref(false)
 const scanningStorage = ref(false)
 const storageScanResult = ref(null)
+const probeLabels = computed(() => ({
+  kv: t('storageProbeHistory.names.kv'),
+  d1: t('storageProbeHistory.names.d1'),
+  byo: t('storageProbeHistory.names.byo'),
+  orphans: t('storageProbeHistory.names.orphans'),
+  deletionQueue: t('storageProbeHistory.names.deletionQueue'),
+  inboundRawCleanup: t('storageProbeHistory.names.inboundRawCleanup'),
+  s3: t('storageProbeHistory.names.s3'),
+  engine: t('storageProbeHistory.names.engine'),
+  settings: t('storageProbeHistory.names.settings')
+}))
+const probeStatuses = computed(() => ({
+  ok: t('storageProbeHistory.status.ok'),
+  unknown: t('storageProbeHistory.status.unknown'),
+  partial: t('storageProbeHistory.status.partial'),
+  error: t('storageProbeHistory.status.error'),
+  not_configured: t('storageProbeHistory.status.not_configured')
+}))
 const cleaningStorage = ref(false)
 
 const backgroundImage = ref('')
