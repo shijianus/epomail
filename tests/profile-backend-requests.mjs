@@ -24,7 +24,8 @@ const warm = bound(values['warm-cycles'], 1, 100);
 const measured = bound(values.cycles, 1, 20);
 const artifact = process.env.EPOMAIL_CANDIDATE_DIR;
 const report = {
-  mode: 'isolated-sequential-diagnostics', warmCycles: warm, measuredCycles: measured,
+  mode: 'isolated-sequential-diagnostics', d1Topology: 'single local db binding shared by identity and mail',
+  warmCycles: warm, measuredCycles: measured,
   measurement: {
     clientMs: 'Loopback request through response body parsing.',
     handlerMs: 'Worker fetch entry to response headers; excludes client transport.',

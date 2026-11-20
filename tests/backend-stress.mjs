@@ -410,6 +410,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const startedAt = nowIso();
   const reportSha = currentGitSha();
+  let testedWorker = { mode: 'source-checkout', sourceSha: reportSha };
   const log = [];
   let cleanupVerified = false;
   let stackCompleted = false;
@@ -418,6 +419,14 @@ async function main() {
   let reportPath = null;
   let report;
   try {
+    const archive = process.env.EPOMAIL_CANDIDATE_DIR;
+    if (archive) {
+      testedWorker = { mode: 'extracted-archive', sourceSha: null };
+      const sourceSha = (await fs.readFile(path.join(archive, 'SOURCE_SHA'), 'utf8')).trim();
+      assert.match(sourceSha, /^[a-f0-9]{40}$/);
+      const bundle = await fs.readFile(path.join(archive, 'bundle/index.js'));
+      testedWorker = { mode: 'extracted-archive', sourceSha, bundleSha256: crypto.createHash('sha256').update(bundle).digest('hex') };
+    }
     await withLocalStack(async stack => {
       observedStack = stack;
       assert.match(stack.base, /^http:\/\/127\.0\.0\.1:\d+$/);
@@ -438,7 +447,7 @@ async function main() {
         schema: 'epomail.backend-stress.v1',
         startedAt,
         finishedAt: nowIso(),
-        gitSha: reportSha,
+        gitSha: reportSha, testedWorker,
         environment: { localOnly: true, host: '127.0.0.1', egressBlockedByHarness: egressConfigured, providerCalls: 'not-measured', browser: false, deployment: false },
         limits: STRESS_LIMITS,
         configuration: { soakMs: args.soakMs, profile: args.profile },
@@ -465,7 +474,7 @@ async function main() {
       schema: 'epomail.backend-stress.v1',
       startedAt,
       finishedAt: nowIso(),
-      gitSha: reportSha,
+      gitSha: reportSha, testedWorker,
       environment: { localOnly: true, host: '127.0.0.1', egressBlockedByHarness: egressConfigured, providerCalls: 'not-measured', browser: false, deployment: false },
       limits: STRESS_LIMITS,
       configuration: { soakMs: args.soakMs, profile: args.profile },
@@ -494,7 +503,10 @@ async function main() {
   console.log(`backend stress PASS; report: ${reportPath}`);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+const directEntry = import.meta.main ?? (process.argv[1] &&
+  (path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) ||
+   await fs.realpath(process.argv[1]).catch(() => null) === fileURLToPath(import.meta.url)));
+if (directEntry) {
   try {
     await main();
   } catch (error) {
