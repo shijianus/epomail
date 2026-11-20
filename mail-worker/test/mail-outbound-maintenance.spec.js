@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { getMailDb, getUserDb } from '../src/utils/db-accessor.js';
 import { ensureMailReliabilitySchema } from '../src/utils/mail-reliability-schema.js';
 import {
-	prepareOutboundTask, reserveSendCount, claimPreparation, claimOutboundTask,
+	prepareOutboundTask, reserveSendCount, compensateSendCount, claimPreparation, claimOutboundTask,
 	maintainOutboundTasks, retireOutboundForUser
 } from '../src/service/mail-outbound-service.js';
 import { emailConst } from '../src/const/entity-const.js';
@@ -151,6 +151,28 @@ const reservation = task => userDb.prepare('SELECT * FROM mail_send_quota_reserv
 const sendCount = async f => Number((await userDb.prepare('SELECT send_count FROM user WHERE user_id=?').bind(f.userId).first()).send_count);
 
 describe('Real D1 outbound task maintenance', () => {
+	it('reserves count in one batch on first use and classifies existing, exhausted and released reservations', () => withFixture(async f => {
+		const reads = [];
+		const counted = { env: { USER_DB: {
+			prepare(sql) {
+				if (/^SELECT/i.test(sql.trim())) reads.push(sql);
+				return userDb.prepare(sql);
+			},
+			batch: statements => userDb.batch(statements)
+		} } };
+		const request = { taskId: f.id, userId: f.userId, quantity: 2, maxCount: 2 };
+		await reserveSendCount(counted, request);
+		expect(reads).toHaveLength(0);
+		await Promise.all([reserveSendCount(counted, request), reserveSendCount(counted, request)]);
+		expect(await sendCount(f)).toBe(2);
+		await expect(reserveSendCount(counted, { ...request, quantity: 1 })).rejects.toMatchObject({ errorCode: 'send_quota_conflict' });
+		await expect(reserveSendCount(counted, { ...request, userId: f.userId + 1 })).rejects.toMatchObject({ errorCode: 'send_quota_conflict' });
+		await expect(reserveSendCount(counted, { ...request, taskId: crypto.randomUUID() })).rejects.toMatchObject({ errorCode: 'send_quota_exceeded' });
+		await compensateSendCount(counted, request);
+		await expect(reserveSendCount(counted, request)).rejects.toMatchObject({ errorCode: 'send_quota_conflict' });
+		expect(await sendCount(f)).toBe(0);
+	}));
+
 	it.each(['insert conflict', 'quota denied', 'different content'])('reconciles a same-key race after the initial lookup (%s)', mode => withFixture(async f => {
 		const request = { userId: f.userId, accountId: f.accountId, idempotencyKey: f.id, contentHash: 'first' };
 		const limits = { reservedBytes: 8, maxStorageBytes: 1000, maxEmails: 10 };

@@ -128,18 +128,24 @@ async function fixture(run, { sendLimit = 20 } = {}) {
 const attachment = { filename: 'local.txt', type: 'text/plain', content: btoa('local attachment') };
 const imageContent = '<p>body<img src="data:image/png;base64,AQIDBA=="></p>';
 
+function observeMailStatements(c, observe) {
+	c.env.MAIL_DB = {
+		prepare(sql) {
+			observe(sql.trim());
+			return db.prepare(sql);
+		},
+		batch: statements => db.batch(statements)
+	};
+}
+
 describe('Outbound send integration and replay', () => {
 	it('prepares a new task with two D1 statements and looks up an accepted replay once without rebuilding its archive', async () => {
 		await fixture(async ({ c, params, userId, provider }) => {
 			const taskStatements = [];
-			c.env.MAIL_DB = {
-				prepare(sql) {
-					if (/^SELECT .* FROM mail_outbound_task WHERE user_id\s*=/i.test(sql.trim())) taskStatements.push('lookup');
-					if (/^INSERT INTO mail_outbound_task\b/i.test(sql.trim())) taskStatements.push('reserve');
-					return db.prepare(sql);
-				},
-				batch: statements => db.batch(statements)
-			};
+			observeMailStatements(c, sql => {
+				if (/^SELECT .* FROM mail_outbound_task WHERE user_id\s*=/i.test(sql)) taskStatements.push('lookup');
+				if (/^INSERT INTO mail_outbound_task\b/i.test(sql)) taskStatements.push('reserve');
+			});
 			const buildArchive = vi.spyOn(emailService, 'imgReplace');
 			userService.getUserQuota.mockRestore();
 			storageQuotaService.checkQuotaAvailable.mockRestore();
@@ -157,6 +163,27 @@ describe('Outbound send integration and replay', () => {
 			expect(scan).toHaveBeenCalledWith(c, userId);
 			expect(replay[0].emailId).toBe(first[0].emailId);
 			expect(provider).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	it('uses the returned archive ID and its known empty attachments for a new local send, then reads current data on replay', async () => {
+		await fixture(async ({ c, params, userId, recipient }) => {
+			params.receiveEmail = [recipient];
+			const attachmentReads = [];
+			const archiveReads = [];
+			observeMailStatements(c, sql => {
+				if (/^select .* from "attachments"/i.test(sql)) attachmentReads.push(sql);
+				if (/^select .* from "email".*"outbound_task_id" = \?/i.test(sql)) archiveReads.push(sql);
+			});
+			const [first] = await emailService.send(c, structuredClone(params), userId);
+			expect(first.emailId).toBeGreaterThan(0);
+			expect(first.attList).toEqual([]);
+			expect(archiveReads).toHaveLength(2); // Check existing archive, then return its current state.
+			expect(attachmentReads).toHaveLength(0);
+			const [replay] = await emailService.send(c, structuredClone(params), userId);
+			expect(replay.emailId).toBe(first.emailId);
+			expect(archiveReads).toHaveLength(3);
+			expect(attachmentReads).toHaveLength(1);
 		});
 	});
 

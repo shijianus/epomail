@@ -1128,13 +1128,13 @@ const emailService = {
 				bypassStorage: quota.bypassStorage || storageCheck.usage?.byoStorageEnabled === 1,
 				storageBlocked: quota.quotaStorageBlocked || quota.dbFull };
 		});
-		const readArchived = async task => {
+		const readArchived = async (task, knownEmptyAttachments = false) => {
 			let row = await orm(c).select().from(email).where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
 			if (!row) throw new BizError('The accepted send record requires reconciliation', 503, 'outbound_archive_missing');
 			if (emailCryptoUtils.ENCRYPTED_FIELDS.some(field => String(row[field] || '').startsWith(emailCryptoUtils.CIPHER_PREFIX))) {
 				row = await emailCryptoUtils.decryptEmailRecord(row, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
 			}
-			const attList = await attService.selectByEmailIds(c, [row.emailId]);
+			const attList = knownEmptyAttachments ? [] : await attService.selectByEmailIds(c, [row.emailId]);
 			if (task.provider === 'local' && row.status === emailConst.status.BOUNCED) {
 				const status = await readSendStatus(c, userId, accountId, idempotencyKey);
 				if (status.deliveryOutcome) row.deliveryOutcome = status.deliveryOutcome;
@@ -1165,23 +1165,27 @@ const emailService = {
 		const task = owned.task;
 		const leaseToken = owned.leaseToken;
 		let archived;
+		let knownEmptyAttachments = false;
 		let staged = { rows: [], uploaded: [] };
 		const guard = () => mailTransactionGuard(c,
 			"EXISTS(SELECT 1 FROM mail_outbound_task WHERE task_id=? AND state='PREPARED' AND lease_token=? AND lease_until>unixepoch())",
 			[task.task_id, leaseToken]);
 		try {
 			archive ??= await buildArchive();
-			archived = await orm(c).select().from(email).where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
+			archived = await orm(c).select({ emailId: email.emailId }).from(email)
+				.where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
 			const completeOnInsert = !archived && attachmentItems.length === 0;
 			if (!archived) {
 				const assertion = guard();
-				await mailDb.batch([assertion.before,
-					prepareMailQuery(c, orm(c).insert(email).values({ ...archive.encryptedRecord, outboundTaskId: task.task_id })),
+				const result = await mailDb.batch([assertion.before,
+					prepareMailQuery(c, orm(c).insert(email).values({ ...archive.encryptedRecord, outboundTaskId: task.task_id })
+						.returning({ emailId: email.emailId })),
 					mailDb.prepare(`UPDATE mail_outbound_task SET reserved_bytes=?,reserved_count=0,
 						email_id=CASE WHEN ? THEN (SELECT email_id FROM email WHERE outbound_task_id=?) ELSE email_id END
 						WHERE task_id=? AND state='PREPARED' AND lease_token=?`)
 						.bind(attachmentBytes, completeOnInsert ? 1 : 0, task.task_id, task.task_id, leaseToken), assertion.after]);
-				archived = await orm(c).select().from(email).where(eq(email.outboundTaskId, task.task_id)).get();
+				archived = { emailId: result[1].results[0].email_id };
+				knownEmptyAttachments = completeOnInsert;
 			}
 			if (!task.email_id && !completeOnInsert) {
 				const sourceAttachments = attachmentItems.map((item, index) => ({ userId, accountId, emailId: archived.emailId,
@@ -1253,7 +1257,7 @@ const emailService = {
 		let providerId = null;
 		try {
 			if (allInternal) {
-				const allAttachments = await orm(c).select().from(att).where(eq(att.emailId, archived.emailId)).all();
+				const allAttachments = knownEmptyAttachments ? [] : await orm(c).select().from(att).where(eq(att.emailId, archived.emailId)).all();
 				await this.HandleOnSiteEmail(c, receiveEmail, { ...archive.plainRecord, emailId: archived.emailId }, allAttachments,
 					{ taskId: task.task_id, leaseToken });
 			} else {
@@ -1318,7 +1322,7 @@ const emailService = {
 			const previous = Number(await c.env.kv.get(dayKey) || 0);
 			await c.env.kv.put(dayKey, String(previous + receiveEmail.length), { expirationTtl: 86400 });
 		} catch (_) { console.warn('Send statistics update failed'); }
-		return readArchived(dispatch.task);
+		return readArchived(dispatch.task, knownEmptyAttachments);
 	},
 
 	async sendByCloudflareEmail(c, params) {

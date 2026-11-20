@@ -107,11 +107,6 @@ export async function reserveSendCount(c, { taskId, userId, quantity, maxCount, 
 	if (!Number.isSafeInteger(userId) || userId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 100
 		|| !Number.isSafeInteger(maxCount) || maxCount < 0) throw error('Send quota is unavailable', 'send_quota_unavailable', 503);
 	const db = getUserDb(c);
-	const existing = await db.prepare('SELECT * FROM mail_send_quota_reservation WHERE task_id=?').bind(taskId).first();
-	if (existing) {
-		if (existing.user_id !== userId || existing.quantity !== quantity || existing.state === 'released') throw error('Send reservation cannot be reused', 'send_quota_conflict');
-		return;
-	}
 	const result = await db.batch([
 		db.prepare(`INSERT INTO mail_send_quota_reservation(task_id,user_id,quantity,quota_day,is_daily,state)
 			SELECT ?,?,?,date('now'),?,'reserved' WHERE EXISTS (
