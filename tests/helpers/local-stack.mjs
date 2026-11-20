@@ -139,7 +139,7 @@ export async function writeLocalConfig(directory, workerDir, assetsDir = path.jo
 		Object.entries(secrets).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join('\n') + '\n',
 		{ mode: 0o600 }
 	);
-	return { configPath, secrets };
+	return { configPath, entryPath, secrets };
 }
 
 export async function verifyProductionAssets(workerDir, assetsDir = path.join(workerDir, 'dist')) {
@@ -417,6 +417,7 @@ export async function startLocalStack({
 			jwtSecret: secrets.jwt_secret,
 			secret: secrets.jwt_secret,
 			tempDir: directory,
+			entryPath: config.entryPath,
 			signal: controller.signal,
 			failure,
 			addCleanup: cleanup => {

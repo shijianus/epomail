@@ -131,8 +131,7 @@ function makeRequest(client, auth = {}) {
 }
 
 async function assertEgressHarness(stack) {
-  const entryPath = path.join(stack.tempDir, 'isolated-worker.mjs');
-  const entry = await fs.readFile(entryPath, 'utf8');
+  const entry = await fs.readFile(stack.entryPath, 'utf8');
   assert.match(entry, /Object\.defineProperty\(globalThis, ['"]fetch['"]/);
   assert.match(entry, /writable:\s*false/);
   assert.match(entry, /configurable:\s*false/);

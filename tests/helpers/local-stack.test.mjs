@@ -45,8 +45,9 @@ test('local archive smoke loads identical ESM bytes with bundling off and outbou
 		const worker = path.join(bundle, 'index.js');
 		const bytes = 'export default { fetch() { return new Response("candidate"); } };';
 		await fs.writeFile(worker, bytes);
-		const { configPath } = await writeLocalConfig(temp, base, path.join(base, 'packed/dist'), worker, true);
+		const { configPath, entryPath } = await writeLocalConfig(temp, base, path.join(base, 'packed/dist'), worker, true);
 		const config = JSON.parse(await fs.readFile(configPath, 'utf8'));
+		assert.equal(entryPath, config.main);
 		assert.equal(config.no_bundle, true);
 		assert.equal(config.find_additional_modules, true);
 		assert.equal(await fs.readFile(path.join(config.base_dir, 'bundle/index.js'), 'utf8'), bytes);
