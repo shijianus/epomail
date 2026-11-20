@@ -8,6 +8,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const LEASE_SECONDS = 30 * 60;
 const RAW_CLEANUP_RETRY_SECONDS = 5 * 60;
+const RAW_CLEANUP_REVIEW_ATTEMPTS = 5;
 const RAW_V2_PREFIX = encoder.encode('raw:v2:');
 const RAW_V2_OVERHEAD = RAW_V2_PREFIX.byteLength + 12 + 16;
 const KV_VALUE_LIMIT = 25 * 1024 * 1024;
@@ -388,12 +389,13 @@ export async function failInboundClaim(c, claimKey, leaseToken, error, { deleteR
 			await r2Service.deleteInboundRawObj(c, failed.raw_object_key,
 				Number(failed.user_id) > 0 ? Number(failed.user_id) : null);
 			await mailDb.prepare(`
-				UPDATE mail_receive_claim SET raw_object_key = '', raw_expires_at = 0, updated_at = CURRENT_TIMESTAMP
-				WHERE claim_key = ? AND state = 'FAILED'
-			`).bind(claimKey).run();
-		} catch (deleteError) {
+				UPDATE mail_receive_claim SET raw_object_key = '', raw_expires_at = 0, cleanup_attempts = 0,
+					cleanup_retry_at = 0, cleanup_review_at = 0, updated_at = CURRENT_TIMESTAMP
+				WHERE claim_key = ? AND state = 'FAILED' AND lease_token = ? AND raw_object_key = ?
+			`).bind(claimKey, leaseToken, failed.raw_object_key).run();
+		} catch {
 			// Keep the claim's locator so the scheduled raw cleanup can retry.
-			console.warn('[inbound] failed to discard rejected raw MIME:', deleteError?.message || deleteError);
+			console.warn(JSON.stringify({ event: 'inbound_rejected_raw_delete_failed' }));
 		}
 	}
 }
@@ -402,16 +404,19 @@ export async function cleanupExpiredInboundClaims(c, { limit = 100 } = {}) {
 	const mailDb = getMailDb(c);
 	const rows = await mailDb.prepare(`
 		SELECT claim_key FROM mail_receive_claim
-		WHERE raw_object_key <> '' AND MAX(raw_expires_at, cleanup_retry_at) <= unixepoch() AND lease_until <= unixepoch()
+		WHERE raw_object_key <> '' AND cleanup_review_at = 0 AND MAX(raw_expires_at, cleanup_retry_at) <= unixepoch() AND lease_until <= unixepoch()
 		ORDER BY MAX(raw_expires_at, cleanup_retry_at), rowid LIMIT ?
 	`).bind(Math.max(1, Math.min(Number(limit) || 100, 500))).all();
 	let deleted = 0;
 	let failed = 0;
+	let reviewAdded = 0;
+	let infrastructureFailures = 0;
 	for (const row of rows.results || []) {
 		const token = `cleanup:${crypto.randomUUID()}`;
+		let claimed;
 		try {
-			const claimed = await mailDb.prepare(`UPDATE mail_receive_claim SET lease_token = ?, lease_until = unixepoch() + ?
-				WHERE claim_key = ? AND raw_object_key <> '' AND MAX(raw_expires_at, cleanup_retry_at) <= unixepoch()
+			claimed = await mailDb.prepare(`UPDATE mail_receive_claim SET lease_token = ?, lease_until = unixepoch() + ?
+				WHERE claim_key = ? AND raw_object_key <> '' AND cleanup_review_at = 0 AND MAX(raw_expires_at, cleanup_retry_at) <= unixepoch()
 					AND lease_until <= unixepoch() RETURNING *`)
 				.bind(token, LEASE_SECONDS, row.claim_key).first();
 			if (!claimed) continue;
@@ -447,6 +452,7 @@ export async function cleanupExpiredInboundClaims(c, { limit = 100 } = {}) {
 				mailDb.prepare(`DELETE FROM email WHERE receive_claim_key = ? AND status = ?`).bind(row.claim_key, emailConst.status.SAVING),
 				claimed.state === 'COMPLETE'
 					? mailDb.prepare(`UPDATE mail_receive_claim SET raw_object_key = '', raw_expires_at = 0, cleanup_retry_at = 0,
+						cleanup_attempts = 0, cleanup_review_at = 0,
 						lease_token = NULL, lease_until = 0, reserved_bytes = 0, reserved_count = 0, last_error = NULL
 						WHERE claim_key = ? AND lease_token = ? AND state = 'COMPLETE'`).bind(row.claim_key, token)
 					: mailDb.prepare(`DELETE FROM mail_receive_claim WHERE claim_key = ? AND lease_token = ?`).bind(row.claim_key, token),
@@ -454,21 +460,41 @@ export async function cleanupExpiredInboundClaims(c, { limit = 100 } = {}) {
 			]);
 			deleted += Number(result[result.length - 2]?.meta?.changes || 0);
 		} catch {
-			failed++;
-			// Redelivery can acquire its normal lease immediately. Only the next
-			// cleanup attempt is deferred, behind claims already due for this sweep.
-			await mailDb.prepare(`UPDATE mail_receive_claim SET lease_until = 0, lease_token = NULL,
-				cleanup_retry_at = unixepoch() + ?, last_error = 'raw_cleanup_failed'
-				WHERE claim_key = ? AND raw_object_key <> '' AND (lease_token = ? OR lease_until <= unixepoch())`)
-				.bind(RAW_CLEANUP_RETRY_SECONDS, row.claim_key, token).run().catch(() => {
-					// The claim remains durable and any held lease expires. Report the
-					// batch failure below and still give the other selected rows a turn.
-				});
+			if (!claimed) {
+				infrastructureFailures++;
+				continue;
+			}
+			const attempts = claimed.cleanup_attempts + 1;
+			const review = attempts >= RAW_CLEANUP_REVIEW_ATTEMPTS;
+			const delay = review ? 0 : RAW_CLEANUP_RETRY_SECONDS * 2 ** (attempts - 1);
+			try {
+				// Only the current lease can record a failed attempt. A concurrent
+				// completion or lease takeover must retain its own retry policy.
+				const result = await mailDb.prepare(`UPDATE mail_receive_claim SET lease_until = 0, lease_token = NULL,
+					cleanup_attempts = ?, cleanup_review_at = CASE WHEN ? THEN unixepoch() ELSE 0 END,
+					cleanup_retry_at = CASE WHEN ? THEN 0 ELSE unixepoch() + ? END, last_error = 'raw_cleanup_failed'
+					WHERE claim_key = ? AND raw_object_key <> '' AND lease_token = ? AND lease_until > unixepoch()`)
+					.bind(attempts, review ? 1 : 0, review ? 1 : 0, delay, row.claim_key, token).run();
+				if (result.meta.changes === 1) {
+					failed++;
+					if (review) reviewAdded++;
+				}
+			} catch {
+				// The durable claim remains for another sweep after the lease expires.
+				infrastructureFailures++;
+			}
 		}
 	}
-	if (failed) {
-		const error = new Error(`Inbound raw cleanup failed for ${failed} claim(s)`);
-		error.summary = { processed: rows.results.length, deleted, failed };
+	const summary = { processed: rows.results.length, deleted, failed, infrastructureFailures, reviewAdded };
+	// Keep alerting on subsequent sweeps even when the only outstanding work
+	// is quarantined. This existence check reads at most one indexed entry.
+	if (reviewAdded || await mailDb.prepare(`SELECT 1 FROM mail_receive_claim WHERE raw_object_key <> ''
+		AND cleanup_attempts > 0 AND cleanup_review_at > 0 LIMIT 1`).first()) {
+		console.error(JSON.stringify({ event: 'inbound_raw_cleanup_review_required', ...summary }));
+	}
+	if (failed || infrastructureFailures) {
+		const error = new Error(`Inbound raw cleanup had ${failed} claim failure(s) and ${infrastructureFailures} database failure(s)`);
+		error.summary = summary;
 		throw error;
 	}
 	return { processed: rows.results?.length || 0, deleted };

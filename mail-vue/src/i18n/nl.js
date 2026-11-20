@@ -1290,6 +1290,35 @@ totpModeAllDesc: 'Instellen of gebruikers TOTP mogen gebruiken. Eenmaal ingescha
     storageScanDesc: "Controleer direct de verdeling van Cloudflare KV-sleutels, D1-bijlagetabellen, bereikbaarheid van cloudopslag en bestandsstatus.",
     storageScanRunning: "KV wordt doorlopen en D1-opslag wordt geanalyseerd…",
     storageScanSuccess: "Uitgebreide opslag- en KV-controle voltooid",
+    storageProbeHistory: {
+        "title": "Opslagwaarnemingen",
+        "scanned": "Scan gestart",
+        "unavailable": "Het archief is niet beschikbaar. Dit tabblad kan eerdere waarnemingen bevatten.",
+        "dependency": "Afhankelijkheid",
+        "current": "Huidige waarneming",
+        "last": "Laatste geslaagde waarneming",
+        "none": "Geen geslaagde waarneming",
+        "queue": "In wachtrij {pending} · Mislukt {failed}",
+        "raw": "Opnieuw proberen {retrying} · Handmatige controle {review}",
+        "status": {
+            "ok": "Gemeten",
+            "unknown": "Onbekend",
+            "partial": "Gedeeltelijk",
+            "error": "Mislukt",
+            "not_configured": "Niet ingesteld"
+        },
+        "names": {
+            "kv": "KV-inventaris",
+            "d1": "D1-bijlagen",
+            "byo": "Opslag van gebruikers",
+            "orphans": "Scan op verweesde objecten",
+            "deletionQueue": "Wachtrij voor objectverwijdering",
+            "inboundRawCleanup": "Opschoning van ruwe inkomende e-mail",
+            "s3": "S3-verbinding",
+            "engine": "Opslagengine",
+            "settings": "Opslaginstellingen"
+        }
+    },
     storageHealthScore: "Score voor opslagstatus",
     storageHealthHealthy: "Uitstekend (100% in orde)",
     storageHealthWarn: "Aandacht nodig (openstaande punten)",

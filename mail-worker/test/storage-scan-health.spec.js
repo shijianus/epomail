@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:test';
 import { afterEach, beforeAll, expect, it, vi } from 'vitest';
+import { ensureStorageProbeHistory, recordStorageProbeHistory } from '../src/utils/storage-probe-history.js';
 import storageScanService from '../src/service/storage-scan-service.js';
 import r2Service from '../src/service/r2-service.js';
 import s3Service from '../src/service/s3-service.js';
@@ -18,8 +19,9 @@ const s3Settings = { bucket: 'fixture', endpoint: 'https://storage.invalid',
 beforeAll(async () => {
 	await mailDb.prepare('CREATE TABLE attachments(key TEXT, size INTEGER, mime_type TEXT)').run();
 	await mailDb.prepare('CREATE TABLE object_deletion_queue(status TEXT, next_retry_at TEXT)').run();
-	await mailDb.prepare('CREATE TABLE mail_receive_claim(raw_object_key TEXT)').run();
+	await mailDb.prepare('CREATE TABLE mail_receive_claim(raw_object_key TEXT, cleanup_attempts INTEGER DEFAULT 0, cleanup_review_at INTEGER DEFAULT 0)').run();
 	await userDb.prepare('CREATE TABLE user(byo_storage_enabled INTEGER)').run();
+	await ensureStorageProbeHistory(context());
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -30,15 +32,30 @@ it('retains numeric zeros and old response fields for an empty, measured KV inst
 		storage: { resolvedType: 'KV', byoUsersCount: 0, s3: { configured: false, status: 'not_configured', ok: null } },
 		orphans: { status: 'ok', orphanCount: 0 }, deletionQueue: { status: 'ok', pending: 0, failed: 0 } });
 	expect(Date.parse(scan.deletionQueue.checkedAt)).not.toBeNaN();
+	expect(scan.inboundRawCleanup).toEqual({ status: 'ok', retrying: 0, manualReview: 0, oldestReviewAt: null });
 });
 
 it('returns null measurements for missing bindings and settings without discarding the whole report', async () => {
 	vi.spyOn(settingService, 'query').mockRejectedValue(new Error('fixture settings unavailable'));
 	const scan = await storageScanService.scan({ env: {} });
+	expect(scan.inboundRawCleanup).toEqual({ status: 'unknown', retrying: null, manualReview: null, oldestReviewAt: null });
 	expect(scan).toMatchObject({ ok: false, status: 'unknown', healthScore: null,
 		kv: { status: 'unknown', totalKeys: null }, d1: { status: 'unknown', totalBytes: null },
 		storage: { activeEngine: null, byoUsersCount: null, s3: { status: 'unknown', ok: null } },
 		orphans: { status: 'unknown', orphanCount: null }, deletionQueue: { status: 'unknown', pending: null, failed: null } });
+});
+
+it('reports outstanding retry and review counts without exposing raw locators', async () => {
+	const heldSince = 1700000000;
+	try {
+		await mailDb.prepare(`INSERT INTO mail_receive_claim VALUES ('raw/retry',1,0), ('raw/review',5,?), ('',0,0)`).bind(heldSince).run();
+		const scan = await storageScanService.scan(context());
+		expect(scan).toMatchObject({ ok: false, status: 'partial', inboundRawCleanup: {
+			status: 'ok', retrying: 1, manualReview: 1, oldestReviewAt: new Date(heldSince * 1000).toISOString()
+		} });
+	} finally {
+		await mailDb.prepare(`DELETE FROM mail_receive_claim WHERE raw_object_key IN ('raw/retry','raw/review','')`).run();
+	}
 });
 
 it('keeps good D1 metrics when the object probe fails and distinguishes an unprobed S3 configuration', async () => {
@@ -59,6 +76,8 @@ it('keeps good D1 metrics when the object probe fails and distinguishes an unpro
 	expect(mixed).toMatchObject({ status: 'partial', d1: { status: 'ok', totalAttachments: 1, totalBytes: 12 },
 		storage: { s3: { status: 'error', ok: false, latencyMs: null } } });
 	expect(Date.parse(mixed.storage.s3.checkedAt)).not.toBeNaN();
+	expect(mixed.probes.s3).toEqual({ status: 'error', lastSuccessAt: measured.probes.s3.lastSuccessAt });
+	expect(measured.probes.s3.lastSuccessAt).toBe(measured.storage.s3.checkedAt);
 });
 
 it('preserves measured KV counts when mail D1 fails, and never labels a bounded KV sample as the total', async () => {
@@ -71,4 +90,33 @@ it('preserves measured KV counts when mail D1 fails, and never labels a bounded 
 	const truncated = await storageScanService.scan(context({}, { kv }));
 	expect(truncated.kv).toMatchObject({ status: 'unknown', totalKeys: null, attachmentKeys: null });
 	expect(truncated.d1.status).toBe('ok');
+});
+
+
+it('retains prior successes when mail D1 fails and never restores current counts', async () => {
+	const good = await storageScanService.scan(context());
+	expect(good.historyAvailable).toBe(true);
+	expect(Date.parse(good.scannedAt)).not.toBeNaN();
+	const down = { prepare() { throw new Error('fixture unavailable'); } };
+	const failed = await storageScanService.scan(context({}, { MAIL_DB: down }));
+	for (const name of ['d1', 'deletionQueue', 'inboundRawCleanup']) {
+		expect(good.probes[name].lastSuccessAt).toMatch(/^\d{4}-/);
+		expect(failed.probes[name]).toEqual({ status: 'unknown', lastSuccessAt: good.probes[name].lastSuccessAt });
+	}
+	expect(failed).toMatchObject({ ok: false, status: 'partial', d1: { totalBytes: null }, deletionQueue: { failed: null } });
+	const noHistory = await storageScanService.scan(context({}, { MAIL_DB: down, USER_DB: down }));
+	expect(noHistory).toMatchObject({ historyAvailable: false, probes: {
+		d1: { status: 'unknown', lastSuccessAt: null }, kv: { status: 'ok', lastSuccessAt: expect.any(String) }
+	} });
+});
+
+it('ignores unrelated identifiers and prevents an earlier scan overwriting a later success', async () => {
+	const later = '2030-01-01T00:00:01.000Z';
+	const earlier = '2030-01-01T00:00:00.000Z';
+	await recordStorageProbeHistory(context(), { kv: later, 'raw/private.eml': earlier });
+	const result = await recordStorageProbeHistory(context(), { kv: earlier });
+	expect(result.history.kv).toBe(later);
+	const stored = (await userDb.prepare('SELECT * FROM storage_probe_history').all()).results;
+	expect(stored.find(row => row.probe === 'kv')).toEqual({ probe: 'kv', last_success_at: later });
+	expect(stored.some(row => row.probe.includes('/'))).toBe(false);
 });

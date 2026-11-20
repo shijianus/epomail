@@ -432,6 +432,27 @@ describe('Production inbound email handler with local D1 and stubbed providers',
 });
 
 describe('Real D1 mail reliability transactions', () => {
+	it('upgrades legacy deferred cleanup once and uses the due and manual review indexes', async () => {
+		const legacy = env.NOTICE_MAIL_DB;
+		const legacyContext = { env: { MAIL_DB: legacy, USER_DB: env.NOTICE_USER_DB } };
+		await legacy.prepare(`CREATE TABLE mail_receive_claim(claim_key TEXT PRIMARY KEY, recipient TEXT,
+			message_id TEXT, raw_object_key TEXT, raw_expires_at INTEGER, cleanup_retry_at INTEGER,
+			state TEXT, lease_until INTEGER, last_error TEXT)`).run();
+		try {
+			await legacy.prepare(`INSERT INTO mail_receive_claim VALUES ('fixture-legacy','','','fixture',0,92,'COMPLETE',0,'raw_cleanup_failed')`).run();
+			await ensureMailReliabilitySchema(legacyContext);
+			await ensureMailReliabilitySchema(legacyContext);
+			expect(await legacy.prepare('SELECT cleanup_attempts, cleanup_retry_at, cleanup_review_at FROM mail_receive_claim').first())
+				.toEqual({ cleanup_attempts: 1, cleanup_retry_at: 92, cleanup_review_at: 0 });
+			const plan = async sql => (await legacy.prepare('EXPLAIN QUERY PLAN ' + sql).all()).results.map(row => row.detail).join(' ');
+			expect(await plan(`SELECT 1 FROM mail_receive_claim WHERE raw_object_key <> '' AND cleanup_attempts > 0 AND cleanup_review_at > 0 LIMIT 1`))
+				.toContain('idx_mail_receive_claim_cleanup_failures');
+			expect(await plan(`SELECT claim_key FROM mail_receive_claim WHERE raw_object_key <> '' AND cleanup_review_at = 0
+				AND MAX(raw_expires_at, cleanup_retry_at) <= unixepoch() AND lease_until <= unixepoch()
+				ORDER BY MAX(raw_expires_at, cleanup_retry_at), rowid LIMIT 100`)).toContain('idx_mail_receive_claim_cleanup_due');
+		} finally { await legacy.prepare('DROP TABLE mail_receive_claim').run(); }
+	});
+
 	it('reconciles a Mailjet UNKNOWN task through the provider status endpoint', async () => {
 		const taskId = crypto.randomUUID();
 		const accountSpy = vi.spyOn(accountService, 'selectById').mockResolvedValue({ email: 'mailjet-user@example.com' });
@@ -728,6 +749,82 @@ describe('Real D1 mail reliability transactions', () => {
 				expect(await acquireInboundClaim(c, { ...input, rawBytes: encoder.encode('Received: replay hop\r\nSubject: expiry\r\n\r\nbody') })).toMatchObject({ complete: true, emailId });
 				expect(await cleanupExpiredInboundClaims(c)).toEqual({ processed: 0, deleted: 0 });
 			} finally { if (claim) await clean([claim.claimKey], emailId ? [emailId] : []); store.clear(); }
+		});
+
+		it('backs off, queues persistent raw cleanup failures, and recovers with one scoped operator reset', async () => {
+			const store = objects();
+			const alert = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const claims = [];
+			try {
+				for (let i = 0; i < 2; i++) {
+					const claim = await acquireInboundClaim(c, { recipient: `${crypto.randomUUID()}@local.test`, rawBytes: encoder.encode('Subject: retention\r\n\r\nbody') });
+					claims.push(claim);
+					const emailId = await seedSaving(claim);
+					await emailService.completeInboundReceive(c, { ...claim, emailId, status: 0, isDel: 0, isSpam: 0 });
+					await db.prepare('UPDATE mail_receive_claim SET raw_expires_at=? WHERE claim_key=?').bind(i, claim.claimKey).run();
+				}
+				const [poisoned, healthy] = claims;
+				r2Service.deleteInboundRawObj.mockImplementation(async (_c, key) => {
+					if (key === poisoned.rawObjectKey) throw new Error('sensitive-upstream-error');
+					store.delete(key);
+				});
+				let reviewAt;
+				for (let attempt = 1; attempt <= 5; attempt++) {
+					await expect(cleanupExpiredInboundClaims(c)).rejects.toMatchObject({ summary: {
+						deleted: attempt === 1 ? 1 : 0, failed: 1, reviewAdded: attempt === 5 ? 1 : 0, infrastructureFailures: 0
+					} });
+					const row = await db.prepare(`SELECT cleanup_attempts, cleanup_retry_at, cleanup_review_at, unixepoch() AS now
+						FROM mail_receive_claim WHERE claim_key=?`).bind(poisoned.claimKey).first();
+					expect(row.cleanup_attempts).toBe(attempt);
+					expect(store.has(healthy.rawObjectKey)).toBe(false);
+					expect(await cleanupExpiredInboundClaims(c)).toEqual({ processed: 0, deleted: 0 });
+					if (attempt < 5) {
+						const delay = 300 * 2 ** (attempt - 1);
+						expect(row.cleanup_retry_at - row.now).toBeGreaterThanOrEqual(delay - 2);
+						expect(row.cleanup_retry_at - row.now).toBeLessThanOrEqual(delay);
+						expect(row.cleanup_review_at).toBe(0);
+						await db.prepare('UPDATE mail_receive_claim SET cleanup_retry_at=0 WHERE claim_key=?').bind(poisoned.claimKey).run();
+					} else {
+						expect(row.cleanup_retry_at).toBe(0);
+						reviewAt = row.cleanup_review_at;
+						expect(reviewAt).toBeGreaterThan(0);
+					}
+				}
+				expect(alert.mock.calls.map(([line]) => JSON.parse(line))).toEqual([{
+					event: 'inbound_raw_cleanup_review_required', processed: 1, deleted: 0, failed: 1, infrastructureFailures: 0, reviewAdded: 1
+				}, {
+					event: 'inbound_raw_cleanup_review_required', processed: 0, deleted: 0, failed: 0, infrastructureFailures: 0, reviewAdded: 0
+				}]);
+				expect(store.has(poisoned.rawObjectKey)).toBe(true);
+				const reset = (key, at) => db.prepare(env.TEST_RETRY_REVIEWED_RAW_SQL).bind(key, at).first();
+				expect(await reset(healthy.claimKey, reviewAt)).toBeNull();
+				expect(await reset(poisoned.claimKey, reviewAt - 1)).toBeNull();
+				await db.prepare('UPDATE mail_receive_claim SET lease_until=unixepoch()+300 WHERE claim_key=?').bind(poisoned.claimKey).run();
+				expect(await reset(poisoned.claimKey, reviewAt)).toBeNull();
+				await db.prepare('UPDATE mail_receive_claim SET lease_until=0 WHERE claim_key=?').bind(poisoned.claimKey).run();
+				r2Service.deleteInboundRawObj.mockImplementation(async (_c, key) => { store.delete(key); });
+				expect(await reset(poisoned.claimKey, reviewAt)).toEqual({ cleanup_attempts: 0, cleanup_retry_at: 0, cleanup_review_at: 0 });
+				expect(await reset(poisoned.claimKey, reviewAt)).toBeNull();
+				expect(await cleanupExpiredInboundClaims(c)).toEqual({ processed: 1, deleted: 1 });
+				expect(store.size).toBe(0);
+				expect((await db.prepare('SELECT raw_object_key FROM mail_receive_claim WHERE claim_key=?').bind(poisoned.claimKey).first()).raw_object_key).toBe('');
+			} finally { await clean(claims.map(claim => claim.claimKey)); store.clear(); }
+		});
+
+		it('leaves the successor lease and attempt count intact when cleanup loses ownership', async () => {
+			const store = objects();
+			let claim;
+			try {
+				claim = await acquireInboundClaim(c, { recipient: `${crypto.randomUUID()}@local.test`, rawBytes: encoder.encode('Subject: stolen lease\r\n\r\nbody') });
+				await db.prepare('UPDATE mail_receive_claim SET raw_expires_at=0, lease_until=0, cleanup_attempts=4 WHERE claim_key=?').bind(claim.claimKey).run();
+				r2Service.deleteInboundRawObj.mockImplementationOnce(async () => {
+					await db.prepare("UPDATE mail_receive_claim SET lease_token='new-owner', lease_until=unixepoch()+100 WHERE claim_key=?").bind(claim.claimKey).run();
+					throw new Error('old worker lost ownership');
+				});
+				expect(await cleanupExpiredInboundClaims(c)).toEqual({ processed: 1, deleted: 0 });
+				expect(await db.prepare('SELECT lease_token, cleanup_attempts, cleanup_retry_at, cleanup_review_at FROM mail_receive_claim WHERE claim_key=?').bind(claim.claimKey).first())
+					.toEqual({ lease_token: 'new-owner', cleanup_attempts: 4, cleanup_retry_at: 0, cleanup_review_at: 0 });
+			} finally { if (claim) await clean([claim.claimKey]); store.clear(); }
 		});
 
 		it('continues past a failed D1 finalization and retries after deleting the legacy raw object', async () => {

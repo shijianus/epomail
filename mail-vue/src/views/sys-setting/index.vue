@@ -2950,6 +2950,25 @@
               </div>
             </div>
 
+            <details v-if="storageScanResult.probes" class="scan-probe-history" :open="storageScanResult.status !== 'ok'">
+              <summary>{{ $t('storageProbeHistory.title') }}</summary>
+              <p>{{ $t('storageProbeHistory.scanned') }} · <time :datetime="storageScanResult.scannedAt">{{ new Date(storageScanResult.scannedAt).toLocaleString(locale) }}</time></p>
+              <p v-if="storageScanResult.historyAvailable === false">{{ $t('storageProbeHistory.unavailable') }}</p>
+              <table>
+                <thead><tr><th>{{ $t('storageProbeHistory.dependency') }}</th><th>{{ $t('storageProbeHistory.current') }}</th><th>{{ $t('storageProbeHistory.last') }}</th></tr></thead>
+                <tbody>
+                  <tr v-for="(probe, name) in storageScanResult.probes" :key="name">
+                    <td>{{ $t('storageProbeHistory.names.' + name) }}</td>
+                    <td>
+                      {{ $t('storageProbeHistory.status.' + probe.status) }}
+                      <small v-if="name === 'deletionQueue'">{{ $t('storageProbeHistory.queue', { pending: storageScanResult.deletionQueue?.pending ?? $t('unknown'), failed: storageScanResult.deletionQueue?.failed ?? $t('unknown') }) }}</small>
+                      <small v-if="name === 'inboundRawCleanup'">{{ $t('storageProbeHistory.raw', { retrying: storageScanResult.inboundRawCleanup?.retrying ?? $t('unknown'), review: storageScanResult.inboundRawCleanup?.manualReview ?? $t('unknown') }) }}</small>
+                    </td>
+                    <td><time v-if="probe.lastSuccessAt" :datetime="probe.lastSuccessAt">{{ new Date(probe.lastSuccessAt).toLocaleString(locale) }}</time><span v-else>{{ $t('storageProbeHistory.none') }}</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </details>
             <!-- 2-Column Side-by-Side Metrics Grid -->
             <div class="scan-2col-grid">
               <!-- Left Column: KV 边缘高速缓存 -->
@@ -3626,6 +3645,8 @@ import ShadowHtml from "@/components/shadow-html/index.vue";
 import {getTextWidth} from "@/utils/text.js";
 import {fileToBase64} from "@/utils/file-utils.js";
 import {formatDetailDate} from "@/utils/day.js";
+import {isSameTabIdentity, resolveTabSession} from '@/utils/tab-session.js'
+import {retainStorageProbeTimes} from '@/utils/storage-probe-history.js'
 import {useI18n} from 'vue-i18n';
 import {useRouter} from 'vue-router';
 import {getRoleGroupSlug} from '@/utils/role-utils.js';
@@ -6067,11 +6088,13 @@ async function handleRunStorageScan() {
   if (scanningStorage.value) return
   scanningStorage.value = true
   storageScanResult.value = null
+  const identity = resolveTabSession()
   try {
     const res = await scanStorage()
     const data = res?.data !== undefined ? res.data : res
     if (!data) throw new Error(t('scanFailed'))
-    storageScanResult.value = data
+    if (identity && !isSameTabIdentity(identity, resolveTabSession())) return
+    storageScanResult.value = retainStorageProbeTimes(data, identity)
     if (data.healthScore === 100) ElMessage.success(t('storageScanSuccess'))
     else ElMessage.warning(t('storageHealthWarn'))
   } catch (e) {
@@ -6119,6 +6142,7 @@ async function handleTestAdminTelegram() {
   testingTg.value = true;
   try {
     await testTelegramBot({
+      scope: 'system',
       botToken: token,
       chatId: String(chatId).trim(),
     });
@@ -9555,6 +9579,15 @@ form .el-button {
         border-radius: 6px;
       }
     }
+  }
+
+  .scan-probe-history {
+    margin-block: 12px;
+    overflow-x: auto;
+    summary { cursor: pointer; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 4px 6px; text-align: start; border-bottom: 1px solid var(--el-border-color-light); }
+    small { display: block; }
   }
 
   .scan-2col-grid {

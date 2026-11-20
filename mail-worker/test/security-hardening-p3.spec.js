@@ -77,10 +77,13 @@ describe('Phase 3 security hardening: safeLogger & upstream error sanitization',
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('SECRET_UPSTREAM_BODY_LEAK', { status: 400 }));
 
-		await expect(telegramService.testPersonalBot({ env, req: { header: () => '' } }, {
-			botToken: '12345678:ABCDEFGHIJKLMNOPQRSTUVWXYZ12345',
+		const admin = 'unit-telegram-admin@example.test';
+		vi.spyOn(userService, 'selectById').mockResolvedValue({ email: admin, status: 0, isDel: 0 });
+		vi.spyOn(settingService, 'query').mockResolvedValue({ allMailMode: 0 });
+		await expect(telegramService.testPersonalBot({ env: { ...env, admin }, req: { header: () => '' } }, {
+			scope: 'system', botToken: '12345678:ABCDEFGHIJKLMNOPQRSTUVWXYZ12345',
 			chatId: '9999'
-		})).rejects.toMatchObject({ message: 'Telegram API 返回错误 (400)' });
+		}, 1)).rejects.toMatchObject({ message: 'Telegram API 返回错误 (400)' });
 
 		vi.spyOn(settingService, 'query').mockResolvedValue({
 			oauthLoginEnabled: 1,

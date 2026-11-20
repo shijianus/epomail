@@ -191,6 +191,8 @@ describe('Module C: Core mail pipeline, isolation, outbound gates, and webhook c
 		} catch (_) {}
 		for (const table of [
 			'attachments',
+			'mail_forward_task',
+			'mail_forward_policy',
 			'mail_receive_claim',
 			'object_deletion_queue',
 			'star',
@@ -862,6 +864,88 @@ describe('Module C: Core mail pipeline, isolation, outbound gates, and webhook c
 		} finally {
 			querySpy.mockRestore();
 		}
+	});
+
+	async function incomingPersonalForward(enabled = true) {
+		const c = { env: { ...env, PERSONAL_FORWARDING_ENABLED: String(enabled) } };
+		const id = crypto.randomUUID() + '@sender.invalid';
+		const target = 'forward-test@recipient.invalid';
+		const settings = await settingService.query(c);
+		vi.spyOn(settingService, 'query').mockResolvedValue({ ...settings, userEmailForward: 1, allMailMode: 0 });
+		const send = vi.spyOn(emailService, 'send').mockResolvedValue([]);
+		const nativeForward = vi.fn();
+		const reject = vi.fn();
+		const policy = { enabled: true, targets: target, mode: 'all', keepCopy: true };
+		await setForwardPolicy(c, victim.userId, policy);
+		const mime = [
+			'From: sender@sender.invalid', 'To: ' + victim.email, 'Message-ID: <' + id + '>',
+			'Subject: Forward intent regression', 'Content-Type: text/plain', '', 'Local receipt.'
+		].join('\r\n');
+		const deliver = () => inboundEmailHandler({
+			to: victim.email, raw: streamFromText(mime), setReject: reject, forward: nativeForward
+		}, c.env, { waitUntil: () => {} });
+		const receipt = () => env.db.prepare(`SELECT claim_key, state, email_id FROM mail_receive_claim
+			WHERE recipient=? AND message_id IN (?,?)`).bind(victim.email, id, '<' + id + '>').first();
+		const tasks = emailId => env.db.prepare('SELECT * FROM mail_forward_task WHERE email_id=?').bind(emailId).all();
+		return { c, deliver, receipt, tasks, policy, target, send, nativeForward, reject };
+	}
+
+	it.each(['changed target', 'deleted source'])('commits a local receipt and forwarding intent, then cancels dispatch for %s', async reason => {
+		const test = await incomingPersonalForward();
+		await test.deliver();
+		await test.deliver(); // Provider re-delivery must leave only the original intent.
+		expect(test.reject).not.toHaveBeenCalled();
+		const receipt = await test.receipt();
+		expect(receipt).toMatchObject({ state: 'COMPLETE' });
+		const { results } = await test.tasks(receipt.email_id);
+		expect(results).toHaveLength(1);
+		const [task] = results;
+		expect(task).toMatchObject({ state: 'PENDING', target: test.target, user_id: victim.userId, account_id: victim.accountId });
+		const source = await env.db.prepare('SELECT status, is_del FROM email WHERE email_id=? AND receive_claim_key=?')
+			.bind(receipt.email_id, receipt.claim_key).first();
+		expect(source).toEqual({ status: emailConst.status.RECEIVE, is_del: 0 });
+
+		if (reason === 'changed target') {
+			await setForwardPolicy(test.c, victim.userId, { ...test.policy, targets: 'replacement@recipient.invalid' });
+		} else {
+			await env.db.prepare('UPDATE email SET is_del=1 WHERE email_id=?').bind(receipt.email_id).run();
+		}
+		await expect(forwardService.processForwardTask(test.c, task.task_id)).resolves.toMatchObject({ failed: true, terminal: true });
+		expect((await test.tasks(receipt.email_id)).results[0].state).toBe('FAILED');
+		expect(test.send).not.toHaveBeenCalled();
+		expect(test.nativeForward).not.toHaveBeenCalled();
+	});
+
+	it('rolls back inbound publication when a forwarding intent write fails, then publishes both on replay', async () => {
+		const test = await incomingPersonalForward();
+		await env.db.prepare(`CREATE TRIGGER forward_intent_test_failure BEFORE INSERT ON mail_forward_task
+			BEGIN SELECT RAISE(ABORT,'injected test intent failure'); END`).run();
+		try {
+			await expect(test.deliver()).rejects.toThrow();
+			const failed = await test.receipt();
+			expect(failed.state).not.toBe('COMPLETE');
+			const visible = await env.db.prepare('SELECT email_id FROM email WHERE receive_claim_key=? AND status=?')
+				.bind(failed.claim_key, emailConst.status.RECEIVE).first();
+			expect(visible).toBeNull();
+		} finally {
+			await env.db.prepare('DROP TRIGGER IF EXISTS forward_intent_test_failure').run();
+		}
+		await test.deliver();
+		const recovered = await test.receipt();
+		expect(recovered.state).toBe('COMPLETE');
+		expect((await test.tasks(recovered.email_id)).results).toHaveLength(1);
+		expect(test.send).not.toHaveBeenCalled();
+		expect(test.nativeForward).not.toHaveBeenCalled();
+	});
+
+	it('keeps the incoming message without creating an intent when deployment forwarding is disabled', async () => {
+		const test = await incomingPersonalForward(false);
+		await test.deliver();
+		const receipt = await test.receipt();
+		expect(receipt.state).toBe('COMPLETE');
+		expect((await test.tasks(receipt.email_id)).results).toHaveLength(0);
+		expect(test.send).not.toHaveBeenCalled();
+		expect(test.nativeForward).not.toHaveBeenCalled();
 	});
 
 	it('persists one forwarding task per target and resends the original attachment bytes', async () => {

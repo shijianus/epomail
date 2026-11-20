@@ -15,6 +15,8 @@ export async function ensureMailReliabilitySchema(c) {
 		raw_object_key TEXT NOT NULL,
 		raw_expires_at INTEGER NOT NULL,
 		cleanup_retry_at INTEGER NOT NULL DEFAULT 0,
+		cleanup_attempts INTEGER NOT NULL DEFAULT 0,
+		cleanup_review_at INTEGER NOT NULL DEFAULT 0,
 		generation INTEGER NOT NULL DEFAULT 0,
 		account_id INTEGER NOT NULL DEFAULT 0,
 		user_id INTEGER NOT NULL DEFAULT 0,
@@ -36,15 +38,25 @@ export async function ensureMailReliabilitySchema(c) {
 	if (!(claims.results || []).some(column => column.name === 'content_sha256')) {
 		await db.prepare(`ALTER TABLE mail_receive_claim ADD COLUMN content_sha256 TEXT`).run();
 	}
-	for (const column of ['cleanup_retry_at', 'generation']) {
+	for (const column of ['cleanup_retry_at', 'cleanup_review_at', 'generation']) {
 		if (!(claims.results || []).some(existing => existing.name === column)) {
 			await db.prepare(`ALTER TABLE mail_receive_claim ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`).run();
 		}
 	}
+	if (!(claims.results || []).some(column => column.name === 'cleanup_attempts')) {
+		await db.batch([
+			db.prepare('ALTER TABLE mail_receive_claim ADD COLUMN cleanup_attempts INTEGER NOT NULL DEFAULT 0'),
+			db.prepare(`UPDATE mail_receive_claim SET cleanup_attempts = 1 WHERE raw_object_key <> ''
+				AND cleanup_retry_at > 0 AND last_error = 'raw_cleanup_failed'`)
+		]);
+	}
 	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_lease ON mail_receive_claim(state, lease_until)`).run();
 	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_expiry ON mail_receive_claim(raw_expires_at)`).run();
-	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_cleanup
-		ON mail_receive_claim(MAX(raw_expires_at, cleanup_retry_at)) WHERE raw_object_key <> ''`).run();
+	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_cleanup_due
+		ON mail_receive_claim(MAX(raw_expires_at, cleanup_retry_at)) WHERE raw_object_key <> '' AND cleanup_review_at = 0`).run();
+	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_cleanup_failures
+		ON mail_receive_claim(cleanup_review_at) WHERE raw_object_key <> '' AND cleanup_attempts > 0`).run();
+	await db.prepare(`DROP INDEX IF EXISTS idx_mail_receive_claim_cleanup`).run();
 	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_message
 		ON mail_receive_claim(recipient, message_id, generation)`).run();
 	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_receive_claim_content

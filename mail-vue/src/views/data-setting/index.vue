@@ -628,6 +628,9 @@
         </div>
 
         <div class="dialog-field">
+          <el-checkbox v-model="tgForm.enabled">{{ $t('enable') }} · {{ $t('tgPushNotification') }}</el-checkbox>
+        </div>
+        <div class="dialog-field">
           <span class="d-label">{{ $t('tgBotToken') || 'Bot Token' }} <span style="color: var(--el-color-danger)">*</span></span>
           <el-input 
             v-model="tgForm.botToken" 
@@ -675,7 +678,8 @@
           <el-button 
             type="info" 
             plain 
-            :loading="testingTg" 
+            :loading="testingTg"
+            :disabled="!canTestPersonalTelegram"
             @click="handleTestTelegram"
             style="border-radius: 8px;"
           >
@@ -1124,6 +1128,13 @@ const tgForm = reactive({
   mode: 'all',
   notifyCodeOnly: false,
   includePreview: false
+})
+
+const canTestPersonalTelegram = computed(() => {
+  const saved = userStore.user?.personalTelegram
+  return saved?.enabled === true && tgForm.enabled && tgForm.botTokenConfigured && !tgForm.botToken.trim()
+    && String(tgForm.chatId).trim() === String(saved.chatId)
+    && String(tgForm.topicId || '').trim() === String(saved.topicId || '')
 })
 
 // 3. Forwarding Settings States & Mode Bindings
@@ -1654,19 +1665,11 @@ async function saveTgSettings(showToast = true) {
 }
 
 async function handleTestTelegram() {
-  if ((!tgForm.botToken && !tgForm.botTokenConfigured) || !tgForm.chatId) {
-    ElMessage({
-      message: t('fillTgBotTokenChatId'),
-      type: 'warning',
-      plain: true
-    })
-    return
-  }
+  if (!canTestPersonalTelegram.value) return
 
   testingTg.value = true
   try {
     await testTelegramBot({
-      botToken: tgForm.botToken,
       chatId: tgForm.chatId,
       topicId: tgForm.topicId
     })

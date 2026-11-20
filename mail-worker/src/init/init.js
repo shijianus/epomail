@@ -10,6 +10,7 @@ import { ensureNoticeDeliverySchema } from '../utils/notice-delivery-schema.js';
 import { ensureAuthSecurityOperationSchema } from '../utils/auth-security-operation.js';
 import { ensureUserSessionTable } from '../utils/session-auth-store.js';
 import { ensureSessionRevocationSchema } from '../utils/session-revocation.js';
+import { ensureStorageProbeHistory } from '../utils/storage-probe-history.js';
 
 function timingSafeEqual(a, b) {
 	if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
@@ -125,12 +126,17 @@ const dbInit = {
 		await this.v3_26DB(c);
 		await this.v3_27DB(c);
 		await this.v3_28DB(c);
+		await this.v3_29DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
 			return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
 		}
 		return c.text('success');
+	},
+
+	async v3_29DB(c) {
+		await ensureStorageProbeHistory(c);
 	},
 
 	async v3_28DB(c) {
@@ -2278,6 +2284,7 @@ const dbInit = {
 		await ensureAuthSecurityOperationSchema(c);
 		await ensureUserSessionTable(userDb);
 		await ensureSessionRevocationSchema(c);
+		await ensureStorageProbeHistory(c);
 	},
 
 	async receiveEmailToRecipient(c) {

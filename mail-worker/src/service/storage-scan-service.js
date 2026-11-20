@@ -1,5 +1,6 @@
 import { getUserDb, getMailDb, isDualDbMode } from '../utils/db-accessor';
 import settingService from './setting-service';
+import { recordStorageProbeHistory } from '../utils/storage-probe-history.js';
 import s3Service from './s3-service';
 import r2Service from './r2-service';
 import user from '../entity/user';
@@ -13,6 +14,8 @@ const storageScanService = {
 	 */
 	async scan(c) {
 		const startTime = Date.now();
+		const scannedAt = new Date(startTime).toISOString();
+		const successfulAt = {};
 		let setting = null;
 		try {
 			setting = await settingService.query(c);
@@ -21,6 +24,7 @@ const storageScanService = {
 		}
 		const settingsKnown = setting !== null && typeof setting === 'object' && !Array.isArray(setting);
 		if (!settingsKnown) setting = {};
+		else successfulAt.settings = new Date().toISOString();
 
 		// 1. Real KV Storage Scan
 		let kvBound = !!c.env?.kv;
@@ -73,6 +77,7 @@ const storageScanService = {
 					if (!cursor) break;
 				}
 				kvScanOk = complete;
+				if (complete) successfulAt.kv = new Date().toISOString();
 			} catch (kvErr) {
 				console.warn('KV scan error:', kvErr.message);
 			}
@@ -107,6 +112,7 @@ const storageScanService = {
 			if (row && ['totalAttachments', 'totalBytes', 'distinctKeys', 'imageCount', 'pdfCount', 'mediaCount', 'otherCount']
 				.every(field => isCount(row[field]))) {
 				d1ScanOk = true;
+				successfulAt.d1 = new Date().toISOString();
 				d1Stats.totalAttachments = Number(row.totalAttachments || 0);
 				d1Stats.totalBytes = Number(row.totalBytes || 0);
 				d1Stats.totalMb = parseFloat((d1Stats.totalBytes / (1024 * 1024)).toFixed(2));
@@ -127,7 +133,10 @@ const storageScanService = {
 			const userRow = await userDb.prepare(`
 				SELECT COUNT(*) as count FROM user WHERE byo_storage_enabled = 1
 			`).first();
-			if (isCount(userRow?.count)) byoUsersCount = userRow.count;
+			if (isCount(userRow?.count)) {
+				byoUsersCount = userRow.count;
+				successfulAt.byo = new Date().toISOString();
+			}
 		} catch (uErr) {}
 
 		const s3Selected = Boolean(setting.bucket && setting.endpoint && setting.s3AccessKey && setting.s3SecretKey);
@@ -149,6 +158,7 @@ const storageScanService = {
 		};
 		try {
 			if (canListObjects) orphanStats = await this.scanOrphans(c, { maxObjects: 2000 });
+			if (orphanStats.status === 'ok') successfulAt.orphans = new Date().toISOString();
 		} catch (orphanErr) {
 			orphanStats.error = orphanErr.message;
 		}
@@ -173,6 +183,20 @@ const storageScanService = {
 			}
 		} catch (_) {}
 
+		let inboundRawCleanup = { status: 'unknown', retrying: null, manualReview: null, oldestReviewAt: null };
+		try {
+			const row = await getMailDb(c).prepare(`SELECT
+				COUNT(*) FILTER (WHERE cleanup_review_at = 0) AS retrying,
+				COUNT(*) FILTER (WHERE cleanup_review_at > 0) AS manualReview,
+				MIN(NULLIF(cleanup_review_at, 0)) AS oldestReviewAt
+				FROM mail_receive_claim WHERE raw_object_key <> '' AND cleanup_attempts > 0`).first();
+			if (isCount(row?.retrying) && isCount(row?.manualReview)) {
+				successfulAt.inboundRawCleanup = new Date().toISOString();
+				inboundRawCleanup = { status: 'ok', retrying: row.retrying, manualReview: row.manualReview,
+					oldestReviewAt: row.oldestReviewAt === null ? null : new Date(row.oldestReviewAt * 1000).toISOString() };
+			}
+		} catch (_) {}
+
 		// 4. Object Storage Reachability & Health Probe
 		let activeEngine = null, resolvedType = null;
 		if (settingsKnown) {
@@ -181,6 +205,7 @@ const storageScanService = {
 				if (resolved?.type && (resolved.type !== 'KV' || kvBound)) {
 					activeEngine = await r2Service.storageType(c);
 					resolvedType = resolved.type;
+					successfulAt.engine = new Date().toISOString();
 				}
 			} catch (error) {
 				console.warn('Storage engine unavailable:', error.message);
@@ -229,6 +254,17 @@ const storageScanService = {
 			}
 		}
 
+		if (s3Status.ok === true) successfulAt.s3 = s3Status.checkedAt;
+		if (deletionQueue.status === 'ok') successfulAt.deletionQueue = deletionQueue.checkedAt;
+		const history = await recordStorageProbeHistory(c, successfulAt);
+		const probeStatus = {
+			kv: kvScanOk ? 'ok' : 'unknown', d1: d1ScanOk ? 'ok' : 'unknown',
+			byo: byoUsersCount !== null ? 'ok' : 'unknown', orphans: orphanStats.status,
+			deletionQueue: deletionQueue.status, inboundRawCleanup: inboundRawCleanup.status, s3: s3Status.status,
+			engine: activeEngine ? 'ok' : 'unknown', settings: settingsKnown ? 'ok' : 'unknown'
+		};
+		const probes = Object.fromEntries(Object.entries(probeStatus).map(([probe, status]) =>
+			[probe, { status, lastSuccessAt: history.history[probe] }]));
 		const r2Bound = !!c.env?.r2;
 		const checkedAt = new Date().toISOString();
 		const scanDurationMs = Date.now() - startTime;
@@ -251,14 +287,16 @@ const storageScanService = {
 		if (!kvScanOk) healthScore -= 20;
 		if (!d1ScanOk) healthScore -= 25;
 		if (deletionQueue.status !== 'ok' || deletionQueue.failed > 0) healthScore -= 25;
+		if (inboundRawCleanup.status !== 'ok' || inboundRawCleanup.manualReview > 0) healthScore -= 10;
 		if (!activeEngine || byoUsersCount === null || orphanStats.status !== 'ok') healthScore -= 10;
-		const measured = kvScanOk || d1ScanOk || deletionQueue.status === 'ok' || s3Status.ok !== null || byoUsersCount !== null;
+		const measured = kvScanOk || d1ScanOk || deletionQueue.status === 'ok' || inboundRawCleanup.status === 'ok' ||
+			s3Status.ok !== null || byoUsersCount !== null;
 		const scanStatus = !measured ? 'unknown' : healthScore === 100 ? 'ok' : 'partial';
 
 		return {
 			ok: healthScore === 100,
 			status: scanStatus,
-			checkedAt,
+			scannedAt, checkedAt, probes, historyAvailable: history.available,
 			scanDurationMs,
 			healthScore: measured ? Math.max(0, healthScore) : null,
 			kv: {
@@ -285,6 +323,7 @@ const storageScanService = {
 			},
 			orphans: orphanStats,
 			deletionQueue,
+			inboundRawCleanup,
 			db: {
 				isDual: isDualDbMode(c),
 				userDbName: (c.env?.USER_DB || c.env?.user_db) ? 'USER_DB' : 'db (Primary D1)',

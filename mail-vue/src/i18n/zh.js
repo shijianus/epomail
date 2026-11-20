@@ -1290,6 +1290,35 @@ totpModeAllDesc: '设置是否允许用户使用TOTP，开启后用户可以且�
     storageScanDesc: '实时扫描 Cloudflare KV 键值分布、D1 附件关系型数据表、对象存储节点连通性及附件健康度。',
     storageScanRunning: '正在执行 KV 深度遍历与 D1 存储分析...',
     storageScanSuccess: '存储与KV深度扫描完成',
+    storageProbeHistory: {
+        "title": "存储探测记录",
+        "scanned": "本次扫描开始时间",
+        "unavailable": "历史记录库暂时不可用，本标签页可能保留了先前的记录。",
+        "dependency": "依赖项",
+        "current": "当前探测结果",
+        "last": "最近一次成功探测",
+        "none": "暂无成功记录",
+        "queue": "待删除 {pending} · 失败 {failed}",
+        "raw": "重试中 {retrying} · 待人工处理 {review}",
+        "status": {
+            "ok": "已测量",
+            "unknown": "未知",
+            "partial": "部分完成",
+            "error": "失败",
+            "not_configured": "未配置"
+        },
+        "names": {
+            "kv": "KV 键统计",
+            "d1": "D1 附件统计",
+            "byo": "用户自带存储设置",
+            "orphans": "孤立对象扫描",
+            "deletionQueue": "对象删除队列",
+            "inboundRawCleanup": "入站原始邮件清理",
+            "s3": "S3 连接",
+            "engine": "存储引擎",
+            "settings": "存储设置"
+        }
+    },
     storageHealthScore: '存储健康指数',
     storageHealthHealthy: '极佳 (100% 正常)',
     storageHealthWarn: '需关注 (检测到未就绪项)',

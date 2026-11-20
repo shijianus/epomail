@@ -1290,6 +1290,35 @@ totpModeAllDesc: '設定是否允許使用者使用TOTP，開啟後使用者可�
     storageScanDesc: '即時掃描 Cloudflare KV 鍵值分佈、D1 附件關係型資料表、物件儲存節點連通性及附件健康度。',
     storageScanRunning: '正在執行 KV 深度遍歷與 D1 儲存分析...',
     storageScanSuccess: '儲存與KV深度掃描完成',
+    storageProbeHistory: {
+        "title": "儲存探測記錄",
+        "scanned": "本次掃描開始時間",
+        "unavailable": "歷史記錄庫暫時無法使用，本分頁可能保留了先前的記錄。",
+        "dependency": "相依項目",
+        "current": "目前探測結果",
+        "last": "最近一次成功探測",
+        "none": "尚無成功記錄",
+        "queue": "待刪除 {pending} · 失敗 {failed}",
+        "raw": "重試中 {retrying} · 待人工處理 {review}",
+        "status": {
+            "ok": "已測量",
+            "unknown": "未知",
+            "partial": "部分完成",
+            "error": "失敗",
+            "not_configured": "尚未設定"
+        },
+        "names": {
+            "kv": "KV 鍵統計",
+            "d1": "D1 附件統計",
+            "byo": "使用者自備儲存設定",
+            "orphans": "孤立物件掃描",
+            "deletionQueue": "物件刪除佇列",
+            "inboundRawCleanup": "傳入原始郵件清理",
+            "s3": "S3 連線",
+            "engine": "儲存引擎",
+            "settings": "儲存設定"
+        }
+    },
     storageHealthScore: '儲存健康指數',
     storageHealthHealthy: '極佳 (100% 正常)',
     storageHealthWarn: '需關注 (檢測到未就緒項)',

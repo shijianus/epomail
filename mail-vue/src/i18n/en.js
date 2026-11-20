@@ -1290,6 +1290,35 @@ totpModeAllDesc: 'Configure whether users can use TOTP. When enabled, 2FA is ava
     storageScanDesc: 'Real-time inspection of Cloudflare KV key distribution, D1 attachment tables, cloud storage reachability, and file health.',
     storageScanRunning: 'Performing live KV traversal and D1 storage analysis...',
     storageScanSuccess: 'Deep Storage & KV Scan Completed',
+    storageProbeHistory: {
+        "title": "Storage observations",
+        "scanned": "Scan started",
+        "unavailable": "History store unavailable. This tab may have earlier observations.",
+        "dependency": "Dependency",
+        "current": "Current observation",
+        "last": "Last successful observation",
+        "none": "No recorded success",
+        "queue": "Pending {pending} · Failed {failed}",
+        "raw": "Retrying {retrying} · Manual review {review}",
+        "status": {
+            "ok": "Measured",
+            "unknown": "Unknown",
+            "partial": "Partial",
+            "error": "Failed",
+            "not_configured": "Not configured"
+        },
+        "names": {
+            "kv": "KV inventory",
+            "d1": "D1 attachments",
+            "byo": "User storage settings",
+            "orphans": "Orphan scan",
+            "deletionQueue": "Object deletion queue",
+            "inboundRawCleanup": "Inbound raw cleanup",
+            "s3": "S3 connection",
+            "engine": "Storage engine",
+            "settings": "Storage settings"
+        }
+    },
     storageHealthScore: 'Storage Health Score',
     storageHealthHealthy: 'Excellent (100% Healthy)',
     storageHealthWarn: 'Attention Needed (Items Pending)',

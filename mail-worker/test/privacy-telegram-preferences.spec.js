@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import telegramService from '../src/service/telegram-service.js';
+import userService from '../src/service/user-service.js';
 import { sealPersonalBotToken } from '../src/utils/oauth-secret-crypto.js';
 
 const userId = 57101;
@@ -103,6 +104,47 @@ afterAll(async () => {
 });
 
 describe('personal Telegram notification preferences', () => {
+	it('tests the saved and enabled bot using its stored credential and destination', async () => {
+		const token = '123456:abcdefghijklmnopqrstuvwxyz123456';
+		const botToken = await sealPersonalBotToken(env, userId, token);
+		await setProfile({ ...config, botToken, topicId: '31' });
+		const transport = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+		expect(await telegramService.testPersonalBot(c, { chatId: config.chatId, topicId: '31' }, userId)).toEqual({ success: true });
+		expect(transport).toHaveBeenCalledTimes(1);
+		const [url, options] = transport.mock.calls[0];
+		expect(url).toBe(`https://api.telegram.org/bot${token}/sendMessage`);
+		expect(JSON.parse(options.body)).toMatchObject({ chat_id: config.chatId, message_thread_id: 31 });
+	});
+
+	it('reserves system settings tests for the active deployment administrator', async () => {
+		const admin = 'telegram-admin@example.test';
+		const ctx = { ...c, env: { ...env, admin } };
+		const params = { scope: 'system', botToken: '123456:abcdefghijklmnopqrstuvwxyz123456', chatId: settings.tgChatId };
+		const actor = vi.spyOn(userService, 'selectById').mockResolvedValue({ email: 'user@example.test', isDel: 0, status: 0 });
+		const transport = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+		await setProfile(null);
+		await expect(telegramService.testPersonalBot(ctx, params, userId)).rejects.toMatchObject({ code: 403 });
+		expect(transport).not.toHaveBeenCalled();
+		actor.mockResolvedValue({ email: admin, isDel: 0, status: 0 });
+		await expect(telegramService.testPersonalBot(ctx, params, userId)).resolves.toEqual({ success: true });
+		expect(transport).toHaveBeenCalledTimes(1);
+	});
+
+	it('requires saved consent and its current version for an ordinary test message', async () => {
+		const transport = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+		const test = () => telegramService.testPersonalBot(c, { chatId: config.chatId }, userId);
+		await setProfile(null);
+		await expect(test()).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
+		await setProfile({ ...config, enabled: false });
+		await expect(test()).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
+		await setProfile(config, { telegramShareVersion: 1 });
+		await expect(test()).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
+		await setProfile(config);
+		await env.kv.put('setting:', JSON.stringify({ ...settings, userTgForward: 0 }));
+		await expect(test()).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
+		expect(transport).not.toHaveBeenCalled();
+	});
+
 	it('keeps mode=all minimal by default and never adds sender or recipient', async () => {
 		const calls = await send({ caller: { sendEmail: 'secret@sender.example', name: 'Secret', toEmail: emailAddress } });
 		expect(calls).toHaveLength(1);

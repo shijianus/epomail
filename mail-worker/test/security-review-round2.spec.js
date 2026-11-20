@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS user (
 	status INTEGER NOT NULL DEFAULT 0,
 	is_del INTEGER NOT NULL DEFAULT 0,
 	auth_version INTEGER NOT NULL DEFAULT 0,
+	telegram_share_version INTEGER NOT NULL DEFAULT 0,
+	deletion_requested_at TEXT DEFAULT '', deletion_status TEXT DEFAULT '',
 	byo_storage_enabled INTEGER NOT NULL DEFAULT 0,
 	byo_storage_config TEXT NOT NULL DEFAULT '{}'
 )`;
@@ -595,9 +597,8 @@ describe('Telegram test endpoint binding', () => {
 		await env.kv.put('USER_PROFILE_' + userId, JSON.stringify({
 			personalTelegram: { enabled: true, botToken: savedToken, chatId: '12345' }
 		}));
-		const userSpy = vi.spyOn(userService, 'selectById').mockResolvedValue({
-			userId, email: 'telegram-review@example.com', status: 0, isDel: 0
-		});
+		await env.db.prepare('INSERT INTO user (user_id, email) VALUES (?, ?)').bind(userId, 'telegram-review@example.com').run();
+		const settingsSpy = vi.spyOn(settingService, 'query').mockResolvedValue({ userTgForward: 1 });
 		try {
 			const { default: telegramService } = await import('../src/service/telegram-service.js');
 			await expect(telegramService.testPersonalBot({ env }, {
@@ -605,7 +606,8 @@ describe('Telegram test endpoint binding', () => {
 				chatId: '12345'
 			}, userId)).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
 		} finally {
-			userSpy.mockRestore();
+			settingsSpy.mockRestore();
+			await env.db.prepare('DELETE FROM user WHERE user_id = ?').bind(userId).run();
 			await env.kv.delete('USER_PROFILE_' + userId);
 		}
 	});

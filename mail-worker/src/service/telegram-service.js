@@ -7,8 +7,8 @@ import domainUtils from '../utils/domain-uitls';
 import emailCryptoUtils from '../utils/email-crypto-utils';
 import BizError from '../error/biz-error.js';
 import { getMailDb } from '../utils/db-accessor.js';
-import { authorizeTelegramRead, issueTelegramReadToken } from './telegram-share-service.js';
-import { revokeTelegramLinks } from './privacy-revocation-service.js';
+import { authorizeTelegramRead, getConsentedPersonalTelegram, issueTelegramReadToken } from './telegram-share-service.js';
+import { isActiveUser, readPrivacyState, revokeTelegramLinks } from './privacy-revocation-service.js';
 import { escapeHtml } from '../utils/safe-email-html.js';
 import { t } from '../i18n/i18n.js';
 import r2Service from './r2-service.js';
@@ -135,44 +135,51 @@ const telegramService = {
 
 	},
 
-	async testPersonalBot(c, params, userId = null) {
-		const { chatId, topicId } = params;
+	async testPersonalBot(c, params, userId) {
+		if (!userId) throw new BizError(t('authExpired'), 401);
+		let { chatId, topicId } = params;
 		let botToken = typeof params.botToken === 'string' ? params.botToken.trim() : '';
 		await rateLimit.check(c, {
 			scope: 'telegram-test',
 			limit: 10,
 			windowSeconds: 900,
-			subject: `user:${userId || 'anonymous'}`
+			subject: `user:${userId}`
 		});
 
-		// A logged-in non-admin may only probe the personal bot they already
-		// saved. Otherwise this endpoint is a generic Telegram send proxy for any
-		// valid bot token. Administrators keep the system-bot test path.
-		if (userId) {
+		const systemTest = params.scope === 'system';
+		if (systemTest) {
 			const [{ default: userService }, { isAdminUser }] = await Promise.all([
 				import('./user-service.js'), import('../utils/admin-utils.js')
 			]);
 			const actor = await userService.selectById(c, userId);
-			if (!actor) throw new BizError(t('authExpired'), 401);
-			if (!botToken || !isAdminUser(c, actor)) {
-				const saved = (await c.env.kv.get('USER_PROFILE_' + userId, { type: 'json' }))?.personalTelegram;
-				const savedToken = await openPersonalBotToken(c.env, userId, saved?.botToken);
-				if (savedToken) {
-					if ((botToken && botToken !== savedToken) || String(saved.chatId) !== String(chatId).trim()
-						|| String(saved.topicId || '') !== String(topicId || '')) {
-						throw new BizError('请先保存新的 Telegram 配置后再测试', 400, 'telegram_config_mismatch');
-					}
-					botToken = savedToken;
-				}
+			if (!isActiveUser(actor) || !isAdminUser(c, actor)) throw new BizError(t('unauthorized'), 403);
+			if (Number((await settingService.query(c)).allMailMode) === 2) {
+				throw new BizError('Encrypted mail mode disables system Telegram', 403);
 			}
+		} else {
+			const owner = await readPrivacyState(c, userId);
+			if (!isActiveUser(owner)) throw new BizError(t('authExpired'), 401);
+			const saved = await getConsentedPersonalTelegram(c, owner, await settingService.query(c));
+			if (!saved || String(saved.chatId) !== String(chatId || '').trim()
+				|| String(saved.topicId || '') !== String(topicId || '').trim()) {
+				throw new BizError('请先保存并启用个人 Telegram 配置后再测试', 400, 'telegram_config_mismatch');
+			}
+			const savedToken = await openPersonalBotToken(c.env, userId, saved.botToken);
+			if (botToken && botToken !== savedToken) {
+				throw new BizError('请先保存新的 Telegram 配置后再测试', 400, 'telegram_config_mismatch');
+			}
+			botToken = savedToken;
+			chatId = saved.chatId;
+			topicId = saved.topicId;
 		}
 		if (!botToken || !chatId) throw new BizError('Bot Token 和 Chat ID 不能为空');
 		if (!/^\d{5,20}:[A-Za-z0-9_-]{20,100}$/.test(botToken)) throw new BizError('Bot Token 格式无效');
 
+		const channel = systemTest ? '系统' : '个人';
 		const body = {
 			chat_id: chatId,
 			parse_mode: 'HTML',
-			text: `🚀 <b>EpoCanvas Mail 个人通知测试</b>\n\n您的个人 Telegram 机器人已成功接入！\n\n⏱️ <b>测试时间</b>: <code>${new Date().toISOString()}</code>\n👤 <b>状态</b>: 验证通过 ✅\n📌 <b>通道</b>: 个人专属通知通道已就绪`
+			text: `🚀 <b>EpoCanvas Mail ${channel}通知测试</b>\n\nTelegram ${channel}通知通道已连接。\n\n⏱️ <b>测试时间</b>: ${new Date().toISOString()}`
 		};
 
 		if (topicId && !isNaN(Number(topicId))) {

@@ -1290,6 +1290,35 @@ totpModeAllDesc: 'Configurar si los usuarios pueden usar TOTP. Al activarlo, la 
     storageScanDesc: "Inspecciona en tiempo real la distribución de claves de Cloudflare KV, las tablas D1 de adjuntos, la accesibilidad del almacenamiento y el estado de los archivos.",
     storageScanRunning: "Recorriendo KV y analizando el almacenamiento D1…",
     storageScanSuccess: "Análisis exhaustivo del almacenamiento y KV completado",
+    storageProbeHistory: {
+        "title": "Observaciones de almacenamiento",
+        "scanned": "Inicio del análisis",
+        "unavailable": "El historial no está disponible. Esta pestaña puede conservar observaciones anteriores.",
+        "dependency": "Dependencia",
+        "current": "Observación actual",
+        "last": "Última observación correcta",
+        "none": "Sin observaciones correctas",
+        "queue": "Pendientes {pending} · Fallidos {failed}",
+        "raw": "Reintentos {retrying} · Revisión manual {review}",
+        "status": {
+            "ok": "Medido",
+            "unknown": "Desconocido",
+            "partial": "Parcial",
+            "error": "Error",
+            "not_configured": "Sin configurar"
+        },
+        "names": {
+            "kv": "Inventario KV",
+            "d1": "Adjuntos D1",
+            "byo": "Almacenamiento de usuarios",
+            "orphans": "Búsqueda de objetos huérfanos",
+            "deletionQueue": "Cola de eliminación de objetos",
+            "inboundRawCleanup": "Limpieza de correo entrante sin procesar",
+            "s3": "Conexión S3",
+            "engine": "Motor de almacenamiento",
+            "settings": "Configuración de almacenamiento"
+        }
+    },
     storageHealthScore: "Puntuación del estado de almacenamiento",
     storageHealthHealthy: "Excelente (100 % operativo)",
     storageHealthWarn: "Requiere atención (elementos pendientes)",

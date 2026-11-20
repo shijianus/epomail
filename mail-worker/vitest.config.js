@@ -77,6 +77,7 @@ export default defineWorkersConfig({
 						totp_enc_key: 'test-totp-encryption-key-for-unit-tests',
 							resend_webhook_secret: ['whsec_', 'test_only_not_a_real_secret'].join(''),
 							ENVIRONMENT: 'test',
+							TEST_RETRY_REVIEWED_RAW_SQL: readFileSync(path.join(workerDir, '../doc/release/retry-reviewed-inbound-raw.sql'), 'utf8'),
 							EMAIL_OUTBOUND_ENABLED: 'false',
 							OUTBOUND_WHITELIST_ENFORCE: 'true',
 							OUTBOUND_WHITELIST: ''

@@ -1290,6 +1290,35 @@ totpModeAllDesc: 'Définir si les utilisateurs peuvent utiliser TOTP. Lorsqu\'il
     storageScanDesc: "Examinez en temps réel la répartition des clés Cloudflare KV, les tables D1 de pièces jointes, l’accessibilité du stockage cloud et l’état des fichiers.",
     storageScanRunning: "Parcours de KV et analyse du stockage D1 en cours…",
     storageScanSuccess: "Analyse approfondie du stockage et de KV terminée",
+    storageProbeHistory: {
+        "title": "Observations du stockage",
+        "scanned": "Début de l’analyse",
+        "unavailable": "Historique indisponible. Cet onglet peut conserver des observations antérieures.",
+        "dependency": "Dépendance",
+        "current": "Observation actuelle",
+        "last": "Dernière observation réussie",
+        "none": "Aucun succès enregistré",
+        "queue": "En attente {pending} · En échec {failed}",
+        "raw": "Nouvelles tentatives {retrying} · Examen manuel {review}",
+        "status": {
+            "ok": "Mesuré",
+            "unknown": "Inconnu",
+            "partial": "Partiel",
+            "error": "Échec",
+            "not_configured": "Non configuré"
+        },
+        "names": {
+            "kv": "Inventaire KV",
+            "d1": "Pièces jointes D1",
+            "byo": "Stockage des utilisateurs",
+            "orphans": "Recherche d’objets orphelins",
+            "deletionQueue": "File de suppression des objets",
+            "inboundRawCleanup": "Nettoyage des messages entrants bruts",
+            "s3": "Connexion S3",
+            "engine": "Moteur de stockage",
+            "settings": "Paramètres de stockage"
+        }
+    },
     storageHealthScore: "Indice d’état du stockage",
     storageHealthHealthy: "Excellent (100 % opérationnel)",
     storageHealthWarn: "Intervention nécessaire (éléments en attente)",
