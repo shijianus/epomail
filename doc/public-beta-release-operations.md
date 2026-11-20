@@ -8,7 +8,7 @@
 2. 在候选 checkout 运行本地 D1 迁移测试。它在临时数据库中创建缺少认证列的旧表，运行两次升级，并验证有可靠回执、无可靠回执及账号不匹配的旧邮件。校验 CI 归档摘要和包内 `SOURCE_SHA`。在解包目录对实际 Staging 配置运行 Wrangler 的 `--dry-run`，核对目标绑定。该命令只验证打包配置，数据库升级由下一步执行。
 
    ```sh
-   pnpm --dir mail-worker exec vitest run test/beta-migrations.spec.js
+   pnpm --dir mail-worker exec vitest run test/beta-migrations.spec.js test/send-quota-period.spec.js
    ```
 
    ```sh
@@ -36,6 +36,12 @@
    SELECT name FROM pragma_table_info('storage_probe_history')
    WHERE name IN ('probe', 'last_success_at') ORDER BY name;
    ```
+
+### 发信额度与待对账邮件
+
+在切换流量前暂停旧版本的发信写入和额度清零，保存 USER_DB 恢复点。在隔离副本完成 `v3_31DB`，核对迁移前后的账号计数与未结预留，再开启候选的发信及调度。日额度按 16:00 UTC 换周期；同一周期内重复触发调度应保留已经使用的额度。旧记录只保存 UTC 日期，不能确定归属的失败预留不自动抵减新周期计数，须依据原业务记录核账。回切旧版发信路径前也须暂停写入并核对兼容性。
+
+用受控发件账号验收对账积压，确认旧任务持续查询失败时，后续可确认邮件仍会更新。已知供应商与当前域名凭据类型不一致时保留待核查状态；由原供应商的受限只读记录核对投递结果，避免重复发送。云端验收记录保留任务状态、观测时间及脱敏回执引用。
 
 ## 按功能开放
 
