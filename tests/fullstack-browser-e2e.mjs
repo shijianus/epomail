@@ -171,7 +171,7 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 	await page.unroute('**/api/my/oauthIdentities/bind/complete');
 
 	// The mobile app must authenticate and render real mail, not an error or login shell.
-	const phone = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+	const phone = await browser.newContext({ locale: 'zh-CN', viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
 	const mobile = await phone.newPage();
 	await mobile.goto(`${base}/login/`, { waitUntil: 'domcontentloaded' });
 	await mobile.locator('input[type="email"]').fill('admin@example.com');
@@ -191,6 +191,34 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 	check('inbox has no horizontal overflow at 375px', () => {
 		assert.ok(overflow <= 1, `scrollWidth exceeds viewport by ${overflow}px`);
 	});
+	for (const width of [375, 320, 390]) {
+		await mobile.setViewportSize({ width, height: 812 });
+		await mobile.locator('.mode-tag span').waitFor({ state: 'visible' });
+		const clipped = await mobile.locator('.custom-footer').evaluate(footer => {
+			const box = footer.getBoundingClientRect();
+			const problems = [];
+			for (const selector of ['.mode-tag span', '.audit-status-tag span']) {
+				const label = footer.querySelector(selector);
+				if (!label?.textContent.trim()) {
+					problems.push(selector + ' missing text');
+					continue;
+				}
+				const text = document.createRange();
+				text.selectNodeContents(label);
+				const lines = [...text.getClientRects()];
+				if (!lines.length || lines.some(line => !line.width || !line.height ||
+					line.left < Math.max(0, box.left) - 1 || line.right > Math.min(innerWidth, box.right) + 1 ||
+					line.top < Math.max(0, box.top) - 1 || line.bottom > Math.min(innerHeight, box.bottom) + 1)) {
+					problems.push(selector + ' clipped');
+				}
+			}
+			const compose = document.querySelector('.compose-fab');
+			if (!compose?.getAttribute('aria-label')?.trim()) problems.push('compose button missing accessible name');
+			else if (compose.getBoundingClientRect().bottom > box.top + 1) problems.push('compose overlaps footer');
+			return problems;
+		});
+		check(`privacy and audit labels fit the mobile footer at ${width}px`, () => assert.deepEqual(clipped, []));
+	}
 	await phone.close();
 
 	// 5. Expired session is forced back to the login app.

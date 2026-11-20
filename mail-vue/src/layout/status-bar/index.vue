@@ -6,7 +6,7 @@
       <span class="status-time" v-if="isOnline">{{ syncTimeText }}</span>
       <span class="status-unread" v-if="isOnline && unreadCount > 0"> ({{ unreadCount }} {{ $t('statUnread') }})</span>
     </div>
-    <div style="flex: 1"></div>
+    <div class="status-spacer"></div>
     <el-tooltip effect="dark" :content="currentMailModeConfig.desc" placement="top">
       <div class="mode-tag" :class="currentMailModeConfig.tagClass">
         <Icon :icon="currentMailModeConfig.icon" width="13" height="13" />
@@ -148,6 +148,10 @@ const unreadCount = computed(() => {
   transition: all 0.3s ease;
 }
 
+.status-spacer {
+  flex: 1;
+}
+
 .status-dot.offline {
   background: var(--danger, #f44336);
   box-shadow: 0 0 6px var(--danger, #f44336);
@@ -223,17 +227,31 @@ const unreadCount = computed(() => {
   }
 }
 
-/* 窄屏：隐藏版本号避免与模式徽章重叠，压缩文本 */
 @media (max-width: 767px) {
+  .status-bar {
+    height: auto;
+    min-height: 22px;
+    flex-wrap: wrap;
+    padding: 2px 8px;
+    gap: 2px 8px;
+  }
+
+  .status-spacer,
   .version-tag {
     display: none;
   }
 
   .status-text {
     font-size: 10px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    flex-wrap: wrap;
+  }
+
+  .mode-tag,
+  .audit-status-tag {
+    flex: 0 0 auto;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    margin: 0;
   }
 }
 </style>
