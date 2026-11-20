@@ -4,6 +4,15 @@ function isReleaseBranch(branch) {
   return branch === 'main' || branch === 'master' || Boolean(branch?.startsWith('release/'));
 }
 
+function requireProtectedReleaseBranch(ref, protection) {
+  const prefix = 'refs/heads/';
+  const branch = typeof ref === 'string' && ref.startsWith(prefix) ? ref.slice(prefix.length) : '';
+  if (!isReleaseBranch(branch) || protection !== 'true') {
+    throw new Error('Dispatch from a protected master, main or release/* branch. GitHub must report GITHUB_REF_PROTECTED=true for this run.');
+  }
+  return branch;
+}
+
 function gitleaksPushRange(branch, before, after) {
   if (!/^[0-9a-f]{40}$/.test(after)) throw new Error('Invalid pushed commit');
   if (!before || /^0{40}$/.test(before) || isReleaseBranch(branch)) return '--all';
@@ -34,6 +43,19 @@ async function requireSuccessfulRun(github, repo, workflow, sha, event, branch) 
   return current;
 }
 
+async function requirePromotionBuild(github, repo, sha, branch, expectedQuality) {
+  if (!isReleaseBranch(branch)) throw new Error('Promotion requires a specific release branch');
+  const checks = ['quality-gates.yml', 'security.yml', 'secret-scanning.yml'];
+  const [quality] = await Promise.all(checks.map(workflow =>
+    requireSuccessfulRun(github, repo, workflow, sha, 'push', branch)
+  ));
+  if (expectedQuality && (String(quality.id) !== expectedQuality.id ||
+    String(quality.run_attempt) !== expectedQuality.attempt)) {
+    throw new Error('The reviewed Quality Gates run or attempt changed. Start a new promotion for the current build.');
+  }
+  return quality;
+}
+
 function requireIndependentApproval(reviews, environment, actors) {
   const requesters = new Set(actors.filter(Boolean).map(actor => actor.toLowerCase()));
   const approval = reviews.find(review => review.state === 'approved' &&
@@ -43,4 +65,32 @@ function requireIndependentApproval(reviews, environment, actors) {
   return approval.user.login;
 }
 
-module.exports = { isReleaseBranch, gitleaksPushRange, releaseKind, requireSuccessfulRun, requireIndependentApproval };
+async function requireTagReleaseChecks(github, repo, sha, kind, expected) {
+  const sourceOnly = kind === 'source-rc';
+  const workflow = sourceOnly ? 'quality-gates.yml' : 'public-beta-promotion.yml';
+  const event = sourceOnly ? 'push' : 'workflow_dispatch';
+  const selected = await requireSuccessfulRun(github, repo, workflow, sha, event);
+  const pin = { id: String(selected.id), attempt: String(selected.run_attempt) };
+  if (expected && (pin.id !== expected.id || pin.attempt !== expected.attempt)) {
+    throw new Error(`${workflow} run or attempt changed during tag publication`);
+  }
+  await requirePromotionBuild(github, repo, sha, selected.head_branch, sourceOnly ? pin : undefined);
+  return selected;
+}
+
+async function requireTagCommit(github, repo, tag, sha) {
+  const { data: ref } = await github.rest.git.getRef({ ...repo, ref: `tags/${tag}` });
+  let target = ref.object;
+  while (target.type === 'tag') {
+    const { data } = await github.rest.git.getTag({ ...repo, tag_sha: target.sha });
+    target = data.object;
+  }
+  if (target.type !== 'commit' || target.sha !== sha) {
+    throw new Error(`The remote tag ${tag} no longer points to the verified commit ${sha}`);
+  }
+}
+
+module.exports = {
+  isReleaseBranch, requireProtectedReleaseBranch, gitleaksPushRange, releaseKind, requireSuccessfulRun,
+  requirePromotionBuild, requireIndependentApproval, requireTagReleaseChecks, requireTagCommit
+};

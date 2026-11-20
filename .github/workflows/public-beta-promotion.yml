@@ -21,25 +21,24 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       quality-run: ${{ steps.ci.outputs.run }}
+      quality-attempt: ${{ steps.ci.outputs.attempt }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - name: Locate the successful push build for this release branch and SHA
+      - name: Verify all three push checks and pin the Quality Gates build
         id: ci
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
-            const { isReleaseBranch, requireSuccessfulRun } = require('./scripts/lib/release-workflows.cjs');
-            const branch = context.ref.replace(/^refs\/heads\//, '');
-            if (!context.ref.startsWith('refs/heads/') || !isReleaseBranch(branch)) {
-              throw new Error('Dispatch on master, main or a protected release/* branch');
-            }
+            const { requireProtectedReleaseBranch, requirePromotionBuild } = require('./scripts/lib/release-workflows.cjs');
+            const branch = requireProtectedReleaseBranch(context.ref, process.env.GITHUB_REF_PROTECTED);
             if (context.payload.inputs?.candidate_sha !== context.sha || !/^[a-f0-9]{64}$/.test(context.payload.inputs?.evidence_sha256 ?? '')) {
               throw new Error('Dispatch inputs must pin this branch SHA and the reviewed evidence digest');
             }
-            const result = await requireSuccessfulRun(github, context.repo, 'quality-gates.yml', context.sha, 'push', branch);
+            const result = await requirePromotionBuild(github, context.repo, context.sha, branch);
             core.setOutput('run', String(result.id));
+            core.setOutput('attempt', String(result.run_attempt));
             core.info(result.html_url);
 
   verify:
@@ -76,12 +75,15 @@ jobs:
           EVIDENCE_SHA256: ${{ inputs.evidence_sha256 }}
           EPOMAIL_PUBLIC_BETA_EVIDENCE: ${{ secrets.EPOMAIL_PUBLIC_BETA_EVIDENCE }}
           EPOMAIL_TRUSTED_STAGING_ORIGIN: ${{ vars.EPOMAIL_TRUSTED_STAGING_ORIGIN }}
+          EPOMAIL_STAGING_ACCOUNT_ID: ${{ vars.EPOMAIL_STAGING_ACCOUNT_ID }}
+          EPOMAIL_STAGING_DEPLOYMENTS_TOKEN: ${{ secrets.EPOMAIL_STAGING_DEPLOYMENTS_TOKEN }}
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           : "${EPOMAIL_PUBLIC_BETA_EVIDENCE:?Missing reviewed evidence}" "${EPOMAIL_TRUSTED_STAGING_ORIGIN:?Missing trusted staging origin}"
           : "${CF_ACCESS_CLIENT_ID:?Missing staging Access client}" "${CF_ACCESS_CLIENT_SECRET:?Missing staging Access secret}"
+          : "${EPOMAIL_STAGING_ACCOUNT_ID:?Missing staging account ID}" "${EPOMAIL_STAGING_DEPLOYMENTS_TOKEN:?Missing staging deployments read token}"
           package="$RUNNER_TEMP/promotion-package"
           (cd "$package" && sha256sum epomail-candidate.tar.gz | cmp - epomail-candidate.tar.gz.sha256)
           test "$(tar -xOzf "$package/epomail-candidate.tar.gz" ./SOURCE_SHA)" = "$GITHUB_SHA"
@@ -93,6 +95,18 @@ jobs:
           test "$(sha256sum "$evidence" | cut -d' ' -f1)" = "$EVIDENCE_SHA256"
           node scripts/public-beta-gate.mjs --scope mail-public-beta --artifact "$package/epomail-candidate.tar.gz" \
             --evidence "$evidence" --staging-origin "$EPOMAIL_TRUSTED_STAGING_ORIGIN"
+      - name: Recheck push CI against the approved build before publishing
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          QUALITY_RUN: ${{ needs.candidate.outputs.quality-run }}
+          QUALITY_ATTEMPT: ${{ needs.candidate.outputs.quality-attempt }}
+        with:
+          script: |
+            const { requirePromotionBuild } = require('./scripts/lib/release-workflows.cjs');
+            await requirePromotionBuild(github, context.repo, context.sha, process.env.GITHUB_REF_NAME, {
+              id: process.env.QUALITY_RUN,
+              attempt: process.env.QUALITY_ATTEMPT
+            });
       - name: Retain the accepted bytes for tag publication
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { assertSafeBaseUrl } from './lib/oauth-staging.mjs';
+import { assertSafeBaseUrl, DEFAULT_CONFIG, parseToml } from './lib/oauth-staging.mjs';
 import { validateBaseOrigin } from './check-privacy-readiness.mjs';
 
 const REQUIRED = {
@@ -51,6 +51,7 @@ export function createEvidenceTemplate(sha, scope) {
 
 export function evaluateBetaEvidence(evidence, { sha, scope }) {
   const blocking = [];
+  const now = Date.now();
   const require = (condition, id, reason) => {
     if (!condition) blocking.push({ id, reason });
   };
@@ -98,9 +99,10 @@ export function evaluateBetaEvidence(evidence, { sha, scope }) {
       continue;
     }
     require(row.sha === sha && row.environment === environment, id, 'Evidence has a different SHA or environment');
-    require(present(row.owner) && present(row.reviewer) && present(row.reference)
-      && present(row.observedAt) && Number.isFinite(Date.parse(row.observedAt)), id,
-    'Include the owner, reviewer, evidence reference and verification time');
+    require(present(row.owner) && present(row.reviewer) && present(row.reference), id,
+      'Include the owner, reviewer and evidence reference');
+    require(present(row.observedAt) && Date.parse(row.observedAt) <= now, id,
+      'Include a valid verification time no later than the current time');
     if (environment === 'staging') {
       require(present(evidence.stagingVersionId) && row.versionId === evidence.stagingVersionId, id,
         'Evidence does not match the active staging Worker version');
@@ -132,14 +134,48 @@ export async function verifyLiveStaging(evidence, rawOrigin, fetchImpl = fetch, 
     headers['CF-Access-Client-Id'] = access.clientId;
     headers['CF-Access-Client-Secret'] = access.clientSecret;
   }
-  async function get(path) {
-    const response = await fetchImpl(new URL(path, origin), {
-      headers, redirect: 'error', signal: AbortSignal.timeout(8000)
-    });
-    if (!response.ok || !response.headers.get('Content-Type')?.includes('application/json')) {
-      throw new Error('Staging response did not match the expected JSON contract');
+  const wrangler = parseToml(readFileSync(DEFAULT_CONFIG, 'utf8'));
+  const worker = wrangler.env?.staging?.name;
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(worker ?? '') || worker === wrangler.name) {
+    throw new Error('Missing isolated Staging Worker name in the candidate configuration');
+  }
+  if (!/^[0-9a-f]{32}$/.test(access.accountId ?? '') || !present(access.deploymentsToken)) {
+    throw new Error('A Staging Cloudflare account ID and read-only deployments token are required');
+  }
+  const deploymentsUrl = new URL(`https://api.cloudflare.com/client/v4/accounts/${access.accountId}/workers/scripts/${worker}/deployments`);
+  async function readJson(url, requestHeaders, failure) {
+    try {
+      const response = await fetchImpl(url, {
+        method: 'GET', headers: requestHeaders, redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(8000)
+      });
+      const type = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase();
+      if (response.ok && type === 'application/json') return await response.json();
+    } catch {
+      // Network, header and JSON parser errors may contain sensitive input.
     }
-    return response.json();
+    throw new Error(failure);
+  }
+  const get = path => readJson(new URL(path, origin), headers, 'Staging response did not match the expected JSON contract');
+  async function verifyDeployment() {
+    const receipt = await readJson(deploymentsUrl, {
+      Accept: 'application/json', Authorization: `Bearer ${access.deploymentsToken}`
+    }, 'Cloudflare Staging deployment lookup failed');
+    // Cloudflare lists the deployment actively serving traffic first.
+    const deployments = receipt?.result?.deployments;
+    const current = Array.isArray(deployments) && deployments[0];
+    if (receipt?.success !== true || current?.id !== evidence.stagingDeploymentId) {
+      throw new Error('Active Cloudflare Staging Deployment ID differs from the evidence or is unavailable');
+    }
+    const versions = current.versions;
+    const serving = Array.isArray(versions) ? versions.filter(v => v?.percentage !== 0) : [];
+    if (serving.length !== 1 || serving[0]?.version_id !== evidence.stagingVersionId || serving[0].percentage !== 100) {
+      throw new Error('The accepted Staging Worker version must serve 100% of deployment traffic');
+    }
+    const deployedAt = Date.parse(current.created_on);
+    if (!present(current.created_on) || !Number.isFinite(deployedAt) || evidence.gates.some(row =>
+      row.environment === 'staging' && !(Date.parse(row.observedAt) >= deployedAt))) {
+      throw new Error('Staging observations must be recorded on or after the active deployment');
+    }
   }
 
   async function verifyVersion() {
@@ -149,25 +185,33 @@ export async function verifyLiveStaging(evidence, rawOrigin, fetchImpl = fetch, 
     }
   }
 
+  await verifyDeployment();
   await verifyVersion();
   const config = await get('/api/setting/websiteConfig');
   const settings = config?.data;
   if (config?.code !== 200 || !isRecord(settings?.oauthProviders)
-    || ![0, 1].includes(settings.oauthLoginEnabled)) {
+    || ![0, 1].includes(settings.oauthLoginEnabled) || typeof settings.linuxdoSwitch !== 'boolean') {
     throw new Error('Staging public OAuth configuration is unavailable');
   }
   const enabled = new Set();
-  if (settings.oauthLoginEnabled === 1) {
-    for (const [provider, value] of Object.entries(settings.oauthProviders)) {
-      if (value?.enabled === 1 || value?.enabled === true) enabled.add(provider);
+  for (const [provider, value] of Object.entries(settings.oauthProviders)) {
+    if (!isRecord(value) || ![0, 1, false, true].includes(value.enabled)) {
+      throw new Error('Staging OAuth provider has an invalid enabled flag');
+    }
+    if (value.enabled === 1 || value.enabled === true) {
+      if (!settings.oauthLoginEnabled || (provider === 'linuxdo' && !settings.linuxdoSwitch)) {
+        throw new Error('Staging public OAuth provider flags disagree with the login switches');
+      }
+      enabled.add(provider);
     }
   }
-  if (settings.linuxdoSwitch === true) enabled.add('linuxdo');
+  if (settings.oauthLoginEnabled === 1 && settings.linuxdoSwitch) enabled.add('linuxdo');
   if (enabled.size !== evidence.oauthProviders.length
     || evidence.oauthProviders.some(provider => !enabled.has(provider))) {
     throw new Error('Enabled Staging OAuth providers differ from the accepted release scope');
   }
   await verifyVersion();
+  await verifyDeployment();
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -199,7 +243,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
         await verifyLiveStaging(evidence, values['staging-origin'], fetch, {
           trustedOrigin: process.env.EPOMAIL_TRUSTED_STAGING_ORIGIN,
           clientId: process.env.CF_ACCESS_CLIENT_ID,
-          clientSecret: process.env.CF_ACCESS_CLIENT_SECRET
+          clientSecret: process.env.CF_ACCESS_CLIENT_SECRET,
+          accountId: process.env.EPOMAIL_STAGING_ACCOUNT_ID,
+          deploymentsToken: process.env.EPOMAIL_STAGING_DEPLOYMENTS_TOKEN
         });
       } catch (error) {
         result.blocking.push({ id: 'staging', reason: error.message });

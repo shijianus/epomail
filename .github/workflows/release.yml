@@ -12,6 +12,7 @@ permissions:
 jobs:
   release:
     name: Publish verified GitHub Release
+    if: github.event.deleted == false
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout tagged commit
@@ -25,21 +26,16 @@ jobs:
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
-            const { releaseKind, requireSuccessfulRun } = require('./scripts/lib/release-workflows.cjs');
+            const { releaseKind, requireTagReleaseChecks } = require('./scripts/lib/release-workflows.cjs');
             const sha = (await exec.getExecOutput('git', ['rev-parse', 'HEAD'])).stdout.trim();
             const kind = releaseKind(process.env.GITHUB_REF_NAME);
-            let branch;
+            const run = await requireTagReleaseChecks(github, context.repo, sha, kind);
+            core.info(run.html_url);
+            core.setOutput('sha', sha);
+            core.setOutput('run', String(run.id));
+            core.setOutput('attempt', String(run.run_attempt));
             if (kind !== 'source-rc') {
-              const promotion = await requireSuccessfulRun(github, context.repo, 'public-beta-promotion.yml', sha, 'workflow_dispatch');
-              branch = promotion.head_branch;
-              core.setOutput('promotion', String(promotion.id));
-              core.setOutput('package', `public-beta-package-${sha}-${promotion.run_attempt}`);
-              core.info(promotion.html_url);
-            }
-            const required = ['quality-gates.yml', 'security.yml', 'secret-scanning.yml'];
-            for (const workflow_id of required) {
-              const latest = await requireSuccessfulRun(github, context.repo, workflow_id, sha, 'push', branch);
-              core.info(`${workflow_id}: ${latest.html_url}`);
+              core.setOutput('package', `public-beta-package-${sha}-${run.run_attempt}`);
             }
             core.setOutput('kind', kind);
 
@@ -50,7 +46,32 @@ jobs:
           name: ${{ steps.gates.outputs.package }}
           path: ${{ runner.temp }}/release-package
           github-token: ${{ github.token }}
-          run-id: ${{ steps.gates.outputs.promotion }}
+          run-id: ${{ steps.gates.outputs.run }}
+
+      - name: Verify downloaded release bytes and source commit
+        if: steps.gates.outputs.kind != 'source-rc'
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="$RUNNER_TEMP/release-package"
+          (cd "$package" && sha256sum epomail-candidate.tar.gz | cmp - epomail-candidate.tar.gz.sha256)
+          test "$(tar -xOzf "$package/epomail-candidate.tar.gz" ./SOURCE_SHA)" = "$(git rev-parse HEAD)"
+
+      - name: Recheck the selected run, push checks and tag before publication
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          RELEASE_SHA: ${{ steps.gates.outputs.sha }}
+          RELEASE_KIND: ${{ steps.gates.outputs.kind }}
+          SELECTED_RUN: ${{ steps.gates.outputs.run }}
+          SELECTED_ATTEMPT: ${{ steps.gates.outputs.attempt }}
+        with:
+          script: |
+            const { requireTagReleaseChecks, requireTagCommit } = require('./scripts/lib/release-workflows.cjs');
+            const sha = process.env.RELEASE_SHA;
+            await requireTagReleaseChecks(github, context.repo, sha, process.env.RELEASE_KIND, {
+              id: process.env.SELECTED_RUN, attempt: process.env.SELECTED_ATTEMPT
+            });
+            await requireTagCommit(github, context.repo, process.env.GITHUB_REF_NAME, sha);
 
       - name: Create GitHub Release
         env:
@@ -65,8 +86,6 @@ jobs:
               --notes "This release publishes the source candidate for review and testing." --prerelease
           else
             package="$RUNNER_TEMP/release-package"
-            (cd "$package" && sha256sum epomail-candidate.tar.gz | cmp - epomail-candidate.tar.gz.sha256)
-            test "$(tar -xOzf "$package/epomail-candidate.tar.gz" ./SOURCE_SHA)" = "$(git rev-parse HEAD)"
             flag=--prerelease
             if [[ "$RELEASE_KIND" == stable ]]; then flag=--latest; fi
             gh release create "$RELEASE_TAG" --verify-tag --title "EpoMail $RELEASE_TAG" --notes-file RELEASE_NOTES.md "$flag" \
