@@ -5,6 +5,7 @@ import { getUserDb, getMailDb } from '../utils/db-accessor';
 import { getDefaultUserLabelsString } from '../const/default-labels';
 import cryptoUtils from '../utils/crypto-utils';
 import { ensureAiBudgetSchema } from '../utils/ai-budget.js';
+import { ensureSendQuotaPeriods } from '../utils/send-quota-period.js';
 import { ensureMailReliabilitySchema } from '../utils/mail-reliability-schema.js';
 import { ensureNoticeDeliverySchema } from '../utils/notice-delivery-schema.js';
 import { ensureAuthSecurityOperationSchema } from '../utils/auth-security-operation.js';
@@ -128,12 +129,17 @@ const dbInit = {
 		await this.v3_28DB(c);
 		await this.v3_29DB(c);
 		await this.v3_30DB(c);
+		await this.v3_31DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
 			return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
 		}
 		return c.text('success');
+	},
+
+	async v3_31DB(c) {
+		await ensureSendQuotaPeriods(getUserDb(c));
 	},
 
 	async v3_30DB(c) {
@@ -2038,6 +2044,8 @@ const dbInit = {
 				is_del INTEGER DEFAULT 0 NOT NULL,
 				auth_version INTEGER NOT NULL DEFAULT 0,
 				passkey_history INTEGER NOT NULL DEFAULT 0,
+				send_quota_period INTEGER NOT NULL DEFAULT 0,
+				send_quota_generation INTEGER NOT NULL DEFAULT 0,
 				telegram_share_version INTEGER NOT NULL DEFAULT 0,
 				deletion_requested_at TEXT NOT NULL DEFAULT '',
 				deletion_status TEXT NOT NULL DEFAULT '',

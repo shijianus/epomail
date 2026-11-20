@@ -1,3 +1,4 @@
+import { ensureSendQuotaPeriods } from './send-quota-period.js';
 import { getMailDb, getUserDb } from './db-accessor.js';
 
 /** Called only by cold-start/upgrade migrations, never from mail requests. */
@@ -148,9 +149,11 @@ export async function ensureMailReliabilitySchema(c) {
 		user_id INTEGER NOT NULL,
 		quantity INTEGER NOT NULL,
 		quota_day TEXT NOT NULL,
+		quota_generation INTEGER,
 		is_daily INTEGER NOT NULL DEFAULT 0,
 		state TEXT NOT NULL CHECK(state IN ('reserved','released'))
 	)`).run();
+	await ensureSendQuotaPeriods(getUserDb(c));
 	return db;
 }
 

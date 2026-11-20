@@ -1,3 +1,4 @@
+import { advanceDailyQuota } from '../utils/send-quota-period.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import BizError from '../error/biz-error.js';
 import { mailTransactionGuard } from '../utils/mail-transaction.js';
@@ -107,23 +108,27 @@ export async function reserveSendCount(c, { taskId, userId, quantity, maxCount, 
 	if (!Number.isSafeInteger(userId) || userId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 100
 		|| !Number.isSafeInteger(maxCount) || maxCount < 0) throw error('Send quota is unavailable', 'send_quota_unavailable', 503);
 	const db = getUserDb(c);
-	const result = await db.batch([
-		db.prepare(`INSERT INTO mail_send_quota_reservation(task_id,user_id,quantity,quota_day,is_daily,state)
-			SELECT ?,?,?,date('now'),?,'reserved' WHERE EXISTS (
-			SELECT 1 FROM user WHERE user_id=? AND status=0 AND is_del=0 AND (?=0 OR CAST(send_count AS INTEGER)+?<=?))
+	const statements = [
+		db.prepare(`INSERT INTO mail_send_quota_reservation(task_id,user_id,quantity,quota_day,quota_generation,is_daily,state)
+			SELECT ?,user_id,?,date('now'),send_quota_generation,?,'reserved' FROM user
+			WHERE user_id=? AND status=0 AND is_del=0 AND (?=0 OR CAST(send_count AS INTEGER)+?<=?)
 			ON CONFLICT(task_id) DO NOTHING`)
-			.bind(taskId,userId,quantity,daily?1:0,userId,maxCount,quantity,maxCount),
+			.bind(taskId,quantity,daily?1:0,userId,maxCount,quantity,maxCount),
 		db.prepare(`UPDATE user SET send_count=CAST(send_count AS INTEGER)+?
 			WHERE user_id=? AND changes()=1
 			AND EXISTS(SELECT 1 FROM mail_send_quota_reservation WHERE task_id=? AND state='reserved')`).bind(quantity,userId,taskId)
-	]);
-	if (Number(result[0].meta?.changes) !== 1) {
+	];
+	if (daily) statements.unshift(advanceDailyQuota(db, userId));
+	const [inserted] = (await db.batch(statements)).slice(-2);
+	if (Number(inserted.meta?.changes) !== 1) {
 		const raced = await db.prepare('SELECT user_id,quantity,state FROM mail_send_quota_reservation WHERE task_id=?').bind(taskId).first();
 		if (!raced) throw error('Send quota is exhausted', 'send_quota_exceeded', 403);
 		if (raced.user_id !== userId || raced.quantity !== quantity || raced.state === 'released') throw error('Send reservation cannot be reused', 'send_quota_conflict');
 	}
 }
 
+// Older reservations recorded only the UTC date. Refund one against an inherited
+// daily count only if its date already started inside that active business day.
 export async function compensateSendCount(c, { taskId }) {
 	const db = getUserDb(c);
 	await db.batch([
@@ -131,7 +136,9 @@ export async function compensateSendCount(c, { taskId }) {
 			SELECT quantity FROM mail_send_quota_reservation WHERE task_id=?))
 			WHERE user_id=(SELECT user_id FROM mail_send_quota_reservation WHERE task_id=?)
 			AND EXISTS(SELECT 1 FROM mail_send_quota_reservation WHERE task_id=? AND state='reserved'
-			AND (is_daily=0 OR quota_day=date('now')))` ).bind(taskId,taskId,taskId),
+			AND (quota_generation=user.send_quota_generation OR
+				(quota_generation IS NULL AND user.send_quota_generation=0 AND
+					(is_daily=0 OR unixepoch(quota_day) BETWEEN user.send_quota_period AND user.send_quota_period+86399))))`).bind(taskId,taskId,taskId),
 		db.prepare("UPDATE mail_send_quota_reservation SET state='released' WHERE task_id=? AND state='reserved'").bind(taskId)
 	]);
 }

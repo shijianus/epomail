@@ -1,3 +1,4 @@
+import { advanceDailyQuota, sendQuotaPeriodStart } from '../utils/send-quota-period.js';
 import { personalForwardingAvailable, readForwardPolicy, setForwardPolicy } from './forward-consent.js';
 import BizError from '../error/biz-error';
 import accountService from './account-service';
@@ -5,7 +6,7 @@ import { userOrm as orm, mailOrm } from '../entity/orm';
 import user from '../entity/user';
 import account from '../entity/account';
 import { and, asc, count, desc, eq, inArray, lt, sql } from 'drizzle-orm';
-import { emailConst, isDel, roleConst, userConst } from '../const/entity-const';
+import { emailConst, isDel, userConst } from '../const/entity-const';
 import { email } from '../entity/email';
 import { att } from '../entity/att';
 import KvConst from '../const/kv-const';
@@ -1619,13 +1620,12 @@ const userService = {
 	},
 
 	async resetDaySendCount(c) {
-		const roleList = await roleService.selectByIdsAndSendType(c, 'email:send', roleConst.sendType.DAY);
-		const roleIds = roleList.map(action => action.roleId);
-		await orm(c).update(user).set({ sendCount: 0 }).where(inArray(user.type, roleIds)).run();
+		await advanceDailyQuota(getUserDb(c)).run();
 	},
 
 	async resetSendCount(c, params) {
-		await orm(c).update(user).set({ sendCount: 0 }).where(eq(user.userId, params.userId)).run();
+		await getUserDb(c).prepare(`UPDATE user SET send_count=0, send_quota_period=MAX(send_quota_period, ?),
+			send_quota_generation=send_quota_generation+1 WHERE user_id=?`).bind(sendQuotaPeriodStart(), params.userId).run();
 	},
 
 	async restore(c, params, callerUserId) {
