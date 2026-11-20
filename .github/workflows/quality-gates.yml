@@ -242,7 +242,7 @@ jobs:
         run: |
           node scripts/verify-production-readiness.mjs
           node scripts/verify-staging-config.mjs --sandbox-outbound
-          node --test tests/verify-production-readiness.test.mjs tests/verify-staging-config.test.mjs tests/public-beta-gate.test.mjs tests/release-promotion.test.mjs
+          node --test tests/verify-production-readiness.test.mjs tests/verify-staging-config.test.mjs tests/public-beta-gate.test.mjs tests/release-promotion.test.mjs tests/recovery-directory.test.mjs
 
       - name: Package the Worker and static assets
         shell: bash
