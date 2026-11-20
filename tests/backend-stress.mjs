@@ -329,7 +329,6 @@ export function operationMix({ user, accountId, syntheticEmail }) {
 }
 
 async function runPressure(fixture, soakMs, log, profile) {
-  const { user, accountId, syntheticEmail, password } = fixture;
   const mix = operationMix(fixture);
   const safeOperation = async context => {
     const operation = mix[context.requestNumber % mix.length];
@@ -358,19 +357,27 @@ async function runPressure(fixture, soakMs, log, profile) {
     }
   });
 
+  return assessCompletedPressure(pressure, fixture, profile);
+}
+
+export async function assessCompletedPressure(pressure, fixture, profile) {
   const stageNames = pressure.results.map(stage => stage.name);
+  const limited = profile === 'limited-beta';
   const expectedStageNames = limited
     ? ['baseline', 'ramp-1', 'ramp-2', 'ramp-4', 'burst', 'recovery', 'soak']
     : ['baseline', 'ramp-1', 'ramp-4', 'ramp-8', 'ramp-16', 'ramp-32', 'burst', 'recovery', 'soak'];
   assert.deepEqual(stageNames, expectedStageNames, 'all pressure stages must complete in order');
   assert.equal(pressure.stopped, false, 'pressure must not stop early');
+  const sampleFailures = [];
   for (const stage of pressure.results) {
     assert.equal(stage.stageCompleted, true, `stage ${stage.name} did not complete safely`);
     const scheduled = Math.min(stage.maxRequests, Math.max(1, Math.floor(stage.durationMs * stage.ratePerSecond / 1000)));
     const sampleFloor = Math.max(1, Math.floor(scheduled * 0.75));
     stage.sampleFloor = sampleFloor;
     stage.sampleRatio = Number((stage.stats.requests / scheduled).toFixed(3));
-    assert.ok(stage.stats.requests >= sampleFloor, `stage ${stage.name} sample count too low (${stage.stats.requests}/${scheduled}, floor ${sampleFloor})`);
+    if (stage.stats.requests < sampleFloor) {
+      sampleFailures.push(`stage ${stage.name} sample count too low (${stage.stats.requests}/${scheduled}, floor ${sampleFloor})`);
+    }
   }
   const readP95Values = pressure.results.flatMap(stage => Object.entries(stage.byKind)
     .filter(([kind]) => ['list', 'sidebar', 'search', 'account', 'detail'].includes(kind))
@@ -384,7 +391,7 @@ async function runPressure(fixture, soakMs, log, profile) {
     const result = await fixture.client('/api/login', {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({ email: syntheticEmail, password })
+      body: JSON.stringify({ email: fixture.syntheticEmail, password: fixture.password })
     });
     authResults.push(result);
     if (result.status !== 200 || result.code !== 200 || !result.json?.data?.token) {
@@ -403,7 +410,7 @@ async function runPressure(fixture, soakMs, log, profile) {
       status: 'positive-login-bounded-five-requests'
     }
   };
-  return { pressure, slo };
+  return { pressure, slo, sampleFailures };
 }
 
 async function main() {
@@ -452,10 +459,13 @@ async function main() {
         limits: STRESS_LIMITS,
         configuration: { soakMs: args.soakMs, profile: args.profile },
         stages: result.pressure.results,
+        sampleFailures: result.sampleFailures,
         slo: result.slo,
         log,
         cleanup: { processTreeStopped: 'pending', temporaryDirectoryRemoved: 'pending' }
       };
+      // Preserve the measured SLOs and every failed floor in the failure report.
+      if (report.sampleFailures.length) throw new Error(report.sampleFailures.join('; '));
       stackCompleted = true;
     });
     cleanupVerified = true;

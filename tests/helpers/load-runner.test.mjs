@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { assessCompletedPressure } from '../backend-stress.mjs';
 import {
   HARD_LIMITS,
   assessSlo,
@@ -9,6 +10,32 @@ import {
   runStage,
   runStages
 } from './load-runner.mjs';
+
+test('completed under-sampled stages keep their failures and independent latency evidence', async () => {
+  const names = ['baseline', 'ramp-1', 'ramp-2', 'ramp-4', 'burst', 'recovery', 'soak'];
+  const pressure = { stopped: false, results: names.map(name => ({
+    name, stageCompleted: true, durationMs: 1000, ratePerSecond: 4, maxRequests: 4,
+    stats: { requests: name === 'burst' || name === 'ramp-4' ? 2 : 3 },
+    byKind: { list: { latencyMs: { p95: 20 } } }
+  })) };
+  let probes = 0;
+  const fixture = { client: async route => {
+    assert.equal(route, '/api/login');
+    probes++;
+    return { status: 200, code: 200, latencyMs: 12, json: { data: { token: 'fixture' } } };
+  } };
+  const result = await assessCompletedPressure(pressure, fixture, 'limited-beta');
+  assert.deepEqual(result.sampleFailures, [
+    'stage ramp-4 sample count too low (2/4, floor 3)', 'stage burst sample count too low (2/4, floor 3)'
+  ]);
+  assert.ok(pressure.results.every(stage => stage.sampleFloor === 3));
+  assert.equal(probes, 5);
+  assert.equal(result.slo.readP95.pass, true);
+  assert.equal(result.slo.auth.pass, true);
+  pressure.stopped = true;
+  await assert.rejects(assessCompletedPressure(pressure, fixture, 'limited-beta'), /must not stop early/);
+  assert.equal(probes, 5);
+});
 
 test('assertLoopbackBase accepts only generated 127.0.0.1 origins', () => {
   assert.equal(assertLoopbackBase('http://127.0.0.1:43127'), 'http://127.0.0.1:43127');
