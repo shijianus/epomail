@@ -10,6 +10,7 @@ import userService from '../src/service/user-service.js';
 import roleService from '../src/service/role-service.js';
 import r2Service from '../src/service/r2-service.js';
 import attService from '../src/service/att-service.js';
+import telegramService from '../src/service/telegram-service.js';
 
 const DOMAIN = 'local-delivery.test.invalid';
 const c = { env: { ...env, orm_log: false, admin: `admin@${DOMAIN}`, email_enc_key: 'local-delivery-test-only-encryption-key' } };
@@ -61,6 +62,7 @@ beforeAll(async () => {
 	)`).run();
 	await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_receive_claim
 		ON email(receive_claim_key) WHERE receive_claim_key IS NOT NULL`).run();
+	await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_account_email_nocase ON account(email COLLATE NOCASE)').run();
 	await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_outbound_task
 		ON email(outbound_task_id) WHERE outbound_task_id IS NOT NULL`).run();
 	await userDb.prepare("CREATE TABLE IF NOT EXISTS audit_log (email TEXT,warning_type TEXT,status TEXT)").run();
@@ -327,6 +329,37 @@ async function quotaReservations(f, owner) {
 }
 
 describe('deliverLocalMail with real D1 transactions and local-only object storage', () => {
+	it('uses indexed receipt/account lookups and one scan per quota table, and notifies with the committed email ID', () => withFixture(async f => {
+		const sender = await mailbox(f, 'sender');
+		const recipient = await mailbox(f, 'MiXeD');
+		const task = await sendTask(f, sender);
+		f.settings.userTgForward = 1;
+		const personalTelegram = { enabled: true, botToken: 'local-fixture', chatId: 'local-chat' };
+		const get = vi.fn(async () => ({ personalTelegram }));
+		const ctx = { env: { ...c.env, kv: { get } } };
+		const notify = vi.spyOn(telegramService, 'sendPersonalEmailToBot').mockResolvedValue(undefined);
+		const prepares = vi.spyOn(db, 'prepare');
+		await deliverLocalMail(ctx, [recipient.address], task.sender, [], task);
+		const queries = prepares.mock.calls.map(([query]) => query);
+		const lookup = queries.find(query => query.includes('AS recorded'));
+		const plan = async (query, bindings) => (await db.prepare('EXPLAIN QUERY PLAN ' + query).bind(...bindings).all()).results.map(row => row.detail);
+		expect((await plan(lookup, [task.taskId, recipient.address])).join(' ')).toContain('idx_account_email_nocase');
+		const quota = queries.find(query => query.includes(' AS allowed'));
+		const steps = await plan(quota, Array(quota.match(/\?/g).length).fill(1));
+		for (const table of ['email', 'attachments', 'mail_receive_claim', 'mail_outbound_task']) {
+			expect(steps.filter(step => new RegExp(`(?:SCAN|SEARCH) ${table}\\b`).test(step))).toHaveLength(1);
+		}
+		expect(queries.some(query => query.startsWith('SELECT email_id AS emailId FROM email WHERE receive_claim_key'))).toBe(false);
+		const [received] = await inbox(recipient);
+		expect(notify).toHaveBeenCalledWith(ctx, expect.objectContaining({ emailId: received.email_id }), personalTelegram);
+		get.mockClear();
+		f.settings.userTgForward = 0;
+		const second = await sendTask(f, sender);
+		await deliverLocalMail(ctx, [recipient.address], second.sender, [], second);
+		expect(get).not.toHaveBeenCalled();
+		expect(notify).toHaveBeenCalledTimes(1);
+	}));
+
 	it('normalizes mixed-case recipients, deduplicates them, and never copies the outbound task id', () => withFixture(async f => {
 		const sender = await mailbox(f, 'sender');
 		const recipient = await mailbox(f, 'MiXeD');

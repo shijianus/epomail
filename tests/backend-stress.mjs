@@ -138,8 +138,7 @@ async function assertEgressHarness(stack) {
   assert.match(entry, /External network is disabled/);
 }
 
-async function bootstrap({ base, jwtSecret }) {
-  const client = createLoopbackClient(base);
+export async function bootstrap({ base, jwtSecret }, client = createLoopbackClient(base)) {
   const init = await client('/api/init', { method: 'POST', headers: { 'x-init-secret': jwtSecret } });
   assert.equal(init.status, 200, 'local init must succeed');
 
@@ -226,7 +225,7 @@ function emailIdFrom(result) {
   return Number(row?.emailId || row?.id || 0) || null;
 }
 
-function operationMix({ user, accountId, syntheticEmail }) {
+export function operationMix({ user, accountId, syntheticEmail }) {
   const operations = [
     async ({ signal }) => requireOk(await user('/api/email/list?size=10&type=0', { signal }), 'list'),
     async ({ signal }) => requireOk(await user('/api/email/sidebarStats', { signal }), 'sidebar'),
@@ -495,9 +494,11 @@ async function main() {
   console.log(`backend stress PASS; report: ${reportPath}`);
 }
 
-try {
-  await main();
-} catch (error) {
-  console.error(`backend stress FAIL: ${redactText(error.message)}`);
-  process.exitCode = 1;
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(`backend stress FAIL: ${redactText(error.message)}`);
+    process.exitCode = 1;
+  }
 }

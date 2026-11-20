@@ -12,7 +12,8 @@ const startedLocal = `provider='local' AND (state IN ('SENDING','UNKNOWN')
 	OR (state='PREPARED' AND (COALESCE(last_error,'')='${legacyLocalRetry}' OR ${hasReceipt})))`;
 const error = (message, code, status = 409) => new BizError(message, status, code);
 
-export async function prepareOutboundTask(c, { userId, accountId, idempotencyKey, contentHash, payload = {}, reservedBytes = 0, maxStorageBytes, maxEmails, bypassStorage = false, storageBlocked = false }) {
+export async function prepareOutboundTask(c, request, getNewReservation) {
+	const { userId, accountId, idempotencyKey, contentHash, payload = {} } = request;
 	const db = getMailDb(c);
 	const key = idempotencyKey || crypto.randomUUID();
 	if (typeof key !== 'string' || !/^[A-Za-z0-9_.:-]{8,128}$/.test(key)) throw error('Invalid idempotency key', 'invalid_idempotency_key', 400);
@@ -23,12 +24,24 @@ export async function prepareOutboundTask(c, { userId, accountId, idempotencyKey
 	};
 	const previous = await read();
 	if (previous) return matches(previous);
+	let reservation = request;
+	if (getNewReservation) {
+		try {
+			reservation = await getNewReservation();
+		} catch (cause) {
+			// Another request can reserve the last available bytes under this key.
+			const concurrent = await read();
+			if (concurrent) return matches(concurrent);
+			throw cause;
+		}
+	}
+	const { reservedBytes = 0, maxStorageBytes, maxEmails, bypassStorage = false, storageBlocked = false } = reservation;
 	if (storageBlocked || !Number.isFinite(maxStorageBytes) || maxStorageBytes < 0 || !Number.isSafeInteger(reservedBytes) || reservedBytes < 0
 		|| !Number.isSafeInteger(maxEmails) || maxEmails < 0) {
 		throw error('Storage quota is unavailable', 'storage_usage_unknown', 503);
 	}
 	const taskId = crypto.randomUUID();
-	await db.prepare(`INSERT INTO mail_outbound_task
+	const inserted = await db.prepare(`INSERT INTO mail_outbound_task
 		(task_id,user_id,account_id,idempotency_key,content_hash,state,payload_json,reserved_bytes,reserved_count,provider)
 		SELECT ?,?,?,?,?,'PREPARED',?,?,1,?
 		WHERE (? = 1 OR ? = 0 OR (
@@ -42,12 +55,13 @@ export async function prepareOutboundTask(c, { userId, accountId, idempotencyKey
 			+ COALESCE((SELECT SUM(reserved_count) FROM mail_receive_claim WHERE user_id=? AND state IN ('CLAIMED','SAVING','RETRY') AND lease_until>unixepoch()),0)
 			+ COALESCE((SELECT SUM(reserved_count) FROM mail_outbound_task WHERE user_id=? AND state IN ('PREPARED','SENDING','UNKNOWN')),0)
 			+ 1 <= ?))
-		ON CONFLICT(user_id,account_id,idempotency_key) DO NOTHING`)
+		ON CONFLICT(user_id,account_id,idempotency_key) DO NOTHING RETURNING *`)
 		.bind(taskId,userId,accountId,key,contentHash,JSON.stringify(payload),reservedBytes,payload.route === 'local' ? 'local' : 'external',bypassStorage?1:0,maxStorageBytes,
-			userId,userId,userId,userId,reservedBytes,maxStorageBytes,maxEmails,userId,userId,userId,maxEmails).run();
+			userId,userId,userId,userId,reservedBytes,maxStorageBytes,maxEmails,userId,userId,userId,maxEmails).first();
+	if (inserted) return { task: inserted, created: true };
 	const task = await read();
 	if (!task) throw error('Storage quota is exhausted', 'storage_quota_exceeded', 413);
-	return { ...matches(task), created: task.task_id === taskId };
+	return matches(task);
 }
 
 export async function claimPreparation(c, taskId) {

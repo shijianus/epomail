@@ -26,127 +26,132 @@ function hasStorageCredentials(config) {
 		typeof config?.[key] === 'string' && config[key].trim() && !config[key].includes('******'));
 }
 
+async function readStorageSnapshot(c, userId) {
+	try {
+		const mailDb = getMailDb(c);
+		const userDb = getUserDb(c);
+		if (!mailDb?.prepare || !userDb?.prepare) throw new Error('Storage database binding is missing');
+		const [stats, userRow, setting] = await Promise.all([
+			// One MAIL_DB statement gives both aggregates the same snapshot.
+			// Trash and SAVING rows still occupy storage until physically deleted.
+			// Reservations are NOT persisted usage: writers must add only their
+			// not-yet-materialized bytes/count in the atomic reservation SQL.
+			mailDb.prepare(`
+				SELECT email_stats.email_bytes, email_stats.email_count,
+					attachment_stats.attachment_bytes, attachment_stats.attachment_count,
+					attachment_stats.invalid_sizes
+				FROM (
+					SELECT COALESCE(SUM(
+						LENGTH(CAST(IFNULL(subject, '') AS BLOB))
+						+ LENGTH(CAST(IFNULL(text, '') AS BLOB))
+						+ LENGTH(CAST(IFNULL(content, '') AS BLOB))
+						+ LENGTH(CAST(IFNULL(code, '') AS BLOB))
+					), 0) AS email_bytes, COUNT(*) AS email_count
+					FROM email WHERE user_id = ?
+				) AS email_stats
+				CROSS JOIN (
+					SELECT COALESCE(SUM(size), 0) AS attachment_bytes,
+						COUNT(*) AS attachment_count,
+						COUNT(CASE WHEN size IS NULL OR TYPEOF(size) <> 'integer' OR size < 0 THEN 1 END) AS invalid_sizes
+					FROM attachments WHERE user_id = ?
+				) AS attachment_stats
+			`).bind(userId, userId).first(),
+			userDb.prepare(`
+				SELECT u.type, u.storage_quota_mb, u.byo_storage_enabled, u.byo_storage_config,
+					r.role_id, r.storage_quota_mb AS role_quota_mb, r.role_code
+				FROM user AS u LEFT JOIN role AS r ON r.role_id = u.type
+				WHERE u.user_id = ?
+			`).bind(userId).first(),
+			settingService.query(c)
+		]);
+		if (!stats || !userRow || !setting || typeof setting !== 'object' || Array.isArray(setting)) {
+			throw new Error('Storage usage or configuration is missing');
+		}
+
+		const emailBytes = quotaNumber(stats.email_bytes);
+		const emailCount = quotaNumber(stats.email_count);
+		const attachmentBytes = quotaNumber(stats.attachment_bytes);
+		const attachmentCount = quotaNumber(stats.attachment_count);
+		const usedBytes = emailBytes + attachmentBytes;
+		const fileCount = emailCount + attachmentCount;
+		if (quotaNumber(stats.invalid_sizes) !== 0
+			|| ![emailBytes, emailCount, attachmentBytes, attachmentCount, usedBytes, fileCount].every(Number.isSafeInteger)) {
+			throw new Error('Storage usage is invalid');
+		}
+
+		const roleId = quotaNumber(userRow.type);
+		// type=0 is the legacy administrator without an assigned role. An
+		// assigned but missing role is unknown, not permission to use defaults.
+		if (!Number.isSafeInteger(roleId) || (roleId !== 0 && userRow.role_id == null)) {
+			throw new Error('Storage quota role is missing');
+		}
+		const userQuotaMb = quotaNumber(userRow.storage_quota_mb);
+		const roleQuotaMb = userRow.role_quota_mb == null ? null : quotaNumber(userRow.role_quota_mb);
+		const roleCode = userRow.role_code || '';
+		const allowUserByo = quotaSwitch(setting.userByoStorage ?? 1) === 1;
+		const byoEnabled = quotaSwitch(userRow.byo_storage_enabled) === 1;
+		const defaultQuotaMb = quotaNumber(setting.defaultStorageQuotaMb ?? 500);
+		const decryptedByo = await decryptByoStorageConfig(userRow.byo_storage_config, c.env, userId);
+		const byoStorageConfig = decryptedByo.ok ? decryptedByo.config : {};
+		const isByoActive = byoEnabled && allowUserByo && hasStorageCredentials(byoStorageConfig);
+		// Only the visitor role is blocked at 0 MB. A non-visitor's role/default
+		// quota of 0 remains unlimited, as checkQuotaAvailable specifies.
+		const isVisitor = roleCode === 'visitor';
+		const quotaStorageBlocked = isVisitor && !isByoActive;
+		let effectiveQuotaMb = userQuotaMb > 0 ? userQuotaMb : (roleQuotaMb ?? defaultQuotaMb);
+		if (quotaStorageBlocked) effectiveQuotaMb = 0;
+		const quotaBytes = quotaNumber(effectiveQuotaMb * 1024 * 1024);
+		const usedPercentage = quotaBytes > 0
+			? Math.max(usedBytes > 0 ? 0.1 : 0, Math.min(100, Math.round((usedBytes / quotaBytes) * 1000) / 10))
+			: 0;
+		const isExceeded = quotaStorageBlocked || (!isByoActive && quotaBytes > 0 && usedBytes >= quotaBytes);
+
+		// Resolve both labels from this settings snapshot. A second, best-effort
+		// settings read must not silently turn a failure into a KV/default quota.
+		const systemS3 = hasStorageCredentials(setting);
+		const storageType = isByoActive ? 'USER_S3' : systemS3 ? 'SYSTEM_S3' : c.env.r2 ? 'R2' : 'KV';
+		const systemStorageType = systemS3 ? `${s3Signer.detectProvider(setting.endpoint)} (S3)`
+			: c.env.r2 ? 'Cloudflare R2' : 'Cloudflare KV / D1';
+		const safeByoConfig = maskByoStorageConfig(byoStorageConfig);
+		if (typeof safeByoConfig.endpoint === 'string' && safeByoConfig.endpoint) {
+			safeByoConfig.provider = s3Signer.detectProvider(safeByoConfig.endpoint);
+		}
+		const mbVal = usedBytes / (1024 * 1024);
+
+		const usage = {
+			userId,
+			usedBytes,
+			usedMb: usedBytes > 0 && mbVal < 0.01 ? '0.01' : mbVal.toFixed(2),
+			quotaMb: effectiveQuotaMb,
+			quotaBytes,
+			usedPercentage,
+			isExceeded,
+			isVisitor,
+			roleCode,
+			fileCount,
+			emailCount,
+			attachmentCount,
+			allowUserByo,
+			byoStorageEnabled: isByoActive ? 1 : 0,
+			bypassStorage: isByoActive,
+			quotaStorageBlocked,
+			byoStorageConfig: safeByoConfig,
+			storageType,
+			systemStorageType
+		};
+		return { usage, setting };
+	} catch (_) {
+		throw new BizError('Storage quota usage or configuration is unavailable', 503, 'storage_usage_unknown');
+	}
+}
+
 const storageQuotaService = {
 
 	/**
 	 * Get detailed storage usage and quota status for a user
 	 */
 	async getUserStorageUsage(c, userId) {
-		try {
-			const mailDb = getMailDb(c);
-			const userDb = getUserDb(c);
-			if (!mailDb?.prepare || !userDb?.prepare) throw new Error('Storage database binding is missing');
-			const [stats, userRow, setting] = await Promise.all([
-				// One MAIL_DB statement gives both aggregates the same snapshot.
-				// Trash and SAVING rows still occupy storage until physically deleted.
-				// Reservations are NOT persisted usage: writers must add only their
-				// not-yet-materialized bytes/count in the atomic reservation SQL.
-				mailDb.prepare(`
-					SELECT email_stats.email_bytes, email_stats.email_count,
-						attachment_stats.attachment_bytes, attachment_stats.attachment_count,
-						attachment_stats.invalid_sizes
-					FROM (
-						SELECT COALESCE(SUM(
-							LENGTH(CAST(IFNULL(subject, '') AS BLOB))
-							+ LENGTH(CAST(IFNULL(text, '') AS BLOB))
-							+ LENGTH(CAST(IFNULL(content, '') AS BLOB))
-							+ LENGTH(CAST(IFNULL(code, '') AS BLOB))
-						), 0) AS email_bytes, COUNT(*) AS email_count
-						FROM email WHERE user_id = ?
-					) AS email_stats
-					CROSS JOIN (
-						SELECT COALESCE(SUM(size), 0) AS attachment_bytes,
-							COUNT(*) AS attachment_count,
-							COUNT(CASE WHEN size IS NULL OR TYPEOF(size) <> 'integer' OR size < 0 THEN 1 END) AS invalid_sizes
-						FROM attachments WHERE user_id = ?
-					) AS attachment_stats
-				`).bind(userId, userId).first(),
-				userDb.prepare(`
-					SELECT u.type, u.storage_quota_mb, u.byo_storage_enabled, u.byo_storage_config,
-						r.role_id, r.storage_quota_mb AS role_quota_mb, r.role_code
-					FROM user AS u LEFT JOIN role AS r ON r.role_id = u.type
-					WHERE u.user_id = ?
-				`).bind(userId).first(),
-				settingService.query(c)
-			]);
-			if (!stats || !userRow || !setting || typeof setting !== 'object' || Array.isArray(setting)) {
-				throw new Error('Storage usage or configuration is missing');
-			}
-
-			const emailBytes = quotaNumber(stats.email_bytes);
-			const emailCount = quotaNumber(stats.email_count);
-			const attachmentBytes = quotaNumber(stats.attachment_bytes);
-			const attachmentCount = quotaNumber(stats.attachment_count);
-			const usedBytes = emailBytes + attachmentBytes;
-			const fileCount = emailCount + attachmentCount;
-			if (quotaNumber(stats.invalid_sizes) !== 0
-				|| ![emailBytes, emailCount, attachmentBytes, attachmentCount, usedBytes, fileCount].every(Number.isSafeInteger)) {
-				throw new Error('Storage usage is invalid');
-			}
-
-			const roleId = quotaNumber(userRow.type);
-			// type=0 is the legacy administrator without an assigned role. An
-			// assigned but missing role is unknown, not permission to use defaults.
-			if (!Number.isSafeInteger(roleId) || (roleId !== 0 && userRow.role_id == null)) {
-				throw new Error('Storage quota role is missing');
-			}
-			const userQuotaMb = quotaNumber(userRow.storage_quota_mb);
-			const roleQuotaMb = userRow.role_quota_mb == null ? null : quotaNumber(userRow.role_quota_mb);
-			const roleCode = userRow.role_code || '';
-			const allowUserByo = quotaSwitch(setting.userByoStorage ?? 1) === 1;
-			const byoEnabled = quotaSwitch(userRow.byo_storage_enabled) === 1;
-			const defaultQuotaMb = quotaNumber(setting.defaultStorageQuotaMb ?? 500);
-			const decryptedByo = await decryptByoStorageConfig(userRow.byo_storage_config, c.env, userId);
-			const byoStorageConfig = decryptedByo.ok ? decryptedByo.config : {};
-			const isByoActive = byoEnabled && allowUserByo && hasStorageCredentials(byoStorageConfig);
-			// Only the visitor role is blocked at 0 MB. A non-visitor's role/default
-			// quota of 0 remains unlimited, as checkQuotaAvailable specifies.
-			const isVisitor = roleCode === 'visitor';
-			const quotaStorageBlocked = isVisitor && !isByoActive;
-			let effectiveQuotaMb = userQuotaMb > 0 ? userQuotaMb : (roleQuotaMb ?? defaultQuotaMb);
-			if (quotaStorageBlocked) effectiveQuotaMb = 0;
-			const quotaBytes = quotaNumber(effectiveQuotaMb * 1024 * 1024);
-			const usedPercentage = quotaBytes > 0
-				? Math.max(usedBytes > 0 ? 0.1 : 0, Math.min(100, Math.round((usedBytes / quotaBytes) * 1000) / 10))
-				: 0;
-			const isExceeded = quotaStorageBlocked || (!isByoActive && quotaBytes > 0 && usedBytes >= quotaBytes);
-
-			// Resolve both labels from this settings snapshot. A second, best-effort
-			// settings read must not silently turn a failure into a KV/default quota.
-			const systemS3 = hasStorageCredentials(setting);
-			const storageType = isByoActive ? 'USER_S3' : systemS3 ? 'SYSTEM_S3' : c.env.r2 ? 'R2' : 'KV';
-			const systemStorageType = systemS3 ? `${s3Signer.detectProvider(setting.endpoint)} (S3)`
-				: c.env.r2 ? 'Cloudflare R2' : 'Cloudflare KV / D1';
-			const safeByoConfig = maskByoStorageConfig(byoStorageConfig);
-			if (typeof safeByoConfig.endpoint === 'string' && safeByoConfig.endpoint) {
-				safeByoConfig.provider = s3Signer.detectProvider(safeByoConfig.endpoint);
-			}
-			const mbVal = usedBytes / (1024 * 1024);
-
-			return {
-				userId,
-				usedBytes,
-				usedMb: usedBytes > 0 && mbVal < 0.01 ? '0.01' : mbVal.toFixed(2),
-				quotaMb: effectiveQuotaMb,
-				quotaBytes,
-				usedPercentage,
-				isExceeded,
-				isVisitor,
-				roleCode,
-				fileCount,
-				emailCount,
-				attachmentCount,
-				allowUserByo,
-				byoStorageEnabled: isByoActive ? 1 : 0,
-				bypassStorage: isByoActive,
-				quotaStorageBlocked,
-				byoStorageConfig: safeByoConfig,
-				storageType,
-				systemStorageType
-			};
-		} catch (_) {
-			throw new BizError('Storage quota usage or configuration is unavailable', 503, 'storage_usage_unknown');
-		}
+		return (await readStorageSnapshot(c, userId)).usage;
 	},
 
 	/**
@@ -208,8 +213,11 @@ const storageQuotaService = {
 		if (!Number.isSafeInteger(fileSizeBytes) || fileSizeBytes < 0) {
 			throw new BizError('Incoming attachment size is unknown', 503, 'storage_usage_unknown');
 		}
+		let setting;
 		if (userId) {
-			const usage = await this.getUserStorageUsage(c, userId);
+			const snapshot = await readStorageSnapshot(c, userId);
+			setting = snapshot.setting;
+			const usage = snapshot.usage;
 			if (usage.byoStorageEnabled === 1) {
 				// User uses their own BYO S3 storage: completely unrestricted
 				return {
@@ -223,7 +231,7 @@ const storageQuotaService = {
 		// User is using administrator-provided public DB/storage: apply system limit.
 		let maxSizeMb;
 		try {
-			const setting = await settingService.query(c);
+			if (!userId) setting = await settingService.query(c);
 			if (!setting || typeof setting !== 'object' || Array.isArray(setting)) throw new Error('Storage settings are missing');
 			maxSizeMb = quotaNumber(setting.attachmentMaxSizeMb ?? 25);
 		} catch (_) {

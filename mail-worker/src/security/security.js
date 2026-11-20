@@ -1,7 +1,5 @@
 import BizError from '../error/biz-error';
 import constant from '../const/constant';
-import jwtUtils from '../utils/jwt-utils';
-import KvConst from '../const/kv-const';
 import dayjs from 'dayjs';
 import userService from '../service/user-service';
 import permService from '../service/perm-service';
@@ -10,7 +8,7 @@ import app from '../hono/hono';
 import { isAdminUser } from '../utils/admin-utils';
 import { getUserDb } from '../utils/db-accessor.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
-import { refreshSessionAuthInfo, readAuthorizedSession, revokeAllUserSessions } from '../utils/session-auth-store.js';
+import { refreshSessionAuthInfo, readVerifiedBearerSession, revokeAllUserSessions } from '../utils/session-auth-store.js';
 
 const exclude = [
 	'/login',
@@ -175,7 +173,7 @@ app.use('*', async (c, next) => {
 
 	const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('token');
 
-	const result = await jwtUtils.verifyToken(c, jwt);
+	const { claims: result, session } = await readVerifiedBearerSession(c, jwt);
 
 	if (!result) {
 		throw new BizError(t('authExpired'), 401);
@@ -190,7 +188,7 @@ app.use('*', async (c, next) => {
 	if (loginEmail) {
 		c.set('loginEmail', loginEmail);
 	}
-	let authInfo = await readAuthorizedSession(c, userId, token);
+	let authInfo = session;
 
 	if (!authInfo || !authInfo.user || !Array.isArray(authInfo.tokens)) {
 		throw new BizError(t('authExpired'), 401);
@@ -218,8 +216,7 @@ app.use('*', async (c, next) => {
 		throw new BizError(t('isBanUser'), 403);
 	}
 
-	authInfo.user = {
-		...authInfo.user,
+	const currentIdentity = {
 		userId: currentUser.user_id,
 		email: currentUser.email,
 		type: currentUser.type,
@@ -232,13 +229,13 @@ app.use('*', async (c, next) => {
 
 	if (permIndex > -1) {
 
-		const permKeys = await permService.userPermKeys(c, authInfo.user.userId);
+		const permKeys = await permService.userPermKeys(c, currentIdentity.userId);
 
 		const userPaths = permKeyToPaths(permKeys);
 
 		const userPermIndex = userPaths.findIndex(item => pathMatches(path, item));
 
-		if (userPermIndex === -1 && !isAdminUser(c, authInfo.user)) {
+		if (userPermIndex === -1 && !isAdminUser(c, currentIdentity)) {
 			throw new BizError(t('unauthorized'), 403);
 		}
 
@@ -249,12 +246,13 @@ app.use('*', async (c, next) => {
 
 	if (!nowTime.isSame(refreshTime)) {
 		authInfo.refreshTime = dayjs().toISOString();
-		await userService.updateUserInfo(c, authInfo.user.userId);
+		await userService.updateUserInfo(c, currentIdentity.userId);
 		const refreshed = await refreshSessionAuthInfo(c, userId, authInfo);
 		if (refreshed?.user) authInfo = refreshed;
 	}
 
-	c.set('user', authInfo.user)
+	// A daily refresh may return an older KV replica. D1 owns identity and role.
+	c.set('user', { ...authInfo.user, ...currentIdentity })
 
 	return await next();
 });

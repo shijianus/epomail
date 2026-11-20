@@ -54,6 +54,10 @@ const ENCRYPTED_SEARCH_BATCH = 100;
 // that while preventing an unbounded decrypt loop if a deployment raises it.
 const ENCRYPTED_SEARCH_MAX_ROWS = 10000;
 
+function hasEncryptedFields(row) {
+	return emailCryptoUtils.ENCRYPTED_FIELDS.some(field => typeof row?.[field] === 'string' && row[field].startsWith(emailCryptoUtils.CIPHER_PREFIX));
+}
+
 function includesNeedle(value, needle) {
 	return String(value || '').toLowerCase().includes(String(needle || '').toLowerCase());
 }
@@ -107,15 +111,7 @@ const emailService = {
 			size = 50;
 		}
 
-		if (!emailId) {
-
-			if (timeSort) {
-				emailId = 0;
-			} else {
-				emailId = 9999999999;
-			}
-
-		}
+		const firstNewestPage = !emailId && !timeSort && !keyword;
 
 		if (accountId && !isNaN(accountId)) {
 			const accountRow = await accountService.selectById(c, accountId);
@@ -286,77 +282,77 @@ const emailService = {
 			);
 		}
 
-		let listQuery = null;
-		let totalQuery = null;
-		if (!encryptedSearch) {
-			query.where(
-				and(
-					...commonConditions,
-					timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId)
-				)
-			);
+		const pageConditions = [...commonConditions];
+		if (emailId) pageConditions.push(timeSort ? gt(email.emailId, emailId) : lt(email.emailId, emailId));
+		const pageQuery = query.where(and(...pageConditions))
+			.orderBy(timeSort ? asc(email.emailId) : desc(email.emailId)).limit(size);
+		const totalQuery = orm(c).select({ total: count() }).from(email)
+			.innerJoin(account, eq(account.accountId, email.accountId))
+			.where(and(...commonConditions));
 
-			if (timeSort) {
-				query.orderBy(asc(email.emailId));
-			} else {
-				query.orderBy(desc(email.emailId));
-			}
-
-			listQuery = query.limit(size).all();
-
-			totalQuery = orm(c).select({ total: count() }).from(email)
-				.leftJoin(
-					account,
-					eq(account.accountId, email.accountId)
-				)
-				.where(
-					and(...commonConditions)
-				).get();
-		}
-
-		const latestEmailQuery = orm(c).select().from(email).where(
-			and(
+		const latestEmailQuery = orm(c).select({ ...email }).from(email)
+			.innerJoin(account, eq(account.accountId, email.accountId))
+			.where(and(
+				eq(account.isDel, isDel.NORMAL),
 				allReceive ? eq(1,1) : eq(email.accountId, accountId),
 				eq(email.userId, userId),
 				folder === 'trash' ? eq(email.isDel, 1) : eq(email.isDel, 0),
 				folder === 'spam' ? eq(email.isSpam, 1) : (folder === 'trash' || folder === 'snoozed' || folder === 'all' ? eq(1,1) : eq(email.isSpam, 0)),
 				folder === 'snoozed' ? sql`snoozed_time IS NOT NULL` : (folder === 'trash' || folder === 'spam' ? eq(1,1) : sql`(snoozed_time IS NULL OR is_official = 1)`),
 				(!folder && type !== undefined) ? eq(email.type, type) : (folder === 'all' ? eq(email.type, 0) : eq(1,1))
-			))
-			.orderBy(desc(email.emailId)).limit(1).get();
+			)).orderBy(desc(email.emailId)).limit(1);
 
-		if (settingData.welcomeExpireDays > 0) {
-			// Auto-clean expired official welcome emails older than welcomeExpireDays
-			await getMailDb(c).prepare(`
-				UPDATE email 
-				SET is_del = 1, trashed_at = COALESCE(trashed_at,CURRENT_TIMESTAMP), snoozed_time = NULL, snoozed_end_time = NULL
-				WHERE user_id = ? 
-				  AND is_official = 1
-				  AND is_del = 0 
-				  AND datetime(create_time, '+' || ? || ' days') < datetime('now')
-			`).bind(userId, settingData.welcomeExpireDays).run().catch(() => {});
-		}
+		const expireDays = settingData.welcomeExpireDays;
+		const expiredNotice = and(eq(email.userId, userId),
+			sql`is_official = 1 AND is_del = 0 AND datetime(create_time, '+' || ${expireDays} || ' days') < datetime('now')`);
+		const expireNotices = () => orm(c).update(email).set({
+			isDel: 1, trashedAt: sql`COALESCE(trashed_at, CURRENT_TIMESTAMP)`, snoozedTime: null, snoozedEndTime: null
+		}).where(expiredNotice).run().catch(() => null);
 
 		let list;
-		let totalRow;
+		let total;
 		let latestEmail;
+		let cryptoKey;
 		if (encryptedSearch) {
+			if (expireDays > 0) await expireNotices();
+			cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
 			const scanned = await this.searchEncryptedEmails(c, {
-				commonConditions, contentTerms, timeSort, emailId, size, userId
+				commonConditions, contentTerms, timeSort, emailId: emailId || (timeSort ? 0 : Number.MAX_SAFE_INTEGER),
+				size, userId, cryptoKey
 			});
 			list = scanned.list;
-			totalRow = { total: scanned.total };
-			latestEmail = await latestEmailQuery;
+			total = scanned.total;
+			latestEmail = await latestEmailQuery.get();
 		} else {
-			[list, totalRow, latestEmail] = await Promise.all([listQuery, totalQuery, latestEmailQuery]);
-		}
-
-		if (userId) {
-			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
-			if (!encryptedSearch) list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
-			if (latestEmail && latestEmail.emailId) {
-				latestEmail = await emailCryptoUtils.decryptEmailRecord(latestEmail, cryptoKey);
+			// The page and exact total share one D1 read transaction. With no search
+			// terms or cursor the descending page already contains the newest row.
+			const queries = [pageQuery, totalQuery];
+			if (!firstNewestPage) queries.push(latestEmailQuery);
+			// Probe the sparse official-mail index in the same read batch. Most
+			// requests have nothing to expire and can stay entirely read-only.
+			const checkExpiry = expireDays > 0;
+			const expiryQuery = orm(c).select({ emailId: email.emailId }).from(email).where(expiredNotice).limit(1);
+			let results = await orm(c).batch(checkExpiry ? [...queries, expiryQuery] : queries);
+			if (checkExpiry && results[queries.length].length && await expireNotices()) {
+				results = await orm(c).batch(queries);
 			}
+			const [rows, totals] = results;
+			const latest = firstNewestPage ? null : results[2];
+			list = rows;
+			total = totals[0].total;
+			latestEmail = latest?.[0];
+			if (userId && list.some(hasEncryptedFields)) {
+				cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+				list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
+			}
+			if (firstNewestPage && list.length) {
+				const { starId, ...newest } = list[0];
+				latestEmail = newest;
+			}
+		}
+		if (!firstNewestPage && userId && hasEncryptedFields(latestEmail)) {
+			cryptoKey ??= await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			latestEmail = await emailCryptoUtils.decryptEmailRecord(latestEmail, cryptoKey);
 		}
 
 		list = list.map(item => {
@@ -372,9 +368,7 @@ const emailService = {
 
 		await this.emailAddAtt(c, list);
 
-		await Promise.all(list.map(async (item) => {
-			item.hash = await hashUtils.encodeEmailHash(item.emailId, userId, c.env.jwt_secret);
-		}));
+		await hashUtils.addEmailHashes(list, c.env.jwt_secret, () => userId);
 
 		if (!latestEmail) {
 			latestEmail = {
@@ -384,7 +378,7 @@ const emailService = {
 			}
 		}
 
-		return { list, total: totalRow.total, latestEmail };
+		return { list, total, latestEmail };
 	},
 
 	/**
@@ -393,19 +387,26 @@ const emailService = {
 	 * already satisfy every plaintext filter, decrypt them in batches, and
 	 * apply the same AND semantics to both the page and its total.
 	 */
-	async searchEncryptedEmails(c, { commonConditions, contentTerms, timeSort, emailId, size, userId }) {
-		const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+	async searchEncryptedEmails(c, { commonConditions, contentTerms, timeSort, emailId, size, userId, cryptoKey }) {
 		let cursor = timeSort ? 0 : Number.MAX_SAFE_INTEGER;
 		let scanned = 0;
 		let total = 0;
 		const list = [];
+		// The exact total may require scanning beyond a full page. Those rows
+		// only need fields that participate in the requested content predicates.
+		const countFields = { emailId: email.emailId };
+		const bySize = Number.isFinite(contentTerms.sizeAtLeast) || Number.isFinite(contentTerms.sizeAtMost);
+		if (contentTerms.subject || contentTerms.subjectOrBody || contentTerms.keyword) countFields.subject = email.subject;
+		if (contentTerms.body || contentTerms.subjectOrBody || contentTerms.keyword || bySize) countFields.text = email.text;
+		if (bySize) countFields.content = email.content;
+		if (contentTerms.keyword) Object.assign(countFields, { name: email.name, sendEmail: email.sendEmail, toEmail: email.toEmail });
 		while (scanned < ENCRYPTED_SEARCH_MAX_ROWS) {
 			const conditions = [
 				...commonConditions,
 				timeSort ? gt(email.emailId, cursor) : lt(email.emailId, cursor)
 			];
 			const rows = await orm(c)
-				.select({ ...email, starId: star.starId })
+				.select(list.length === size ? countFields : { ...email, starId: star.starId })
 				.from(email)
 				.leftJoin(star, and(eq(star.emailId, email.emailId), eq(star.userId, userId)))
 				.leftJoin(account, eq(account.accountId, email.accountId))
@@ -1072,8 +1073,6 @@ const emailService = {
 			const bytes = item.buff instanceof Uint8Array ? item.buff
 				: item.buff ? new Uint8Array(item.buff) : new Uint8Array(await this.toAttachmentArrayBuffer(item) || 0);
 			item.buff = bytes;
-			const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, bytes.byteLength);
-			if (!sizeCheck.allowed) throw new BizError(sizeCheck.reason);
 			attachmentBytes += bytes.byteLength;
 			// Inline image filenames and CIDs are generated anew on every request.
 			// The original HTML and image bytes identify the actual compose content.
@@ -1081,47 +1080,54 @@ const emailService = {
 				mimeType: item.mimeType || item.contentType || (typeof item.type === 'string' ? item.type : ''),
 				size: bytes.byteLength, hash: await mailSha256(bytes) });
 		}
+		if (attachmentMeta.length) {
+			const largest = Math.max(...attachmentMeta.map(item => item.size));
+			const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, largest);
+			if (!sizeCheck.allowed) throw new BizError(sizeCheck.reason);
+		}
 		if (new Blob([text, providerHtml]).size + attachmentBytes > maxLimitBytes) {
 			throw new BizError(t('emailSizeLimit', { msg: maxLimitMB + 'MB' }));
 		}
 		const contentHash = await mailSha256(JSON.stringify({ accountId, receiveEmail, name, sendType,
 			emailId, subject: subject || '', text, content, attachments: attachmentMeta }));
-		for (const [index, item] of attachmentItems.entries()) {
-			item.key = `attachments/out-${await mailSha256(`${userId}\n${accountId}\n${idempotencyKey}\n${index}\n${attachmentMeta[index].hash}`)}${fileUtils.getExtFileName(item.filename)}`;
-		}
-		const imageRows = imageDataList.map(item => ({ ...item,
-			contentId: item.contentId ? `<${item.contentId.replace(/^<|>$/g, '')}>` : null }));
-		const storedHtml = this.imgReplace(providerHtml, imageRows, r2Domain);
-		const plainRecord = { sendEmail: accountRow.email, name, subject, content: storedHtml, text,
-			accountId, userId, status: emailConst.status.SAVING, type: emailConst.type.SEND,
-			recipient: JSON.stringify(receiveEmail.map(address => ({ address, name: '' }))),
-			inReplyTo: sendType === 'reply' ? emailRow.messageId : '', relation: sendType === 'reply' ? emailRow.messageId : '' };
-		let encryptedRecord = { ...plainRecord };
-		if (emailCryptoUtils.shouldEncryptEmail(settingRow.allMailMode, plainRecord)) {
-			encryptedRecord = await emailCryptoUtils.encryptEmailRecord(encryptedRecord, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
-		}
-		assertMailRowSize(encryptedRecord);
-		const bodyStorageBytes = ['subject', 'text', 'content', 'code'].reduce((total, field) =>
-			total + new TextEncoder().encode(String(encryptedRecord[field] || '')).byteLength, 0);
-		const reserveBytes = bodyStorageBytes + attachmentBytes;
+		const buildArchive = async () => {
+			for (const [index, item] of attachmentItems.entries()) {
+				item.key = `attachments/out-${await mailSha256(`${userId}\n${accountId}\n${idempotencyKey}\n${index}\n${attachmentMeta[index].hash}`)}${fileUtils.getExtFileName(item.filename)}`;
+			}
+			const imageRows = imageDataList.map(item => ({ ...item,
+				contentId: item.contentId ? `<${item.contentId.replace(/^<|>$/g, '')}>` : null }));
+			const storedHtml = this.imgReplace(providerHtml, imageRows, r2Domain);
+			const plainRecord = { sendEmail: accountRow.email, name, subject, content: storedHtml, text,
+				accountId, userId, status: emailConst.status.SAVING, type: emailConst.type.SEND,
+				recipient: JSON.stringify(receiveEmail.map(address => ({ address, name: '' }))),
+				inReplyTo: sendType === 'reply' ? emailRow.messageId : '', relation: sendType === 'reply' ? emailRow.messageId : '' };
+			let encryptedRecord = { ...plainRecord };
+			if (emailCryptoUtils.shouldEncryptEmail(settingRow.allMailMode, plainRecord)) {
+				encryptedRecord = await emailCryptoUtils.encryptEmailRecord(encryptedRecord, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
+			}
+			assertMailRowSize(encryptedRecord);
+			const bodyStorageBytes = ['subject', 'text', 'content', 'code'].reduce((total, field) =>
+				total + new TextEncoder().encode(String(encryptedRecord[field] || '')).byteLength, 0);
+			return { plainRecord, encryptedRecord, imageRows, reserveBytes: bodyStorageBytes + attachmentBytes };
+		};
 		const mailDb = getMailDb(c);
-		// A replay already owns its archive/reservation. Do not charge its bytes
-		// again or reject ACCEPTED/UNKNOWN just because that send filled storage.
-		const previousTask = typeof idempotencyKey === 'string' && idempotencyKey
-			? await mailDb.prepare('SELECT task_id FROM mail_outbound_task WHERE user_id=? AND account_id=? AND idempotency_key=?')
-				.bind(userId, accountId, idempotencyKey).first() : null;
-		const storageCheck = previousTask ? null : await storageQuotaService.checkQuotaAvailable(c, userId, reserveBytes);
-		if (storageCheck && !storageCheck.allowed) throw new BizError(storageCheck.reason);
-		const quota = previousTask ? null : await userService.getUserQuota(c, userId, storageCheck.usage);
+		let archive;
 		const providerName = allInternal
 			? 'local'
 			: (useCloudflareEmail ? 'cloudflare' : (String(resendToken || '').startsWith('mailjet:') ? 'mailjet' : 'resend'));
-		const prepared = await mailOutboundService.prepareOutboundTask(c, { userId, accountId, idempotencyKey,
-			contentHash, reservedBytes: reserveBytes, maxStorageBytes: quota?.maxStorageBytes, maxEmails: quota?.maxEmails,
-			bypassStorage: quota?.bypassStorage || storageCheck?.usage?.byoStorageEnabled === 1,
-			storageBlocked: quota?.quotaStorageBlocked || quota?.dbFull,
+		const prepared = await mailOutboundService.prepareOutboundTask(c, {
+			userId, accountId, idempotencyKey, contentHash,
 			payload: { recipients: receiveEmail, attachmentCount: attachmentItems.length,
-				route: allInternal ? 'local' : 'external', providerName } });
+				route: allInternal ? 'local' : 'external', providerName }
+		}, async () => {
+			archive = await buildArchive();
+			const storageCheck = await storageQuotaService.checkQuotaAvailable(c, userId, archive.reserveBytes);
+			if (!storageCheck.allowed) throw new BizError(storageCheck.reason);
+			const quota = await userService.getUserQuota(c, userId, storageCheck.usage);
+			return { reservedBytes: archive.reserveBytes, maxStorageBytes: quota.maxStorageBytes, maxEmails: quota.maxEmails,
+				bypassStorage: quota.bypassStorage || storageCheck.usage?.byoStorageEnabled === 1,
+				storageBlocked: quota.quotaStorageBlocked || quota.dbFull };
+		});
 		const readArchived = async task => {
 			let row = await orm(c).select().from(email).where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
 			if (!row) throw new BizError('The accepted send record requires reconciliation', 503, 'outbound_archive_missing');
@@ -1129,7 +1135,7 @@ const emailService = {
 				row = await emailCryptoUtils.decryptEmailRecord(row, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
 			}
 			const attList = await attService.selectByEmailIds(c, [row.emailId]);
-			if (prepared.task.provider === 'local' && row.status === emailConst.status.BOUNCED) {
+			if (task.provider === 'local' && row.status === emailConst.status.BOUNCED) {
 				const status = await readSendStatus(c, userId, accountId, idempotencyKey);
 				if (status.deliveryOutcome) row.deliveryOutcome = status.deliveryOutcome;
 			}
@@ -1164,21 +1170,25 @@ const emailService = {
 			"EXISTS(SELECT 1 FROM mail_outbound_task WHERE task_id=? AND state='PREPARED' AND lease_token=? AND lease_until>unixepoch())",
 			[task.task_id, leaseToken]);
 		try {
+			archive ??= await buildArchive();
 			archived = await orm(c).select().from(email).where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
+			const completeOnInsert = !archived && attachmentItems.length === 0;
 			if (!archived) {
 				const assertion = guard();
 				await mailDb.batch([assertion.before,
-					prepareMailQuery(c, orm(c).insert(email).values({ ...encryptedRecord, outboundTaskId: task.task_id })),
-					mailDb.prepare("UPDATE mail_outbound_task SET reserved_bytes=?,reserved_count=0 WHERE task_id=? AND state='PREPARED' AND lease_token=?")
-						.bind(attachmentBytes, task.task_id, leaseToken), assertion.after]);
+					prepareMailQuery(c, orm(c).insert(email).values({ ...archive.encryptedRecord, outboundTaskId: task.task_id })),
+					mailDb.prepare(`UPDATE mail_outbound_task SET reserved_bytes=?,reserved_count=0,
+						email_id=CASE WHEN ? THEN (SELECT email_id FROM email WHERE outbound_task_id=?) ELSE email_id END
+						WHERE task_id=? AND state='PREPARED' AND lease_token=?`)
+						.bind(attachmentBytes, completeOnInsert ? 1 : 0, task.task_id, task.task_id, leaseToken), assertion.after]);
 				archived = await orm(c).select().from(email).where(eq(email.outboundTaskId, task.task_id)).get();
 			}
-			if (!task.email_id) {
+			if (!task.email_id && !completeOnInsert) {
 				const sourceAttachments = attachmentItems.map((item, index) => ({ userId, accountId, emailId: archived.emailId,
 					content: item.buff, size: item.buff.byteLength, filename: item.filename,
 					mimeType: item.mimeType || item.type || 'application/octet-stream',
 					key: item.key || '', type: index < imageDataList.length ? attConst.type.EMBED : attConst.type.ATT,
-					contentId: index < imageDataList.length ? imageRows[index].contentId : null }));
+					contentId: index < imageDataList.length ? archive.imageRows[index].contentId : null }));
 				for (const item of sourceAttachments) {
 					if (!item.key) item.key = 'attachments/' + await fileUtils.getBuffHash(item.content) + fileUtils.getExtFileName(item.filename);
 				}
@@ -1244,7 +1254,7 @@ const emailService = {
 		try {
 			if (allInternal) {
 				const allAttachments = await orm(c).select().from(att).where(eq(att.emailId, archived.emailId)).all();
-				await this.HandleOnSiteEmail(c, receiveEmail, { ...plainRecord, emailId: archived.emailId }, allAttachments,
+				await this.HandleOnSiteEmail(c, receiveEmail, { ...archive.plainRecord, emailId: archived.emailId }, allAttachments,
 					{ taskId: task.task_id, leaseToken });
 			} else {
 				const providerParams = { name, accountEmail: accountRow.email, receiveEmail, subject, text, html: providerHtml,
@@ -1308,7 +1318,7 @@ const emailService = {
 			const previous = Number(await c.env.kv.get(dayKey) || 0);
 			await c.env.kv.put(dayKey, String(previous + receiveEmail.length), { expirationTtl: 86400 });
 		} catch (_) { console.warn('Send statistics update failed'); }
-		return readArchived({ task_id: dispatch.task.task_id });
+		return readArchived(dispatch.task);
 	},
 
 	async sendByCloudflareEmail(c, params) {
@@ -2034,7 +2044,7 @@ const emailService = {
 			.get();
 		if (emailRow) {
 			emailRow.isStar = emailRow.starId != null ? 1 : 0;
-			if (emailRow.userId) {
+			if (emailRow.userId && hasEncryptedFields(emailRow)) {
 				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, emailRow.userId);
 				if (emailCryptoUtils.needsEmailRecordMigration(emailRow, cryptoKey)) {
 					await emailKeyMigrationService.lazyReencryptEmailRow(c, emailRow, cryptoKey).catch(() => {});
@@ -2120,7 +2130,7 @@ const emailService = {
 
 		await this.emailAddAtt(c, list);
 
-		if (userId) {
+		if (userId && list.some(hasEncryptedFields)) {
 			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
 			list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
 		}
@@ -2138,9 +2148,7 @@ const emailService = {
 			}
 		});
 
-		await Promise.all(list.map(async (item) => {
-			item.hash = await hashUtils.encodeEmailHash(item.emailId, userId, c.env.jwt_secret);
-		}));
+		await hashUtils.addEmailHashes(list, c.env.jwt_secret, () => userId);
 
 		return list;
 	},
@@ -2615,9 +2623,7 @@ const emailService = {
 
 		await this.emailAddAtt(c, list);
 
-		await Promise.all(list.map(async (item) => {
-			item.hash = await hashUtils.encodeEmailHash(item.emailId, item.userId || 0, c.env.jwt_secret);
-		}));
+		await hashUtils.addEmailHashes(list, c.env.jwt_secret, item => item.userId || 0);
 
 		if (!latestEmail) {
 			latestEmail = {
@@ -2793,7 +2799,6 @@ const emailService = {
 			conditionList.push(eq(email.accountId, Number(accountId)));
 		}
 
-		let fieldToSelect = null;
 		let results = [];
 		const isFrom = ['from', 'sender_address_includes'].includes(type);
 		const isTo = ['to', 'recipient_address_includes', 'email_received_for_others'].includes(type);
@@ -2839,10 +2844,11 @@ const emailService = {
 				.groupBy(email.subject)
 				.limit(25);
 			if (userId) {
-				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+				const encrypted = list.some(item => emailCryptoUtils.inspectEncryptedValue(item.value).encrypted);
+				const cryptoKey = encrypted ? await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId) : null;
 				const decryptedSubjects = await Promise.all(list.map(async item => {
 					try {
-						const dec = await emailCryptoUtils.decryptText(item.value, cryptoKey);
+						const dec = cryptoKey ? await emailCryptoUtils.decryptText(item.value, cryptoKey) : item.value;
 						// 若解密结果依然是密文前缀，说明属于其他用户密文或解密未成功，予以安全剔除
 						if (typeof dec === 'string' && dec.startsWith('enc:v1:')) return null;
 						return dec;
@@ -2861,7 +2867,7 @@ const emailService = {
 
 	async getSidebarStats(c, userId) {
 		const mailDb = getMailDb(c);
-		const stats = await mailDb.prepare(`
+		const counts = mailDb.prepare(`
 			SELECT 
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND (snoozed_time IS NULL OR is_official = 1) AND type = 0 AND unread = 0 THEN 1 ELSE 0 END) as inboxUnread,
 				SUM(CASE WHEN is_del = 0 AND is_spam = 0 AND snoozed_time IS NULL AND type = 1 AND status = 6 AND unread = 0 THEN 1 ELSE 0 END) as draftUnread,
@@ -2875,13 +2881,16 @@ const emailService = {
 				SUM(CASE WHEN is_del = 0 AND unread = 0 THEN 1 ELSE 0 END) as allUnread
 			FROM email
 			WHERE user_id = ?
-		`).bind(userId).first();
+		`).bind(userId);
 
-		const labelEmails = await mailDb.prepare(`
-			SELECT labels, unread FROM email WHERE user_id = ? AND is_del = 0 AND labels != '[]' AND labels IS NOT NULL
-		`).bind(userId).all();
+		const labelsQuery = mailDb.prepare(`
+			SELECT labels, unread, count(*) AS messages FROM email
+			WHERE user_id = ? AND is_del = 0 AND labels != '[]' AND labels IS NOT NULL
+			GROUP BY labels, unread
+		`).bind(userId);
+		const [stats, labelEmails] = await mailDb.batch([counts, labelsQuery]);
 
-		const labelStats = {};
+		const labelStats = Object.create(null);
 		if (labelEmails && labelEmails.results) {
 			for (const row of labelEmails.results) {
 				try {
@@ -2891,9 +2900,9 @@ const emailService = {
 							labelStats[lbl] = { unread: 0, read: 0 };
 						}
 						if (row.unread === 0) {
-							labelStats[lbl].unread++;
+							labelStats[lbl].unread += row.messages;
 						} else {
-							labelStats[lbl].read++;
+							labelStats[lbl].read += row.messages;
 						}
 					}
 				} catch (e) {}
@@ -2901,7 +2910,7 @@ const emailService = {
 		}
 
 		return {
-			...stats,
+			...stats.results[0],
 			labelStats
 		};
 	},

@@ -127,12 +127,23 @@ const dbInit = {
 		await this.v3_27DB(c);
 		await this.v3_28DB(c);
 		await this.v3_29DB(c);
+		await this.v3_30DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
 			return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
 		}
 		return c.text('success');
+	},
+
+	async v3_30DB(c) {
+		const db = getMailDb(c);
+		await db.batch([
+			db.prepare('CREATE INDEX IF NOT EXISTS idx_email_user_page ON email(user_id, email_id)'),
+			db.prepare('CREATE INDEX IF NOT EXISTS idx_star_user_email ON star(user_id, email_id)'),
+			db.prepare('CREATE INDEX IF NOT EXISTS idx_email_live_notice ON email(user_id, create_time) WHERE is_official=1 AND is_del=0'),
+			db.prepare("CREATE INDEX IF NOT EXISTS idx_email_user_labels ON email(user_id, labels, unread) WHERE is_del=0 AND labels!='[]' AND labels IS NOT NULL")
+		]);
 	},
 
 	async v3_29DB(c) {

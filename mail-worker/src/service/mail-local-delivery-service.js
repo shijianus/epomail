@@ -34,20 +34,34 @@ function sameStorage(left, right) {
 }
 
 function quotaCondition({ userId, incomingBytes, maxStorageBytes, maxEmails, bypassStorage }) {
+	const checkBytes = !bypassStorage && maxStorageBytes !== 0;
+	const checkCount = maxEmails !== 0;
+	if (!checkBytes && !checkCount) return { sql: '1', params: [] };
+	const totals = (bytes, count) => [
+		checkBytes && `COALESCE(SUM(${bytes}),0) AS bytes`,
+		checkCount && `${count} AS n`
+	].filter(Boolean).join(', ');
+	const emailBytes = `LENGTH(CAST(IFNULL(subject,'') AS BLOB))+LENGTH(CAST(IFNULL(text,'') AS BLOB))+
+		LENGTH(CAST(IFNULL(content,'') AS BLOB))+LENGTH(CAST(IFNULL(code,'') AS BLOB))`;
+	const reserved = totals('reserved_bytes', 'COALESCE(SUM(reserved_count),0)');
+	const conditions = [];
+	const params = [];
+	if (checkBytes) {
+		conditions.push(`m.bytes + i.bytes + o.bytes + COALESCE((SELECT SUM(size) FROM attachments WHERE user_id=?),0) + ? <= ?`);
+		params.push(userId, incomingBytes, maxStorageBytes);
+	}
+	if (checkCount) {
+		conditions.push('m.n + i.n + o.n + 1 <= ?');
+		params.push(maxEmails);
+	}
 	return {
-		sql: `(?=1 OR ?=0 OR (
-			COALESCE((SELECT SUM(LENGTH(CAST(IFNULL(subject,'') AS BLOB))+LENGTH(CAST(IFNULL(text,'') AS BLOB))+
-				LENGTH(CAST(IFNULL(content,'') AS BLOB))+LENGTH(CAST(IFNULL(code,'') AS BLOB))) FROM email WHERE user_id=?),0)
-			+ COALESCE((SELECT SUM(size) FROM attachments WHERE user_id=?),0)
-			+ COALESCE((SELECT SUM(reserved_bytes) FROM mail_receive_claim WHERE user_id=? AND state IN ('CLAIMED','SAVING','RETRY') AND lease_until>unixepoch()),0)
-			+ COALESCE((SELECT SUM(reserved_bytes) FROM mail_outbound_task WHERE user_id=? AND state IN ('PREPARED','SENDING','UNKNOWN')),0)
-			+ ?<=?)) AND (?=0 OR (
-			(SELECT COUNT(*) FROM email WHERE user_id=?)
-			+ COALESCE((SELECT SUM(reserved_count) FROM mail_receive_claim WHERE user_id=? AND state IN ('CLAIMED','SAVING','RETRY') AND lease_until>unixepoch()),0)
-			+ COALESCE((SELECT SUM(reserved_count) FROM mail_outbound_task WHERE user_id=? AND state IN ('PREPARED','SENDING','UNKNOWN')),0)
-			+ 1<=?))`,
-		params: [bypassStorage ? 1 : 0, maxStorageBytes, userId, userId, userId, userId, incomingBytes, maxStorageBytes,
-			maxEmails, userId, userId, userId, maxEmails]
+		sql: `(SELECT ${conditions.join(' AND ')}
+			FROM (SELECT ${totals(emailBytes, 'COUNT(*)')} FROM email WHERE user_id=?) AS m
+			CROSS JOIN (SELECT ${reserved} FROM mail_receive_claim WHERE user_id=?
+				AND state IN ('CLAIMED','SAVING','RETRY') AND lease_until>unixepoch()) AS i
+			CROSS JOIN (SELECT ${reserved} FROM mail_outbound_task WHERE user_id=?
+				AND state IN ('PREPARED','SENDING','UNKNOWN')) AS o)`,
+		params: [...params, userId, userId, userId]
 	};
 }
 
@@ -164,9 +178,16 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 	const setting = await settingService.query(c);
 	const failedRecipients = [];
 	for (const recipient of addresses) {
-		const receipt = await db.prepare('SELECT state FROM mail_local_delivery WHERE task_id=? AND recipient=?').bind(taskId, recipient).first();
-		if (receipt) continue;
-		const recipientAccount = await mailOrm(c).select().from(account).where(sql`lower(${account.email})=${recipient}`).get();
+		// UNION ALL stops at an existing receipt. A new address uses the NOCASE
+		// index, with the original exact folded-string comparison as a residual.
+		const recipientAccount = await db.prepare(`
+			SELECT 1 AS recorded, NULL AS accountId, NULL AS userId, NULL AS status, NULL AS isDel
+			FROM mail_local_delivery WHERE task_id=?1 AND recipient=?2
+			UNION ALL
+			SELECT 0, account_id, user_id, status, is_del FROM account
+			WHERE email COLLATE NOCASE=?2 AND lower(email)=?2 LIMIT 1
+		`).bind(taskId, recipient).first();
+		if (recipientAccount?.recorded) continue;
 		let owner = null;
 		let reason = null;
 		if (setting.receive === settingConst.receive.CLOSE) reason = 'Receiving is disabled';
@@ -241,8 +262,9 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 		assertMailRowSize(values);
 		const quotaCheck = quotaCondition({ userId, incomingBytes: bodyBytes(values) + copied.rows.reduce((sum, item) => sum + item.size, 0),
 			maxStorageBytes: quota.maxStorageBytes, maxEmails: quota.maxEmails, bypassStorage: quota.bypassStorage || quota.byoStorageEnabled === 1 });
-		const available = await db.prepare(`SELECT (${quotaCheck.sql}) AS allowed`).bind(...quotaCheck.params).first();
-		if (!available?.allowed) {
+		const withinQuota = !quotaCheck.params.length ||
+			(await db.prepare(`SELECT (${quotaCheck.sql}) AS allowed`).bind(...quotaCheck.params).first())?.allowed;
+		if (!withinQuota) {
 			await recordBounce(c, taskId, leaseToken, recipient, 'Recipient quota is exhausted');
 			continue;
 		}
@@ -251,24 +273,22 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 			SELECT 1 FROM mail_local_delivery WHERE task_id=? AND recipient=?)`,
 			[taskId, leaseToken, ...quotaCheck.params, ...(userId ? [accountId, userId] : []), taskId, recipient]);
 		const plannedForward = await forwardPlan(c, setting, notificationSnapshot);
-		const statements = [guard.before, prepareMailQuery(c, mailOrm(c).insert(email).values(values)),
+		const statements = [guard.before, prepareMailQuery(c, mailOrm(c).insert(email).values(values).returning({ emailId: email.emailId })),
 			...forwardIntentStatements(c, plannedForward, deliveryKey),
 			...buildBoundedInserts(chunk => mailOrm(c).insert(att).values(chunk), copied.rows.map(row => ({ ...row,
 				emailId: sql`(SELECT email_id FROM email WHERE receive_claim_key=${deliveryKey})` }))).map(query => prepareMailQuery(c, query)),
 			db.prepare(`INSERT INTO mail_local_delivery(task_id,recipient,email_id,state)
 				SELECT ?,?,email_id,'DELIVERED' FROM email WHERE receive_claim_key=?`).bind(taskId, recipient, deliveryKey),
 			...copied.stagedKeys.map(key => db.prepare('DELETE FROM object_deletion_queue WHERE object_key=? AND user_id=?').bind(key, userId)), guard.after];
-		await db.batch(statements);
+		const results = await db.batch(statements);
 		try {
-			if (!userId || !owner) continue;
-			const inserted = await db.prepare('SELECT email_id AS emailId FROM email WHERE receive_claim_key=?')
-				.bind(deliveryKey).first();
-			if (!inserted?.emailId) continue;
+			if (!userId || !owner || Number(setting.userTgForward ?? 1) !== 1) continue;
+			const emailId = results[1].results[0]?.email_id;
+			if (!emailId) continue;
 			const profile = await c.env.kv.get('USER_PROFILE_' + userId, { type: 'json' });
-			const notificationRow = { ...notificationSnapshot, emailId: inserted.emailId };
+			const notificationRow = { ...notificationSnapshot, emailId };
 			const ptg = profile?.personalTelegram;
-			if (Number(setting.userTgForward ?? 1) === 1
-				&& ptg?.enabled === true && ptg.botToken && ptg.chatId) {
+			if (ptg?.enabled === true && ptg.botToken && ptg.chatId) {
 				await telegramService.sendPersonalEmailToBot(c, notificationRow, ptg)
 					.catch(err => console.warn('Local personal Telegram notification failed:', err.message));
 			}

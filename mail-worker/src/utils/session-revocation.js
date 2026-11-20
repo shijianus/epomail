@@ -42,7 +42,12 @@ export async function revokeSessionToken(c, userId, token, expiresAt = 0) {
 }
 
 export async function withoutRevokedTokens(c, userId, tokens) {
-	const checked = await Promise.all(tokens.map(async token =>
-		await isSessionRevoked(c, userId, token) ? null : token));
-	return checked.filter(token => token !== null);
+	if (!tokens.length) return [];
+	const hashes = await Promise.all(tokens.map(hashToken));
+	// Bind one JSON array so existing KV records of any size use one D1 read.
+	const rows = await storage(c).prepare(`SELECT token_hash FROM session_revocation
+		WHERE token_hash IN (SELECT value FROM json_each(?)) AND user_id = ? AND expires_at >= unixepoch()`)
+		.bind(JSON.stringify(hashes), userId).all();
+	const revoked = new Set(rows.results.map(row => row.token_hash));
+	return tokens.filter((token, index) => token !== null && !revoked.has(hashes[index]));
 }

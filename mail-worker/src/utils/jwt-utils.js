@@ -23,6 +23,11 @@ function requireJwtSecret(c) {
 	return secret.trim();
 }
 
+// Only standard login JWTs have an account/session revocation record.
+export function hasSessionRevocationCheck(payload) {
+	return !payload.purpose && Boolean(payload.userId && payload.token);
+}
+
 const jwtUtils = {
 	async generateTokenWithSecret(c, secret, payload, expiresInSeconds) {
 		if (!secret || typeof secret !== 'string' || !secret.trim()) {
@@ -111,7 +116,7 @@ const jwtUtils = {
 			if (!payload.exp || payload.exp < now) return null;
 
 			// Durable revocation wins over stale KV hits and D1 positive-session fallback.
-			if (!payload.purpose && payload.userId && payload.token
+			if (hasSessionRevocationCheck(payload)
 				&& await isSessionRevoked(c, payload.userId, payload.token)) return null;
 
 			return payload;

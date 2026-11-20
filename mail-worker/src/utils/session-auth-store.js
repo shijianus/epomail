@@ -3,6 +3,7 @@ import constant from '../const/constant.js';
 import { getUserDb } from './db-accessor.js';
 import { revokeSessionToken, withoutRevokedTokens, isSessionRevoked } from './session-revocation.js';
 import safeLogger from './safe-logger.js';
+import jwtUtils, { hasSessionRevocationCheck } from './jwt-utils.js';
 
 const USER_SESSION_LIMIT = 10;
 const ensuredSessionDbs = new WeakSet();
@@ -259,14 +260,27 @@ export async function persistSessionRecord(c, userId, authInfo, token) {
 	return null;
 }
 
+// Consume the revocation result only inside this verification call. Standalone
+// lookups, the next request and explicit reauthentication perform their own checks.
+export async function readVerifiedBearerSession(c, bearer) {
+	const claims = await jwtUtils.verifyToken(c, bearer);
+	if (!claims || claims.purpose === 'restricted_notice') return { claims, session: null };
+	const session = await readSessionRecord(c, claims.userId, claims.token, !hasSessionRevocationCheck(claims));
+	return { claims, session };
+}
+
+export function readAuthorizedSession(c, userId, token) {
+	return readSessionRecord(c, userId, token, true);
+}
+
 /**
  * Resolve an active session record from KV edge cache first, falling back to
  * D1 `user_session` only when KV missed a validly signed bearer token and
  * self-healing KV when D1 confirms the session is active.
  */
-export async function readAuthorizedSession(c, userId, token) {
+async function readSessionRecord(c, userId, token, checkRevocation) {
 	if (!c?.env?.kv || typeof token !== 'string' || !token) return null;
-	if (resolveSessionDb(c) && await isSessionRevoked(c, userId, token)) return null;
+	if (checkRevocation && resolveSessionDb(c) && await isSessionRevoked(c, userId, token)) return null;
 	const key = sessionKey(userId);
 	const authInfo = await c.env.kv.get(key, { type: 'json' });
 	const cached = Array.isArray(authInfo?.tokens) && authInfo.tokens.includes(token);

@@ -80,7 +80,7 @@ export function localEnvironment(directory, source = process.env) {
 	};
 }
 
-export async function writeLocalConfig(directory, workerDir, assetsDir = path.join(workerDir, 'dist'), workerEntry = path.join(workerDir, 'src/index.js'), prebuilt = false) {
+export async function writeLocalConfig(directory, workerDir, assetsDir = path.join(workerDir, 'dist'), workerEntry = path.join(workerDir, 'src/index.js'), prebuilt = false, profileRequests = false) {
 	const secrets = {
 		jwt_secret: randomBytes(32).toString('base64url'),
 		totp_enc_key: randomBytes(32).toString('base64'),
@@ -94,7 +94,14 @@ export async function writeLocalConfig(directory, workerDir, assetsDir = path.jo
 		await fs.cp(path.dirname(mainPath), path.join(moduleDir, 'bundle'), { recursive: true });
 		mainPath = './bundle/' + path.basename(mainPath);
 	}
-	await fs.writeFile(entryPath, `import worker from ${JSON.stringify(mainPath)};\nObject.defineProperty(globalThis, 'fetch', { value: async () => { throw new Error('External network is disabled in the isolated test worker'); }, writable: false, configurable: false });\nexport default worker;\n`, { mode: 0o600, flag: 'wx' });
+	let exportedWorker = 'worker';
+	let profileImport = '';
+	if (profileRequests) {
+		await fs.copyFile(path.join(helperDir, 'profile-local-worker.mjs'), path.join(moduleDir, 'profile-local-worker.mjs'));
+		profileImport = "import { profileWorker } from './profile-local-worker.mjs';\n";
+		exportedWorker = 'profileWorker(worker)';
+	}
+	await fs.writeFile(entryPath, `import worker from ${JSON.stringify(mainPath)};\nObject.defineProperty(globalThis, 'fetch', { value: async () => { throw new Error('External network is disabled in the isolated test worker'); }, writable: false, configurable: false });\n${profileImport}export default ${exportedWorker};\n`, { mode: 0o600, flag: 'wx' });
 	const configPath = path.join(directory, 'wrangler.json');
 	await fs.writeFile(configPath, JSON.stringify({
 		name: 'epomail-local-test',
@@ -103,7 +110,7 @@ export async function writeLocalConfig(directory, workerDir, assetsDir = path.jo
 			no_bundle: true,
 			base_dir: moduleDir,
 			find_additional_modules: true,
-			rules: [{ type: 'ESModule', globs: ['bundle/**/*.js'], fallthrough: true }]
+			rules: [{ type: 'ESModule', globs: ['bundle/**/*.js', ...(profileRequests ? ['profile-local-worker.mjs'] : [])], fallthrough: true }]
 		} : {}),
 		compatibility_date: '2025-06-04',
 		compatibility_flags: ['nodejs_als'],
@@ -321,6 +328,7 @@ export async function startLocalStack({
 	workerDir = path.join(root, 'mail-worker'),
 	assetsDir = process.env.EPOMAIL_CANDIDATE_DIR ? path.resolve(process.env.EPOMAIL_CANDIDATE_DIR, 'dist') : path.join(workerDir, 'dist'),
 	workerEntry = process.env.EPOMAIL_CANDIDATE_DIR ? path.resolve(process.env.EPOMAIL_CANDIDATE_DIR, 'bundle/index.js') : path.join(workerDir, 'src/index.js'),
+	profileRequests = false,
 	startupTimeoutMs = 180000
 } = {}) {
 	let directory, child, state, stopPromise;
@@ -385,7 +393,7 @@ export async function startLocalStack({
 		const runtimeEntry = path.resolve(helperDir, 'local-stack-runtime.mjs');
 		await fs.mkdir(os.tmpdir(), { recursive: true });
 		directory = await fs.mkdtemp(path.join(os.tmpdir(), 'epomail-local-'));
-		const config = await writeLocalConfig(directory, workerDir, assetsDir, workerEntry, Boolean(process.env.EPOMAIL_CANDIDATE_DIR));
+		const config = await writeLocalConfig(directory, workerDir, assetsDir, workerEntry, Boolean(process.env.EPOMAIL_CANDIDATE_DIR), profileRequests);
 		secrets = config.secrets;
 		controller.signal.throwIfAborted();
 		child = spawn(process.execPath, [

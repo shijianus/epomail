@@ -129,8 +129,18 @@ const attachment = { filename: 'local.txt', type: 'text/plain', content: btoa('l
 const imageContent = '<p>body<img src="data:image/png;base64,AQIDBA=="></p>';
 
 describe('Outbound send integration and replay', () => {
-	it('reads sender storage usage once for a new send and skips the scan on accepted replay', async () => {
+	it('prepares a new task with two D1 statements and looks up an accepted replay once without rebuilding its archive', async () => {
 		await fixture(async ({ c, params, userId, provider }) => {
+			const taskStatements = [];
+			c.env.MAIL_DB = {
+				prepare(sql) {
+					if (/^SELECT .* FROM mail_outbound_task WHERE user_id\s*=/i.test(sql.trim())) taskStatements.push('lookup');
+					if (/^INSERT INTO mail_outbound_task\b/i.test(sql.trim())) taskStatements.push('reserve');
+					return db.prepare(sql);
+				},
+				batch: statements => db.batch(statements)
+			};
+			const buildArchive = vi.spyOn(emailService, 'imgReplace');
 			userService.getUserQuota.mockRestore();
 			storageQuotaService.checkQuotaAvailable.mockRestore();
 			const scan = vi.spyOn(storageQuotaService, 'getUserStorageUsage').mockResolvedValue({
@@ -138,10 +148,50 @@ describe('Outbound send integration and replay', () => {
 				byoStorageEnabled: 0, isVisitor: false
 			});
 			const first = await emailService.send(c, params, userId);
+			expect(taskStatements).toEqual(['lookup', 'reserve']);
+			taskStatements.length = 0;
 			const replay = await emailService.send(c, params, userId);
+			expect(taskStatements).toEqual(['lookup']);
+			expect(buildArchive).toHaveBeenCalledTimes(1);
 			expect(scan).toHaveBeenCalledTimes(1);
 			expect(scan).toHaveBeenCalledWith(c, userId);
 			expect(replay[0].emailId).toBe(first[0].emailId);
+			expect(provider).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	it('checks the largest decoded attachment once and verifies bytes and sender authorization on replay', async () => {
+		await fixture(async ({ c, params, userId, provider }) => {
+			params.attachments = ['a', 'abcd', 'ab'].map((content, index) =>
+				({ filename: `file-${index}.txt`, type: 'text/plain', content: btoa(content) }));
+			const sizeCheck = storageQuotaService.checkAttachmentSizeLimit;
+			sizeCheck.mockResolvedValueOnce({ allowed: false, reason: 'Attachment too large' });
+			await expect(emailService.send(c, structuredClone(params), userId)).rejects.toThrow('Attachment too large');
+			expect(sizeCheck.mock.calls.map(call => call[2])).toEqual([4]);
+			await emailService.send(c, structuredClone(params), userId);
+			sizeCheck.mockClear(); // Object staging performs its own checks before uploading.
+			const changed = structuredClone(params);
+			changed.attachments[1].content = btoa('wxyz');
+			await expect(emailService.send(c, changed, userId)).rejects.toMatchObject({ errorCode: 'idempotency_conflict' });
+			accountService.selectById.mockResolvedValueOnce({ accountId: params.accountId, userId, status: 1 });
+			await expect(emailService.send(c, structuredClone(params), userId)).rejects.toMatchObject({ code: 403 });
+			expect(sizeCheck.mock.calls.map(call => call[2])).toEqual([4]);
+			expect(provider).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	it('links an attachment-free archive in its first transaction and resumes it after a reservation failure', async () => {
+		await fixture(async ({ c, params, userId, task, provider }) => {
+			const stage = vi.spyOn(attService, 'stageInboundAtt');
+			vi.spyOn(mailOutboundService, 'reserveSendCount').mockRejectedValueOnce(new Error('Local reservation unavailable'));
+			await expect(emailService.send(c, structuredClone(params), userId)).rejects.toThrow('Local reservation unavailable');
+			const pending = await task();
+			expect(pending.email_id).toBeGreaterThan(0);
+			expect(pending).toMatchObject({ state: 'PREPARED', lease_token: null, reserved_bytes: 0, reserved_count: 0 });
+			expect(provider).not.toHaveBeenCalled();
+			const [completed] = await emailService.send(c, structuredClone(params), userId);
+			expect(completed.emailId).toBe(pending.email_id);
+			expect(stage).not.toHaveBeenCalled();
 			expect(provider).toHaveBeenCalledTimes(1);
 		});
 	});

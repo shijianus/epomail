@@ -54,8 +54,7 @@ function buildEmailAad(userId, domainTag) {
 	return encoder.encode(`epomail:email:v1:uid=${Number(userId || 0)}:d=${domainTag}`);
 }
 
-async function deriveDomainAesKey(secret, uid, domainName) {
-	const baseKey = await crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey']);
+async function deriveDomainAesKey(baseKey, uid, domainName) {
 	return await crypto.subtle.deriveKey(
 		{
 			name: 'HKDF',
@@ -70,8 +69,7 @@ async function deriveDomainAesKey(secret, uid, domainName) {
 	);
 }
 
-async function deriveLegacyV1AesKey(secret, uid, legacySalt) {
-	const baseKey = await crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey']);
+async function deriveLegacyV1AesKey(baseKey, uid, legacySalt) {
 	return await crypto.subtle.deriveKey(
 		{
 			name: 'HKDF',
@@ -138,58 +136,33 @@ const emailCryptoUtils = {
 		const totpSecret = cleanSecret(env?.totp_enc_key);
 		const jwtSecret = cleanSecret(env?.jwt_secret);
 
-		let activeDomain = null;
-		let domainName = null;
-		let writeKey = null;
-
-		if (emailSecret) {
-			activeDomain = EMAIL_KEY_DOMAINS.EMAIL_ENC_KEY;
-			domainName = EMAIL_KEY_DOMAIN_NAMES.e;
-			writeKey = await deriveDomainAesKey(emailSecret, uid, domainName);
-		} else if (!requireDedicatedKey && totpSecret) {
-			activeDomain = EMAIL_KEY_DOMAINS.TOTP_COMPAT;
-			domainName = EMAIL_KEY_DOMAIN_NAMES.t;
-			writeKey = await deriveDomainAesKey(totpSecret, uid, domainName);
-		} else if (!allowLegacyJwtDecryptOnly || !jwtSecret) {
+		const activeDomain = emailSecret ? EMAIL_KEY_DOMAINS.EMAIL_ENC_KEY
+			: (!requireDedicatedKey && totpSecret ? EMAIL_KEY_DOMAINS.TOTP_COMPAT : null);
+		if (!activeDomain && (!allowLegacyJwtDecryptOnly || !jwtSecret)) {
 			throw new Error('email encryption key is not configured (set email_enc_key or totp_enc_key)');
 		}
 
+		// The imports belong only to this keyring, so rotations take effect on the next call.
+		const secrets = [...new Set([emailSecret, prevEmailSecret, totpSecret, jwtSecret].filter(Boolean))];
+		const baseKeys = new Map(await Promise.all(secrets.map(async secret => [
+			secret, await crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey'])
+		])));
+		const domainKey = (secret, domain) => secret
+			? deriveDomainAesKey(baseKeys.get(secret), uid, EMAIL_KEY_DOMAIN_NAMES[domain])
+			: null;
+		const [currentE, previousE, previousP, currentP, compatT, legacyReadKeys] = await Promise.all([
+			domainKey(emailSecret, 'e'), domainKey(prevEmailSecret, 'e'),
+			domainKey(prevEmailSecret, 'p'), domainKey(emailSecret, 'p'), domainKey(totpSecret, 't'),
+			Promise.all(secrets.map(secret => deriveLegacyV1AesKey(baseKeys.get(secret), uid, userSalt)))
+		]);
 		const readKeysByDomain = {
-			[EMAIL_KEY_DOMAINS.EMAIL_ENC_KEY]: [],
-			[EMAIL_KEY_DOMAINS.PREVIOUS_EMAIL_ENC_KEY]: [],
-			[EMAIL_KEY_DOMAINS.TOTP_COMPAT]: []
+			e: [currentE, previousE].filter(Boolean),
+			// A p-tagged write uses the previous secret first, including during rotation.
+			p: [previousP, previousE, currentP].filter(Boolean),
+			t: [compatT].filter(Boolean)
 		};
-
-		if (emailSecret) {
-			readKeysByDomain[EMAIL_KEY_DOMAINS.EMAIL_ENC_KEY].push(
-				await deriveDomainAesKey(emailSecret, uid, EMAIL_KEY_DOMAIN_NAMES.e)
-			);
-		}
-		if (prevEmailSecret) {
-			const prevWithE = await deriveDomainAesKey(prevEmailSecret, uid, EMAIL_KEY_DOMAIN_NAMES.e);
-			const prevWithP = await deriveDomainAesKey(prevEmailSecret, uid, EMAIL_KEY_DOMAIN_NAMES.p);
-			readKeysByDomain[EMAIL_KEY_DOMAINS.EMAIL_ENC_KEY].push(prevWithE);
-			readKeysByDomain[EMAIL_KEY_DOMAINS.PREVIOUS_EMAIL_ENC_KEY].push(prevWithP, prevWithE);
-		}
-		if (emailSecret) {
-			// Append after prevEmailSecret so domainOverride=p writes still select previous_email_enc_key[0],
-			// while d=p ciphertext stays readable after rollback clears previous_email_enc_key.
-			readKeysByDomain[EMAIL_KEY_DOMAINS.PREVIOUS_EMAIL_ENC_KEY].push(
-				await deriveDomainAesKey(emailSecret, uid, EMAIL_KEY_DOMAIN_NAMES.p)
-			);
-		}
-		if (totpSecret) {
-			readKeysByDomain[EMAIL_KEY_DOMAINS.TOTP_COMPAT].push(
-				await deriveDomainAesKey(totpSecret, uid, EMAIL_KEY_DOMAIN_NAMES.t)
-			);
-		}
-
-		const legacySecrets = [...new Set([emailSecret, prevEmailSecret, totpSecret, jwtSecret].filter(Boolean))];
-		const legacyReadKeys = [];
-		const legacySalt = userSalt || `epomail-user-salt-${uid || 0}`;
-		for (const secret of legacySecrets) {
-			legacyReadKeys.push(await deriveLegacyV1AesKey(secret, uid, legacySalt));
-		}
+		const domainName = EMAIL_KEY_DOMAIN_NAMES[activeDomain] ?? null;
+		const writeKey = activeDomain ? readKeysByDomain[activeDomain][0] : null;
 
 		return {
 			__epomailEmailKeyring: true,

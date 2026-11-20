@@ -161,6 +161,16 @@ async function withoutTable(db, table, run) {
 }
 
 describe('Mail quota consistency (real D1, separate identity and mail databases)', () => {
+	it('reads one settings snapshot per public-storage attachment check', async () => {
+		await fixture(async ({ c }) => {
+			const settings = vi.spyOn(settingService, 'query');
+			expect(await storageQuotaService.checkAttachmentSizeLimit(c, USER_ID, 26 * MIB)).toMatchObject({
+				allowed: false, isByo: false, maxSizeMb: 25
+			});
+			expect(settings).toHaveBeenCalledTimes(1);
+		});
+	});
+
 	it('counts UTF-8 bytes of all four stored fields and routes usage and role configuration to their own databases', async () => {
 		await fixture(async ({ c }) => {
 			const rows = [

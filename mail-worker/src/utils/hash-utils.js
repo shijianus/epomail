@@ -41,6 +41,38 @@ async function getHmacKey(secret) {
   );
 }
 
+async function encodeWithKey(numId, userId, key) {
+  const salt = new Uint8Array(3);
+  crypto.getRandomValues(salt);
+  const saltStr = bufferToBase64Url(salt);
+
+  // 4-byte pseudo-random mask derived from HMAC(secret, 'mask:' + salt)
+  const maskSig = new Uint8Array(
+    await crypto.subtle.sign('HMAC', key, encoder.encode('mask:' + saltStr))
+  );
+  const mask = maskSig.subarray(0, 4);
+
+  const buf = new Uint8Array(15);
+  buf.set(salt, 0); // bytes 0..2: salt
+
+  const rawIdBytes = new Uint8Array(4);
+  new DataView(rawIdBytes.buffer).setUint32(0, numId, false);
+  for (let i = 0; i < 4; i++) {
+    buf[3 + i] = rawIdBytes[i] ^ mask[i]; // bytes 3..6: masked emailId
+  }
+
+  // bytes 7..14: 8-byte HMAC signature covering (emailId, userId, salt)
+  const sigBuf = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(`${numId}:${userId}:${saltStr}`)
+  );
+  const sig = new Uint8Array(sigBuf).subarray(0, 8);
+  buf.set(sig, 7);
+
+  return bufferToBase64Url(buf);
+}
+
 export const hashUtils = {
   /**
    * Encode an emailId into an opaque, URL-safe hash string
@@ -54,35 +86,16 @@ export const hashUtils = {
     if (!numId || isNaN(numId)) return '';
 
     const key = await getHmacKey(secret);
-    const salt = new Uint8Array(3);
-    crypto.getRandomValues(salt);
-    const saltStr = bufferToBase64Url(salt);
+    return encodeWithKey(numId, userId, key);
+  },
 
-    // 4-byte pseudo-random mask derived from HMAC(secret, 'mask:' + salt)
-    const maskSig = new Uint8Array(
-      await crypto.subtle.sign('HMAC', key, encoder.encode('mask:' + saltStr))
-    );
-    const mask = maskSig.subarray(0, 4);
-
-    const buf = new Uint8Array(15);
-    buf.set(salt, 0); // bytes 0..2: salt
-
-    const rawIdBytes = new Uint8Array(4);
-    new DataView(rawIdBytes.buffer).setUint32(0, numId, false);
-    for (let i = 0; i < 4; i++) {
-      buf[3 + i] = rawIdBytes[i] ^ mask[i]; // bytes 3..6: masked emailId
-    }
-
-    // bytes 7..14: 8-byte HMAC signature covering (emailId, userId, salt)
-    const sigBuf = await crypto.subtle.sign(
-      'HMAC',
-      key,
-      encoder.encode(`${numId}:${userId}:${saltStr}`)
-    );
-    const sig = new Uint8Array(sigBuf).subarray(0, 8);
-    buf.set(sig, 7);
-
-    return bufferToBase64Url(buf);
+  async addEmailHashes(rows, secret, getUserId) {
+    if (!rows.length) return;
+    const key = await getHmacKey(secret);
+    await Promise.all(rows.map(async row => {
+      const id = Number(row.emailId);
+      row.hash = id ? await encodeWithKey(id, getUserId(row), key) : '';
+    }));
   },
 
   /**

@@ -82,6 +82,16 @@ describe('Email hash tokens', () => {
 		expect(await hashUtils.decodeEmailHash(hash, 8, secret)).toBeNull();
 	});
 
+	it('signs mixed-owner pages with the same wire format and preserves owner isolation', async () => {
+		const rows = [{ emailId: 8, owner: 1 }, { emailId: 8, owner: 2 }];
+		await hashUtils.addEmailHashes(rows, secret, row => row.owner);
+		for (const row of rows) {
+			expect(await hashUtils.decodeEmailHash(row.hash, row.owner, secret)).toBe(8);
+			expect(await hashUtils.decodeEmailHash(row.hash, 3 - row.owner, secret)).toBeNull();
+		}
+		await expect(hashUtils.addEmailHashes(rows, '', row => row.owner)).rejects.toThrow('jwt_secret');
+	});
+
 	it('fails closed without a secret', async () => {
 		await expect(hashUtils.encodeEmailHash(1, 1, '')).rejects.toThrow('jwt_secret');
 	});

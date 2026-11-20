@@ -151,6 +151,27 @@ const reservation = task => userDb.prepare('SELECT * FROM mail_send_quota_reserv
 const sendCount = async f => Number((await userDb.prepare('SELECT send_count FROM user WHERE user_id=?').bind(f.userId).first()).send_count);
 
 describe('Real D1 outbound task maintenance', () => {
+	it.each(['insert conflict', 'quota denied', 'different content'])('reconciles a same-key race after the initial lookup (%s)', mode => withFixture(async f => {
+		const request = { userId: f.userId, accountId: f.accountId, idempotencyKey: f.id, contentHash: 'first' };
+		const limits = { reservedBytes: 8, maxStorageBytes: 1000, maxEmails: 10 };
+		let winner;
+		const pending = prepareOutboundTask(c, request, async () => {
+			winner = await prepareOutboundTask(c, { ...request, ...limits,
+				contentHash: mode === 'different content' ? 'second' : 'first' });
+			f.taskIds.add(winner.task.task_id);
+			if (mode === 'quota denied') throw new Error('Quota consumed by racing request');
+			return limits;
+		});
+		if (mode === 'different content') {
+			await expect(pending).rejects.toMatchObject({ errorCode: 'idempotency_conflict' });
+		} else {
+			const result = await pending;
+			expect(result.created).toBe(false);
+			expect(result.task.task_id).toBe(winner.task.task_id);
+		}
+		expect(winner.created).toBe(true);
+	}));
+
 	it('expires a PREPARED task older than one day, marks its archive failed and compensates its send count only once', () => withFixture(async f => {
 		const task = await prepared(f);
 		await db.prepare("UPDATE mail_outbound_task SET updated_at=datetime('now','-25 hours'),lease_until=0 WHERE task_id=?").bind(task.taskId).run();
