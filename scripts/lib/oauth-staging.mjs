@@ -330,6 +330,14 @@ function git(args) {
  * Static staging configuration audit
  * ------------------------------------------------------------------------- */
 
+export function hasBoundedSandboxOutbound(vars) {
+	const sandboxRecipients = String(vars.OUTBOUND_WHITELIST ?? '').split(',').map(value => value.trim()).filter(Boolean);
+	return (vars.EMAIL_OUTBOUND_ENABLED === 'true' || vars.EMAIL_OUTBOUND_ENABLED === true)
+		&& (vars.OUTBOUND_WHITELIST_ENFORCE === 'true' || vars.OUTBOUND_WHITELIST_ENFORCE === true)
+		&& sandboxRecipients.length > 0 && sandboxRecipients.length <= 20
+		&& sandboxRecipients.every(value => /^[^*\s@<>]+@[^*\s@<>]+\.[^*\s@<>]+$/.test(value));
+}
+
 export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Checks(), allowSandboxOutbound = false } = {}) {
 	let text;
 	try {
@@ -441,12 +449,7 @@ export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Chec
 
 	const urlInitDisabled = String(vars.ALLOW_URL_INIT) === 'false';
 	const outboundDisabled = String(vars.EMAIL_OUTBOUND_ENABLED) === 'false';
-	const sandboxRecipients = String(vars.OUTBOUND_WHITELIST ?? '').split(',').map(value => value.trim()).filter(Boolean);
-	const boundedSandbox = String(vars.EMAIL_OUTBOUND_ENABLED) === 'true'
-		&& String(vars.OUTBOUND_WHITELIST_ENFORCE) === 'true'
-		&& sandboxRecipients.length > 0 && sandboxRecipients.length <= 20
-		&& sandboxRecipients.every(value => /^[^*\s@<>]+@[^*\s@<>]+\.[^*\s@<>]+$/.test(value));
-	if (urlInitDisabled && (outboundDisabled || (allowSandboxOutbound && boundedSandbox))) {
+	if (urlInitDisabled && (outboundDisabled || (allowSandboxOutbound && hasBoundedSandboxOutbound(vars)))) {
 		checks.pass('CFG-11', 'URL init is disabled and the Staging outbound policy is bounded',
 			outboundDisabled ? 'Outbound disabled' : 'Explicit sandbox recipient allowlist');
 	} else {

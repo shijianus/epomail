@@ -241,7 +241,8 @@ jobs:
       - name: Release preflight and evidence contract
         run: |
           node scripts/verify-production-readiness.mjs
-          node --test tests/verify-production-readiness.test.mjs tests/public-beta-gate.test.mjs tests/release-promotion.test.mjs
+          node scripts/verify-staging-config.mjs --sandbox-outbound
+          node --test tests/verify-production-readiness.test.mjs tests/verify-staging-config.test.mjs tests/public-beta-gate.test.mjs tests/release-promotion.test.mjs
 
       - name: Package the Worker and static assets
         shell: bash
@@ -266,6 +267,7 @@ jobs:
           tar -xzf epomail-candidate.tar.gz -C "$extracted"
           test "$(cat "$extracted/SOURCE_SHA")" = "$GITHUB_SHA"
           cd "$extracted"
+          node "$GITHUB_WORKSPACE/scripts/verify-staging-config.mjs" --config "$extracted/wrangler.toml" --sandbox-outbound
           "$GITHUB_WORKSPACE/mail-worker/node_modules/.bin/wrangler" deploy --dry-run --env staging --no-bundle --config wrangler.toml --outdir "$RUNNER_TEMP/candidate-deploy"
           cmp bundle/index.js "$RUNNER_TEMP/candidate-deploy/index.js"
           echo "EPOMAIL_CANDIDATE_DIR=$extracted" >> "$GITHUB_ENV"
