@@ -1,3 +1,5 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
@@ -6,13 +8,13 @@ import assert from "assert";
   console.log("=== 开始测试：登录失败/凭证过期被动与强制退出至 /login/ 界面端到端审计 ===");
   console.log("==========================================================================");
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: "zh-CN"
   });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   let adminToken = null;
 
@@ -22,11 +24,11 @@ import assert from "assert";
     // -----------------------------------------------------------------------------
     console.log("\n[测试 1] 获取真实站长 Token 并验证登录状态...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "Admin 登录失败: " + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, "Admin 登录失败: " + Number(loginData?.code));
     adminToken = typeof loginData.data === "string" ? loginData.data : loginData.data?.token;
     assert.ok(adminToken, "必须成功获取鉴权 Token");
     console.log("  ✓ Admin 登录成功，Token 已生成");
@@ -38,7 +40,7 @@ import assert from "assert";
     await page.goto(BASE + "/inbox", { waitUntil: "domcontentloaded" });
     await page.evaluate((t) => {
       localStorage.setItem("token", t);
-      localStorage.setItem("loginEmail", "admin@epomail.bond");
+      localStorage.setItem("loginEmail", legacyAdminEmail);
       localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));
       localStorage.setItem("locale", "zh");
     }, adminToken);
@@ -73,7 +75,7 @@ import assert from "assert";
     const fakeExpiredToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fake_expired_token_payload.signature";
     await page.evaluate((t) => {
       localStorage.setItem("token", t);
-      localStorage.setItem("loginEmail", "admin@epomail.bond");
+      localStorage.setItem("loginEmail", legacyAdminEmail);
     }, fakeExpiredToken);
 
     // 访问 /inbox，触发鉴权失败 401
@@ -134,7 +136,7 @@ import assert from "assert";
     await page.goto(BASE + "/login/", { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#epo-email", { timeout: 10000 });
 
-    await page.fill("#epo-email", "admin@epomail.bond");
+    await page.fill("#epo-email", legacyAdminEmail);
     await page.fill("#epo-password", (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || ''));
     await page.click('button[type="submit"]');
 

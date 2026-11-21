@@ -434,11 +434,10 @@ const loginService = {
 		}
 
 		let userId;
-		let acc;
 		try {
 			const acceptance = await legalPolicyService.validateRegistrationAcceptanceAuthoritative(c, params);
 			userId = await userService.insert(c, { email, regKeyId, password: hash, salt, type: type || defType });
-			acc = await accountService.insert(c, { userId: userId, email, name: assignedName });
+			await accountService.insert(c, { userId: userId, email, name: assignedName });
 			await legalPolicyService.recordAcceptance(c, userId, acceptance);
 			await userService.updateUserInfo(c, userId, true);
 		} catch (err) {
@@ -454,10 +453,7 @@ const loginService = {
 
 		try {
 			const emailService = (await import('./email-service')).default;
-			const accountRow = acc || await accountService.selectByEmail(c, email);
-			if (accountRow) {
-				await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
-			}
+			await emailService.ensureWelcomeEmailForUser(c, userId, email);
 		} catch (err) {
 			safeLogger.error('register_welcome_email_failed', { userId, error: err });
 		}

@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import userService from '../src/service/user-service.js';
 import accountService from '../src/service/account-service.js';
 import permService from '../src/service/perm-service.js';
+import storageScanService from '../src/service/storage-scan-service.js';
 import publicService from '../src/service/public-service.js';
 import telegramService from '../src/service/telegram-service.js';
 import deviceTrustService from '../src/service/device-trust-service.js';
@@ -351,6 +352,122 @@ describe('deletion request and original object-storage location', () => {
  });
 });
 
+describe('physical deletion KV contracts', () => {
+ const owner = { ...c, env: { ...env, admin: mailAddress } };
+ const ids = [3, 4, 5, 6, 7, 8, 9, 10, 11];
+ beforeEach(() => { rbacGuard.assertCanManageUser.mockRestore(); });
+
+ it('protects the system and configured administrators before changing any member of a batch', async () => {
+  await env.db.prepare("INSERT INTO user(user_id,email) VALUES (1,'system@example.test'), (9,'target@example.test')").run();
+  await env.kv.put('auth-uid:9', 'active');
+  for (const protectedId of [1, uid]) {
+   await expect(userService.physicsDelete(owner, {userIds:[9, protectedId]}, uid)).rejects.toMatchObject({code:403});
+   const row = await env.db.prepare('SELECT is_del,status FROM user WHERE user_id=?').bind(protectedId).first();
+   expect(row).toEqual({is_del:0,status:0});
+   expect(await env.db.prepare('SELECT is_del,status FROM user WHERE user_id=9').first()).toEqual({is_del:0,status:0});
+   expect(await env.kv.get('auth-uid:9')).toBe('active');
+  }
+ });
+
+ it.each([4, 6])('physically deletes users including ID 9, scopes access cleanup and reconciles a daily total of %i', async initial => {
+  const targets = new Map();
+  for (const id of ids) {
+   const email = `User${id}@example.test`;
+   await env.db.prepare('INSERT INTO user(user_id,email) VALUES (?,?)').bind(id,email).run();
+   await env.db.prepare('INSERT INTO account(account_id,user_id,email,name) VALUES (?,?,?,?)').bind(id,id,email,`Name${id}`).run();
+   for (const key of [`HAS_WELCOME_${id}`, `USER_KNOWN_ENV_${id}`, `WELCOME_ISSUED_${id}`,
+    `login_fail:${email}`, `login_fail:${email.toLowerCase()}`, `login_fail:Name${id}`, `login_fail:name${id}`]) targets.set(key, '1');
+  }
+  await env.db.prepare("INSERT INTO account(account_id,user_id,email,name) VALUES (100,4,'Alias@Example.test','AliasName')").run();
+  for (const key of ['login_fail:Alias@Example.test','login_fail:alias@example.test','login_fail:AliasName','login_fail:aliasname',
+   'auth-uid:9','REVOKED_GRANT_9_client','HAS_GLOBAL_EMAIL_9_notice','static/avatar/9/picture']) targets.set(key,'1');
+  targets.set('USER_PROFILE_9', JSON.stringify({apiTokens:[{token:'fixture-indexed'}]}));
+  for (const key of ['API_TOKEN_fixture-indexed','API_TOKEN_fixture-orphan','dev_trust:fixture:9']) targets.set(key,JSON.stringify({userId:9}));
+  targets.set('risk_ip_acc:removed',JSON.stringify(ids));
+  for (const [key,value] of targets) await env.kv.put(key,value);
+  await env.kv.put('risk_ip_acc:shared',JSON.stringify([4, '9', uid]));
+  const survivors = {'HAS_WELCOME_99':'active','API_TOKEN_fixture-active':JSON.stringify({userId:uid}),[`dev_trust:fixture:${uid}`]:JSON.stringify({userId:uid})};
+  for (const [key,value] of Object.entries(survivors)) await env.kv.put(key,value);
+  const day = new Date().toISOString().slice(0,10);
+  await env.db.prepare("INSERT INTO email(email_id,user_id,account_id,type,status,recipient,create_time) VALUES (9,9,9,1,1,?,?), (10,9,9,1,8,'[]',?), (11,9,9,1,1,?,'2000-01-01')").bind(JSON.stringify(['a','b','c','d']),day+'T00:00:00Z',day+'T00:00:00Z','["older"]').run();
+  await env.kv.put('send_day_count:'+day,String(initial));
+
+  const result = await userService.physicsDelete(owner, {userIds:ids}, uid);
+  expect(result.deletedUserIds).toEqual(ids);
+  expect((await env.db.prepare('SELECT user_id FROM user ORDER BY user_id').all()).results).toEqual([{user_id:uid}]);
+  expect((await env.db.prepare('SELECT user_id FROM account ORDER BY user_id').all()).results).toEqual([{user_id:uid}]);
+  expect(await env.db.prepare('SELECT email_id FROM email WHERE user_id=9').first()).toBeNull();
+  for (const key of targets.keys()) expect(await env.kv.get(key),key).toBeNull();
+  for (const [key,value] of Object.entries(survivors)) expect(await env.kv.get(key),key).toBe(value);
+  expect(await env.kv.get('risk_ip_acc:shared','json')).toEqual([uid]);
+  expect(await env.kv.get('send_day_count:'+day)).toBe(initial === 4 ? null : '2');
+ });
+
+ it.each(['account','user'])('retains the %s deletion locator after a KV fault and protects identifiers claimed by a survivor on retry', async kind => {
+  const alias = 'retry@example.test', id = 9;
+  await env.db.prepare("INSERT INTO user(user_id,email) VALUES (9,'primary@example.test')").run();
+  await env.db.prepare("INSERT INTO account(account_id,user_id,email,name) VALUES (9,9,?,'Écran')").bind(alias).run();
+  const key = 'login_fail:'+alias;
+  const orphan = key+'|ip:192.0.2.1', shared = 'login_fail:écran|ip:192.0.2.1', adjacent = key+'x|ip:192.0.2.1';
+  for (const k of [key,orphan,shared,adjacent]) await env.kv.put(k,'4');
+  const subjects = [alias+'|ip:192.0.2.1','écran|ip:192.0.2.1',alias+'x|ip:192.0.2.1'];
+  const database = env.db;
+  await database.prepare('CREATE TABLE IF NOT EXISTS rate_limit_counter (scope TEXT, subject TEXT, window_start INTEGER, count INTEGER, expires_at INTEGER, PRIMARY KEY(scope,subject,window_start))').run();
+  for (const subject of subjects) await database.prepare("INSERT INTO rate_limit_counter VALUES ('login-fail',?,1,4,5)").bind('email:'+subject).run();
+  await database.prepare("INSERT INTO rate_limit_counter VALUES ('other',?,1,4,5)").bind('email:'+subjects[0]).run();
+  const broken = {...owner,env:{...owner.env,kv:{
+   get:(...args)=>env.kv.get(...args), put:(...args)=>env.kv.put(...args), list:(...args)=>env.kv.list(...args),
+   delete: async name => { if(name === key) throw new Error('fixture failure'); return env.kv.delete(name); }
+  }}};
+  const remove = ctx => kind === 'user' ? userService.physicsDelete(ctx,{userIds:[id]},uid) : accountService.physicsDelete(ctx,{accountId:id},uid);
+  try {
+   await expect(remove(broken)).rejects.toMatchObject({code:503});
+   expect(await database.prepare('SELECT email,is_del,status FROM account WHERE account_id=9').first()).toEqual({email:alias,is_del:1,status:1});
+   await database.prepare("UPDATE account SET name='ÉCRAN' WHERE account_id=?").bind(aid).run();
+   await env.kv.put(shared,'5');
+   await remove(owner);
+   expect(await database.prepare('SELECT account_id FROM account WHERE account_id=9').first()).toBeNull();
+   expect(await env.kv.get(key)).toBeNull();
+   expect(await env.kv.get(orphan)).toBeNull();
+   expect(await env.kv.get(shared)).toBe('5');
+   expect(await env.kv.get(adjacent)).toBe('4');
+   const rows = await database.prepare("SELECT scope,subject FROM rate_limit_counter WHERE window_start=1 ORDER BY scope,subject").all();
+   expect(rows.results).toContainEqual({scope:'other',subject:'email:'+subjects[0]});
+   expect(rows.results).toContainEqual({scope:'login-fail',subject:'email:'+subjects[1]});
+   expect(rows.results).toContainEqual({scope:'login-fail',subject:'email:'+subjects[2]});
+   expect(rows.results).not.toContainEqual({scope:'login-fail',subject:'email:'+subjects[0]});
+  } finally { await database.prepare('DELETE FROM rate_limit_counter WHERE window_start=1').run(); }
+ });
+
+ it('leaves an address reissued to a different mailbox untouched on retry of the old deletion', async () => {
+  const address = 'reissued@example.test', key = 'login_fail:'+address+'|ip:192.0.2.3';
+  await env.db.prepare("INSERT INTO account(account_id,user_id,email,name) VALUES (9,? ,?,'old')").bind(uid,address).run();
+  await accountService.physicsDelete(owner, {accountId:9}, uid);
+  await env.db.prepare("INSERT INTO account(account_id,user_id,email,name) VALUES (10,?,?,'new')").bind(uid,address).run();
+  await env.kv.put(key,'5');
+  await expect(accountService.physicsDelete(owner, {accountId:9}, uid)).rejects.toMatchObject({code:404});
+  expect(await env.db.prepare('SELECT email FROM account WHERE account_id=10').first()).toEqual({email:address});
+  expect(await env.kv.get(key)).toBe('5');
+ });
+
+ it('clears only the deleted alias lockouts and sweeps welcome and environment markers against live D1 owners', async () => {
+  await env.db.prepare("INSERT INTO account(account_id,user_id,email,name) VALUES (?,?,'Alias@Example.test','AliasName')").bind(aid+1,uid).run();
+  const keys = ['login_fail:Alias@Example.test','login_fail:alias@example.test','login_fail:AliasName','login_fail:aliasname'];
+  for (const key of keys) await env.kv.put(key,'2');
+  await env.kv.put('login_fail:'+mailAddress,'5');
+  await accountService.physicsDelete(owner, {accountId:aid+1}, uid);
+  for (const key of keys) expect(await env.kv.get(key),key).toBeNull();
+  expect(await env.kv.get('login_fail:'+mailAddress)).toBe('5');
+  for (const prefix of ['HAS_WELCOME_','USER_KNOWN_ENV_']) {
+   await env.kv.put(prefix+9,'old');
+   await env.kv.put(prefix+uid,'live');
+   await storageScanService.cleanup(owner,{prefix});
+   expect(await env.kv.get(prefix+9)).toBeNull();
+   expect(await env.kv.get(prefix+uid)).toBe('live');
+  }
+ });
+});
+
 describe('trusted device pagination and failure reporting', () => {
  function kvWithDevices({ fail = '' } = {}) {
   const data = new Map();
@@ -487,8 +604,10 @@ describe('administrative deletion and export contracts', () => {
   await expect(accountService.physicsDelete(c, {accountId:aid}, 1)).rejects.toMatchObject({errorCode:'mail_purge_conflict'});
   await env.db.prepare('UPDATE account SET user_id=? WHERE account_id=?').bind(uid,aid).run();
   await env.db.prepare('UPDATE email SET status=6 WHERE email_id=?').bind(mid).run();
+  await env.kv.put('login_fail:privacy-owner','5');
   await expect(accountService.physicsDelete(c, {accountId:aid}, 1)).rejects.toMatchObject({errorCode:'mail_purge_conflict'});
   expect(await env.db.prepare('SELECT att_id FROM attachments WHERE att_id=?').bind(attId).first()).toBeTruthy();
+  expect(await env.kv.get('login_fail:privacy-owner')).toBe('5');
   expect((await getObjectDeletionCounts(c,uid)).total).toBe(0);
  });
 

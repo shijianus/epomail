@@ -1,25 +1,27 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch, legacyUserEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 
 async function verifyUserList() {
   console.log('🚀 Verifying User List Multi-Mode Display...');
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
   const page = await context.newPage();
 
   try {
     // Acquire auth token
-    const loginRes = await fetch('https://mail.epocanvas.com/api/login', {
+    const loginRes = await fetch(legacyOrigin + '/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'audit_normal_1789140856529@epomail.bond', password: process.env.EPOMAIL_E2E_USER_PASSWORD || '' })
+      body: JSON.stringify({ email: legacyUserEmail, password: process.env.EPOMAIL_E2E_USER_PASSWORD || '' })
     });
     const loginJson = await loginRes.json();
     const token = loginJson.data?.token;
 
-    await page.goto('https://mail.epocanvas.com/login/', { waitUntil: 'domcontentloaded' });
+    await page.goto(legacyOrigin + '/login/', { waitUntil: 'domcontentloaded' });
     await page.evaluate(({ t }) => {
       localStorage.setItem('token', t);
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'audit_normal_1789140856529@epomail.bond' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyUserEmail }]));
     }, { t: token });
 
     await page.route('**/api/my/loginUserInfo', async (route) => {
@@ -30,7 +32,7 @@ async function verifyUserList() {
           code: 200,
           data: {
             userId: 1,
-            email: 'admin@epomail.bond',
+            email: legacyAdminEmail,
             name: '站长',
             permKeys: ['*'],
             role: { roleId: 6, roleCode: 'master', name: '站长' }
@@ -40,7 +42,7 @@ async function verifyUserList() {
     });
 
     // Navigate to User List
-    await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/admin/user', { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(legacyOrigin + '/mail/u/0/#manage/admin/user', { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(2000);
 
     const userTable = page.locator('.el-table').first();

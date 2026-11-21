@@ -83,7 +83,7 @@ jobs:
         run: node scripts/secret-scan.mjs
 
       - name: Staged metadata and secret-file regression tests
-        run: node --test tests/check-staged-files.test.mjs
+        run: node --test tests/check-staged-files.test.mjs tests/historical-credential-docs.test.mjs
 
   i18n:
     name: i18n gates (6-language dictionaries)
@@ -223,13 +223,18 @@ jobs:
       - name: Worker test suite
         run: pnpm --dir mail-worker test
 
+      - name: JWT verification key rotation and request isolation
+        run: node --test tests/jwt-verification-key.test.mjs
+
       - name: Isolated stack and bounded load-runner tests
-        run: node --test tests/helpers/local-stack.test.mjs tests/helpers/load-runner.test.mjs
+        run: node --test tests/helpers/local-stack.test.mjs tests/helpers/load-runner.test.mjs tests/legacy-test-safety.test.mjs tests/legacy-local-target.test.mjs
 
       # wrangler.toml 的 [build] 钩子会执行 scripts/build-prod.mjs（先 temp_login_ui 后 mail-vue），
       # 因此该步骤同时验证了真实部署路径的可构建性；dry-run 不连接 Cloudflare 账户、不上传任何产物。
       - name: Wrangler deploy dry-run
         working-directory: mail-worker
+        env:
+          EPOMAIL_FREEZE_MANIFEST: '1'
         run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-dry-run"
 
       - name: Install browser test dependencies (frozen lockfile)
@@ -242,25 +247,28 @@ jobs:
         run: |
           node scripts/verify-production-readiness.mjs
           node scripts/verify-staging-config.mjs --sandbox-outbound
-          node --test tests/verify-production-readiness.test.mjs tests/verify-staging-config.test.mjs tests/public-beta-gate.test.mjs tests/release-promotion.test.mjs tests/recovery-directory.test.mjs
+          node --test tests/verify-production-readiness.test.mjs tests/verify-staging-config.test.mjs tests/public-beta-gate.test.mjs tests/release-promotion.test.mjs tests/recovery-directory.test.mjs tests/candidate-package.test.mjs
 
-      - name: Package the Worker and static assets
+      - name: Freeze two independent builds and compare the release archives
         shell: bash
+        env:
+          EPOMAIL_FREEZE_MANIFEST: '1'
         run: |
-          candidate="$RUNNER_TEMP/epomail-candidate"
-          mkdir -p "$candidate"
-          cp -R "$RUNNER_TEMP/worker-dry-run" "$candidate/bundle"
-          cp -R mail-worker/dist "$candidate/dist"
-          node scripts/candidate-config.mjs mail-worker/wrangler.toml "$candidate/wrangler.toml"
-          git rev-parse HEAD > "$candidate/SOURCE_SHA"
-          tar -czf "$RUNNER_TEMP/epomail-candidate.tar.gz" -C "$candidate" .
-          cd "$RUNNER_TEMP"
-          sha256sum epomail-candidate.tar.gz > epomail-candidate.tar.gz.sha256
+          node scripts/package-candidate.mjs "$RUNNER_TEMP/worker-dry-run" "$RUNNER_TEMP/frozen-release" "$GITHUB_SHA"
+          rebuild="$RUNNER_TEMP/epomail-independent-rebuild"
+          git worktree add --detach "$rebuild" "$GITHUB_SHA"
+          (
+            cd "$rebuild"
+            pnpm --dir mail-worker install --frozen-lockfile
+            (cd mail-worker && pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-rebuild")
+            node scripts/package-candidate.mjs "$RUNNER_TEMP/worker-rebuild" "$RUNNER_TEMP/rebuilt-release" "$GITHUB_SHA"
+          )
+          cmp "$RUNNER_TEMP/frozen-release/epomail-candidate.tar.gz" "$RUNNER_TEMP/rebuilt-release/epomail-candidate.tar.gz"
 
       - name: Verify and dry-run the extracted staging candidate
         shell: bash
         run: |
-          cd "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/frozen-release"
           sha256sum -c epomail-candidate.tar.gz.sha256
           extracted="$RUNNER_TEMP/extracted-candidate"
           mkdir "$extracted"
@@ -282,14 +290,18 @@ jobs:
         run: |
           node tests/fullstack-browser-e2e.mjs
           node --test tests/compose-draft-browser.mjs
+          node --test tests/restricted-notice-browser.mjs
+          node tests/test-security-notices-browser.mjs
+          node tests/verify-public-global-dialog.mjs
+          node --test tests/helpers/legacy-browser.test.mjs
 
       - name: Upload candidate package
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: epomail-candidate-${{ github.sha }}
           path: |
-            ${{ runner.temp }}/epomail-candidate.tar.gz
-            ${{ runner.temp }}/epomail-candidate.tar.gz.sha256
+            ${{ runner.temp }}/frozen-release/epomail-candidate.tar.gz
+            ${{ runner.temp }}/frozen-release/epomail-candidate.tar.gz.sha256
           retention-days: 14
           if-no-files-found: error
 

@@ -334,6 +334,39 @@ describe('Phase 3 security hardening: Email encryption key domain isolation & mi
 		expect(await emailCryptoUtils.decryptText(ctIsolated, otherUserKeyring)).toBe(ctIsolated);
 	});
 
+	it('derives the current write key alone and reads mixed historical fields after rotation', async () => {
+		const temporarySecret = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+		const settings = {
+			email_enc_key: temporarySecret(),
+			previous_email_enc_key: temporarySecret(),
+			totp_enc_key: temporarySecret(),
+			jwt_secret: temporarySecret()
+		};
+		const keyFor = (owner, records) => emailCryptoUtils.getEmailRecordKey(settings, owner, records);
+		const write = await keyFor(UID_1);
+		expect(write.legacyReadKeys).toHaveLength(0);
+		expect(write.readKeysByDomain.e).toHaveLength(1);
+		expect(write.readKeysByDomain.p).toHaveLength(0);
+		expect(write.readKeysByDomain.t).toHaveLength(0);
+		const full = await emailCryptoUtils.getUserEmailCryptoKey(settings, UID_1);
+		const earlier = await emailCryptoUtils.getUserEmailCryptoKey({ email_enc_key: settings.previous_email_enc_key }, UID_1);
+		const legacy = await deriveLegacyEmailKey(settings.jwt_secret, UID_1);
+		const row = {
+			subject: await emailCryptoUtils.encryptText('old-e', earlier),
+			content: await emailCryptoUtils.encryptText('old-p', full, { domainOverride: 'p' }),
+			text: await emailCryptoUtils.encryptText('old-t', full, { domainOverride: 't' }),
+			code: await emailCryptoUtils.encryptText('old-v1', legacy)
+		};
+		const read = await keyFor(UID_1, [row]);
+		expect(await emailCryptoUtils.decryptEmailRecord(row, read)).toEqual({
+			subject: 'old-e', content: 'old-p', text: 'old-t', code: 'old-v1'
+		});
+		expect(await emailCryptoUtils.decryptEmailRecord(row, await keyFor(UID_2, [row]))).toEqual(row);
+		const current = await emailCryptoUtils.encryptText('current', write);
+		expect(await emailCryptoUtils.decryptText(current, full)).toBe('current');
+		await expect(emailCryptoUtils.getEmailRecordKey({ jwt_secret: settings.jwt_secret }, UID_1)).rejects.toThrow('not configured');
+	});
+
 	it('supports legacy_v1 dual-read, lazy & batch migration, stats, pre/post checks, and rollback', async () => {
 		const syntheticLegacyJwt = ['fixture', 'legacy', 'jwt', '01'].join('-');
 		const syntheticTotpKey = ['fixture', 'totp', 'key', '01'].join('-');

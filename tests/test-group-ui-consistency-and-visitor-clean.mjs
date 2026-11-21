@@ -1,12 +1,14 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "node:assert";
 
 (async () => {
   console.log("=== 启动全用户组 UI 一致性、写邮件入口完备性、无沙盒标注与单次权限说明 E2E 审计 ===");
-  const browser = await chromium.launch({ headless: true, args: ["--lang=zh-CN"] });
+  const browser = await launchIsolatedChromium(chromium, { headless: true, args: ["--lang=zh-CN"] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   let adminToken = null;
   let testNormalUserId = null;
@@ -23,11 +25,11 @@ import assert from "node:assert";
     // --------------------------------------------------------------------------------------
     console.log("\n[步骤 1] 登录 Admin 并准备测试分组用户...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, "Admin 登录失败: " + JSON.stringify(loginJson));
+    assert.strictEqual(loginJson.code, 200, "Admin 登录失败: " + Number(loginJson?.code));
     adminToken = typeof loginJson.data === "string" ? loginJson.data : loginJson.data?.token;
     console.log("  ✓ Admin 登录成功");
 
@@ -139,7 +141,7 @@ import assert from "node:assert";
       headers: { "Content-Type": "application/json" }
     });
     const normalLoginJson = await normalLoginRes.json();
-    assert.strictEqual(normalLoginJson.code, 200, "普通用户登录失败: " + JSON.stringify(normalLoginJson));
+    assert.strictEqual(normalLoginJson.code, 200, "普通用户登录失败: " + Number(normalLoginJson?.code));
     const normalToken = typeof normalLoginJson.data === "string" ? normalLoginJson.data : normalLoginJson.data?.token;
 
     const normalContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" });
@@ -191,7 +193,7 @@ import assert from "node:assert";
       headers: { "Content-Type": "application/json" }
     });
     const visitorLoginJson = await visitorLoginRes.json();
-    assert.strictEqual(visitorLoginJson.code, 200, "参观者登录失败: " + JSON.stringify(visitorLoginJson));
+    assert.strictEqual(visitorLoginJson.code, 200, "参观者登录失败: " + Number(visitorLoginJson?.code));
     const visitorToken = typeof visitorLoginJson.data === "string" ? visitorLoginJson.data : visitorLoginJson.data?.token;
 
     const visitorContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" });

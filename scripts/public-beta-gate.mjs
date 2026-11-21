@@ -21,6 +21,15 @@ const REQUIRED = {
   outbound: 'staging',
   webhook: 'staging'
 };
+// RISK-17 covers both currently usable material and sessions signed before retirement.
+const normalizeActor = name => typeof name === 'string' ? name.trim().replace(/^@/, '').toLowerCase() : '';
+const CREDENTIAL_OUTCOMES = {
+  mailProvider: ['retired', 'verified-never-issued'],
+  jwtSigning: ['retired', 'verified-never-used'],
+  totp: ['retired', 'verified-never-used'],
+  testCredentials: ['retired', 'verified-test-only'],
+  priorSessions: ['revoked', 'verified-unaffected']
+};
 const PILOT_EXCLUSIONS = new Set(['inbound', 'outbound', 'webhook']);
 const SHA = /^[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
@@ -33,6 +42,7 @@ function requiredGates(scope) {
   const pilot = scope === 'internal-pilot';
   const gates = new Map(Object.entries(REQUIRED).filter(([id]) => !pilot || !PILOT_EXCLUSIONS.has(id)));
   if (pilot) gates.set('pilot-isolation', 'staging');
+  else gates.set('credential-retirement', 'candidate');
   return gates;
 }
 
@@ -44,7 +54,11 @@ export function createEvidenceTemplate(sha, scope) {
     gates: Array.from(requiredGates(scope), ([id, environment]) => ({
       id, environment, sha, status: 'NOT_RUN', owner: '', reviewer: '',
       reference: '', observedAt: '', artifactSha256: '',
-      ...(environment === 'staging' && { versionId: '', deploymentId: '' })
+      ...(environment === 'staging' && { versionId: '', deploymentId: '' }),
+      ...(id === 'credential-retirement' && {
+        restrictedReportSha256: '', unresolvedFindings: null,
+        disposition: Object.fromEntries(Object.keys(CREDENTIAL_OUTCOMES).map(key => [key, '']))
+      })
     }))
   };
 }
@@ -103,6 +117,17 @@ export function evaluateBetaEvidence(evidence, { sha, scope }) {
       'Include the owner, reviewer and evidence reference');
     require(present(row.observedAt) && Date.parse(row.observedAt) <= now, id,
       'Include a valid verification time no later than the current time');
+    if (id === 'credential-retirement') {
+      const owner = normalizeActor(row.owner);
+      const reviewer = normalizeActor(row.reviewer);
+      require(owner && reviewer && owner !== reviewer,
+        id, 'An independent reviewer must verify the account and session disposition');
+      require(typeof row.restrictedReportSha256 === 'string' && DIGEST.test(row.restrictedReportSha256) && row.unresolvedFindings === 0,
+        id, 'Pin the restricted disposition record and resolve every open credential finding');
+      require(isRecord(row.disposition) && Object.entries(CREDENTIAL_OUTCOMES).every(([key, states]) => states.includes(row.disposition[key])) &&
+        Object.keys(row.disposition).every(key => Object.hasOwn(CREDENTIAL_OUTCOMES, key)),
+        id, 'Include the reviewed provider, JWT, TOTP, test credential and prior session outcomes');
+    }
     if (environment === 'staging') {
       require(present(evidence.stagingVersionId) && row.versionId === evidence.stagingVersionId, id,
         'Evidence does not match the active staging Worker version');

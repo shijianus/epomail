@@ -51,11 +51,12 @@
 | Gate ID / 签字职责 | 验收目标和步骤 | 证据与通过条件 |
 | --- | --- | --- |
 | `ci` 发布 / QA | 在发布分支 push 后核对 3 个工作流，查 actual checkout，包含登录单测、Worker 全量、六语、密钥和依赖扫描、前端两应用构建、全栈浏览器、Worker dry-run 与压测。 | 工作流成功、执行提交为候选 SHA，0 失败、0 跳过的必需步骤。保留 URL、attempt、checkout SHA。清理真实凭据类命中，运行时 High/Critical 为 0 或在修复后重跑。 |
+| `credential-retirement` 账号或凭据负责人 / 独立安全复核人 | 公测专用，核对 RISK-17 及公开历史扫描的完整处置记录。逐项核对提供方账户、JWT、TOTP、测试身份和旧会话影响，在有权的环境取得撤销、失效验证或从未生效的记录。 | 受限处置工单引用、经独立复核的原始记录 SHA-256、已处置范围及未结数。扫描增量零命中、清理代码字面量和归档完整性均不能代替账户侧处置。 |
 | `artifact` 发布 / SRE | 下载成功候选归档。核对 SOURCE_SHA、归档 SHA-256；检查 Worker Bundle、主站/Login/SW、实际静态资产 MIME 和加载路径。 | CI 产物校验文件、候选 SHA、Staging 部署回执可关联，产物未重建。 |
 | `accounts` 身份开发 / QA | 用两个合成账号走邀请码/条款接受、注册、登录、退出、改密及找回、MFA 启用与备份码恢复、撤销旧会话、角色授权、封禁/解封、游客限权和管理员安全操作。 | 桌面 Chromium 及目标移动设备实测；跨账户对象不可读取，普通用户无法提升角色；未授权接口 HTTP 401/403，配额到达时 429，UI 错误可理解。会话令牌、测试密码从证据删去。 |
 | `mailbox` 邮箱开发 / QA | A→B 站内发信；收件、已发送、草稿、搜索、星标、标签、已读、垃圾箱、恢复、永久删除；附件含二进制与 inline CID；打开深链接和刷新，两个账户交替。重复提交、一次存储故障与队列重试。 | 可见副本数、计数、权限和附件 SHA-256 正确；A 无法读取 B 的对象；相同幂等键一次业务生效，恢复后无丢件/重复件；关停外发时站内仍可投递。 |
 | `privacy` 运营 / QA | 验证真实运营主体、告知 URL、生效版本、注册同意；测试资料导出/删号、清除会话及公共分享、确认对象与队列实际删除；确认外发、AI、Telegram 等实际数据流与告知相符。 | 匿名隐私预检 JSON、运营确认记录、导出和删除证据。内容、附件、令牌、第三方 key 不进日志。真实隐私运营事项由负责人审查。 |
-| `scheduler` SRE / QA | 验证独立触发和密钥；5 分钟任务连续 3 次可观测，执行一次夜间任务；验证挂起任务恢复、对象清理、留存和告警路由。 | 成功记录和脱敏队列指标。设置 15 分钟无调度心跳告警，实际触发并收到。失败的任务可辨识，健康日志不包含正文或凭据。 |
+| `scheduler` SRE / QA | 验证独立触发和密钥；5 分钟任务连续 3 次可观测，执行一次夜间任务；验证挂起任务恢复、对象清理、留存和告警路由。 | 成功记录和脱敏队列指标。在隔离环境分别验证 15 分钟无调度心跳、5xx、429 激增和已启用发信供应商失败率的告警，记录脱敏的接收回执及当班和回滚负责人。失败的任务可辨识，健康日志不包含正文或凭据。 |
 | `migration` 数据负责人 / QA | 空库建库、上版快照升级、相同版本重复执行、升级失败后继续。核对 schema、关键约束和索引、表行数、样本邮件/附件哈希、账号与 OAuth 数据。 | 关键不变量逐项通过，迁移执行记录与资源绑定可追溯；至少一次故障演练证明可恢复；任何会阻止旧版启动的 schema 变更必须有独立恢复方案。 |
 | `recovery` SRE / 数据负责人 | 备份后部署，在隔离环境演练 Worker 回滚及数据恢复到新实例。D1、KV、对象存储分别核对；复查外发总开关和登录静态资源。 | 建议 Worker 回滚 RTO ≤ 15 分钟，整套恢复 RTO ≤ 60 分钟、RPO ≤ 15 分钟，均以演练记录和邮件/附件清点为证；达不到则在冻结前调整容量与备份方案。 |
 | `performance` SRE / QA | 以建议首批 100 注册、20 活跃并发作为压力计划输入，冻结前确认目标。CI 公测修复或发布分支使用 limited-beta 15 分钟及两次 capacity 核验，普通分支保留 3 分钟快速核验；Staging 用隔离测试账号做 30 分钟代表性读、登录、写和附件的压测。含回收及冷启动。 | 建议读 API P95 ≤ 2s、登录 P95 ≤ 3s，30 分钟无未预期 5xx/超时/错误响应结构；邮件/附件无丢失和重复，测试后队列在 15 分钟内排空。报告写负载、样本量、网络位置、各阶段 P95。 |
@@ -106,7 +107,9 @@ curl --fail --silent --show-error "$STAGING_ORIGIN/api/version"
 
 ## 7. 最终裁决与阻断收敛
 
-在干净候选中运行 `node scripts/public-beta-gate.mjs --template --scope mail-public-beta > ../beta-evidence.json`，生成全部为 NOT_RUN 的模板。证据 JSON 放在 checkout 之外。顶层字段为 `schemaVersion: 1`、`scope`、`sha`、`artifactSha256`、`stagingOrigin`、`stagingVersionId`、`stagingDeploymentId`、`oauthProviders` 和 `gates`。每项 `gates` 记录含 `id`、`status`、`sha`、`environment`、`owner`、`reviewer`、`observedAt`、`reference`。CI 和产物使用 `candidate`，其余用 `staging`。除 CI 外各记录包含归档 `artifactSha256`，Staging 记录还包含 `versionId`、`deploymentId`。没有启用外部登录时显式写空数组。发布负责人或分工安排的审核人复核原始日志、摘要、工件来源、部署回执和实际运行配置，工作流读取 GitHub 审批记录、受信 Staging 的运行信息及 Cloudflare 活动部署。邮件、恢复及供应商回执的内容仍须由审核人查阅。生产放行前记录 Staging 证据与计划上线的实际生产配置差异，尤其是打开外发、收件范围、域名、Secret 名称和调度。只允许事先审查的环境差异。
+在干净候选中运行 `node scripts/public-beta-gate.mjs --template --scope mail-public-beta > ../beta-evidence.json`，生成全部为 NOT_RUN 的模板。证据 JSON 放在 checkout 之外。顶层字段为 `schemaVersion: 1`、`scope`、`sha`、`artifactSha256`、`stagingOrigin`、`stagingVersionId`、`stagingDeploymentId`、`oauthProviders` 和 `gates`。每项 `gates` 记录含 `id`、`status`、`sha`、`environment`、`owner`、`reviewer`、`observedAt`、`reference`。CI、产物及历史凭据处置使用 `candidate`，其余用 `staging`。除 CI 外各记录包含归档 `artifactSha256`，Staging 记录还包含 `versionId`、`deploymentId`。没有启用外部登录时显式写空数组。发布负责人或分工安排的审核人复核原始日志、摘要、工件来源、部署回执和实际运行配置，工作流读取 GitHub 审批记录、受信 Staging 的运行信息及 Cloudflare 活动部署。邮件、恢复及供应商回执的内容仍须由审核人查阅。生产放行前记录 Staging 证据与计划上线的实际生产配置差异，尤其是打开外发、收件范围、域名、Secret 名称和调度。只允许事先审查的环境差异。
+公测证据的 `credential-retirement` 行保存私密工单的 `reference`、`restrictedReportSha256`、`unresolvedFindings` 和 `disposition`。独立复核人与负责人须为不同人员。复核人在受限系统核对处置原件的摘要、范围、账户记录和旧会话验证，再提交晋级审批。`unresolvedFindings` 须为数字 0。`mailProvider` 可为 `retired`（包括轮换后旧材料已失效）或 `verified-never-issued`。`jwtSigning`、`totp` 可为 `retired` 或 `verified-never-used`。`testCredentials` 可为 `retired` 或 `verified-test-only`。`priorSessions` 可为 `revoked` 或 `verified-unaffected`。每一种例外须有工单中对应的核对记录。凭据值、令牌、原始扫描日志和供应商后台详单保留在受限系统。旧证据仍可读取，缺少这项会得到明确的公测阻断项。
+
 
 ```bash
 node scripts/public-beta-gate.mjs --scope mail-public-beta \

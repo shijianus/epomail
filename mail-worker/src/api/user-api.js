@@ -86,12 +86,8 @@ app.post('/user/sendWelcomeEmail', async (c) => {
 	if (!userId) {
 		return c.json(result.fail('userId 不能为空'));
 	}
-	// 先清除 KV 缓存，强制重新投递
-	try {
-		await c.env.kv.delete('HAS_WELCOME_' + userId);
-	} catch (_) {}
 	const emailService = (await import('../service/email-service')).default;
-	const emailRow = await emailService.ensureWelcomeEmailForUser(c, Number(userId), userEmail || null);
+	const emailRow = await emailService.ensureWelcomeEmailForUser(c, Number(userId), userEmail || null, { repairMissing: true });
 	return c.json(result.ok({ delivered: !!emailRow, emailId: emailRow?.emailId }));
 });
 

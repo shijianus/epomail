@@ -1,8 +1,10 @@
+import { legacyOrigin, legacyAdminEmail, legacyUserEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = process.env.TARGET_URL || 'https://mail.epocanvas.com';
-const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
+const BASE = legacyOrigin;
+const USER_EMAIL = legacyUserEmail;
 const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
 let pass = 0, fail = 0;
@@ -23,7 +25,7 @@ async function run() {
   console.log('================================================================');
   console.log('=== 公网视觉核验：分析页六大图表正常渲染与主题自适应 ===');
   console.log('================================================================');
-  console.log(`[目标公网环境] 基地址: ${BASE}`);
+  console.log(`[目标隔离环境] 基地址: ${BASE}`);
 
   let browser;
 
@@ -36,11 +38,11 @@ async function run() {
       body: JSON.stringify({ email: USER_EMAIL, password: USER_PWD })
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, `登录必须成功: ${JSON.stringify(loginJson)}`);
+    assert.strictEqual(loginJson.code, 200, `登录必须成功: ${Number(loginJson?.code)}`);
     const token = loginJson.data?.token;
     ok(!!token, '公网线上 JWT Token 获取就绪');
 
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'
@@ -65,7 +67,7 @@ async function run() {
           code: 200,
           data: {
             userId: 1,
-            email: 'admin@epomail.bond',
+            email: legacyAdminEmail,
             name: '站长',
             permKeys: ['*'],
             role: { roleId: 6, roleCode: 'master', name: '站长' }

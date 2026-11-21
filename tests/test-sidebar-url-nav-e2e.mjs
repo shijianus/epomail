@@ -36,7 +36,7 @@ async function runTest() {
       headers: { 'Content-Type': 'application/json' }
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, `登录必须成功: ${JSON.stringify(loginJson)}`);
+    assert.strictEqual(loginJson.code, 200, `登录必须成功: ${Number(loginJson?.code)}`);
     const token = loginJson.data?.token;
     ok(!!token, 'JWT Token 获取就绪');
 

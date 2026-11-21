@@ -174,7 +174,16 @@ export async function deleteAccountEvidence(c, userId) {
 	for (const table of ['auth_security_operation', 'auth_totp_replay', 'mail_send_quota_reservation']) {
 		if (await tableExists(db, table)) await db.prepare(`DELETE FROM ${table} WHERE user_id=?`).bind(userId).run();
 	}
+	if (await tableExists(db, 'mail_global_audience')) {
+		await db.batch([
+			db.prepare('DELETE FROM mail_global_audience WHERE user_id=? OR broadcast_id IN (SELECT broadcast_id FROM mail_global_operation WHERE owner_id=?)').bind(userId,userId),
+			db.prepare('DELETE FROM mail_global_operation WHERE owner_id=?').bind(userId)
+		]);
+	}
 	const mailDb = getMailDb(c);
+	for (const table of ['mail_welcome_receipt', 'mail_global_receipt']) {
+		if (await tableExists(mailDb, table)) await mailDb.prepare(`DELETE FROM ${table} WHERE user_id=?`).bind(userId).run();
+	}
 	if (await tableExists(mailDb, 'mail_forward_policy')) await mailDb.prepare('DELETE FROM mail_forward_policy WHERE user_id=?').bind(userId).run();
 	if (await tableExists(mailDb, 'mail_forward_task')) {
 		await mailDb.prepare('DELETE FROM mail_forward_task WHERE user_id=?').bind(userId).run();

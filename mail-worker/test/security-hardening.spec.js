@@ -92,6 +92,25 @@ describe('Email hash tokens', () => {
 		await expect(hashUtils.addEmailHashes(rows, '', row => row.owner)).rejects.toThrow('jwt_secret');
 	});
 
+	it('reads existing URLs across the unsigned ID range and rejects a changed key', async () => {
+		const oldUrlHash = '-___3r6Dmo5mPsyDQsKK';
+		expect(await hashUtils.decodeEmailHash(oldUrlHash, 7, secret)).toBe(3100000001);
+		expect(await hashUtils.decodeEmailHash(oldUrlHash, 8, secret)).toBeNull();
+		expect(await hashUtils.decodeEmailHash(oldUrlHash, 7, secret + '-rotated')).toBeNull();
+	});
+
+	it('assigns opaque IDs across salt batches without losing row ownership', async () => {
+		const rows = Array.from({ length: 135 }, (_, i) => ({ emailId: i, owner: (i % 2) + 1 }));
+		await hashUtils.addEmailHashes(rows, secret, row => row.owner);
+		expect(rows[0].hash).toBe('');
+		for (const index of [1, 127, 128, 134]) {
+			const { hash, emailId, owner } = rows[index];
+			expect(hash).toMatch(/^[A-Za-z0-9_-]{20}$/);
+			expect(await hashUtils.decodeEmailHash(hash, owner, secret)).toBe(emailId);
+			expect(await hashUtils.decodeEmailHash(hash, 3 - owner, secret)).toBeNull();
+		}
+	});
+
 	it('fails closed without a secret', async () => {
 		await expect(hashUtils.encodeEmailHash(1, 1, '')).rejects.toThrow('jwt_secret');
 	});

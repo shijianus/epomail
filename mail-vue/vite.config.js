@@ -52,6 +52,7 @@ export default defineConfig(({mode}) => {
             }
         },
         build: {
+            manifest: process.env.EPOMAIL_FREEZE_MANIFEST === '1',
             target: 'es2022',
             outDir: env.VITE_OUT_DIR || 'dist',
             emptyOutDir: true,

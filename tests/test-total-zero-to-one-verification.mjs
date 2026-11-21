@@ -1,3 +1,5 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
@@ -6,7 +8,7 @@ import assert from "assert";
   console.log("🚀 开始全系统「从零开始重写验证整体逻辑」端到端自动化深度审计测试 (Zero-to-One E2E)");
   console.log("================================================================================");
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ 
     viewport: { width: 1440, height: 900 },
     locale: "zh-CN"
@@ -15,7 +17,7 @@ import assert from "assert";
   page.on('console', msg => console.log('[BROWSER CONSOLE]', msg.type(), msg.text()));
   page.on('pageerror', err => console.log('[BROWSER UNCAUGHT]', err));
 
-  const BASE = "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
   let authToken = null;
   let testAppId = null;
   let testClientId = null;
@@ -27,11 +29,11 @@ import assert from "assert";
     // -------------------------------------------------------------------------
     console.log("\n[Phase 1] 正在登录 Epomail 生产环境...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "管理员登录必须返回 HTTP 200: " + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, "管理员登录必须返回 HTTP 200: " + Number(loginData?.code));
     authToken = loginData.data?.token;
     assert.ok(authToken, "登录成功后必须获取到有效的 JWT Token");
     console.log("✓ Phase 1: 登录成功，获取管理员 Token");
@@ -116,7 +118,7 @@ import assert from "assert";
     testClientSecret = (await secEl.innerText()).trim();
     assert.ok(testClientSecret.startsWith("epo_sec_"), "Client Secret 必须以 epo_sec_ 开头");
     console.log(`✓ 成功生成 Client ID: ${testClientId}`);
-    console.log(`✓ 成功捕获 Client Secret: ${testClientSecret.substring(0, 12)}...`);
+    console.log('Credential creation succeeded');
 
     // 点击我已妥善保存
     await page.locator(".secret-reveal-dialog .saved-confirm-btn").click();
@@ -157,7 +159,7 @@ import assert from "assert";
 
     const consentBody = await page.locator(".oauth-card-container").innerText();
     assert.ok(consentBody.includes("Epomail Zero-To-One Verified Client"), "授权页必须展示第三方应用名称");
-    assert.ok(consentBody.includes("admin@epomail.bond"), "授权页必须展示当前 Epomail 账号");
+    assert.ok(consentBody.includes(legacyAdminEmail), "授权页必须展示当前 Epomail 账号");
     assert.ok(consentBody.includes("OpenID") && consentBody.includes("email") && consentBody.includes("profile"), "授权页必须展示 3 大请求权限");
 
     // 点击授权并继续，捕获 302 回调中的 Code
@@ -208,7 +210,7 @@ import assert from "assert";
       headers: { "Authorization": `Bearer ${tokenPayload.access_token}` }
     });
     const userinfoPayload = await userinfoRes.json();
-    assert.strictEqual(userinfoPayload.email, "admin@epomail.bond", "UserInfo 邮箱必须完全匹配");
+    assert.strictEqual(userinfoPayload.email, legacyAdminEmail, "UserInfo 邮箱必须完全匹配");
     assert.strictEqual(userinfoPayload.email_verified, true, "email_verified 必须为 true");
     assert.ok(userinfoPayload.sub, "必须包含唯一用户主键 sub");
     console.log("✓ UserInfo 档案解析验证通过:", JSON.stringify(userinfoPayload));

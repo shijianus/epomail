@@ -39,6 +39,7 @@ import { mailSha256 } from '../utils/mail-pipeline.js';
 import safeLogger from '../utils/safe-logger.js';
 import { sealPersonalBotToken } from '../utils/oauth-secret-crypto.js';
 import { encryptByoStorageConfig } from '../utils/storage-credential-crypto.js';
+import { clearDeletedLoginFailures } from './login-failure-cleanup.js';
 import { deleteKvKeys, deleteKvMatching, forEachKvPage } from '../utils/kv-revocation.js';
 import { assertStorageCanChange, beginAccountDeletion, deleteAccountEvidence, getObjectDeletionCounts,
 	isActiveUser, readPrivacyState, revokeAccountAccess, revokeTelegramLinks, setDeletionStatus } from './privacy-revocation-service.js';
@@ -603,6 +604,19 @@ const userService = {
 
 	async getUserQuota(c, userId, storageUsage) {
 		try {
+			const usage = storageUsage === undefined
+				? await (await import('./storage-quota-service')).default.getUserStorageUsage(c, userId) : storageUsage;
+			if (!usage || !Number.isSafeInteger(usage.emailCount) || usage.emailCount < 0
+				|| !Number.isSafeInteger(usage.usedBytes) || usage.usedBytes < 0) throw new Error('Storage usage is unknown');
+			const limits = await this.getDeliveryLimits(c, userId, usage);
+			return { ...limits, usedEmails: usage.emailCount, usedStorageBytes: usage.usedBytes };
+		} catch {
+			throw new BizError('Storage quota unavailable', 503, 'quota_unavailable');
+		}
+	},
+
+	async getDeliveryLimits(c, userId, usage) {
+		try {
 			const DEFAULT_MAX_EMAILS = 5000;
 			const configuredMaxEmails = c.env.max_emails ?? DEFAULT_MAX_EMAILS;
 			const emailLimit = Number(configuredMaxEmails);
@@ -612,17 +626,10 @@ const userService = {
 				throw new Error('Mailbox quota configuration is invalid');
 			}
 			const maxEmails = Math.min(emailLimit, DEFAULT_MAX_EMAILS);
-			let usage = storageUsage;
-			if (usage === undefined) {
-				const storageQuotaService = (await import('./storage-quota-service')).default;
-				usage = await storageQuotaService.getUserStorageUsage(c, userId);
-			}
-			if (!usage || usage.userId !== userId || !Number.isSafeInteger(usage.emailCount) || usage.emailCount < 0
-				|| !Number.isSafeInteger(usage.usedBytes) || usage.usedBytes < 0
-				|| !Number.isFinite(usage.quotaMb) || usage.quotaMb < 0
+			if (!usage || usage.userId !== userId || !Number.isFinite(usage.quotaMb) || usage.quotaMb < 0
 				|| !Number.isFinite(usage.quotaBytes) || usage.quotaBytes < 0
 				|| ![0, 1].includes(usage.byoStorageEnabled) || typeof usage.isVisitor !== 'boolean') {
-				throw new Error('Storage quota usage is unknown');
+				throw new Error('Storage quota policy is unknown');
 			}
 			const dbFullFlag = await c.env.kv.get('db_full_status');
 			if (dbFullFlag !== null && dbFullFlag !== 'true' && dbFullFlag !== 'false') {
@@ -633,9 +640,6 @@ const userService = {
 				maxEmails,
 				maxStorageMB: usage.quotaMb,
 				maxStorageBytes: usage.quotaBytes,
-				// Actual MAIL_DB occupancy (including trash/SAVING), not reservations.
-				usedEmails: usage.emailCount,
-				usedStorageBytes: usage.usedBytes,
 				byoStorageEnabled: usage.byoStorageEnabled,
 				bypassStorage,
 				isVisitor: usage.isVisitor,
@@ -998,40 +1002,33 @@ const userService = {
 			.select({ accountId: account.accountId, userId: account.userId, email: account.email, name: account.name })
 			.from(account).where(inArray(account.userId, userIds)).all();
 
-		const identifiers = new Set();
-		for (const u of usersToDelete) {
-			if (u.email) {
-				identifiers.add(u.email.trim());
-				identifiers.add(u.email.trim().toLowerCase());
-			}
-		}
-		for (const a of accountsToDelete) {
-			if (a.email) {
-				identifiers.add(a.email.trim());
-				identifiers.add(a.email.trim().toLowerCase());
-			}
-			if (a.name) {
-				identifiers.add(a.name.trim());
-				identifiers.add(a.name.trim().toLowerCase());
-			}
+		try {
+			await clearDeletedLoginFailures(c, usersToDelete, accountsToDelete);
+		} catch (error) {
+			for (const id of userIds) await setDeletionStatus(c, id, 'cleanup_failed');
+			throw error;
 		}
 
 		// 2. 统计这批待删用户今日的发件数量，用于精准扣减当日全局发送配额计数器
-		const dateStr = dayjs().format('YYYY-MM-DD');
+		const dateStr = new Date().toISOString().slice(0, 10);
 		let sentTodayCount = 0;
 		try {
-			const todayStartIso = dayjs().startOf('day').toISOString();
-			const todayStartMs = dayjs().startOf('day').valueOf();
-			const todayEndMs = dayjs().endOf('day').valueOf();
+			const todayStartIso = dateStr + 'T00:00:00.000Z';
+			const todayStartMs = Date.parse(todayStartIso);
+			const todayEndMs = todayStartMs + 86400000 - 1;
 
 			// 优先使用 SQLite datetime() 规范化比较候选发件
 			const sentRows = await mailOrm(c)
-				.select({ emailId: email.emailId, createTime: email.createTime })
+				.select({ createTime: email.createTime, recipient: email.recipient })
 				.from(email)
 				.where(and(
 					inArray(email.userId, userIds),
 					eq(email.type, emailConst.type.SEND),
-					sql`datetime(${email.createTime}) >= datetime(${todayStartIso})`
+					sql`datetime(${email.createTime}) >= datetime(${todayStartIso})`,
+					sql`NOT EXISTS (SELECT 1 FROM mail_outbound_task t WHERE t.task_id=${email.outboundTaskId}
+						AND t.user_id=${email.userId} AND (t.counted_day IS NOT NULL OR t.state!='ACCEPTED'))`,
+					inArray(email.status, [emailConst.status.SENT, emailConst.status.DELIVERED, emailConst.status.BOUNCED,
+						emailConst.status.COMPLAINED, emailConst.status.DELAYED, emailConst.status.NOONE])
 				))
 				.all();
 
@@ -1044,7 +1041,13 @@ const userService = {
 					const ts = new Date(isoFormatted).getTime();
 					if (isNaN(ts)) return true;
 					return ts >= todayStartMs && ts <= todayEndMs;
-				}).length;
+				}).reduce((total, row) => {
+					try {
+						const recipients = JSON.parse(row.recipient);
+						if (Array.isArray(recipients)) return total + recipients.length;
+					} catch { /* Older single-recipient rows can have a plain address. */ }
+					return total + 1;
+				}, 0);
 			}
 		} catch (e) {
 			console.warn('[user-service] Failed to count sentTodayCount:', e);
@@ -1095,12 +1098,11 @@ const userService = {
 			for (const id of userIds) {
 				await deleteUserSessionsFromDb(c, id);
 				await deleteKvKeys(kv, [KvConst.AUTH_INFO + id, 'USER_PROFILE_' + id,
-					'HAS_WELCOME_' + id, 'USER_KNOWN_ENV_' + id]);
+					'HAS_WELCOME_' + id, 'WELCOME_ISSUED_' + id, 'USER_KNOWN_ENV_' + id]);
 				for (const prefix of [`REVOKED_GRANT_${id}_`, `HAS_GLOBAL_EMAIL_${id}_`, `static/avatar/${id}/`]) {
 					await deleteKvMatching(kv, prefix);
 				}
 			}
-			await deleteKvKeys(kv, [...identifiers].map(identifier => KvConst.LOGIN_FAIL + identifier));
 			await forEachKvPage(kv, KvConst.RISK_IP_ACCOUNTS, async keys => {
 				for (const key of keys) {
 					const ids = await kv.get(key.name, { type: 'json' });
@@ -1591,14 +1593,11 @@ const userService = {
 
 			await userService.updateUserInfo(c, userId, true);
 
-			const acc = await accountService.insert(c, { userId: userId, email, type, name: assignedName });
+			await accountService.insert(c, { userId: userId, email, type, name: assignedName });
 
 			try {
 				const emailService = (await import('./email-service')).default;
-				const accountRow = acc || await accountService.selectByEmail(c, email);
-				if (accountRow) {
-					await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
-				}
+				await emailService.ensureWelcomeEmailForUser(c, userId, email);
 			} catch (err) {
 				safeLogger.error('user_add_welcome_email_failed', { userId, error: err });
 			}

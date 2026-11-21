@@ -1,8 +1,10 @@
 # Epocanvas Mail - 上线就绪度与环境检查报告 (RELEASE-READINESS.md)
 
 > [!CAUTION]
-> **当前准入结论 (2026-11-15 更新)**：
-> - **当前分支与代码基线**：`fix/public-beta-go-blockers-2026-11-07` @ `e75305491edf9300475ab45ddc8cc2450c48addf` (Short: `e753054`，详细证据见 [PUBLIC-BETA-AUDIT-2026-11-14.md](doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md))
+> 2026-11-21 的修复分支与验收记录见 [REPORTS.md](REPORTS.md)。请按[发布流程](doc/release/PUBLIC-BETA-PROMOTION.md)核对候选 SHA 对应的 CI 与 Staging 制品。
+>
+> **历史准入结论 (2026-11-15)**：
+> - **当次分支与代码基线**：`fix/public-beta-go-blockers-2026-11-07` @ `e75305491edf9300475ab45ddc8cc2450c48addf` (Short: `e753054`，详细证据见 [PUBLIC-BETA-AUDIT-2026-11-14.md](doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md))
 > - **受控公测 (Controlled Public Beta)**：**`NO-GO (BLOCKED)`** —— 代码与本地自动化测试/恢复演练已完成，但隔离 Staging (`598171bf` @ `6c0c010`) 尚缺本轮提交、`legalNotice` 为空 (`notReady`)、`crons=[]`、缺少 `oauth_client_enc_key` / `email_enc_key` / `storage_enc_key` / `scheduled_secret` / `resend_webhook_secret`，真实外部集成（OAuth、Resend/Mailjet 外发、Svix Webhook、BYO S3、Cloudflare Cron）、历史凭据轮换与外部告警/值班体制尚未人工闭环。
 > - **无条件公开发布 (Unconditional GA)**：**`NO-GO`** —— 尚受官方 `capacity` (`ramp-16` 464/640 FAIL)、单实例 PBKDF2 并发瓶颈 (~1.6 auth/s)、存量密文迁移及上述公测阻断制约。
 >

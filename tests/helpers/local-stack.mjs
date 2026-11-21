@@ -80,7 +80,7 @@ export function localEnvironment(directory, source = process.env) {
 	};
 }
 
-export async function writeLocalConfig(directory, workerDir, assetsDir = path.join(workerDir, 'dist'), workerEntry = path.join(workerDir, 'src/index.js'), prebuilt = false, profileRequests = false) {
+export async function writeLocalConfig(directory, workerDir, assetsDir = path.join(workerDir, 'dist'), workerEntry = path.join(workerDir, 'src/index.js'), prebuilt = false, profileRequests = false, enablePatIssuance = false) {
 	const secrets = {
 		jwt_secret: randomBytes(32).toString('base64url'),
 		totp_enc_key: randomBytes(32).toString('base64'),
@@ -131,6 +131,7 @@ export async function writeLocalConfig(directory, workerDir, assetsDir = path.jo
 		vars: {
 			DEV: 'true',
 			ENVIRONMENT: 'smoke',
+			...(enablePatIssuance ? { ENABLE_PAT_ISSUANCE: 'true' } : {}),
 			EMAIL_OUTBOUND_ENABLED: 'false',
 			OUTBOUND_WHITELIST_ENFORCE: 'true',
 			OUTBOUND_WHITELIST: '',
@@ -329,6 +330,7 @@ export async function startLocalStack({
 	assetsDir = process.env.EPOMAIL_CANDIDATE_DIR ? path.resolve(process.env.EPOMAIL_CANDIDATE_DIR, 'dist') : path.join(workerDir, 'dist'),
 	workerEntry = process.env.EPOMAIL_CANDIDATE_DIR ? path.resolve(process.env.EPOMAIL_CANDIDATE_DIR, 'bundle/index.js') : path.join(workerDir, 'src/index.js'),
 	profileRequests = false,
+	enablePatIssuance = false,
 	startupTimeoutMs = 180000
 } = {}) {
 	let directory, child, state, stopPromise;
@@ -393,7 +395,7 @@ export async function startLocalStack({
 		const runtimeEntry = path.resolve(helperDir, 'local-stack-runtime.mjs');
 		await fs.mkdir(os.tmpdir(), { recursive: true });
 		directory = await fs.mkdtemp(path.join(os.tmpdir(), 'epomail-local-'));
-		const config = await writeLocalConfig(directory, workerDir, assetsDir, workerEntry, Boolean(process.env.EPOMAIL_CANDIDATE_DIR), profileRequests);
+		const config = await writeLocalConfig(directory, workerDir, assetsDir, workerEntry, Boolean(process.env.EPOMAIL_CANDIDATE_DIR), profileRequests, enablePatIssuance);
 		secrets = config.secrets;
 		controller.signal.throwIfAborted();
 		child = spawn(process.execPath, [
@@ -428,6 +430,10 @@ export async function startLocalStack({
 			entryPath: config.entryPath,
 			signal: controller.signal,
 			failure,
+			runtimeStatus: () => ({
+				exited: state.exited, closed: state.closed, spawnError: Boolean(state.error),
+				exitCode: child.exitCode, exitSignal: child.signalCode
+			}),
 			addCleanup: cleanup => {
 				if (stopPromise) throw new Error('Cannot register a resource after local-stack shutdown');
 				cleanups.push(cleanup);

@@ -5,7 +5,6 @@ import mailOutboundService, { readSendStatus } from '../src/service/mail-outboun
 import settingService from '../src/service/setting-service.js';
 import userService from '../src/service/user-service.js';
 import roleService from '../src/service/role-service.js';
-import accountService from '../src/service/account-service.js';
 import attService from '../src/service/att-service.js';
 import r2Service from '../src/service/r2-service.js';
 import storageQuotaService from '../src/service/storage-quota-service.js';
@@ -22,7 +21,7 @@ const db = env.db;
 
 beforeAll(async () => {
 	// Exercise the real ban lookup without missing-table warnings. No audit
-	// rows are inserted; column names/types come from the production entity.
+	// entries survive a fixture; column names/types come from the production entity.
 	const auditColumns = Object.values(getTableColumns(auditLog))
 		.map(column => `"${column.name}" ${column.getSQLType()}`);
 	await db.prepare(`CREATE TABLE IF NOT EXISTS audit_log (${auditColumns.join(',')})`).run();
@@ -91,12 +90,18 @@ async function fixture(run, { sendLimit = 20 } = {}) {
 			const row = await db.prepare('SELECT * FROM user WHERE user_id=?').bind(id).first();
 			return row && { userId: row.user_id, email: row.email, type: row.type, status: row.status, isDel: row.is_del };
 		});
+		vi.spyOn(storageQuotaService, 'selectMailPolicyIdentity').mockImplementation(async (ctx, id) => {
+			const owner = await userService.selectByIdIncludeDel(ctx, id);
+			return owner && {
+				user: { storageQuotaMb: 0, byoStorageEnabled: 0, byoStorageConfig: '{}', ...owner },
+				role: { roleId: owner.type, storageQuotaMb: 5, roleCode: 'custom', ...role }
+			};
+		});
 		vi.spyOn(r2Service, 'resolveStorage').mockResolvedValue({ type: 'KV', config: null });
 		vi.spyOn(roleService, 'selectById').mockResolvedValue(role);
 		vi.spyOn(roleService, 'selectByUserIds').mockResolvedValue([{ ...role, userId: recipientId }]);
 		vi.spyOn(roleService, 'hasAvailDomainPerm').mockReturnValue(true);
 		vi.spyOn(roleService, 'isBanEmail').mockReturnValue(false);
-		vi.spyOn(accountService, 'selectById').mockResolvedValue({ accountId, userId, email: sender, status: 0 });
 		vi.spyOn(emailCryptoUtils, 'shouldEncryptEmail').mockReturnValue(false);
 		vi.spyOn(storageQuotaService, 'checkQuotaAvailable').mockResolvedValue({ allowed: true,
 			usage: { byoStorageEnabled: 0, quotaBytes: 5 * 1024 * 1024, isVisitor: false } });
@@ -139,6 +144,85 @@ function observeMailStatements(c, observe) {
 }
 
 describe('Outbound send integration and replay', () => {
+	it.each([true, false])('rechecks mailbox case status on every send (shared binding: %s)', async shared => {
+		await fixture(async ({ c, params, userId, provider }) => {
+			const sender = (await db.prepare('SELECT email FROM account WHERE account_id=?').bind(params.accountId).first()).email;
+			const mailReads = [];
+			const userReads = [];
+			const binding = reads => ({
+				prepare(sql) { reads.push(sql); return db.prepare(sql); },
+				batch: statements => db.batch(statements)
+			});
+			c.env.MAIL_DB = binding(mailReads);
+			c.env.USER_DB = shared ? c.env.MAIL_DB : binding(userReads);
+			try {
+				await db.prepare("INSERT INTO audit_log(email,warning_type,status) VALUES (?,'ban','banned')").bind(sender).run();
+				await expect(emailService.send(c, structuredClone(params), userId)).rejects.toMatchObject({ code: 403 });
+				expect(mailReads.filter(sql => /FROM account a WHERE/.test(sql))).toHaveLength(1);
+				expect(mailReads.filter(sql => /FROM audit_log/.test(sql))).toHaveLength(shared ? 1 : 0);
+				expect(userReads.filter(sql => /FROM audit_log/.test(sql))).toHaveLength(shared ? 0 : 1);
+				expect(provider).not.toHaveBeenCalled();
+				await db.prepare("UPDATE audit_log SET status='resolved' WHERE email=?").bind(sender).run();
+				await emailService.send(c, structuredClone(params), userId);
+				expect(provider).toHaveBeenCalledTimes(1);
+			} finally {
+				await db.prepare('DELETE FROM audit_log WHERE email=?').bind(sender).run();
+			}
+		});
+	});
+
+	it.each([
+		[true, 'disabled mailbox', 'external'], [true, 'new owner', 'self'], [true, 'renamed mailbox', 'external'],
+		[true, 'removed mailbox', 'internal'], [true, 'address ban', 'external'], [true, 'paused owner', 'self'],
+		[false, 'address ban', 'external'], [false, 'new owner', 'internal'], [false, 'removed mailbox', 'self']
+	])('applies current dispatch policy (shared=%s, %s, %s)', async (shared, change, route) => {
+		await fixture(async ({ c, params, userId, recipientId, recipient, provider, task, count }) => {
+			const address = (await db.prepare('SELECT email FROM account WHERE account_id=?').bind(params.accountId).first()).email;
+			if (route !== 'external') params.receiveEmail = [route === 'self' ? address : recipient];
+			if (route !== 'self') params.attachments = [attachment];
+			const binding = () => ({ prepare: sql => db.prepare(sql), batch: statements => db.batch(statements) });
+			c.env.MAIL_DB = binding();
+			c.env.USER_DB = shared ? c.env.MAIL_DB : binding();
+			const reserve = mailOutboundService.reserveSendCount;
+			vi.spyOn(mailOutboundService, 'reserveSendCount').mockImplementationOnce(async (...args) => {
+				await reserve(...args);
+				const updates = {
+					'disabled mailbox': db.prepare('UPDATE account SET status=1 WHERE account_id=?').bind(params.accountId),
+					'new owner': db.prepare('UPDATE account SET user_id=? WHERE account_id=?').bind(recipientId, params.accountId),
+					'renamed mailbox': db.prepare('UPDATE account SET email=? WHERE account_id=?').bind('replacement@example.test', params.accountId),
+					'removed mailbox': db.prepare('UPDATE account SET is_del=1 WHERE account_id=?').bind(params.accountId),
+					'address ban': db.prepare("INSERT INTO audit_log(email,warning_type,status) VALUES (?,'ban','banned')").bind(address),
+					'paused owner': db.prepare('UPDATE user SET status=1 WHERE user_id=?').bind(userId)
+				};
+				await updates[change].run();
+			});
+			try {
+				await expect(emailService.send(c, params, userId)).rejects.toMatchObject({ code: 403, errorCode: 'account_unavailable' });
+				expect(await task()).toMatchObject({ state: 'FAILED', lease_until: 0 });
+				expect(await count()).toBe(0);
+				expect(await db.prepare('SELECT 1 FROM mail_local_delivery WHERE task_id=?').bind((await task()).task_id).first()).toBeNull();
+				expect(provider).not.toHaveBeenCalled();
+			} finally {
+				await db.prepare('DELETE FROM audit_log WHERE email=?').bind(address).run();
+			}
+		});
+	});
+
+	it.each(['new-lease', 'SENDING'])('preserves an existing reservation when the dispatch claim is %s', async winner => {
+		await fixture(async ({ c, params, userId, provider, task, count }) => {
+			const claim = mailOutboundService.claimOutboundTask;
+			vi.spyOn(mailOutboundService, 'claimOutboundTask').mockImplementationOnce(async (ctx, id, lease, ...rest) => {
+				await db.prepare('UPDATE mail_outbound_task SET state=?,lease_token=? WHERE task_id=? AND lease_token=?')
+					.bind(winner === 'SENDING' ? 'SENDING' : 'PREPARED', crypto.randomUUID(), id, lease).run();
+				return claim(ctx, id, lease, ...rest);
+			});
+			await expect(emailService.send(c, params, userId)).rejects.toMatchObject({ errorCode: 'outbound_lease_lost' });
+			expect((await task()).state).toBe(winner === 'SENDING' ? 'SENDING' : 'PREPARED');
+			expect(await count()).toBe(1);
+			expect(provider).not.toHaveBeenCalled();
+		});
+	});
+
 	it('prepares a new task with two D1 statements and looks up an accepted replay once without rebuilding its archive', async () => {
 		await fixture(async ({ c, params, userId, provider }) => {
 			const taskStatements = [];
@@ -159,10 +243,29 @@ describe('Outbound send integration and replay', () => {
 			const replay = await emailService.send(c, params, userId);
 			expect(taskStatements).toEqual(['lookup']);
 			expect(buildArchive).toHaveBeenCalledTimes(1);
-			expect(scan).toHaveBeenCalledTimes(1);
-			expect(scan).toHaveBeenCalledWith(c, userId);
+			expect(scan).not.toHaveBeenCalled();
 			expect(replay[0].emailId).toBe(first[0].emailId);
 			expect(provider).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	it('reports the previous storage-full reason and fails closed on corrupt usage without publishing or reserving', async () => {
+		await fixture(async ({ c, params, userId, provider }) => {
+			storageQuotaService.checkQuotaAvailable.mockRestore();
+			const occupancy = vi.spyOn(storageQuotaService, 'getUserStorageUsage');
+			await db.prepare("INSERT INTO attachments(user_id,account_id,email_id,key,size) VALUES(?,?,0, 'full-fixture',?)")
+				.bind(userId, params.accountId, 6 * 1024 * 1024).run();
+			await expect(emailService.send(c, params, userId)).rejects.toMatchObject({ code: 400, message: '用户存储配额已满 (6.00MB / 5MB)，无法继续接收或保存该附件。' });
+			await db.prepare('UPDATE attachments SET size=-1 WHERE user_id=?').bind(userId).run();
+			await expect(emailService.send(c, params, userId)).rejects.toMatchObject({ code: 503, errorCode: 'storage_usage_unknown' });
+			await db.prepare('UPDATE attachments SET size=0 WHERE user_id=?').bind(userId).run();
+			await db.prepare('INSERT INTO email(user_id,account_id,subject) VALUES(?,?,?)').bind(userId, params.accountId, 'limit fixture').run();
+			c.env.max_emails = 1;
+			await expect(emailService.send(c, params, userId)).rejects.toMatchObject({ code: 413, errorCode: 'storage_quota_exceeded' });
+			expect(occupancy).not.toHaveBeenCalled();
+			const task = await db.prepare('SELECT task_id FROM mail_outbound_task WHERE user_id=?').bind(userId).first();
+			expect(task).toBeNull();
+			expect(provider).not.toHaveBeenCalled();
 		});
 	});
 
@@ -172,17 +275,18 @@ describe('Outbound send integration and replay', () => {
 			const attachmentReads = [];
 			const archiveReads = [];
 			observeMailStatements(c, sql => {
-				if (/^select .* from "attachments"/i.test(sql)) attachmentReads.push(sql);
-				if (/^select .* from "email".*"outbound_task_id" = \?/i.test(sql)) archiveReads.push(sql);
+				const table = /^select .*? from "(\w+)"/i.exec(sql)?.[1];
+				if (table === 'attachments') attachmentReads.push(sql);
+				if (table === 'email' && /"outbound_task_id" = \?/i.test(sql)) archiveReads.push(sql);
 			});
 			const [first] = await emailService.send(c, structuredClone(params), userId);
 			expect(first.emailId).toBeGreaterThan(0);
 			expect(first.attList).toEqual([]);
-			expect(archiveReads).toHaveLength(2); // Check existing archive, then return its current state.
+			expect(archiveReads).toHaveLength(1); // A newly inserted, exclusively leased task has no previous archive.
 			expect(attachmentReads).toHaveLength(0);
 			const [replay] = await emailService.send(c, structuredClone(params), userId);
 			expect(replay.emailId).toBe(first.emailId);
-			expect(archiveReads).toHaveLength(3);
+			expect(archiveReads).toHaveLength(2);
 			expect(attachmentReads).toHaveLength(1);
 		});
 	});
@@ -200,7 +304,7 @@ describe('Outbound send integration and replay', () => {
 			const changed = structuredClone(params);
 			changed.attachments[1].content = btoa('wxyz');
 			await expect(emailService.send(c, changed, userId)).rejects.toMatchObject({ errorCode: 'idempotency_conflict' });
-			accountService.selectById.mockResolvedValueOnce({ accountId: params.accountId, userId, status: 1 });
+			await db.prepare('UPDATE account SET status=1 WHERE account_id=?').bind(params.accountId).run();
 			await expect(emailService.send(c, structuredClone(params), userId)).rejects.toMatchObject({ code: 403 });
 			expect(sizeCheck.mock.calls.map(call => call[2])).toEqual([4]);
 			expect(provider).toHaveBeenCalledTimes(1);
@@ -270,13 +374,16 @@ describe('Outbound send integration and replay', () => {
 	});
 
 	it('replays ACCEPTED at the send limit without dispatching or counting twice', async () => {
-		await fixture(async ({ c, params, userId, provider, count }) => {
+		await fixture(async ({ c, params, userId, provider, count, task }) => {
 			const first = await emailService.send(c, structuredClone(params), userId);
 			const second = await emailService.send(c, structuredClone(params), userId);
 			expect(second[0].emailId).toBe(first[0].emailId);
 			expect(provider).toHaveBeenCalledTimes(1);
 			expect(await count()).toBe(1);
-			expect(c.env.kv.put).toHaveBeenCalledTimes(1);
+			const recorded = await task();
+			expect(recorded.counted_day).toBe(new Date().toISOString().slice(0, 10));
+			expect(recorded.counted_recipients).toBe(1);
+			expect(c.env.kv.put).not.toHaveBeenCalled();
 		}, { sendLimit: 1 });
 	});
 

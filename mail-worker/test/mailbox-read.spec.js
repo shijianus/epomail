@@ -95,3 +95,48 @@ it('counts encrypted-search matches beyond a full page using only the predicate 
 	expect(result.list[0]).toMatchObject({ emailId: 203, content: 'full html' });
 	expect(Object.keys(decrypt.mock.calls[1][0][0]).sort()).toEqual(['emailId','subject']);
 });
+
+it('attaches only files matching the parent owner and mailbox and keeps the query marker private', async () => {
+	const c = context();
+	const add = (id, owner, mailbox, kind) => db.prepare(
+		'INSERT INTO attachments(att_id,email_id,user_id,account_id,type,key) VALUES (?,4,?,?,?,?)'
+	).bind(id, owner, mailbox, kind, 'fixture-' + id);
+	await db.batch([add(20,uid,1,0), add(21,7,1,0), add(22,uid,2,0), add(23,uid,1,1)]);
+	const page = await emailService.list(c, {type:0}, uid);
+	const detail = await emailService.selectById(c,4,uid);
+	expect(detail.attList.map(file => file.attId)).toEqual([20]);
+	expect(page.list[0].attList).toEqual(detail.attList);
+	expect(page.list[1].attList).toEqual([]);
+	for (const row of [page.latestEmail, ...page.list, detail]) expect(row).not.toHaveProperty('hasFileAttachments');
+});
+
+it('finds scoped Unicode, literal and encrypted subjects after early unrelated titles', async () => {
+	const c = context();
+	await db.prepare(`INSERT INTO email(email_id,user_id,account_id,subject)
+		WITH RECURSIVE n(i) AS (VALUES(100) UNION ALL SELECT i+1 FROM n WHERE i<145)
+		SELECT i,4,1,'a filler ' || i FROM n`).run();
+	const key = await emailCrypto.getUserEmailCryptoKey(c.env,uid);
+	const otherKey = await emailCrypto.getUserEmailCryptoKey(c.env,7);
+	const ins = (owner, accountId, subject) => db.prepare('INSERT INTO email(user_id,account_id,subject) VALUES (?,?,?)').bind(owner,accountId,subject);
+	await db.batch([ins(uid,1,'ŻÓŁTY %_ Kit'), ins(uid,1,await emailCrypto.encryptText('visible %_',key)),
+		ins(uid,1,await emailCrypto.encryptText('private %_',otherKey)), ins(7,3,'other owner %_'), ins(uid,2,'other mailbox %_')]);
+	const find = query => emailService.searchSuggestions(c,{query,type:'subject_include',accountId:1},uid);
+	expect((await find('%_')).sort()).toEqual(['visible %_', 'ŻÓŁTY %_ Kit'].sort());
+	expect(await find('żółty')).toEqual(['ŻÓŁTY %_ Kit']);
+	expect(await find('kit')).toEqual(['ŻÓŁTY %_ Kit']);
+	const derive = vi.spyOn(emailCrypto, 'getUserEmailCryptoKey');
+	expect(await find('filler')).toHaveLength(15);
+	expect(derive).not.toHaveBeenCalled();
+});
+
+it('searches a large plaintext mailbox completely and reports incomplete encrypted scans explicitly', async () => {
+	const c = context();
+	await db.prepare(`INSERT INTO email(email_id,user_id,account_id,subject)
+		WITH RECURSIVE n(i) AS (VALUES(100) UNION ALL SELECT i+1 FROM n WHERE i<10100)
+		SELECT i,4,1,CASE WHEN i=10100 THEN 'needle at end' ELSE 'ordinary title' END FROM n`).run();
+	const find = query => emailService.searchSuggestions(c,{query,type:'subject_include',accountId:1},uid);
+	expect(await find('needle')).toEqual(['needle at end']);
+	await db.prepare("UPDATE email SET subject='enc:v1:legacy-fixture' || email_id WHERE email_id>=100").run();
+	await expect(emailService.searchSuggestions(c,{query:'absent',type:'subject_include',accountId:1},uid))
+		.rejects.toMatchObject({ code:400, errorCode:'search_too_broad' });
+});

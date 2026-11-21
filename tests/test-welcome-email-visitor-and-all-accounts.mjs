@@ -1,12 +1,14 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "node:assert";
 
 (async () => {
   console.log("=== 启动欢迎邮件触发优化、参观者全量保障与 0MB 配额端到端审计 ===");
-  const browser = await chromium.launch({ headless: true, args: ["--lang=zh-CN"] });
+  const browser = await launchIsolatedChromium(chromium, { headless: true, args: ["--lang=zh-CN"] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   let adminToken = null;
   const timestamp = Date.now();
@@ -25,11 +27,11 @@ import assert from "node:assert";
     // --------------------------------------------------------------------------------------
     console.log("\n[步骤 1] 登录系统管理员并查询角色定义...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, "Admin 登录失败: " + JSON.stringify(loginJson));
+    assert.strictEqual(loginJson.code, 200, "Admin 登录失败: " + Number(loginJson?.code));
     adminToken = typeof loginJson.data === "string" ? loginJson.data : loginJson.data?.token;
     console.log("  ✓ Admin 登录成功");
 
@@ -82,7 +84,7 @@ import assert from "node:assert";
       headers: { "Content-Type": "application/json" }
     });
     const visitorLoginJson = await visitorLoginRes.json();
-    assert.strictEqual(visitorLoginJson.code, 200, "参观者登录失败: " + JSON.stringify(visitorLoginJson));
+    assert.strictEqual(visitorLoginJson.code, 200, "参观者登录失败: " + Number(visitorLoginJson?.code));
     const visitorToken = typeof visitorLoginJson.data === "string" ? visitorLoginJson.data : visitorLoginJson.data?.token;
     console.log("  ✓ 参观者登录成功，获得 JWT");
 
@@ -103,7 +105,7 @@ import assert from "node:assert";
     console.log(`  ✓ 欢迎邮件官方标识: ${welcomeEmail.isOfficial}`);
     console.log(`  ✓ 欢迎邮件星标状态: ${welcomeEmail.isStar}`);
 
-    assert.strictEqual(welcomeEmail.sendEmail, "admin@epocanvas.com", "欢迎邮件发件人必须为官方 admin@epocanvas.com");
+    assert.strictEqual(welcomeEmail.sendEmail, legacyAdminEmail, "欢迎邮件发件人必须为官方 admin@epocanvas.com");
     assert.strictEqual(welcomeEmail.isOfficial, 1, "欢迎邮件必须具备官方认证 isOfficial = 1");
     assert.strictEqual(welcomeEmail.isStar, 1, "欢迎邮件必须默认被星标 (重要) isStar = 1");
     assert.ok(welcomeEmail.subject.includes("欢迎"), "邮件主题必须包含欢迎词");
@@ -200,7 +202,7 @@ import assert from "node:assert";
       headers: { "Content-Type": "application/json" }
     });
     const normalLoginJson = await normalLoginRes.json();
-    assert.strictEqual(normalLoginJson.code, 200, "普通用户登录失败: " + JSON.stringify(normalLoginJson));
+    assert.strictEqual(normalLoginJson.code, 200, "普通用户登录失败: " + Number(normalLoginJson?.code));
     const normalToken = typeof normalLoginJson.data === "string" ? normalLoginJson.data : normalLoginJson.data?.token;
 
     const normalEmailListRes = await page.request.get(BASE + "/api/email/list", {
@@ -209,7 +211,7 @@ import assert from "node:assert";
     const normalEmailListJson = await normalEmailListRes.json();
     const normalEmailList = normalEmailListJson.data?.list || [];
     assert.strictEqual(normalEmailList.length, 1, "普通用户账号创建后必须精确收到 1 封欢迎邮件");
-    assert.strictEqual(normalEmailList[0].sendEmail, "admin@epocanvas.com");
+    assert.strictEqual(normalEmailList[0].sendEmail, legacyAdminEmail);
     assert.strictEqual(normalEmailList[0].isOfficial, 1);
     assert.strictEqual(normalEmailList[0].isStar, 1);
     console.log("  ✓ 普通用户同样 100% 成功接收官方欢迎引导信件");

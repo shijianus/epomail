@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assessCompletedPressure } from '../backend-stress.mjs';
+import { assessCompletedPressure, operationMix } from '../backend-stress.mjs';
 import {
   HARD_LIMITS,
   assessSlo,
@@ -16,13 +16,14 @@ test('completed under-sampled stages keep their failures and independent latency
   const pressure = { stopped: false, results: names.map(name => ({
     name, stageCompleted: true, durationMs: 1000, ratePerSecond: 4, maxRequests: 4,
     stats: { requests: name === 'burst' || name === 'ramp-4' ? 2 : 3 },
-    byKind: { list: { latencyMs: { p95: 20 } } }
+    byKind: Object.fromEntries(['list', 'sidebar', 'search', 'account', 'detail']
+      .map(kind => [kind, { latencyMs: { p95: 20 } }]))
   })) };
   let probes = 0;
   const fixture = { client: async route => {
     assert.equal(route, '/api/login');
     probes++;
-    return { status: 200, code: 200, latencyMs: 12, json: { data: { token: 'fixture' } } };
+    return { status: 200, code: 200, latencyMs: 12, json: { code: 200, data: { token: 'fixture' } } };
   } };
   const result = await assessCompletedPressure(pressure, fixture, 'limited-beta');
   assert.deepEqual(result.sampleFailures, [
@@ -32,9 +33,14 @@ test('completed under-sampled stages keep their failures and independent latency
   assert.equal(probes, 5);
   assert.equal(result.slo.readP95.pass, true);
   assert.equal(result.slo.auth.pass, true);
+  for (const stage of pressure.results) delete stage.byKind.search;
+  const incomplete = await assessCompletedPressure(pressure, fixture, 'limited-beta');
+  assert.deepEqual(incomplete.slo.readP95.missingKinds, ['search']);
+  assert.equal(incomplete.slo.readP95.pass, false);
+  assert.equal(probes, 10);
   pressure.stopped = true;
   await assert.rejects(assessCompletedPressure(pressure, fixture, 'limited-beta'), /must not stop early/);
-  assert.equal(probes, 5);
+  assert.equal(probes, 10);
 });
 
 test('assertLoopbackBase accepts only generated 127.0.0.1 origins', () => {
@@ -110,7 +116,8 @@ test('runStage enforces request limit and records response classes', async () =>
   assert.equal(result.stats.contractFailure, 0);
   assert.equal(result.stats.latencyMs.p50, 20);
   assert.equal(result.stats.latencyMs.p95, 29);
-  assert.equal(result.stopReason, 'request_limit');
+  assert.equal(result.stopReason, 'unexpected_status');
+  assert.equal(result.firstFailure.status, 500);
   assert.equal(result.byKind.read.requests, 3);
 });
 
@@ -121,7 +128,7 @@ test('runStage stops dispatching after a request timeout', async () => {
     concurrency: 4,
     durationMs: 100,
     maxRequests: 100,
-    limits: { ...HARD_LIMITS, requestTimeoutMs: 10, maxStageMs: 100 },
+    limits: { ...HARD_LIMITS, requestTimeoutMs: 35, shutdownGraceMs: 10, maxStageMs: 100 },
     ratePerSecond: 1000,
     operation: async () => {
       calls++;
@@ -129,7 +136,10 @@ test('runStage stops dispatching after a request timeout', async () => {
     }
   });
   assert.equal(result.timedOut, true);
-  assert.equal(result.stats.timeout, 4);
+  assert.equal(result.stats.timeout, 1);
+  assert.equal(result.stats.abortedByFuse, 3);
+  assert.equal(result.stats.transportError, 0);
+  assert.equal(result.stats.ignoredAbort, 4);
   assert.equal(result.stopReason, 'request_timeout');
   assert.equal(calls, 4);
 });
@@ -162,6 +172,90 @@ test('runStages stops later stages after a failed local request', async () => {
   assert.equal(result.stopped, true);
   assert.deepEqual(names, ['first']);
   assert.equal(result.results.length, 1);
+});
+
+test('the first transport error retains its request identity while siblings cancel and drain', async () => {
+  let failFirst;
+  const result = await runStage({
+    name: 'transport-control', concurrency: 4, ratePerSecond: 1000, maxRequests: 4, durationMs: 1000,
+    operation: async context => {
+      context.kind = 'detail';
+      context.endpoint = '/api/email/get';
+      context.method = 'GET';
+      context.subrequest = 2;
+      if (context.requestNumber === 0) return new Promise(resolve => {
+        failFirst = () => resolve({ transportError: true, transportCode: 'ECONNRESET' });
+      });
+      return new Promise(resolve => {
+        context.signal.addEventListener('abort', () => resolve({ abortedByFuse: true }), { once: true });
+        if (context.requestNumber === 3) failFirst();
+      });
+    }
+  });
+  assert.equal(result.stageCompleted, false);
+  assert.equal(result.stopReason, 'transport_error');
+  assert.equal(result.firstFailure.requestNumber, 0);
+  assert.equal(result.firstFailure.kind, 'detail');
+  assert.equal(result.firstFailure.endpoint, '/api/email/get');
+  assert.equal(result.firstFailure.method, 'GET');
+  assert.equal(result.firstFailure.subrequest, 2);
+  assert.equal(result.firstFailure.transportCode, 'ECONNRESET');
+  assert.equal(result.stats.transportError, 1);
+  assert.equal(result.stats.abortedByFuse, 3);
+  assert.equal(result.byKind.detail.latencyMs.count, 1);
+  assert.equal(result.stats.timeout, 0);
+});
+
+test('a local operation exception cannot overwrite a network counter or disclose its message', async () => {
+  const result = await runStage({
+    name: 'operation-control', concurrency: 1, durationMs: 100, maxRequests: 1,
+    operation: () => { throw new Error('private fixture marker'); }
+  });
+  assert.equal(result.stopReason, 'operation_error');
+  assert.equal(result.stats.operationFailure, 1);
+  assert.equal(result.stats.transportError, 0);
+  assert.ok(!JSON.stringify(result).includes('private fixture marker'));
+});
+
+test('detail and replay keep failing subrequests, stop subsequent calls and omit private input', async () => {
+  for (const [index, failOnCall, expectedKind, expectedRoute] of [
+    [4, 1, 'detail', '/api/email/list'], [4, 2, 'detail', '/api/email/get'],
+    [6, 1, 'send-replay', '/api/email/send'], [6, 2, 'send-replay', '/api/email/send'], [6, 3, 'send-replay', '/api/email/list']
+  ]) {
+    let calls = 0;
+    const operations = operationMix({
+      accountId: 1, syntheticEmail: 'private-fixture@example.invalid', user: async () => {
+        if (++calls === failOnCall) return { status: null, code: null, json: null, transportError: true, latencyMs: 8 };
+        return { status: 200, code: 200, json: { code: 200, data: { list: [{ emailId: 1 }], emailId: 1 } }, latencyMs: 4 };
+      }
+    });
+    const stage = await runStage({ name: 'mix-control', concurrency: 1, durationMs: 100, maxRequests: 1, operation: operations[index] });
+    assert.equal(calls, failOnCall);
+    assert.equal(stage.firstFailure.kind, expectedKind);
+    assert.equal(stage.firstFailure.endpoint, expectedRoute);
+    assert.equal(stage.firstFailure.subrequest, failOnCall);
+    assert.equal(stage.firstFailure.status, null);
+    assert.equal(stage.firstFailure.code, null);
+    assert.equal(stage.stats.success, 0);
+    assert.equal(stage.stats.transportError, 1);
+    assert.equal(stage.stats.contractFailure, 0);
+    assert.deepEqual(stage.stats.statusCounts, {});
+    assert.doesNotMatch(JSON.stringify(stage), /private-fixture|emailId=|Idempotency-Key|size=|local replay/);
+  }
+});
+
+test('HTML 200 and HTTP 500 with a success envelope both fail the read operation', async () => {
+  for (const response of [
+    { status: 200, code: 200, json: null },
+    { status: 500, code: 200, json: { code: 200 } }
+  ]) {
+    const [list] = operationMix({ user: async () => response });
+    const stage = await runStage({ name: 'response-control', concurrency: 1, durationMs: 100, maxRequests: 1, operation: list });
+    assert.equal(stage.stageCompleted, false);
+    assert.equal(stage.stats.contractFailure, 1);
+    assert.equal(stage.stats.unexpected5xx, response.status === 500 ? 1 : 0);
+    assert.equal(stage.firstFailure.status, response.status);
+  }
 });
 
 test('assessSlo applies one strict threshold', () => {

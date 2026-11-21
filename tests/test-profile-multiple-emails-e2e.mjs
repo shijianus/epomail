@@ -1,8 +1,10 @@
+import { legacyOrigin, legacyUserEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = process.env.TARGET_URL || 'https://mail.epocanvas.com';
-const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
+const BASE = legacyOrigin;
+const USER_EMAIL = legacyUserEmail;
 const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
 let pass = 0, fail = 0;
@@ -39,7 +41,7 @@ async function run() {
       body: JSON.stringify({ email: USER_EMAIL, password: USER_PWD })
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, `登录必须成功: ${JSON.stringify(loginJson)}`);
+    assert.strictEqual(loginJson.code, 200, `登录必须成功: ${Number(loginJson?.code)}`);
     token = loginJson.data?.token;
     ok(!!token, 'JWT Token 获取成功');
 
@@ -84,7 +86,7 @@ async function run() {
 
     // 4. 浏览器全真栈 UI 验证
     console.log('\n[步骤 4] 启动浏览器验证个资界面 UI 与交互...');
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'

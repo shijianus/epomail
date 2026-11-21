@@ -52,7 +52,7 @@ app.post('/setting/sendWelcomeEmail', async (c) => {
 });
 
 app.post('/setting/sendGlobalEmail', async (c) => {
-	const res = await settingService.sendGlobalBroadcastEmail(c, await readJsonObject(c));
+	const res = await settingService.sendGlobalBroadcastEmail(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok(res));
 });
 
@@ -84,7 +84,7 @@ app.post('/setting/storage/scan', async (c) => {
 });
 
 app.post('/setting/storage/cleanup', async (c) => {
-	const cleanResult = await storageScanService.cleanup(c);
+	const cleanResult = await storageScanService.cleanup(c, c.req.query());
 	return c.json(result.ok(cleanResult));
 });
 

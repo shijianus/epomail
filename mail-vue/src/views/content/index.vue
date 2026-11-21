@@ -595,7 +595,7 @@
               </div>
 
               <el-scrollbar class="htm-scrollbar" :class="(!msg.attList || msg.attList.length === 0) ? 'bottom-distance' : ''">
-                <ShadowHtml class="shadow-html" :html="formatImage(displayedContent(msg))" :message-key="msg.emailId || msg.hash" :trusted-image-urls="trustedImageUrls" v-if="msg.content || translatedHtmlMap[msg.emailId]" />
+                <ShadowHtml class="shadow-html" :official="msg.isOfficial === 1" :html="formatImage(displayedContent(msg))" :message-key="msg.emailId || msg.hash" :trusted-image-urls="trustedImageUrls" v-if="msg.content || translatedHtmlMap[msg.emailId]" />
                 <pre v-else class="email-text" >{{ displayedText(msg) }}</pre>
               </el-scrollbar>
 
@@ -860,6 +860,7 @@
 </template>
 <script setup>
 import ShadowHtml from '@/components/shadow-html/index.vue'
+import { OFFICIAL_MAIL_CSS } from '@/utils/official-mail-layout.js'
 import DOMPurify from 'dompurify';
 import { MAIL_SANITIZE_OPTIONS, prepareMailContent } from '@/utils/mail-content-privacy.js';
 import {reactive, ref, computed, watch, onMounted, onUnmounted, nextTick} from "vue";
@@ -1707,7 +1708,9 @@ const printSingleMsg = (msg) => {
   const safeFrom = escapeHtml(target.name ? `${target.name} <${target.sendEmail}>` : (target.sendEmail || ''));
   const safeTo = escapeHtml(formateReceive(target.recipient));
   const safeDate = escapeHtml(formatDetailDate(target.createTime));
+  const official = target.isOfficial === 1;
   const printable = prepareMailContent(formatImage(target.content || target.text || ''), {
+    official,
     trustedImageUrls: trustedImageUrls.value
   });
   const safeBody = DOMPurify.sanitize(printable.html, MAIL_SANITIZE_OPTIONS);
@@ -1723,6 +1726,7 @@ const printSingleMsg = (msg) => {
           .title { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
           .meta { font-size: 13px; color: #64748b; line-height: 1.6; }
           .body { font-size: 14px; line-height: 1.6; margin-top: 16px; }
+          ${official ? OFFICIAL_MAIL_CSS : ''}
         </style>
       </head>
       <body>
@@ -1734,7 +1738,7 @@ const printSingleMsg = (msg) => {
             <div><strong>Date:</strong> ${safeDate}</div>
           </div>
         </div>
-        <div class="body">
+        <div class="body${official ? ' official-mail-body' : ''}">
           ${safeBody}
         </div>
       </body>

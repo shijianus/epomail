@@ -1,9 +1,11 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch, legacyUserEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = 'https://mail.epocanvas.com';
-const ADMIN_EMAIL = 'admin@epomail.cyou';
-const ADMIN_PWD = (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
+const BASE = legacyOrigin;
+const ADMIN_EMAIL = legacyAdminEmail;
+const ADMIN_PWD = (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
 
 let passCount = 0;
 let failCount = 0;
@@ -40,7 +42,7 @@ async function safeFetchJson(url, options, maxRetries = 3) {
 
 async function run() {
   console.log('====================================================================');
-  console.log('=== 公网线上 Cloudflare 生产环境 (mail.epocanvas.com) 真实核验 ===');
+  console.log('=== 公网线上 本地隔离环境 (mail.epocanvas.com) 真实核验 ===');
   console.log('====================================================================\n');
 
   let browser;
@@ -58,7 +60,7 @@ async function run() {
 
     // 2. 启动 Playwright 打开线上生产环境
     console.log('\n[步骤 2] 启动 Chromium 无头浏览器访问生产环境...');
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'
@@ -75,7 +77,7 @@ async function run() {
     });
 
     // 3. 打开公网系统设置页 #manage/admin/system
-    console.log('\n[步骤 3] 访问公网系统设置页 https://mail.epocanvas.com/mail/u/0/#manage/admin/system ...');
+    console.log('\n[步骤 3] 访问本地系统设置页 <本地测试地址>/mail/u/0/#manage/admin/system ...');
     await page.goto(`${BASE}/mail/u/0/#manage/admin/system`, { waitUntil: 'networkidle', timeout: 35000 });
     await page.waitForTimeout(2000);
 
@@ -119,12 +121,12 @@ async function run() {
     check(Number(criticalQuotaVal) > 0, `严重违规配额参数已展示 (当前生产数值: ${criticalQuotaVal})`);
 
     // 8. 截屏留存：线上生产系统设置卡片
-    console.log('\n[步骤 8] 截取公网生产「系统设置 - 操作报告」现场截图...');
+    console.log('\n[步骤 8] 截取本地隔离「系统设置 - 操作报告」现场截图...');
     await auditCard.screenshot({ path: 'tests/live_prod_sys_setting_audit_card.png' });
     console.log('  📸 生产现场截图已保存至 tests/live_prod_sys_setting_audit_card.png');
 
     // 9. 核验状态栏纯色提示与偏移
-    console.log('\n[步骤 9] 核验公网生产底部状态栏...');
+    console.log('\n[步骤 9] 核验本地隔离底部状态栏...');
     const statusBar = page.locator('.status-bar');
     await statusBar.waitFor({ state: 'visible' });
 
@@ -157,7 +159,7 @@ async function run() {
     const userJson = await safeFetchJson(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'audit_normal_1789140856529@epomail.bond', password: (process.env.EPOMAIL_LIVE_E2E_USER_PASSWORD || process.env.EPOMAIL_E2E_USER_PASSWORD || '') })
+      body: JSON.stringify({ email: legacyUserEmail, password: (process.env.EPOMAIL_E2E_USER_PASSWORD || '') })
     });
     const userToken = userJson.data?.token;
     check(!!userToken, '获取普通用户生产 Token 成功');
@@ -170,15 +172,15 @@ async function run() {
     await userContext.addInitScript(({ t, email }) => {
       localStorage.setItem('token', t);
       localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email }]));
-    }, { t: userToken, email: 'audit_normal_1789140856529@epomail.bond' });
+    }, { t: userToken, email: legacyUserEmail });
 
     const userPage = await userContext.newPage();
-    console.log('  打开公网生产页面 https://mail.epocanvas.com/audit-report ...');
+    console.log('  打开本地隔离页面 <本地测试地址>/audit-report ...');
     await userPage.goto(`${BASE}/audit-report`, { waitUntil: 'networkidle', timeout: 35000 });
     await userPage.waitForTimeout(2000);
 
     // 12. 验证非管理员在公网环境的上层选框与管理按钮已彻底隐藏
-    console.log('\n[步骤 12] 核验公网生产参观者视角：屏蔽 4 组 KPI 选框与管理按钮...');
+    console.log('\n[步骤 12] 核验本地隔离参观者视角：屏蔽 4 组 KPI 选框与管理按钮...');
     const userKpiGrid = userPage.locator('.kpi-grid');
     const isKpiVisible = await userKpiGrid.isVisible();
     check(!isKpiVisible, '公网生产：非管理员彻底隐藏上方 KPI 汇报选框 (严格纯表格)');
@@ -209,7 +211,7 @@ async function run() {
     console.error('公网生产环境存在不符合预期的项！');
     process.exit(1);
   } else {
-    console.log('🎉 公网生产环境 (mail.epocanvas.com) 真实核验 100% 全部通过！\n');
+    console.log('🎉 本地隔离环境 (mail.epocanvas.com) 真实核验 100% 全部通过！\n');
   }
 }
 

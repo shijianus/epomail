@@ -1,6 +1,8 @@
 import { advanceDailyQuota } from '../utils/send-quota-period.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import BizError from '../error/biz-error.js';
+import storageQuotaService from './storage-quota-service.js';
+import { mailQuotaCondition, validatedMailQuotaCondition } from '../utils/mail-pipeline.js';
 import { mailTransactionGuard } from '../utils/mail-transaction.js';
 
 const LEASE_SECONDS = 300;
@@ -39,29 +41,41 @@ export async function prepareOutboundTask(c, request, getNewReservation) {
 	const { reservedBytes = 0, maxStorageBytes, maxEmails, bypassStorage = false, storageBlocked = false } = reservation;
 	if (storageBlocked || !Number.isFinite(maxStorageBytes) || maxStorageBytes < 0 || !Number.isSafeInteger(reservedBytes) || reservedBytes < 0
 		|| !Number.isSafeInteger(maxEmails) || maxEmails < 0) {
+		await reservation.explainQuotaFailure?.();
 		throw error('Storage quota is unavailable', 'storage_usage_unknown', 503);
 	}
 	const taskId = crypto.randomUUID();
-	const inserted = await db.prepare(`INSERT INTO mail_outbound_task
-		(task_id,user_id,account_id,idempotency_key,content_hash,state,payload_json,reserved_bytes,reserved_count,provider)
-		SELECT ?,?,?,?,?,'PREPARED',?,?,1,?
-		WHERE (? = 1 OR ? = 0 OR (
-			COALESCE((SELECT SUM(LENGTH(CAST(IFNULL(subject,'') AS BLOB))+LENGTH(CAST(IFNULL(text,'') AS BLOB))+
-				LENGTH(CAST(IFNULL(content,'') AS BLOB))+LENGTH(CAST(IFNULL(code,'') AS BLOB))) FROM email WHERE user_id=?),0)
-			+ COALESCE((SELECT SUM(size) FROM attachments WHERE user_id=?),0)
-			+ COALESCE((SELECT SUM(reserved_bytes) FROM mail_receive_claim WHERE user_id=? AND state IN ('CLAIMED','SAVING','RETRY') AND lease_until>unixepoch()),0)
-			+ COALESCE((SELECT SUM(reserved_bytes) FROM mail_outbound_task WHERE user_id=? AND state IN ('PREPARED','SENDING','UNKNOWN')),0)
-			+ ? <= ?)) AND (? = 0 OR (
-			(SELECT COUNT(*) FROM email WHERE user_id=?)
-			+ COALESCE((SELECT SUM(reserved_count) FROM mail_receive_claim WHERE user_id=? AND state IN ('CLAIMED','SAVING','RETRY') AND lease_until>unixepoch()),0)
-			+ COALESCE((SELECT SUM(reserved_count) FROM mail_outbound_task WHERE user_id=? AND state IN ('PREPARED','SENDING','UNKNOWN')),0)
-			+ 1 <= ?))
+	const leaseToken = request.claimOnInsert ? crypto.randomUUID() : null;
+	const buildQuota = reservation.explainQuotaFailure ? validatedMailQuotaCondition : mailQuotaCondition;
+	const limits = { userId, incomingBytes: reservedBytes, maxStorageBytes, maxEmails, bypassStorage };
+	const quota = buildQuota(limits);
+	const insert = db.prepare(`INSERT INTO mail_outbound_task
+		(task_id,user_id,account_id,idempotency_key,content_hash,state,payload_json,reserved_bytes,reserved_count,provider,lease_token,lease_until)
+		SELECT ?,?,?,?,?,'PREPARED',?,?,1,?,?,CASE WHEN ?=0 THEN 0 ELSE unixepoch()+? END
+		WHERE ${quota.sql}
 		ON CONFLICT(user_id,account_id,idempotency_key) DO NOTHING RETURNING *`)
-		.bind(taskId,userId,accountId,key,contentHash,JSON.stringify(payload),reservedBytes,payload.route === 'local' ? 'local' : 'external',bypassStorage?1:0,maxStorageBytes,
-			userId,userId,userId,userId,reservedBytes,maxStorageBytes,maxEmails,userId,userId,userId,maxEmails).first();
-	if (inserted) return { task: inserted, created: true };
+		.bind(taskId, userId, accountId, key, contentHash, JSON.stringify(payload), reservedBytes,
+			payload.route === 'local' ? 'local' : 'external', leaseToken, leaseToken ? 1 : 0, LEASE_SECONDS, ...quota.params);
+	let inserted;
+	try { inserted = await insert.first(); }
+	catch (cause) {
+		// Preserve the established 503 if an accounting table/column is missing.
+		await reservation.explainQuotaFailure?.();
+		throw cause;
+	}
+	if (inserted) return leaseToken ? { task: inserted, created: true, leaseToken } : { task: inserted, created: true };
 	const task = await read();
-	if (!task) throw error('Storage quota is exhausted', 'storage_quota_exceeded', 413);
+	if (!task) {
+		if (reservation.explainQuotaFailure) {
+			// Re-read validity and the persisted bytes for the existing error message
+			// together. Pending reservations can block this write without filling storage.
+			const report = validatedMailQuotaCondition(limits, { reportUsage: true });
+			const measured = await db.prepare('SELECT * FROM ' + report.sql).bind(...report.params).first();
+			if (measured?.allowed == null) throw error('Storage quota usage or configuration is unavailable', 'storage_usage_unknown', 503);
+			await reservation.explainQuotaFailure(measured);
+		}
+		throw error('Storage quota is exhausted', 'storage_quota_exceeded', 413);
+	}
 	return matches(task);
 }
 
@@ -85,12 +99,39 @@ export async function claimPreparation(c, taskId) {
 	throw error('The same request is already being prepared', 'outbound_in_flight', 425);
 }
 
-export async function claimOutboundTask(c, taskId, leaseToken) {
-	const task = await getMailDb(c).prepare(`UPDATE mail_outbound_task SET state='SENDING',lease_until=unixepoch()+?,updated_at=CURRENT_TIMESTAMP
-		WHERE task_id=? AND state='PREPARED' AND lease_token=? AND lease_until>unixepoch() AND email_id IS NOT NULL RETURNING *`)
-		.bind(LEASE_SECONDS,taskId,leaseToken).first();
-	if (!task) throw error('Send lease has changed', 'outbound_lease_lost');
-	return { task, leaseToken, dispatch: true };
+export async function claimOutboundTask(c, taskId, leaseToken, { userId, senderAddress, selfDelivery = false }) {
+	const mailDb = getMailDb(c);
+	const userDb = getUserDb(c);
+	const shared = mailDb === userDb;
+	const denied = () => error('Sender is unavailable', 'account_unavailable', 403);
+	let dispatchIdentity = null;
+	if (selfDelivery) {
+		dispatchIdentity = await storageQuotaService.selectMailPolicyIdentity(c, userId, shared ? undefined : senderAddress);
+		const user = dispatchIdentity?.user;
+		if (!user || Number(user.status) !== 0 || Number(user.isDel) !== 0) throw denied();
+	} else if (!shared) {
+		// Different bindings cannot share a transaction. Check USER_DB immediately
+		// before the MAIL_DB claim, and never read its user or audit tables on MAIL_DB.
+		const active = await userDb.prepare(`SELECT 1 FROM user WHERE user_id=? AND status=0 AND is_del=0
+			AND NOT EXISTS (SELECT 1 FROM audit_log WHERE email=? AND warning_type='ban' AND status='banned')`)
+			.bind(userId, senderAddress).first();
+		if (!active) throw denied();
+	}
+	const ownerPolicy = shared ? `AND EXISTS (SELECT 1 FROM user u WHERE u.user_id=a.user_id AND u.status=0 AND u.is_del=0)
+		AND NOT EXISTS (SELECT 1 FROM audit_log b WHERE b.email=a.email AND b.warning_type='ban' AND b.status='banned')` : '';
+	const owned = "task_id=? AND state='PREPARED' AND lease_token=? AND lease_until>unixepoch() AND email_id IS NOT NULL";
+	const task = await mailDb.prepare(`UPDATE mail_outbound_task SET state='SENDING',lease_until=unixepoch()+?,updated_at=CURRENT_TIMESTAMP
+		WHERE ${owned} AND user_id=? AND EXISTS (
+			SELECT 1 FROM account a JOIN email e ON e.email_id=mail_outbound_task.email_id
+			WHERE a.account_id=mail_outbound_task.account_id AND a.user_id=mail_outbound_task.user_id
+			AND a.status=0 AND a.is_del=0 AND a.email=? AND e.send_email=a.email
+			AND e.account_id=a.account_id AND e.user_id=a.user_id AND e.outbound_task_id=mail_outbound_task.task_id
+			${ownerPolicy}) RETURNING *`).bind(LEASE_SECONDS,taskId,leaseToken,userId,senderAddress).first();
+	if (!task) {
+		if (await mailDb.prepare(`SELECT 1 FROM mail_outbound_task WHERE ${owned}`).bind(taskId,leaseToken).first()) throw denied();
+		throw error('Send lease has changed', 'outbound_lease_lost');
+	}
+	return { task, leaseToken, dispatch: true, dispatchIdentity };
 }
 
 export async function markOutboundUnknown(c, { taskId, leaseToken, providerId = null }) {
@@ -178,7 +219,13 @@ export async function closeExternalUnknown(c, { taskId, providerId = null, state
 			WHERE ${selector} AND t.user_id=email.user_id AND t.email_id=email.email_id)`)
 			.bind(...fromStatuses, status, providerId, ...identity),
 		db.prepare(`UPDATE mail_outbound_task SET state=?,reserved_bytes=0,reserved_count=0,lease_until=0,last_error=?,
-			updated_at=CURRENT_TIMESTAMP WHERE ${selector} RETURNING email_id,user_id`).bind(state, reason, ...identity)
+			counted_day=CASE WHEN ?='ACCEPTED' THEN date('now') END,
+			counted_recipients=CASE WHEN ?='ACCEPTED' THEN COALESCE(
+				CASE WHEN json_valid(payload_json) THEN
+					CASE WHEN json_type(payload_json,'$.recipients')='array' THEN json_array_length(payload_json,'$.recipients') END END,
+				(SELECT CASE WHEN json_valid(e.recipient) THEN json_array_length(e.recipient) END FROM email e
+					WHERE e.email_id=mail_outbound_task.email_id AND e.user_id=mail_outbound_task.user_id), 0) ELSE 0 END,
+			updated_at=CURRENT_TIMESTAMP WHERE ${selector} RETURNING email_id,user_id`).bind(state, reason, state, state, ...identity)
 	]);
 	return results[1].results?.[0];
 }

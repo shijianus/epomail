@@ -1,3 +1,5 @@
+import { officialBackgroundColor, restoreStoredWelcomeArt } from './official-mail-layout.js';
+
 // Parse in an inert <template> before DOMPurify or the live shadow root sees
 // sender-controlled markup. DOMPurify handles XSS; this layer handles network
 // privacy, including CSS URLs and alternate image sources.
@@ -28,12 +30,16 @@ const NETWORK_ATTRIBUTES = new Set([
   'xlink:href', 'data', 'codebase', 'action', 'formaction', 'manifest', 'lowsrc', 'dynsrc'
 ]);
 
-export function safeMailStyle(style = '') {
+export function safeMailStyle(style = '', official = false) {
   return String(style).split(';').flatMap(declaration => {
     const separator = declaration.indexOf(':');
     if (separator < 0) return [];
     const property = declaration.slice(0, separator).trim().toLowerCase();
     const value = declaration.slice(separator + 1).trim();
+    if (official && property === 'background') {
+      const color = officialBackgroundColor(value);
+      return color ? [`background-color: ${color}`] : [];
+    }
     if (!SAFE_STYLE_PROPERTIES.has(property) || !value) return [];
     // No escapes, custom properties, resource functions, CSS imports or markup.
     if (/[^a-z0-9\s#.,%()+\-/'"!]/i.test(value) || /url|image|expression|var\s*\(|attr\s*\(/i.test(value)) return [];
@@ -58,10 +64,12 @@ export function prepareMailContent(html, {
   document = globalThis.document,
   baseUrl = document?.baseURI,
   allowRemoteImages = false,
+  official = false,
   trustedImageUrls = []
 } = {}) {
   const template = document.createElement('template');
   template.innerHTML = String(html || '');
+  if (official) restoreStoredWelcomeArt(template.content);
   const trusted = new Set(trustedImageUrls.map(url => httpUrl(url, baseUrl)).filter(Boolean));
   let remoteImageCount = 0;
 
@@ -82,7 +90,7 @@ export function prepareMailContent(html, {
       if (NETWORK_ATTRIBUTES.has(name) || name.startsWith('on') || name === 'autofocus') {
         element.removeAttribute(attribute.name);
       } else if (name === 'style') {
-        const style = safeMailStyle(attribute.value);
+        const style = safeMailStyle(attribute.value, official);
         if (style) element.setAttribute('style', style);
         else element.removeAttribute('style');
       } else if (name === 'href') {
@@ -117,6 +125,6 @@ export function prepareMailContent(html, {
   return {
     html: serialized,
     remoteImageCount,
-    bodyStyle: safeMailStyle(bodyStyle?.[1] || bodyStyle?.[2] || '')
+    bodyStyle: safeMailStyle(bodyStyle?.[1] || bodyStyle?.[2] || '', official)
   };
 }

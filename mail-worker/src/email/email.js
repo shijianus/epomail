@@ -12,7 +12,7 @@ import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
 import aiService from '../service/ai-service';
 import { applyRules } from './rule-engine';
-import kvConst from '../const/kv-const';
+import analysisDao from '../dao/analysis-dao.js';
 import mailReliabilityService, { failInboundClaim } from '../service/mail-reliability-service.js';
 import { getMailDb } from '../utils/db-accessor.js';
 import { forwardPlan } from '../service/forward-consent.js';
@@ -161,8 +161,7 @@ export async function email(message, env, ctx) {
 
 		if (hardBlockFlag) {
 			try {
-				const count = await env.kv.get(kvConst.HARD_INTERCEPT_TOTAL) || 0;
-				await env.kv.put(kvConst.HARD_INTERCEPT_TOTAL, Number(count) + 1);
+				await analysisDao.recordHardIntercept({ env });
 			} catch(e) {
 				safeLogger.error('inbound_hard_intercept_metric_failed', { error: e });
 			}

@@ -1,26 +1,28 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
 (async () => {
   console.log("=== 开始测试「个资」、常规界面5x2壁纸、个性装扮生效、个人背景、精简阅读窗格与邮件会话聚合 ===");
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ 
     viewport: { width: 1440, height: 900 },
     locale: "zh-CN"
   });
   const page = await context.newPage();
 
-  const BASE = "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   try {
     // 1. 登录
-    console.log("1. 正在登录 Cloudflare 生产环境...");
+    console.log("1. 正在登录 本地隔离环境...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "登录失败: " + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, "登录失败: " + Number(loginData?.code));
     const token = loginData.data?.token;
     console.log("✓ 登录成功");
 
@@ -151,7 +153,7 @@ import assert from "assert";
     console.log("11. 创建两封同主题测试邮件模拟订阅/会话...");
     const subEmail1 = await page.request.post(BASE + "/api/email/send", {
       data: {
-        to: "admin@epomail.bond",
+        to: legacyAdminEmail,
         subject: "[Notification] AWS Monthly Usage Report & Billing Summary",
         content: "<p>This is the first notification regarding your AWS monthly usage.</p>",
         text: "This is the first notification regarding your AWS monthly usage."
@@ -161,7 +163,7 @@ import assert from "assert";
     await page.waitForTimeout(1000);
     const subEmail2 = await page.request.post(BASE + "/api/email/send", {
       data: {
-        to: "admin@epomail.bond",
+        to: legacyAdminEmail,
         subject: "Re: [Notification] AWS Monthly Usage Report & Billing Summary",
         content: "<p>This is an update regarding your AWS monthly usage: All metrics normal.</p>",
         text: "This is an update regarding your AWS monthly usage: All metrics normal."

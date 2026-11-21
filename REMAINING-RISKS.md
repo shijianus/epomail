@@ -1,7 +1,9 @@
 # Epocanvas Mail - 剩余风险评估与接受理由 (REMAINING-RISKS.md)
 
 > [!WARNING]
-> **基线更新说明 (2026-11-15)**：第 1–10 项为历史 `release/2026-10-31` (`4d9d9d8`) 评估条目；当前有效评估基线已更新至 **`fix/public-beta-go-blockers-2026-11-07` @ `e75305491edf9300475ab45ddc8cc2450c48addf`**。因新增未关闭的外部集成、凭据加密、容量瓶颈及运维监控风险（见文末 `RISK-11` 至 `RISK-17`），当前 **受控公测与 GA 均维持 `NO-GO (BLOCKED)`**，下文历史签字建议已废止。
+> 2026-11-21 修复分支的逐项审计见 [REPORTS.md](REPORTS.md)。风险关闭凭据需要绑定各自的候选和实际环境。
+>
+> **历史基线说明 (2026-11-15)**：第 1–10 项为历史 `release/2026-10-31` (`4d9d9d8`) 评估条目；该次评估基线为 **`fix/public-beta-go-blockers-2026-11-07` @ `e75305491edf9300475ab45ddc8cc2450c48addf`**。因新增未关闭的外部集成、凭据加密、容量瓶颈及运维监控风险（见文末 `RISK-11` 至 `RISK-17`），该次 **受控公测与 GA 均维持 `NO-GO (BLOCKED)`**，下文历史签字建议已废止。
 
 > **历史评估基线**：`release/2026-10-31` @ Commit `4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
 > **适用阶段**：受控公测阶段 (Controlled Public Beta)

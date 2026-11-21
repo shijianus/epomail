@@ -4,6 +4,9 @@ import { getMailDb, getUserDb } from './db-accessor.js';
 /** Called only by cold-start/upgrade migrations, never from mail requests. */
 export async function ensureMailReliabilitySchema(c) {
 	const db = getMailDb(c);
+	await db.prepare(`CREATE TABLE IF NOT EXISTS mail_ingress_stat (
+		metric TEXT PRIMARY KEY, total INTEGER NOT NULL DEFAULT 0
+	)`).run();
 	await db.prepare(`CREATE TABLE IF NOT EXISTS mail_transaction_guard (
 		token TEXT PRIMARY KEY, valid INTEGER NOT NULL CHECK(valid = 1)
 	)`).run();
@@ -76,6 +79,8 @@ export async function ensureMailReliabilitySchema(c) {
 		email_id INTEGER,
 		provider_id TEXT,
 		quota_reconciled INTEGER NOT NULL DEFAULT 0,
+		counted_day TEXT,
+		counted_recipients INTEGER NOT NULL DEFAULT 0,
 		reserved_bytes INTEGER NOT NULL DEFAULT 0,
 		reserved_count INTEGER NOT NULL DEFAULT 0,
 		last_error TEXT,
@@ -89,11 +94,20 @@ export async function ensureMailReliabilitySchema(c) {
 		['payload_json', "TEXT NOT NULL DEFAULT '{}'"],
 		['reserved_count', 'INTEGER NOT NULL DEFAULT 0'],
 		['quota_reconciled', 'INTEGER NOT NULL DEFAULT 0'],
+		['counted_day', 'TEXT'],
+		['counted_recipients', 'INTEGER NOT NULL DEFAULT 0'],
 		['lease_token', 'TEXT'],
 		['lease_until', 'INTEGER NOT NULL DEFAULT 0']
 	]) {
-		if (!taskColumns.has(column)) await db.prepare(`ALTER TABLE mail_outbound_task ADD COLUMN ${column} ${ddl}`).run();
+		if (taskColumns.has(column)) continue;
+		try {
+			await db.prepare(`ALTER TABLE mail_outbound_task ADD COLUMN ${column} ${ddl}`).run();
+		} catch (cause) {
+			const fresh = await db.prepare("PRAGMA table_info('mail_outbound_task')").all();
+			if (!fresh.results?.some(field => field.name === column)) throw cause;
+		}
 	}
+	await db.prepare('CREATE INDEX IF NOT EXISTS idx_mail_counted_day ON mail_outbound_task(counted_day,counted_recipients) WHERE counted_day IS NOT NULL').run();
 	await db.prepare(`CREATE INDEX IF NOT EXISTS idx_mail_outbound_task_state ON mail_outbound_task(state, updated_at)`).run();
 	await db.prepare(`CREATE TABLE IF NOT EXISTS mail_local_delivery (
 		task_id TEXT NOT NULL,
@@ -153,8 +167,40 @@ export async function ensureMailReliabilitySchema(c) {
 		is_daily INTEGER NOT NULL DEFAULT 0,
 		state TEXT NOT NULL CHECK(state IN ('reserved','released'))
 	)`).run();
-	await ensureSendQuotaPeriods(getUserDb(c));
+	await db.prepare(`CREATE TABLE IF NOT EXISTS mail_welcome_receipt (
+		user_id INTEGER PRIMARY KEY NOT NULL, email_id INTEGER
+	) WITHOUT ROWID`).run();
+	await db.prepare(`CREATE TABLE IF NOT EXISTS mail_global_receipt (
+		user_id INTEGER NOT NULL, campaign_id TEXT NOT NULL, PRIMARY KEY (user_id,campaign_id)
+	) WITHOUT ROWID`).run();
+	const userDb = getUserDb(c);
+	await userDb.batch([
+		userDb.prepare(`CREATE TABLE IF NOT EXISTS mail_global_operation (
+			owner_id INTEGER NOT NULL, operation_id TEXT NOT NULL, content_hash TEXT NOT NULL, broadcast_id TEXT NOT NULL UNIQUE,
+			target_count INTEGER NOT NULL DEFAULT 0, delivered INTEGER NOT NULL DEFAULT 0, completed INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY(owner_id,operation_id)
+		) WITHOUT ROWID`),
+		userDb.prepare(`CREATE TABLE IF NOT EXISTS mail_global_audience (
+			broadcast_id TEXT NOT NULL,user_id INTEGER NOT NULL,resolved INTEGER NOT NULL DEFAULT 0,delivered INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY(broadcast_id,user_id)
+		) WITHOUT ROWID`),
+		userDb.prepare('CREATE INDEX IF NOT EXISTS idx_global_pending ON mail_global_audience(broadcast_id,resolved,user_id)')
+	]);
+	await ensureSendQuotaPeriods(userDb);
 	return db;
+}
+
+// Global announcements and security notices use different server-written metadata.
+// Never promote legacy messages to official based on a sender address or labels.
+export const LEGACY_WELCOME_PREDICATE = `is_official=1 AND type=0
+	AND send_email='announcement@epocanvas.com' AND labels='["官方","代办"]'
+	AND COALESCE(message_id,'')='' AND receive_claim_key IS NULL AND outbound_task_id IS NULL`;
+
+export async function backfillWelcomeReceipts(c) {
+	await getMailDb(c).prepare(`INSERT INTO mail_welcome_receipt(user_id,email_id)
+		SELECT user_id, MAX(email_id) FROM email WHERE user_id>0 AND ${LEGACY_WELCOME_PREDICATE}
+		GROUP BY user_id ON CONFLICT(user_id) DO UPDATE SET email_id=excluded.email_id
+		WHERE mail_welcome_receipt.email_id IS NULL`).run();
 }
 
 export default ensureMailReliabilitySchema;

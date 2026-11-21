@@ -97,7 +97,7 @@
 
         <el-scrollbar class="detail-body-scrollbar">
           <div class="email-body-content">
-            <ShadowHtml class="shadow-html" :html="formatImage(currentEmail.content)" :message-key="currentEmail.emailId || currentEmail.hash" :trusted-image-urls="trustedImageUrls" v-if="currentEmail.content" />
+            <ShadowHtml class="shadow-html" :official="currentEmail.isOfficial === 1" :html="formatImage(currentEmail.content)" :message-key="currentEmail.emailId || currentEmail.hash" :trusted-image-urls="trustedImageUrls" v-if="currentEmail.content" />
             <pre v-else class="email-text">{{ currentEmail.text || $t('noContent') }}</pre>
           </div>
         </el-scrollbar>

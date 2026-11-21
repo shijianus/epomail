@@ -123,6 +123,19 @@ const emailCryptoUtils = {
 		});
 	},
 
+	// Normal mail reads know the ciphertext formats in the records. New writes only need the active key.
+	// Migration and search use the complete keyring when the input records are not yet known.
+	async getEmailRecordKey(env, userId, records = []) {
+		const readFormats = new Set();
+		for (const row of records) {
+			for (const field of ENCRYPTED_FIELDS) {
+				const info = this.inspectEncryptedValue(row?.[field]);
+				if (info.encrypted) readFormats.add(info.domainTag ?? 'legacy');
+			}
+		}
+		return this.getUserEmailCryptoKey(env, userId, null, { readFormats });
+	},
+
 	/**
 	 * Derive a domain-isolated keyring for a specific user using HKDF-SHA-256.
 	 * New writes prefer dedicated `email_enc_key` and NEVER fall back to `jwt_secret`.
@@ -142,18 +155,28 @@ const emailCryptoUtils = {
 			throw new Error('email encryption key is not configured (set email_enc_key or totp_enc_key)');
 		}
 
-		// The imports belong only to this keyring, so rotations take effect on the next call.
-		const secrets = [...new Set([emailSecret, prevEmailSecret, totpSecret, jwtSecret].filter(Boolean))];
-		const baseKeys = new Map(await Promise.all(secrets.map(async secret => [
-			secret, await crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey'])
-		])));
-		const domainKey = (secret, domain) => secret
-			? deriveDomainAesKey(baseKeys.get(secret), uid, EMAIL_KEY_DOMAIN_NAMES[domain])
+		// Keep imports local to this keyring. Rotation is visible on the next call.
+		const baseKeys = new Map();
+		function baseKey(secret) {
+			if (!baseKeys.has(secret)) {
+				baseKeys.set(secret, crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey']));
+			}
+			return baseKeys.get(secret);
+		}
+		const needs = format => !options.readFormats || options.readFormats.has(format);
+		const domainKey = async (secret, domain) => secret
+			? deriveDomainAesKey(await baseKey(secret), uid, EMAIL_KEY_DOMAIN_NAMES[domain])
 			: null;
+		const legacySecrets = needs('legacy')
+			? [...new Set([emailSecret, prevEmailSecret, totpSecret, jwtSecret].filter(Boolean))]
+			: [];
 		const [currentE, previousE, previousP, currentP, compatT, legacyReadKeys] = await Promise.all([
-			domainKey(emailSecret, 'e'), domainKey(prevEmailSecret, 'e'),
-			domainKey(prevEmailSecret, 'p'), domainKey(emailSecret, 'p'), domainKey(totpSecret, 't'),
-			Promise.all(secrets.map(secret => deriveLegacyV1AesKey(baseKeys.get(secret), uid, userSalt)))
+			(activeDomain === 'e' || needs('e')) ? domainKey(emailSecret, 'e') : null,
+			(needs('e') || needs('p')) ? domainKey(prevEmailSecret, 'e') : null,
+			needs('p') ? domainKey(prevEmailSecret, 'p') : null,
+			needs('p') ? domainKey(emailSecret, 'p') : null,
+			(activeDomain === 't' || needs('t')) ? domainKey(totpSecret, 't') : null,
+			Promise.all(legacySecrets.map(async secret => deriveLegacyV1AesKey(await baseKey(secret), uid, userSalt)))
 		]);
 		const readKeysByDomain = {
 			e: [currentE, previousE].filter(Boolean),

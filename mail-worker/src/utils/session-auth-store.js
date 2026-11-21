@@ -1,24 +1,13 @@
 import KvConst from '../const/kv-const.js';
 import constant from '../const/constant.js';
 import { getUserDb } from './db-accessor.js';
-import { revokeSessionToken, withoutRevokedTokens, isSessionRevoked } from './session-revocation.js';
+import { USER_SESSION_LIMIT, USER_SESSION_DDL, ensureSessionRevocationSchema, revokeSessionToken, withoutRevokedTokens, isSessionRevoked } from './session-revocation.js';
+import { hashToken } from './one-time-credential.js';
 import safeLogger from './safe-logger.js';
-import jwtUtils, { hasSessionRevocationCheck } from './jwt-utils.js';
+import jwtUtils from './jwt-utils.js';
 
-const USER_SESSION_LIMIT = 10;
 const ensuredSessionDbs = new WeakSet();
 
-const USER_SESSION_DDL = `CREATE TABLE IF NOT EXISTS user_session (
-	seq INTEGER PRIMARY KEY AUTOINCREMENT,
-	user_id INTEGER NOT NULL,
-	token TEXT NOT NULL,
-	meta_json TEXT NOT NULL DEFAULT '{}',
-	user_json TEXT NOT NULL DEFAULT '{}',
-	refresh_time TEXT NOT NULL DEFAULT '',
-	max_session_epoch INTEGER,
-	expires_at INTEGER NOT NULL,
-	UNIQUE(user_id, token)
-)`;
 const USER_SESSION_IDX = `CREATE INDEX IF NOT EXISTS idx_user_session_uid_seq ON user_session(user_id, seq DESC)`;
 
 function sessionKey(userId) {
@@ -42,6 +31,14 @@ export async function ensureUserSessionTable(db) {
 	if (!db || typeof db.prepare !== 'function') return false;
 	if (ensuredSessionDbs.has(db)) return true;
 	await db.prepare(USER_SESSION_DDL).run();
+	const hashColumn = () => db.prepare("SELECT 1 AS found FROM pragma_table_info('user_session') WHERE name='token_hash'").first();
+	if (!await hashColumn()) {
+		try {
+			await db.prepare('ALTER TABLE user_session ADD COLUMN token_hash TEXT').run();
+		} catch (error) {
+			if (!await hashColumn()) throw error;
+		}
+	}
 	await db.prepare(USER_SESSION_IDX).run();
 	ensuredSessionDbs.add(db);
 	return true;
@@ -173,13 +170,35 @@ function sameTokenSet(left, right) {
 	return a.length === b.length && a.every((token, index) => token === b[index]);
 }
 
+// Retain the newest D1 sessions first. Old KV-only sessions fill spare slots in
+// their issuance order. After reaching the limit, use the previous durable
+// window as the only source of legacy survivors, even if KV reads regress.
+const updateSessionCapacity = `
+	WITH active AS (
+		SELECT token_hash, seq FROM user_session WHERE user_id = ?1 ORDER BY seq DESC LIMIT ?2
+	), previous AS (
+		SELECT token_hashes FROM session_capacity WHERE user_id = ?1 AND expires_at >= ?3
+	), legacy AS (
+		SELECT j.value AS token_hash, CAST(j.key AS INTEGER) AS entry_order
+		FROM json_each(COALESCE((SELECT COALESCE(json_extract(token_hashes,'$.legacy'), '[]') FROM previous), ?4)) j
+		WHERE j.type='text' AND length(j.value)=64
+		  AND NOT EXISTS (SELECT 1 FROM active WHERE active.token_hash=j.value)
+		  AND NOT EXISTS (SELECT 1 FROM session_revocation r WHERE r.user_id = ?1
+		                  AND r.token_hash = j.value AND r.expires_at >= ?3)
+		ORDER BY entry_order DESC LIMIT max(0, ?2 - (SELECT count(*) FROM active))
+	)
+	INSERT INTO session_capacity(user_id, token_hashes, expires_at)
+	SELECT ?1, json_object('legacy', json((SELECT json_group_array(token_hash)
+		FROM (SELECT token_hash FROM legacy ORDER BY entry_order)))), ?5
+	WHERE (SELECT count(*) FROM active)+(SELECT count(*) FROM legacy)>=?2 OR EXISTS (SELECT 1 FROM previous)
+	ON CONFLICT(user_id) DO UPDATE SET token_hashes=excluded.token_hashes, expires_at=excluded.expires_at`;
+
 /**
  * Persist a newly minted session token. When a D1 user DB is bound, writes
  * atomically to `user_session` first so high-concurrency logins never lose
  * sessions to KV eventual consistency, then updates KV edge cache.
  */
 export async function persistSessionRecord(c, userId, authInfo, token) {
-	if (resolveSessionDb(c) && await isSessionRevoked(c, userId, token)) return null;
 	const key = sessionKey(userId);
 	const db = resolveSessionDb(c);
 	if (db) {
@@ -192,44 +211,70 @@ export async function persistSessionRecord(c, userId, authInfo, token) {
 		const refreshTime = authInfo?.refreshTime || new Date().toISOString();
 		const maxEpoch = sessionHorizon(authInfo, token);
 
-		const batchResults = await withSessionTable(db, async sessionDb => {
-			return await sessionDb.batch([
-				sessionDb.prepare('DELETE FROM user_session WHERE user_id = ? AND expires_at <= ?').bind(uid, nowSec),
-				sessionDb.prepare('DELETE FROM user_session WHERE user_id = ? AND token = ?').bind(uid, token),
+		const tokenHash = await hashToken(token);
+		const latestKv = await c.env.kv?.get(key, { type: 'json' }).catch(() => null);
+		const sameUserKv = latestKv && (!latestKv.user?.email || !authInfo?.user?.email || latestKv.user.email === authInfo.user.email)
+			? latestKv : null;
+		const cachedTokens = normalizeTokens(sameUserKv?.tokens);
+		const cachedHashes = await Promise.all(cachedTokens.filter(t => validAtHorizon(sameUserKv, t)).map(hashToken));
+		const persist = () => withSessionTable(db, async sessionDb => {
+			// Deployed v3_26 rows have no digest. Compute it for this user's live
+			// rows on the first login; all concurrent new writers persist digests.
+			const oldRows = await sessionDb.prepare('SELECT token FROM user_session WHERE user_id=? AND token_hash IS NULL AND expires_at>?')
+				.bind(uid, nowSec).all();
+			const backfill = await Promise.all(oldRows.results.map(async row => sessionDb.prepare(
+				'UPDATE user_session SET token_hash=? WHERE user_id=? AND token=? AND token_hash IS NULL'
+			).bind(await hashToken(row.token), uid, row.token)));
+			return sessionDb.batch([
+				...backfill,
+				sessionDb.prepare(`DELETE FROM user_session WHERE user_id=?1 AND (expires_at<=?2 OR EXISTS (
+					SELECT 1 FROM session_revocation r WHERE r.user_id=?1 AND r.token_hash=user_session.token_hash AND r.expires_at>=?2
+				))`).bind(uid, nowSec),
+				// The explicit logout ledger also prevents a pending persist from
+				// winning a race against logout. A newly minted token can enter a full window.
 				sessionDb.prepare(`
-					INSERT INTO user_session (user_id, token, meta_json, user_json, refresh_time, max_session_epoch, expires_at)
-					VALUES (?, ?, ?, ?, ?, ?, ?)
-				`).bind(uid, token, metaJson, userJson, refreshTime, maxEpoch, expiresAt),
+					INSERT INTO user_session(user_id, token, token_hash, meta_json, user_json, refresh_time, max_session_epoch, expires_at)
+					SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8
+					WHERE NOT EXISTS (SELECT 1 FROM session_revocation WHERE token_hash=?3 AND user_id=?1 AND expires_at>=?9)
+					ON CONFLICT(user_id, token) DO NOTHING
+				`).bind(uid, token, tokenHash, metaJson, userJson, refreshTime, maxEpoch, expiresAt, nowSec),
 				sessionDb.prepare(`
-					DELETE FROM user_session
-					WHERE user_id = ?
-					  AND seq NOT IN (
-					    SELECT seq FROM user_session WHERE user_id = ? AND expires_at > ? ORDER BY seq DESC LIMIT ?
-					  )
-				`).bind(uid, uid, nowSec, USER_SESSION_LIMIT),
+					INSERT INTO session_revocation (token_hash,user_id,expires_at)
+					SELECT token_hash,user_id,max(expires_at,?2) FROM user_session WHERE user_id=?1
+					ORDER BY seq DESC LIMIT -1 OFFSET ?3
+					ON CONFLICT(token_hash) DO UPDATE SET expires_at=max(session_revocation.expires_at,excluded.expires_at)
+				`).bind(uid, expiresAt, USER_SESSION_LIMIT),
+				sessionDb.prepare(`DELETE FROM user_session WHERE user_id=?1 AND seq NOT IN
+					(SELECT seq FROM user_session WHERE user_id=?1 ORDER BY seq DESC LIMIT ?2)`).bind(uid, USER_SESSION_LIMIT),
+				sessionDb.prepare(updateSessionCapacity).bind(uid, USER_SESSION_LIMIT, nowSec, JSON.stringify(cachedHashes), expiresAt),
 				sessionDb.prepare(`
-					SELECT token, meta_json, user_json, refresh_time, max_session_epoch
-					FROM user_session
-					WHERE user_id = ? AND expires_at > ?
-					ORDER BY seq ASC
+					SELECT token, meta_json, user_json, refresh_time, max_session_epoch FROM user_session
+					WHERE user_id=? AND expires_at>? ORDER BY seq ASC
 				`).bind(uid, nowSec)
 			]);
 		});
 
-		const dbRows = batchResults?.[4]?.results || [];
-		const dbRecord = buildRecordFromDbRows(dbRows, authInfo) || mergeSessionRecords(null, authInfo);
-		if (c?.env?.kv) {
-			const latestKv = await c.env.kv.get(key, { type: 'json' }).catch(() => null);
-			const sameUserKv = latestKv && (!latestKv.user?.email || !dbRecord?.user?.email || latestKv.user.email === dbRecord.user.email)
-				? latestKv
-				: null;
-			const merged = mergeSessionRecords(sameUserKv, dbRecord);
-			if (merged.tokens.length > 0) {
-				merged.tokens = await withoutRevokedTokens(c, userId, merged.tokens);
-				for (const tok of Object.keys(merged.tokenMeta || {})) {
-					if (!merged.tokens.includes(tok)) delete merged.tokenMeta[tok];
-				}
+		let batchResults;
+		for (let attempt = 1; ; attempt++) {
+			try {
+				batchResults = await persist();
+				break;
+			} catch (error) {
+				// A pre-upgrade writer can commit an undigested row after the
+				// backfill read. D1 rolled back the entire pruning transaction.
+				if (!/NOT NULL constraint failed: session_revocation\.token_hash/i.test(String(error?.message))) throw error;
+				if (attempt >= 3) return null;
 			}
+		}
+
+		const dbRows = batchResults.at(-1).results;
+		if (!dbRows.some(row => row.token === token)) return null;
+		const dbRecord = buildRecordFromDbRows(dbRows, authInfo);
+		if (c?.env?.kv) {
+			const allowed = new Set(await withoutRevokedTokens(c, uid, [...new Set([...cachedTokens, ...dbRecord.tokens])]));
+			const legacy = cachedTokens.filter(t => allowed.has(t) && !dbRecord.tokens.includes(t));
+			const merged = mergeSessionRecords({ ...sameUserKv, tokens: legacy },
+				{ ...dbRecord, tokens: dbRecord.tokens.filter(t => allowed.has(t)) });
 			await c.env.kv.put(key, JSON.stringify(merged), { expirationTtl: constant.TOKEN_EXPIRE }).catch(() => {});
 			return merged;
 		}
@@ -262,11 +307,26 @@ export async function persistSessionRecord(c, userId, authInfo, token) {
 
 // Consume the revocation result only inside this verification call. Standalone
 // lookups, the next request and explicit reauthentication perform their own checks.
-export async function readVerifiedBearerSession(c, bearer) {
-	const claims = await jwtUtils.verifyToken(c, bearer);
-	if (!claims || claims.purpose === 'restricted_notice') return { claims, session: null };
-	const session = await readSessionRecord(c, claims.userId, claims.token, !hasSessionRevocationCheck(claims));
-	return { claims, session };
+export async function readVerifiedBearerSession(c, bearer, permissionKeys = null) {
+	const { claims, currentUser } = await jwtUtils.verifyMailboxAccess(c, bearer, permissionKeys);
+	if (!currentUser || !c.env?.kv) return { claims, session: null, currentUser };
+
+	// The issued token's own positive row is authoritative for its trust bound.
+	// Stale or missing KV cannot extend the bound. Older KV-only sessions and
+	// the daily metadata refresh still use the existing recovery/merge path.
+	if (currentUser.session_id != null) {
+		if (!currentUser.active_session) return { claims, session: null, currentUser };
+		const horizon = currentUser.session_horizon;
+		if (horizon != null && (!Number.isSafeInteger(horizon) || horizon <= Math.floor(Date.now() / 1000))) {
+			return { claims, session: null, currentUser };
+		}
+		const user = currentUser.fresh_session ? parseJsonSafe(currentUser.session_user, null) : null;
+		if (user && Number(user.userId) === Number(claims.userId)) {
+			return { claims, currentUser, session: { user, tokens: [claims.token], refreshTime: currentUser.session_refresh } };
+		}
+	}
+	const session = await readSessionRecord(c, claims.userId, claims.token, false);
+	return { claims, session, currentUser };
 }
 
 export function readAuthorizedSession(c, userId, token) {
@@ -478,10 +538,20 @@ export async function removeSessionToken(c, userId, token, { expiresAt = 0 } = {
 export async function deleteUserSessionsFromDb(c, userId) {
 	const db = resolveSessionDb(c);
 	if (!db || userId === undefined || userId === null) return;
+	const uid = Number(userId);
+	const clear = () => db.batch([
+		db.prepare('DELETE FROM user_session WHERE user_id=?').bind(uid),
+		db.prepare(`INSERT INTO session_capacity(user_id,token_hashes,expires_at) VALUES(?,'[]',?)
+			ON CONFLICT(user_id) DO UPDATE SET token_hashes='[]', expires_at=max(expires_at,excluded.expires_at)`)
+			.bind(uid, Math.floor(Date.now() / 1000) + constant.TOKEN_EXPIRE)
+	]);
 	try {
-		await db.prepare('DELETE FROM user_session WHERE user_id = ?').bind(Number(userId)).run();
-	} catch (err) {
-		if (!isMissingSessionTableError(err)) throw err;
+		await clear();
+	} catch (error) {
+		// Account cleanup can also be invoked during upgrade on a KV-only database.
+		if (!/no such table:\s*(?:user_session|session_capacity)\b/i.test(String(error?.message))) throw error;
+		await ensureSessionRevocationSchema(c);
+		await clear();
 	}
 }
 

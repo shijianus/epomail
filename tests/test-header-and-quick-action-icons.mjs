@@ -1,97 +1,68 @@
-import { chromium } from "playwright";
-import assert from "assert";
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { chromium } from 'playwright';
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 
-(async () => {
-  console.log("==========================================================================");
-  console.log("=== 验证 class=\"header-actions\" 与 class=\"msg-header-quick-actions\" Icon 正常渲染 ===");
-  console.log("==========================================================================");
-
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    locale: "zh-CN"
-  });
-  const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
-
-  try {
-    // 1. 登录
-    console.log("\n[步骤 1] 登录 Admin 账号...");
-    const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
-      headers: { "Content-Type": "application/json" }
+async function mailApi(page, route, method = 'GET', body) {
+  return page.evaluate(async ({ route, method, body }) => {
+    const session = JSON.parse(sessionStorage.getItem('epomail_tab_identity'));
+    const response = await fetch('/api/' + route, {
+      method, redirect: 'error', headers: { token: session.token, 'Content-Type': 'application/json' },
+      body: body && JSON.stringify(body)
     });
-    const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "登录失败: " + JSON.stringify(loginData));
-    const token = typeof loginData.data === "string" ? loginData.data : loginData.data?.token;
+    const result = await response.json();
+    if (!response.ok || result.code !== 200) throw new Error('Local mail API failed: ' + route.split('?')[0] + ' (' + response.status + '/' + Number(result.code) + ')');
+    return result.data;
+  }, { route, method, body });
+}
 
-    // 2. 打开收件箱
-    console.log("\n[步骤 2] 打开收件箱 (/inbox)...");
-    await page.goto(BASE + "/inbox", { waitUntil: "domcontentloaded" });
-    await page.evaluate((t) => {
-      localStorage.setItem("token", t);
-      localStorage.setItem("setting", JSON.stringify({ lang: "zh" }));
-      localStorage.setItem("locale", "zh");
-    }, token);
-    await page.goto(BASE + "/inbox", { waitUntil: "networkidle" });
-    await page.waitForTimeout(2000);
+async function assertIcons(group, minimum) {
+  await group.waitFor({ state: 'visible' });
+  const shapes = await group.locator('svg:visible').evaluateAll(nodes => nodes.map(node => {
+    const { width, height } = node.getBoundingClientRect();
+    return { width, height, paths: node.querySelectorAll('path, rect, circle, polygon, polyline, line, ellipse').length };
+  }));
+  assert.ok(shapes.length >= minimum, 'expected at least ' + minimum + ' visible action icons, found ' + shapes.length);
+  assert.ok(shapes.every(item => item.width > 0 && item.height > 0 && item.paths > 0), 'every visible action icon has vector geometry');
+}
 
-    // 点击邮件查看详情
-    await page.waitForSelector(".email-row", { timeout: 15000 });
-    const emailRows = await page.$$(".email-row");
-    assert.ok(emailRows.length > 0, "收件箱必须有邮件行");
-    await emailRows[0].click();
-    await page.waitForTimeout(2000);
-
-    // 3. 验证 class="header-actions" 内部的所有 Icon
-    console.log("\n[步骤 3] 验证 class=\"header-actions\" 中所有 Icon 的 SVG 渲染...");
-    await page.waitForSelector(".header-actions .header-actions-left", { timeout: 15000 });
-
-    const headerSvgs = await page.$$eval(".header-actions:has(.header-actions-left) svg", svgs => svgs.map(s => ({
-      class: s.getAttribute("class") || "",
-      viewBox: s.getAttribute("viewBox") || "",
-      hasPath: s.querySelectorAll("path, g, rect, circle").length > 0,
-      width: s.getBoundingClientRect().width,
-      height: s.getBoundingClientRect().height
-    })));
-
-    console.log(`  class="header-actions" 中检测到 SVG 数量: ${headerSvgs.length}`);
-    assert.ok(headerSvgs.length >= 10, "header-actions 中应至少渲染 10 个有效图标 SVG");
-
-    for (const [idx, icon] of headerSvgs.entries()) {
-      assert.ok(icon.hasPath, `第 ${idx + 1} 个顶栏图标 SVG (${icon.class}) 必须包含矢量路径 (path/g)`);
-      assert.ok(icon.width > 0 && icon.height > 0, `第 ${idx + 1} 个顶栏图标 (${icon.class}) 尺寸必须 > 0，当前为 ${icon.width}x${icon.height}`);
-      console.log(`  ✓ 顶栏图标 [${idx + 1}] class="${icon.class}" 尺寸 ${icon.width.toFixed(1)}x${icon.height.toFixed(1)}，路径正常`);
+const browser = await launchIsolatedChromium(chromium, { headless: true });
+try {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'en-US', serviceWorkers: 'block' });
+  const page = await context.newPage();
+  await page.goto(legacyOrigin + '/login/', { waitUntil: 'domcontentloaded' });
+  await page.locator('input[type="email"]').fill(legacyAdminEmail);
+  try { await page.locator('input[type="password"]').fill(process.env.EPOMAIL_E2E_ADMIN_PASSWORD || ''); }
+  catch { throw new Error('Cannot fill the isolated login form'); }
+  await page.locator('button[type="submit"]').click();
+  await page.waitForURL(/\/mail\/u\/\d+\/#inbox/);
+  const key = randomUUID(), subject = 'Icon validation ' + key;
+  const accounts = await mailApi(page, 'account/list');
+  const account = (accounts.list ?? accounts).find(row => row.email === legacyAdminEmail);
+  assert.ok(account?.accountId, 'expected the signed-in mailbox');
+  try {
+    await mailApi(page, 'email/send', 'POST', { accountId: account.accountId, receiveEmail: [account.email],
+      subject, content: '<p>Temporary local UI fixture</p>', text: 'Temporary local UI fixture', attachments: [], sendType: 0, idempotencyKey: key });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByText(subject, { exact: true }).first().click();
+    await assertIcons(page.locator('.header-actions:has(.header-actions-left)'), 10);
+    const quick = page.locator('.thread-header-bar .thread-actions-bar').last();
+    await assertIcons(quick, 5);
+    for (const action of ['.btn-reply', '.btn-forward', '.btn-translate', '.btn-print', '.btn-msg-more']) {
+      assert.ok(await quick.locator(action + ' svg').isVisible(), 'missing thread action: ' + action);
     }
-
-    // 4. 验证 class="msg-header-quick-actions" 内部的所有 Icon
-    console.log("\n[步骤 4] 验证 class=\"msg-header-quick-actions\" 中所有 Icon 的 SVG 渲染...");
-    await page.waitForSelector(".thread-header-bar .msg-header-quick-actions", { timeout: 15000 });
-
-    const quickSvgs = await page.$$eval(".thread-header-bar .msg-header-quick-actions svg", svgs => svgs.map(s => ({
-      class: s.getAttribute("class") || "",
-      viewBox: s.getAttribute("viewBox") || "",
-      hasPath: s.querySelectorAll("path, g, rect, circle").length > 0,
-      width: s.getBoundingClientRect().width,
-      height: s.getBoundingClientRect().height
-    })));
-
-    console.log(`  class="msg-header-quick-actions" 中检测到 SVG 数量: ${quickSvgs.length}`);
-    assert.ok(quickSvgs.length >= 5, "msg-header-quick-actions 中应至少渲染 5 个快捷操作图标 SVG");
-
-    for (const [idx, icon] of quickSvgs.entries()) {
-      assert.ok(icon.hasPath, `第 ${idx + 1} 个邮件头部快捷图标 SVG (${icon.class}) 必须包含矢量路径`);
-      assert.ok(icon.width > 0 && icon.height > 0, `第 ${idx + 1} 个邮件头部快捷图标尺寸必须 > 0，当前为 ${icon.width}x${icon.height}`);
-      console.log(`  ✓ 邮件头部快捷图标 [${idx + 1}] class="${icon.class}" 尺寸 ${icon.width.toFixed(1)}x${icon.height.toFixed(1)}，路径正常`);
-    }
-
-    console.log("\n==========================================================================");
-    console.log("=== 全部 class=\"header-actions\" 与 class=\"msg-header-quick-actions\" 图标验证 100% 成功! ===");
-    console.log("==========================================================================");
-  } catch (err) {
-    console.error("\n❌ 测试执行失败:", err);
-    process.exit(1);
+    await quick.locator('.btn-msg-more').click();
+    await page.getByRole('menu').filter({ visible: true }).last().waitFor();
   } finally {
-    await browser.close();
+    // Only clean up this run's two copies, even when a UI assertion fails.
+    for (const type of [0, 1]) {
+      const { list } = await mailApi(page, 'email/list?size=100&type=' + type);
+      const ids = list.filter(row => row.subject === subject && Number.isInteger(row.emailId)).map(row => row.emailId);
+      if (ids.length) await mailApi(page, 'email/delete?emailIds=' + ids.join(','), 'DELETE');
+    }
   }
-})();
+  console.log('阅读器工具栏和邮件快捷操作图标验证通过');
+} finally {
+  await browser.close();
+}

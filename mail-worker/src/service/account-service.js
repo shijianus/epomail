@@ -13,7 +13,7 @@ import turnstileService from './turnstile-service';
 import roleService from './role-service';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
-import KvConst from '../const/kv-const';
+import { clearDeletedLoginFailures } from './login-failure-cleanup.js';
 import rbacGuard from './rbac-guard-service.js';
 
 const accountService = {
@@ -135,6 +135,13 @@ const accountService = {
 				eq(account.isDel, isDel.NORMAL)
 			)
 		).get();
+	},
+
+	selectActiveForUser(c, userId, preferredEmail) {
+		return orm(c).select({ accountId: account.accountId, email: account.email }).from(account)
+			.where(and(eq(account.userId, userId), eq(account.isDel, isDel.NORMAL), eq(account.status, 0)))
+			.orderBy(desc(sql`${account.email} = ${preferredEmail || ''} COLLATE NOCASE`),
+				desc(account.sort), asc(account.accountId)).limit(1).get();
 	},
 
 	selectByEmail(c, email) {
@@ -343,20 +350,11 @@ const accountService = {
 		const targetAcc = await orm(c).select().from(account).where(eq(account.accountId, aid)).get();
 		if (!targetAcc) throw new BizError(t('noUserAccount'), 404);
 		await rbacGuard.assertCanManageUser(c, callerUserId, targetAcc.userId);
-		await purgeOwnedMail(c, targetAcc.userId, aid);
-
-		if (c.env?.kv) {
-			try {
-				if (targetAcc.email) {
-					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.email.trim().toLowerCase()).catch(() => {});
-					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.email.trim()).catch(() => {});
-				}
-				if (targetAcc.name) {
-					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.name.trim().toLowerCase()).catch(() => {});
-					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.name.trim()).catch(() => {});
-				}
-			} catch (e) {}
-		}
+		// Hold the authorized alias while KV is unavailable. The final guarded
+		// transaction rejects a renamed, restored or reassigned mailbox.
+		await purgeOwnedMail(c, targetAcc.userId, aid, { mailbox: targetAcc, retainLocator: true });
+		await clearDeletedLoginFailures(c, [], [targetAcc], targetAcc);
+		await purgeOwnedMail(c, targetAcc.userId, aid, { mailbox: targetAcc });
 	},
 
 	async setAllReceive(c, params, userId) {

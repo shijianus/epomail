@@ -5,8 +5,9 @@ import { getUserDb, getMailDb } from '../utils/db-accessor';
 import { getDefaultUserLabelsString } from '../const/default-labels';
 import cryptoUtils from '../utils/crypto-utils';
 import { ensureAiBudgetSchema } from '../utils/ai-budget.js';
+import { MAIL_BODY_BYTES_SQL } from '../utils/mail-pipeline.js';
 import { ensureSendQuotaPeriods } from '../utils/send-quota-period.js';
-import { ensureMailReliabilitySchema } from '../utils/mail-reliability-schema.js';
+import { ensureMailReliabilitySchema, backfillWelcomeReceipts } from '../utils/mail-reliability-schema.js';
 import { ensureNoticeDeliverySchema } from '../utils/notice-delivery-schema.js';
 import { ensureAuthSecurityOperationSchema } from '../utils/auth-security-operation.js';
 import { ensureUserSessionTable } from '../utils/session-auth-store.js';
@@ -130,12 +131,30 @@ const dbInit = {
 		await this.v3_29DB(c);
 		await this.v3_30DB(c);
 		await this.v3_31DB(c);
+		await this.v3_32DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
 			return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
 		}
 		return c.text('success');
+	},
+
+	async v3_32DB(c) {
+		const mailDb = getMailDb(c);
+		const userDb = getUserDb(c);
+		await ensureMailReliabilitySchema(c);
+		await backfillWelcomeReceipts(c);
+		await ensureUserSessionTable(userDb);
+		await ensureSessionRevocationSchema(c);
+		await mailDb.batch([
+			mailDb.prepare(`CREATE INDEX IF NOT EXISTS idx_email_user_body_bytes ON email(user_id,${MAIL_BODY_BYTES_SQL})`),
+			mailDb.prepare('CREATE INDEX IF NOT EXISTS idx_attachments_user_size ON attachments(user_id,size)'),
+			mailDb.prepare("CREATE INDEX IF NOT EXISTS idx_outbound_active_user ON mail_outbound_task(user_id,reserved_bytes,reserved_count) WHERE state IN ('PREPARED','SENDING','UNKNOWN')"),
+			mailDb.prepare("CREATE INDEX IF NOT EXISTS idx_receive_active_user ON mail_receive_claim(user_id,lease_until,reserved_bytes,reserved_count) WHERE state IN ('CLAIMED','SAVING','RETRY')"),
+			mailDb.prepare('CREATE INDEX IF NOT EXISTS idx_account_user_order ON account(user_id,is_del,sort DESC,account_id ASC)')
+		]);
+		await userDb.prepare('CREATE INDEX IF NOT EXISTS idx_role_perm_membership ON role_perm(role_id,perm_id)').run();
 	},
 
 	async v3_31DB(c) {

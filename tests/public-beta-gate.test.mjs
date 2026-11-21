@@ -13,7 +13,7 @@ const deployment = {
 };
 const candidateIds = ['ci', 'artifact'];
 const stagingIds = ['accounts', 'mailbox', 'privacy', 'scheduler', 'migration', 'recovery', 'performance'];
-const fullOnly = ['inbound', 'outbound', 'webhook'];
+const fullOnly = ['inbound', 'outbound', 'webhook', 'credential-retirement'];
 
 function manifest(scope = 'mail-public-beta', oauthProviders = []) {
   const ids = [...candidateIds, ...stagingIds, ...(scope === 'internal-pilot' ? ['pilot-isolation'] : fullOnly),
@@ -22,9 +22,14 @@ function manifest(scope = 'mail-public-beta', oauthProviders = []) {
     schemaVersion: 1, scope, sha, artifactSha256, stagingOrigin: 'https://staging.example.test',
     stagingVersionId, stagingDeploymentId, oauthProviders,
     gates: ids.map(id => ({
-      id, status: 'PASS', sha, artifactSha256, environment: candidateIds.includes(id) ? 'candidate' : 'staging',
+      id, status: 'PASS', sha, artifactSha256, environment: candidateIds.includes(id) || id === 'credential-retirement' ? 'candidate' : 'staging',
       versionId: stagingVersionId, deploymentId: stagingDeploymentId, owner: 'fixture-owner', reviewer: 'fixture-reviewer',
-      reference: 'evidence/fixture.json', observedAt: '2026-11-13T00:00:00Z'
+      reference: 'evidence/fixture.json', observedAt: '2026-11-13T00:00:00Z',
+      ...(id === 'credential-retirement' && {
+        restrictedReportSha256: 'c'.repeat(64), unresolvedFindings: 0,
+        disposition: { mailProvider: 'retired', jwtSigning: 'retired', totp: 'verified-never-used',
+          testCredentials: 'verified-test-only', priorSessions: 'revoked' }
+      })
     }))
   };
 }
@@ -55,6 +60,28 @@ test('mail public beta requires every applicable gate, including each enabled Id
   const result = evaluateBetaEvidence(evidence, options);
   assert.equal(result.decision, 'BLOCK');
   assert.deepEqual(result.blocking.map(row => row.id), ['webhook', 'oauth:github']);
+});
+
+test('old public evidence, unreviewed credentials and outstanding sessions block public admission', () => {
+  for (const change of [
+    (e, row) => { e.gates = e.gates.filter(g => g !== row); },
+    (e, row) => { row.reviewer = ' @FIXTURE-OWNER '; },
+    (e, row) => { row.reviewer = '@'; },
+    (e, row) => { row.restrictedReportSha256 = ''; },
+    (e, row) => { row.unresolvedFindings = 1; },
+    (e, row) => { row.disposition.mailProvider = 'verified-never-used'; },
+    (e, row) => { delete row.disposition.totp; },
+    (e, row) => { row.disposition.priorSessions = 'pending'; }
+  ]) {
+    const evidence = manifest();
+    change(evidence, evidence.gates.find(g => g.id === 'credential-retirement'));
+    const result = evaluateBetaEvidence(evidence, { sha, scope: 'mail-public-beta' });
+    assert.equal(result.decision, 'BLOCK');
+    assert.deepEqual([...new Set(result.blocking.map(issue => issue.id))], ['credential-retirement']);
+  }
+  const template = createEvidenceTemplate(sha, 'mail-public-beta');
+  assert.equal(template.gates.find(g => g.id === 'credential-retirement').status, 'NOT_RUN');
+  assert.equal(createEvidenceTemplate(sha, 'internal-pilot').gates.some(g => g.id === 'credential-retirement'), false);
 });
 
 test('rejects stale deployment, duplicate evidence, skipped gates and different artifact digests', () => {

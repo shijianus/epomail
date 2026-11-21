@@ -1,3 +1,6 @@
+import { initializeLegacyStack } from './helpers/legacy-initialize.mjs';
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 import dbService from "../mail-worker/src/service/db-service.js";
@@ -138,28 +141,25 @@ import { getUserDb, getMailDb, isDualDbMode } from "../mail-worker/src/utils/db-
   // E2E Test: 生产环境 API 与 Web 前端 UI 验证
   // ---------------------------------------------------------------------------
   console.log("\n[Step 2] 端到端验证: 生产环境 API 与 Web 前端 UI 交互...");
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: "zh-CN"
   });
   const page = await context.newPage();
 
-  const BASE = "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
   let authToken = null;
 
   try {
     // 2.1 触发 DDL 幂等升级
-    console.log("  -> 触发 /api/init/123456 升级 v3_12DB 附件规则与存储扩展字段...");
-    const initRes = await page.request.get(BASE + "/api/init/123456");
-    const initText = await initRes.text();
-    assert.strictEqual(initText, "success", "数据库初始化必须返回 success");
+    await initializeLegacyStack();
     console.log("  ✓ v3_12DB 数据表升级完成");
 
     // 2.2 管理员登录
     console.log("  -> 执行管理员登录...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();

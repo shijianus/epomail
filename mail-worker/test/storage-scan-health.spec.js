@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:test';
-import { afterEach, beforeAll, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ensureStorageProbeHistory, recordStorageProbeHistory } from '../src/utils/storage-probe-history.js';
 import storageScanService from '../src/service/storage-scan-service.js';
 import r2Service from '../src/service/r2-service.js';
@@ -20,10 +20,54 @@ beforeAll(async () => {
 	await mailDb.prepare('CREATE TABLE attachments(key TEXT, size INTEGER, mime_type TEXT)').run();
 	await mailDb.prepare('CREATE TABLE object_deletion_queue(status TEXT, next_retry_at TEXT)').run();
 	await mailDb.prepare('CREATE TABLE mail_receive_claim(raw_object_key TEXT, cleanup_attempts INTEGER DEFAULT 0, cleanup_review_at INTEGER DEFAULT 0)').run();
-	await userDb.prepare('CREATE TABLE user(byo_storage_enabled INTEGER)').run();
+	await userDb.prepare('CREATE TABLE user(user_id INTEGER PRIMARY KEY, byo_storage_enabled INTEGER)').run();
 	await ensureStorageProbeHistory(context());
 });
 afterEach(() => vi.restoreAllMocks());
+
+describe('bounded KV orphan cleanup', () => {
+	it('keeps active and undated verification records and deletes only proven expired keys', async () => {
+		const now = Date.now();
+		const kv = { list: vi.fn(async () => ({ keys: [
+			{ name: 'VERIFY_TEMP_active', expiration: Math.ceil(now / 1000) + 300, metadata: { createdAt: now - 90000000 } },
+			{ name: 'VERIFY_TEMP_fresh', metadata: { createdAt: now - 10 } },
+			{ name: 'VERIFY_TEMP_unknown' }, { name: 'VERIFY_TEMP_expired', expiration: Math.floor(now / 1000) - 1 },
+			{ name: 'VERIFY_TEMP_old', metadata: { createdAt: new Date(now - 90000000).toISOString() } }
+		], list_complete: true })), delete: vi.fn() };
+		const result = await storageScanService.cleanup(context({}, { kv }));
+		expect(result).toMatchObject({ ok: true, cleanedCount: 2, next: { prefix: 'HAS_WELCOME_' } });
+		expect(kv.delete.mock.calls.flat()).toEqual(['VERIFY_TEMP_expired','VERIFY_TEMP_old']);
+	});
+
+	it('checks ownership on the identity binding and resumes from the exact KV cursor', async () => {
+		// This test owns the synthetic schema. The separate mail binding has no user table.
+		const db = userDb;
+		await db.prepare('INSERT INTO user(user_id) VALUES (91)').run();
+		try {
+			const pages = [
+				{ keys: [{ name: 'HAS_WELCOME_91' }], list_complete: false, cursor: 'next-page' },
+				{ keys: [{ name: 'HAS_WELCOME_92' }, { name: 'HAS_WELCOME_1e2' }], list_complete: true }
+			];
+			const kv = { list: vi.fn(async () => pages.shift()), delete: vi.fn() };
+			const c = context({}, { USER_DB: db, kv });
+			const first = await storageScanService.cleanup(c, { prefix: 'HAS_WELCOME_' });
+			const next = await storageScanService.cleanup(c, first.next);
+			expect(kv.list.mock.calls[1][0].cursor).toBe('next-page');
+			expect(next).toMatchObject({ cleanedCount: 1, next: { prefix: 'WELCOME_ISSUED_' } });
+			expect(kv.delete.mock.calls.flat()).toEqual(['HAS_WELCOME_92']);
+		} finally { await db.prepare('DELETE FROM user WHERE user_id=91').run(); }
+	});
+
+	it('reports failed listing and failed authoritative lookup without deleting keys', async () => {
+		const kv = { list: vi.fn(async () => ({ keys: [{ name: 'HAS_WELCOME_20' }], list_complete: true })), delete: vi.fn() };
+		const c = context({}, { kv, USER_DB: { prepare() { throw new Error('unavailable'); } } });
+		await expect(storageScanService.cleanup(c, { prefix: 'HAS_WELCOME_' })).rejects.toMatchObject({ errorCode: 'storage_cleanup_incomplete' });
+		kv.list.mockRejectedValue(new Error('unavailable'));
+		await expect(storageScanService.cleanup(c)).rejects.toMatchObject({ errorCode: 'storage_cleanup_incomplete' });
+		expect(kv.delete).not.toHaveBeenCalled();
+	});
+});
+
 
 it('retains numeric zeros and old response fields for an empty, measured KV installation', async () => {
 	const scan = await storageScanService.scan(context());

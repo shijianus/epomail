@@ -1,8 +1,10 @@
+import { legacyOrigin, legacyAdminEmail, legacyUserEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "node:assert";
 
-const BASE = process.env.TEST_BASE_URL || "https://mail.epocanvas.com";
-const API  = process.env.TEST_API_URL  || "https://epomail.epocanvas.workers.dev";
+const BASE = legacyOrigin;
+const API  = legacyOrigin;
 
 const results = [];
 let passed = 0, failed = 0;
@@ -30,7 +32,7 @@ async function safeCheck(section, label, fn) {
   console.log(`  API 基地址: ${API}`);
   console.log(`  前端基地址: ${BASE}\n`);
 
-  const browser = await chromium.launch({ headless: true, args: ["--lang=zh-CN", "--no-sandbox"] });
+  const browser = await launchIsolatedChromium(chromium, { headless: true, args: ["--lang=zh-CN", "--no-sandbox"] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" });
   const page = await context.newPage();
 
@@ -46,12 +48,12 @@ async function safeCheck(section, label, fn) {
     console.log("§ 1  站长登录与身份验证");
 
     const loginBondRes = await page.request.post(`${API}/api/login`, {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginBondJson = await loginBondRes.json();
     await safeCheck("§1", "admin@epomail.bond 登录成功 code=200",
-      () => assert.strictEqual(loginBondJson.code, 200, JSON.stringify(loginBondJson)));
+      () => assert.strictEqual(loginBondJson.code, 200, Number(loginBondJson?.code)));
     adminToken = typeof loginBondJson.data === "string" ? loginBondJson.data : loginBondJson.data?.token;
 
     if (adminToken) {
@@ -60,7 +62,7 @@ async function safeCheck(section, label, fn) {
       });
       const meJson = await meRes.json();
       await safeCheck("§1", "loginUserInfo 返回 admin@epomail.bond 邮箱",
-        () => assert.strictEqual(meJson.data?.email, "admin@epomail.bond"));
+        () => assert.strictEqual(meJson.data?.email, legacyAdminEmail));
       await safeCheck("§1", "站长角色为 master",
         () => assert.ok(meJson.data?.role?.roleCode === "master" || meJson.data?.role?.name === "站长",
           `实际 role: ${JSON.stringify(meJson.data?.role)}`));
@@ -75,7 +77,7 @@ async function safeCheck(section, label, fn) {
     });
     const loginAdminJson = await loginAdminRes.json();
     await safeCheck("§1", "纯用户名 'admin' 登录能映射至站长",
-      () => assert.strictEqual(loginAdminJson.code, 200, JSON.stringify(loginAdminJson)));
+      () => assert.strictEqual(loginAdminJson.code, 200, Number(loginAdminJson?.code)));
 
     // ══════════════════════════════════════════════════════════════
     // § 2  参观者账号 admin@epomail.cyou 身份隔离验证
@@ -83,12 +85,12 @@ async function safeCheck(section, label, fn) {
     console.log("\n§ 2  参观者账号 admin@epomail.cyou 身份隔离");
 
     const loginCyouRes = await page.request.post(`${API}/api/login`, {
-      data: { email: "admin@epomail.cyou", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginCyouJson = await loginCyouRes.json();
     await safeCheck("§2", "admin@epomail.cyou 登录成功",
-      () => assert.strictEqual(loginCyouJson.code, 200, JSON.stringify(loginCyouJson)));
+      () => assert.strictEqual(loginCyouJson.code, 200, Number(loginCyouJson?.code)));
     const visitorToken = typeof loginCyouJson.data === "string" ? loginCyouJson.data : loginCyouJson.data?.token;
 
     if (visitorToken) {
@@ -97,7 +99,7 @@ async function safeCheck(section, label, fn) {
       });
       const visMeJson = await visMeRes.json();
       await safeCheck("§2", "参观者 email 返回 admin@epomail.cyou（非 bond）",
-        () => assert.strictEqual(visMeJson.data?.email, "admin@epomail.cyou",
+        () => assert.strictEqual(visMeJson.data?.email, legacyAdminEmail,
           `实际: ${visMeJson.data?.email}`));
       await safeCheck("§2", "参观者角色 NOT master（非站长）",
         () => assert.ok(visMeJson.data?.role?.roleCode !== "master", `实际 role: ${JSON.stringify(visMeJson.data?.role)}`));
@@ -173,7 +175,7 @@ async function safeCheck(section, label, fn) {
             if (emailList.length > 0) {
               const welcome = emailList[0];
               await safeCheck("§3", "欢迎邮件发件人为 admin@epocanvas.com",
-                () => assert.strictEqual(welcome.sendEmail, "admin@epocanvas.com", `实际: ${welcome.sendEmail}`));
+                () => assert.strictEqual(welcome.sendEmail, legacyAdminEmail, `实际: ${welcome.sendEmail}`));
               await safeCheck("§3", "欢迎邮件有 isOfficial=1 官方认证",
                 () => assert.strictEqual(welcome.isOfficial, 1, `实际: ${welcome.isOfficial}`));
               await safeCheck("§3", `欢迎邮件主题包含欢迎词: "${welcome.subject}"`,
@@ -238,13 +240,13 @@ async function safeCheck(section, label, fn) {
         `code=${adminProfileJson.code} status=${adminProfileRes.status()} msg=${adminProfileJson.message}`));
     if (adminProfileJson.code === 200) {
       await safeCheck("§4", "/admin profile 对应 admin@epomail.bond（站长）",
-        () => assert.ok(adminProfileJson.data?.userInfo?.email === "admin@epomail.bond" ||
+        () => assert.ok(adminProfileJson.data?.userInfo?.email === legacyAdminEmail ||
           adminProfileJson.data?.userInfo?.account?.toLowerCase().includes("admin"),
           `实际 userInfo: ${JSON.stringify(adminProfileJson.data?.userInfo)}`));
     }
 
     // /admin@epomail.cyou → 应解析至参观者
-    const cyouProfileRes = await page.request.get(`${API}/api/public/profile/${encodeURIComponent("admin@epomail.cyou")}`, {
+    const cyouProfileRes = await page.request.get(`${API}/api/public/profile/${encodeURIComponent(legacyAdminEmail)}`, {
       headers: adminToken ? { Authorization: adminToken } : {}
     });
     const cyouProfileJson = await cyouProfileRes.json();
@@ -253,7 +255,7 @@ async function safeCheck(section, label, fn) {
         `code=${cyouProfileJson.code} msg=${cyouProfileJson.message}`));
     if (cyouProfileJson.code === 200) {
       await safeCheck("§4", "admin@epomail.cyou profile 对应参观者账号（非站长）",
-        () => assert.ok(cyouProfileJson.data?.userInfo?.email === "admin@epomail.cyou" ||
+        () => assert.ok(cyouProfileJson.data?.userInfo?.email === legacyAdminEmail ||
           (cyouProfileJson.data?.userInfo?.roleName !== "站长"),
           `实际: ${JSON.stringify(cyouProfileJson.data?.userInfo)}`));
     }
@@ -277,7 +279,7 @@ async function safeCheck(section, label, fn) {
       await page.evaluate((token) => {
         localStorage.clear();
         localStorage.setItem("token", token);
-        localStorage.setItem("loginEmail", "admin@epomail.bond");
+        localStorage.setItem("loginEmail", legacyAdminEmail);
         localStorage.setItem("setting", JSON.stringify({ lang: "zh", theme: "light" }));
         localStorage.setItem("locale", "zh");
         document.documentElement.classList.remove("dark");
@@ -292,14 +294,14 @@ async function safeCheck(section, label, fn) {
 
       // 检查 Header 显示的邮箱
       const headerText = await page.locator("header, .header, #header, nav").first().innerText().catch(() => "");
-      const hasAdminBond = headerText.includes("admin@epomail.bond") || headerText.includes("admin");
+      const hasAdminBond = headerText.includes(legacyAdminEmail) || headerText.includes("admin");
       await safeCheck("§5", `Header 显示站长邮箱 (hasAdminBond=${hasAdminBond})`,
         () => assert.ok(hasAdminBond || true, "Header 未能确认邮箱")); // 宽松检查
     }
 
     // 5.3 参观者登录进入 inbox
     const visLoginRes2 = await page.request.post(`${API}/api/login`, {
-      data: { email: "admin@epomail.cyou", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const visLoginJson2 = await visLoginRes2.json();
@@ -308,7 +310,7 @@ async function safeCheck(section, label, fn) {
       await page.evaluate((token) => {
         localStorage.clear();
         localStorage.setItem("token", token);
-        localStorage.setItem("loginEmail", "admin@epomail.cyou");
+        localStorage.setItem("loginEmail", legacyAdminEmail);
         localStorage.setItem("setting", JSON.stringify({ lang: "zh", theme: "light" }));
         localStorage.setItem("locale", "zh");
       }, visToken2);
@@ -325,7 +327,7 @@ async function safeCheck(section, label, fn) {
     if (adminToken) {
       await page.evaluate((token) => {
         localStorage.setItem("token", token);
-        localStorage.setItem("loginEmail", "admin@epomail.bond");
+        localStorage.setItem("loginEmail", legacyAdminEmail);
       }, adminToken);
       await page.goto(`${BASE}/admin`, { waitUntil: "networkidle", timeout: 30000 });
       await page.waitForTimeout(2000);
@@ -421,7 +423,7 @@ async function safeCheck(section, label, fn) {
 
       // admin 保留字防注册
       const regAdminRes = await page.request.post(`${API}/api/register`, {
-        data: { email: `admin@epomail.bond`, password: "Test1234!" },
+        data: { email: legacyAdminEmail, password: "Test1234!" },
         headers: { "Content-Type": "application/json" }
       });
       const regAdminJson = await regAdminRes.json();
@@ -436,7 +438,7 @@ async function safeCheck(section, label, fn) {
 
     // /test-receive 生产环境应被 403
     const testRcvRes = await page.request.post(`${API}/api/test-receive`, {
-      data: { to: "test@epomail.bond", subject: "test", text: "test" },
+      data: { to: legacyUserEmail, subject: "test", text: "test" },
       headers: { "Content-Type": "application/json" }
     });
     await safeCheck("§7", `/api/test-receive 生产环境已禁用（状态: ${testRcvRes.status()}）`,
@@ -480,7 +482,7 @@ async function safeCheck(section, label, fn) {
       await page.evaluate((token) => {
         localStorage.clear();
         localStorage.setItem("token", token);
-        localStorage.setItem("loginEmail", "admin@epomail.bond");
+        localStorage.setItem("loginEmail", legacyAdminEmail);
         localStorage.setItem("setting", JSON.stringify({ lang: "zh", theme: "light" }));
       }, adminToken);
 

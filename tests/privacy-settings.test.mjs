@@ -382,3 +382,68 @@ for (const component of [
     assert.deepEqual(template.errors, []);
   });
 }
+
+test('historic official backgrounds survive as static colors without changing ordinary mail or permitting resources', () => {
+  const source = '<div style="background:linear-gradient(135deg,#0078D4 0%,#4338ca 100%);color:white">' +
+    '<p style="background:#faeded">Notice</p><a style="background:rgb(15,23,42)">Settings</a>' +
+    '<i style="background:linear-gradient(30deg,#aaa,url(https://tracker.invalid/a))">x</i>' +
+    '<img src="https://tracker.invalid/i"><svg><rect/></svg></div>';
+  const official = parsedBody(render(source, { official: true }).html);
+  assert.match(official.querySelector('div').getAttribute('style'), /background-color: #1854a0/);
+  assert.match(official.querySelector('p').getAttribute('style'), /background-color: #faeded/);
+  assert.match(official.querySelector('a').getAttribute('style'), /background-color: rgb\(15,23,42\)/);
+  assert.equal(official.querySelector('i').hasAttribute('style'), false);
+  assert.equal(official.querySelector('img').hasAttribute('src'), false);
+  assert.equal(official.querySelector('svg'), null);
+  const ordinary = parsedBody(render(source).html);
+  assert.equal(ordinary.querySelector('div').getAttribute('style'), 'color: white');
+});
+
+test('all six shipped welcome and announcement editors match their delivered accessible defaults', async () => {
+  const worker = await import('../mail-worker/src/const/welcome-template.js');
+  const editor = await import('../mail-vue/src/const/welcome-templates.js');
+  const announcements = await import('../mail-vue/src/const/announcement-templates.js');
+  for (const [lang, template] of Object.entries(worker.WELCOME_TEMPLATES)) {
+    assert.equal(editor.WELCOME_TEMPLATES[lang].content, template.content);
+    assert.match(template.content, /background-color: #1854a0/);
+    assert.doesNotMatch(template.content, /<svg\b/i);
+    const ready = parsedBody(render(template.content, { official: true }).html);
+    assert.match(ready.textContent, /EpoMail/);
+    assert.match(ready.textContent, /★/);
+    const illustrations = [...ready.querySelectorAll('div')].filter(box => box.style.width === '300px' && box.parentElement.querySelector('h3'));
+    assert.equal(illustrations.length, 5, lang);
+    assert.ok(illustrations.every(box => box.querySelector('strong')?.textContent.trim() && box.querySelectorAll('span').length >= 6), lang);
+    assert.doesNotMatch(template.content, /min-width: (?:280|300)px/);
+    const announcement = worker.GLOBAL_ANNOUNCEMENT_TEMPLATES[lang].content;
+    assert.equal(announcements.GLOBAL_ANNOUNCEMENT_TEMPLATES[lang].content, announcement);
+    assert.match(announcement, /background-color: #ffffff/);
+  }
+});
+
+test('stored official welcome art uses safe text while untrusted graphics still disappear', () => {
+  const box = style => '<div style="' + style + '">';
+  const brandBox = box('display:flex;width:92px;height:92px;border-radius:22px');
+  const artBox = box('display:flex;width:300px');
+  const svg = '<svg width="76" height="76" viewBox="0 0 400 400"><defs><linearGradient id="epomailLogoGrad"/><mask id="epomailCutout"/></defs></svg>';
+  const oldArt = '<svg width="100%" height="150" viewBox="0 0 320 180">' +
+    ['Feature title', 'A', 'B', 'C', 'D', 'E', '&lt;img src="https://tracker.invalid/pixel"&gt;']
+      .map(label => '<text>' + label + '</text>').join('') + '</svg>';
+  const html = '<section><div><div><h1>Welcome</h1></div>' + brandBox + svg + '</div></div>' +
+    '<article><h3>Feature</h3>' + artBox + oldArt + '</div></article></section>';
+  const safe = parsedBody(render(html, { official: true }).html);
+  assert.match(safe.textContent, /✉EpoMail/);
+  assert.match(safe.textContent, /Feature title/);
+  assert.equal(safe.querySelectorAll('svg, img').length, 0);
+  assert.equal(safe.querySelector('article strong').textContent, 'Feature title');
+  assert.match(safe.querySelector('article').textContent, /<img src=/);
+  const ordinary = parsedBody(render(html).html);
+  assert.doesNotMatch(ordinary.textContent, /EpoMail|Feature title/);
+  assert.equal(ordinary.querySelectorAll('svg, img').length, 0);
+
+  const savedWithoutSvg = parsedBody(render(html.replace(svg, '').replace(oldArt, ''), { official: true }).html);
+  assert.match(savedWithoutSvg.textContent, /EpoMail/);
+  assert.equal(savedWithoutSvg.querySelector('article div'), null);
+  const custom = parsedBody(render(html.replace(svg, '<strong>Custom artwork</strong>'), { official: true }).html);
+  assert.match(custom.textContent, /Custom artwork/);
+  assert.doesNotMatch(custom.textContent, /EpoMail/);
+});

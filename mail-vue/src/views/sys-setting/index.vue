@@ -6130,9 +6130,18 @@ async function handleCleanupStorage() {
       type: 'warning'
     })
     cleaningStorage.value = true
-    const res = await cleanupStorage()
-    const data = res?.data !== undefined ? res.data : res
-    ElMessage.success(data?.message || t('cleanupStorageDone'))
+    let page = {}
+    const visited = new Set()
+    while (page) {
+      const key = JSON.stringify(page)
+      if (visited.has(key)) throw new Error(t('cleanFailed'))
+      visited.add(key)
+      const res = await cleanupStorage(page)
+      const data = res?.data !== undefined ? res.data : res
+      if (data?.ok !== true) throw new Error(t('cleanFailed'))
+      page = data.next
+    }
+    ElMessage.success(t('cleanupStorageDone'))
     await handleRunStorageScan()
   } catch (e) {
     if (e !== 'cancel') {

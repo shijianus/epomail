@@ -1,8 +1,10 @@
+import { legacyOrigin, legacyAdminEmail, legacyUserEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = process.env.TARGET_URL || 'https://mail.epocanvas.com';
-const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
+const BASE = legacyOrigin;
+const USER_EMAIL = legacyUserEmail;
 const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
 let pass = 0, fail = 0;
@@ -32,7 +34,7 @@ async function run() {
   console.log('================================================================');
   console.log('=== 公网线上核验：系统设置操作报告控制项与操作风控报告完整UI ===');
   console.log('================================================================');
-  console.log(`[目标公网环境] 基地址: ${BASE}`);
+  console.log(`[目标隔离环境] 基地址: ${BASE}`);
 
   let browser;
 
@@ -45,11 +47,11 @@ async function run() {
       body: JSON.stringify({ email: USER_EMAIL, password: USER_PWD })
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, `登录必须成功: ${JSON.stringify(loginJson)}`);
+    assert.strictEqual(loginJson.code, 200, `登录必须成功: ${Number(loginJson?.code)}`);
     const token = loginJson.data?.token;
     ok(!!token, '公网线上 JWT Token 获取就绪');
 
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'
@@ -78,7 +80,7 @@ async function run() {
           code: 200,
           data: {
             userId: 1,
-            email: 'admin@epomail.bond',
+            email: legacyAdminEmail,
             name: '站长',
             permKeys: ['*'],
             role: { roleId: 6, roleCode: 'master', name: '站长' }
@@ -88,7 +90,7 @@ async function run() {
     });
 
     // 2. 访问公网系统设置页 #manage/admin/system
-    console.log('\n[步骤 2] 访问公网「系统设置」(#manage/admin/system)，核验操作报告卡片与控制按钮...');
+    console.log('\n[步骤 2] 访问本地「系统设置」(#manage/admin/system)，核验操作报告卡片与控制按钮...');
     await page.goto(`${BASE}/mail/u/0/#manage/admin/system`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.settings-layout', { timeout: 20000 });
     await page.waitForTimeout(1500);
@@ -241,7 +243,7 @@ async function run() {
     console.log('失败清单:', failures);
     process.exit(1);
   }
-  console.log('🎉 公网生产环境操作报告与风控控制台各项 UI 与交互 100% 验收通过！');
+  console.log('🎉 本地隔离环境操作报告与风控控制台各项 UI 与交互 100% 验收通过！');
 }
 
 run();

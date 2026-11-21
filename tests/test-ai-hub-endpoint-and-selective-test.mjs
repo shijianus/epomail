@@ -1,14 +1,16 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
-const BASE = "https://epomail.epocanvas.workers.dev";
+const BASE = legacyOrigin;
 
 async function main() {
   console.log("==========================================================================");
   console.log("=== 测试：AI Hub 接口端点智能补齐与回退、选定模型按需测试与0-Token延迟测算 ===");
   console.log("==========================================================================\n");
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
 
@@ -17,13 +19,13 @@ async function main() {
     console.log("[步骤 1] 登录管理员获取鉴权 Token...");
     const loginRes = await page.request.post(BASE + "/api/login", {
       data: {
-        email: "admin@epomail.bond",
+        email: legacyAdminEmail,
         password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || ''
       },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "管理员登录失败: " + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, "管理员登录失败: " + Number(loginData?.code));
     const token = typeof loginData.data === "string" ? loginData.data : loginData.data?.token;
     assert.ok(token, "未获取到有效的管理员 Token");
     console.log("  ✓ 管理员登录成功");

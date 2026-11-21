@@ -1,9 +1,11 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 
-const BASE = 'https://epomail.epocanvas.workers.dev';
+const BASE = legacyOrigin;
 
 async function diagnose() {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ 
     viewport: { width: 1440, height: 900 },
     locale: 'zh-CN'
@@ -12,7 +14,7 @@ async function diagnose() {
 
   console.log('Logging in via API...');
   const loginRes = await page.request.post(BASE + '/api/login', {
-    data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+    data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
     headers: { 'Content-Type': 'application/json' }
   });
   const loginData = await loginRes.json();

@@ -1,3 +1,4 @@
+import { startBroadcast, advanceBroadcast } from './global-broadcast-operation.js';
 import { personalForwardingAvailable } from './forward-consent.js';
 import KvConst from '../const/kv-const';
 import settingEntity from '../entity/setting';
@@ -915,24 +916,21 @@ const settingService = {
 		await this.set(c, savePayload);
 
 		const user = (await import('../entity/user')).default;
-		const account = (await import('../entity/account')).default;
+		const accountService = (await import('./account-service')).default;
 		const emailService = (await import('./email-service')).default;
 		const { eq, and } = await import('drizzle-orm');
 
 		const users = await orm(c).select({
 			userId: user.userId,
 			email: user.email,
-		}).from(user).where(eq(user.status, 0)).all();
+		}).from(user).where(and(eq(user.status, 0), eq(user.isDel, 0))).all();
 
 		let deliverCount = 0;
 		for (const u of users) {
-			const acc = await orm(c).select({
-				accountId: account.accountId,
-				name: account.name
-			}).from(account).where(and(eq(account.userId, u.userId), eq(account.isDel, 0))).limit(1).get();
+			const acc = await accountService.selectActiveForUser(c, u.userId, u.email);
 
 			if (acc) {
-				const res = await emailService.deliverWelcomeEmailToUser(c, u.userId, acc.accountId, u.email, {
+				const res = await emailService.deliverWelcomeEmailToUser(c, u.userId, acc.accountId, acc.email, {
 					subject: welcomeSubject,
 					expireDays: welcomeExpireDays,
 					content: welcomeContent,
@@ -948,16 +946,11 @@ const settingService = {
 	},
 
 	async getGlobalEmailConfig(c) {
-		await this.ensureSettingColumns(c);
-		const settingRow = await this.get(c, true);
-		let cfg = settingRow.globalEmailConfig || {};
-		if (typeof cfg === 'string') {
-			try { cfg = JSON.parse(cfg); } catch (e) { cfg = {}; }
-		}
-		return cfg;
+		const row = await orm(c).select({ config: settingEntity.globalEmailConfig }).from(settingEntity).get();
+		return JSON.parse(row?.config || '{}');
 	},
 
-	async sendGlobalBroadcastEmail(c, params) {
+	async sendGlobalBroadcastEmail(c, params, actorId = 0) {
 		await this.ensureSettingColumns(c);
 		let {
 			subject,
@@ -1013,15 +1006,15 @@ const settingService = {
 		expireDays = Number(expireDays) >= 0 ? Number(expireDays) : 0;
 		sendToNewUsers = Number(sendToNewUsers) === 1 ? 1 : 0;
 		isStarred = isStarred === 0 ? 0 : 1;
-		const nowIso = new Date().toISOString();
+		targetRoleIds = [...new Set(targetRoleIds)].sort((a,b) => a-b);
 
 		if (!text && content) {
 			const emailUtils = (await import('../utils/email-utils')).default;
 			text = emailUtils.htmlToText(content);
 		}
 
-		const globalConfig = {
-			active: 1,
+		const config = {
+			lang: params?.lang || '',
 			subject,
 			content,
 			text: text || '',
@@ -1031,78 +1024,17 @@ const settingService = {
 			expireDays,
 			sendToNewUsers,
 			isStarred,
-			senderName: senderName || null,
-			lastBroadcastTime: nowIso
+			senderName: senderName || null
 		};
-
-		await this.set(c, {
-			globalEmailConfig: globalConfig
-		});
-
-		if (sendToNewUsers === 1) {
-			try {
-				await c.env.kv.put('ACTIVE_GLOBAL_EMAIL', JSON.stringify(globalConfig));
-			} catch (e) {}
-		} else {
-			try {
-				await c.env.kv.delete('ACTIVE_GLOBAL_EMAIL');
-			} catch (e) {}
-		}
-
-		const user = (await import('../entity/user')).default;
-		const account = (await import('../entity/account')).default;
+		const { op, fresh } = await startBroadcast(c, actorId, params?.operationId, config);
+		if (fresh) await this.refresh(c);
+		const accountService = (await import('./account-service')).default;
 		const emailService = (await import('./email-service')).default;
-		const { eq, and, inArray } = await import('drizzle-orm');
-
-		let users = [];
-		if (targetType === 'roles' && targetRoleIds.length > 0) {
-			users = await orm(c).select({
-				userId: user.userId,
-				email: user.email,
-				type: user.type
-			}).from(user).where(and(
-				eq(user.status, 0),
-				eq(user.isDel, 0),
-				inArray(user.type, targetRoleIds)
-			)).all();
-		} else {
-			users = await orm(c).select({
-				userId: user.userId,
-				email: user.email,
-				type: user.type
-			}).from(user).where(and(eq(user.status, 0), eq(user.isDel, 0))).all();
-		}
-
-		let deliverCount = 0;
-		for (const u of users) {
-			const acc = await orm(c).select({
-				accountId: account.accountId,
-				name: account.name
-			}).from(account).where(and(eq(account.userId, u.userId), eq(account.isDel, 0))).orderBy(account.sort).limit(1).get();
-
-			if (acc) {
-				const res = await emailService.deliverGlobalEmailToUser(c, u.userId, acc.accountId, u.email, {
-					subject,
-					content,
-					text,
-					lang: params?.lang,
-					templates: normalizedTemplates || globalConfig.templates || null,
-					expireDays,
-					isStarred,
-					senderName: senderName || null
-				});
-				if (res) deliverCount++;
-			}
-		}
-
-		return {
-			success: true,
-			deliverCount,
-			totalUsers: users.length,
-			targetType,
-			targetRoleIds,
-			sendToNewUsers
-		};
+		const progress = await advanceBroadcast(c, op, async (id, current) => {
+			const mailbox = await accountService.selectActiveForUser(c, id, current.email);
+			if (mailbox) await emailService.deliverGlobalEmailToUser(c, id, mailbox.accountId, mailbox.email, current.config, false);
+		});
+		return { ...progress, targetType, targetRoleIds, sendToNewUsers, broadcastId: op.broadcast_id };
 	},
 
 	async websiteConfig(c) {

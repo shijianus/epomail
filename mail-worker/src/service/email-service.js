@@ -1,4 +1,6 @@
 import { forwardIntentStatements } from './forward-consent.js';
+import { authoritativeCampaign } from './global-broadcast-operation.js';
+import { cachedWelcome, completeWelcomeChecks, hasWelcomeReceipt, persistGlobal, persistWelcome } from './official-mail-receipt.js';
 import { mailOrm as orm, userOrm } from '../entity/orm';
 import { getUserDb, getMailDb } from '../utils/db-accessor';
 import email from '../entity/email';
@@ -19,8 +21,6 @@ import userService from './user-service';
 import roleService from './role-service';
 import user from '../entity/user';
 import starService from './star-service';
-import dayjs from 'dayjs';
-import kvConst from '../const/kv-const';
 import { t } from '../i18n/i18n'
 import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
@@ -54,6 +54,9 @@ const ENCRYPTED_SEARCH_BATCH = 100;
 // that while preventing an unbounded decrypt loop if a deployment raises it.
 const ENCRYPTED_SEARCH_MAX_ROWS = 10000;
 
+const hasFileAttachments = sql`EXISTS (SELECT 1 FROM attachments a WHERE a.email_id = email.email_id
+	AND a.user_id = email.user_id AND a.account_id = email.account_id AND a.type = ${attConst.type.ATT})`;
+
 function hasEncryptedFields(row) {
 	return emailCryptoUtils.ENCRYPTED_FIELDS.some(field => typeof row?.[field] === 'string' && row[field].startsWith(emailCryptoUtils.CIPHER_PREFIX));
 }
@@ -83,6 +86,37 @@ export function matchesContentSearch(row, terms) {
 	if (Number.isFinite(terms.sizeAtLeast) && visibleSize < terms.sizeAtLeast) return false;
 	if (Number.isFinite(terms.sizeAtMost) && visibleSize > terms.sizeAtMost) return false;
 	return true;
+}
+
+// On a shared D1 binding the mailbox and its current case decision belong
+// to the same SQL snapshot. With distinct bindings each table stays on its owner.
+async function loadSenderAccount(c, accountId, userId) {
+	const mailDb = getMailDb(c);
+	const userDb = getUserDb(c);
+	const shared = mailDb === userDb;
+	const banPredicate = "warning_type='ban' AND status='banned'";
+	let accountRow;
+	try {
+		const decision = shared ? `, EXISTS(SELECT 1 FROM audit_log b
+			WHERE b.email=a.email AND ${banPredicate}) AS banned` : '';
+		accountRow = await mailDb.prepare(`SELECT a.email, a.user_id AS userId, a.status${decision}
+			FROM account a WHERE a.account_id=? AND a.is_del=0`).bind(accountId).first();
+	} catch {
+		throw new BizError('Send safety checks are unavailable', 503, 'send_policy_unavailable');
+	}
+	if (!accountRow) throw new BizError(t('senderAccountNotExist'));
+	if (accountRow.userId !== userId) throw new BizError(t('sendEmailNotCurUser'));
+	if (Number(accountRow.status) === 1) throw new BizError('该发信邮箱已被系统安全策略限制使用', 403);
+	if (!shared) {
+		try {
+			accountRow.banned = await userDb.prepare(`SELECT 1 FROM audit_log
+				WHERE email=? AND ${banPredicate} LIMIT 1`).bind(accountRow.email).first();
+		} catch {
+			throw new BizError('Send safety checks are unavailable', 503, 'send_policy_unavailable');
+		}
+	}
+	if (accountRow.banned) throw new BizError('该发信地址当前处于安全封禁状态，无法外发邮件', 403);
+	return accountRow;
 }
 
 const emailService = {
@@ -128,6 +162,7 @@ const emailService = {
 		const query = orm(c)
 			.select({
 				...email,
+				hasFileAttachments,
 				starId: star.starId
 			})
 			.from(email)
@@ -342,16 +377,16 @@ const emailService = {
 			total = totals[0].total;
 			latestEmail = latest?.[0];
 			if (userId && list.some(hasEncryptedFields)) {
-				cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+				cryptoKey = await emailCryptoUtils.getEmailRecordKey(c.env, userId, firstNewestPage ? list : [...list, latestEmail]);
 				list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
 			}
 			if (firstNewestPage && list.length) {
-				const { starId, ...newest } = list[0];
+				const { starId, hasFileAttachments, ...newest } = list[0];
 				latestEmail = newest;
 			}
 		}
 		if (!firstNewestPage && userId && hasEncryptedFields(latestEmail)) {
-			cryptoKey ??= await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			cryptoKey ??= await emailCryptoUtils.getEmailRecordKey(c.env, userId, [latestEmail]);
 			latestEmail = await emailCryptoUtils.decryptEmailRecord(latestEmail, cryptoKey);
 		}
 
@@ -406,7 +441,7 @@ const emailService = {
 				timeSort ? gt(email.emailId, cursor) : lt(email.emailId, cursor)
 			];
 			const rows = await orm(c)
-				.select(list.length === size ? countFields : { ...email, starId: star.starId })
+				.select(list.length === size ? countFields : { ...email, hasFileAttachments, starId: star.starId })
 				.from(email)
 				.leftJoin(star, and(eq(star.emailId, email.emailId), eq(star.userId, userId)))
 				.leftJoin(account, eq(account.accountId, email.accountId))
@@ -515,7 +550,7 @@ const emailService = {
 		const settingRow = await settingService.query(c);
 		const mode = Number(settingRow?.allMailMode);
 		if (mode === 0 && userId) {
-			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			const cryptoKey = await emailCryptoUtils.getEmailRecordKey(c.env, userId);
 			for (const row of emailRows) {
 				const encrypted = await emailCryptoUtils.encryptEmailRecord(row, cryptoKey);
 				await orm(c).update(email).set({
@@ -773,7 +808,7 @@ const emailService = {
 		const settingRow = await settingService.query(c);
 		let dbParams = { ...params, isOfficial: 0 };
 		if (params.userId && emailCryptoUtils.shouldEncryptEmail(settingRow?.allMailMode, params)) {
-			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, params.userId);
+			const cryptoKey = await emailCryptoUtils.getEmailRecordKey(c.env, params.userId);
 			dbParams = await emailCryptoUtils.encryptEmailRecord(dbParams, cryptoKey);
 		}
 		assertMailRowSize(dbParams);
@@ -943,8 +978,9 @@ const emailService = {
 			throw new BizError(t('disabledSend'), 403);
 		}
 
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) {
+		const policyIdentity = await storageQuotaService.selectMailPolicyIdentity(c, userId);
+		const { user: userRow, role: roleRow } = policyIdentity;
+		if (!userRow || Number(userRow.isDel) !== 0) {
 			throw new BizError(t('notExistUser') || '用户不存在', 404);
 		}
 
@@ -953,10 +989,9 @@ const emailService = {
 			throw new BizError(t('isBanUser') || '账号已被系统安全管控限制，已暂停发信能力', 403);
 		}
 
-		const roleRow = await roleService.selectById(c, userRow.type);
-
 		// 计算邮件总大小限制
 		const isSuperAdmin = isAdminUser(c, userRow);
+		if (!isSuperAdmin && !roleRow) throw new BizError('Sender role is unavailable', 403, 'send_policy_unavailable');
 		const maxLimitMB = isSuperAdmin ? 100 : 25;
 		const maxLimitBytes = maxLimitMB * 1024 * 1024;
 		
@@ -1003,32 +1038,7 @@ const emailService = {
 
 		// Send-count limits are enforced atomically by reserveSendCount after
 		// task replay, so ACCEPTED/UNKNOWN requests never consume quota again.
-		const accountRow = await accountService.selectById(c, accountId);
-
-		if (!accountRow) {
-			throw new BizError(t('senderAccountNotExist'));
-		}
-
-		if (accountRow.userId !== userId) {
-			throw new BizError(t('sendEmailNotCurUser'));
-		}
-
-		// 发信账号限制检查
-		if (Number(accountRow.status) === 1) {
-			throw new BizError('该发信邮箱已被系统安全策略限制使用', 403);
-		}
-
-		// 检查是否存在针对该邮箱或主账号的有效封禁管控案卷
-		let activeBan = null;
-		try {
-			activeBan = await getUserDb(c).prepare(`SELECT 1 AS banned FROM audit_log
-				WHERE email=? AND warning_type='ban' AND status='banned' LIMIT 1`).bind(accountRow.email).first();
-		} catch (e) {
-			throw new BizError('Send safety checks are unavailable', 503, 'send_policy_unavailable');
-		}
-		if (activeBan) {
-			throw new BizError('该发信地址当前处于安全封禁状态，无法外发邮件', 403);
-		}
+		const accountRow = await loadSenderAccount(c, accountId, userId);
 
 		if (!isSuperAdmin) {
 			//用户没有这个域名的使用权限
@@ -1082,7 +1092,7 @@ const emailService = {
 		}
 		if (attachmentMeta.length) {
 			const largest = Math.max(...attachmentMeta.map(item => item.size));
-			const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, largest);
+			const sizeCheck = await storageQuotaService.checkAttachmentSizeLimit(c, userId, largest, policyIdentity);
 			if (!sizeCheck.allowed) throw new BizError(sizeCheck.reason);
 		}
 		if (new Blob([text, providerHtml]).size + attachmentBytes > maxLimitBytes) {
@@ -1103,7 +1113,7 @@ const emailService = {
 				inReplyTo: sendType === 'reply' ? emailRow.messageId : '', relation: sendType === 'reply' ? emailRow.messageId : '' };
 			let encryptedRecord = { ...plainRecord };
 			if (emailCryptoUtils.shouldEncryptEmail(settingRow.allMailMode, plainRecord)) {
-				encryptedRecord = await emailCryptoUtils.encryptEmailRecord(encryptedRecord, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
+				encryptedRecord = await emailCryptoUtils.encryptEmailRecord(encryptedRecord, await emailCryptoUtils.getEmailRecordKey(c.env, userId));
 			}
 			assertMailRowSize(encryptedRecord);
 			const bodyStorageBytes = ['subject', 'text', 'content', 'code'].reduce((total, field) =>
@@ -1116,25 +1126,40 @@ const emailService = {
 			? 'local'
 			: (useCloudflareEmail ? 'cloudflare' : (String(resendToken || '').startsWith('mailjet:') ? 'mailjet' : 'resend'));
 		const prepared = await mailOutboundService.prepareOutboundTask(c, {
-			userId, accountId, idempotencyKey, contentHash,
+			userId, accountId, idempotencyKey, contentHash, claimOnInsert: true,
 			payload: { recipients: receiveEmail, attachmentCount: attachmentItems.length,
 				route: allInternal ? 'local' : 'external', providerName }
 		}, async () => {
 			archive = await buildArchive();
-			const storageCheck = await storageQuotaService.checkQuotaAvailable(c, userId, archive.reserveBytes);
-			if (!storageCheck.allowed) throw new BizError(storageCheck.reason);
-			const quota = await userService.getUserQuota(c, userId, storageCheck.usage);
+			const policy = await storageQuotaService.getDeliveryPolicy(c, userId, policyIdentity, settingRow);
+			const quota = await userService.getDeliveryLimits(c, userId, policy);
 			return { reservedBytes: archive.reserveBytes, maxStorageBytes: quota.maxStorageBytes, maxEmails: quota.maxEmails,
-				bypassStorage: quota.bypassStorage || storageCheck.usage?.byoStorageEnabled === 1,
-				storageBlocked: quota.quotaStorageBlocked || quota.dbFull };
+				bypassStorage: quota.bypassStorage, storageBlocked: quota.quotaStorageBlocked || quota.dbFull,
+				explainQuotaFailure: async measured => {
+					const reason = measured
+						? storageQuotaService.storageRejectionReason(policy, measured.usedBytes, archive.reserveBytes)
+						: (await storageQuotaService.checkQuotaAvailable(c, userId, archive.reserveBytes, policyIdentity)).reason;
+					if (reason) throw new BizError(reason);
+				} };
 		});
 		const readArchived = async (task, knownEmptyAttachments = false) => {
-			let row = await orm(c).select().from(email).where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
+			const database = orm(c);
+			const scope = and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId), eq(email.accountId, accountId));
+			const rowQuery = database.select().from(email).where(scope);
+			let row, attList = [];
+			if (knownEmptyAttachments) {
+				row = await rowQuery.get();
+			} else {
+				const attachmentsQuery = database.select().from(att).where(and(eq(att.type, attConst.type.ATT),
+					eq(att.userId, userId), inArray(att.emailId, database.select({ id: email.emailId }).from(email).where(scope))));
+				const [rows, files] = await database.batch([rowQuery, attachmentsQuery]);
+				[row] = rows;
+				attList = files;
+			}
 			if (!row) throw new BizError('The accepted send record requires reconciliation', 503, 'outbound_archive_missing');
 			if (emailCryptoUtils.ENCRYPTED_FIELDS.some(field => String(row[field] || '').startsWith(emailCryptoUtils.CIPHER_PREFIX))) {
-				row = await emailCryptoUtils.decryptEmailRecord(row, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
+				row = await emailCryptoUtils.decryptEmailRecord(row, await emailCryptoUtils.getEmailRecordKey(c.env, userId, [row]));
 			}
-			const attList = knownEmptyAttachments ? [] : await attService.selectByEmailIds(c, [row.emailId]);
 			if (task.provider === 'local' && row.status === emailConst.status.BOUNCED) {
 				const status = await readSendStatus(c, userId, accountId, idempotencyKey);
 				if (status.deliveryOutcome) row.deliveryOutcome = status.deliveryOutcome;
@@ -1160,7 +1185,7 @@ const emailService = {
 				throw new BizError('Local delivery is pending under this request', 503, 'local_delivery_pending');
 			}
 		}
-		const owned = await mailOutboundService.claimPreparation(c, prepared.task.task_id);
+		const owned = prepared.leaseToken ? prepared : await mailOutboundService.claimPreparation(c, prepared.task.task_id);
 		if (!owned.leaseToken) return readArchived(owned.task);
 		const task = owned.task;
 		const leaseToken = owned.leaseToken;
@@ -1172,8 +1197,10 @@ const emailService = {
 			[task.task_id, leaseToken]);
 		try {
 			archive ??= await buildArchive();
-			archived = await orm(c).select({ emailId: email.emailId }).from(email)
-				.where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
+			if (!prepared.leaseToken) {
+				archived = await orm(c).select({ emailId: email.emailId }).from(email)
+					.where(and(eq(email.outboundTaskId, task.task_id), eq(email.userId, userId))).get();
+			}
 			const completeOnInsert = !archived && attachmentItems.length === 0;
 			if (!archived) {
 				const assertion = guard();
@@ -1223,19 +1250,17 @@ const emailService = {
 			if (!allInternal) assertOutboundAllowed(c, receiveEmail);
 			await mailOutboundService.reserveSendCount(c, { taskId: task.task_id, userId, quantity: receiveEmail.length,
 				maxCount: isSuperAdmin || roleRow.sendType === 'internal' ? 0 : Number(roleRow.sendCount || 0),
-				daily: roleRow.sendType === 'day' });
+				daily: roleRow?.sendType === 'day' });
 		} catch (cause) {
 			await mailOutboundService.releasePreparation(c, task.task_id, leaseToken).catch(() => {});
 			throw cause;
 		}
-		const currentSender = await getUserDb(c).prepare('SELECT status,is_del FROM user WHERE user_id=?').bind(userId).first();
-		if (!currentSender || Number(currentSender.status) !== 0 || Number(currentSender.is_del) !== 0) {
-			await mailOutboundService.releasePreparation(c, task.task_id, leaseToken);
-			throw new BizError('Sender is unavailable', 403, 'account_unavailable');
-		}
+		const isPlainSelfSend = allInternal && knownEmptyAttachments && receiveEmail.length === 1
+			&& receiveEmail[0] === normalizeMailAddress(accountRow.email);
 		let dispatch;
 		try {
-			dispatch = await mailOutboundService.claimOutboundTask(c, task.task_id, leaseToken);
+			dispatch = await mailOutboundService.claimOutboundTask(c, task.task_id, leaseToken,
+				{ userId, senderAddress: accountRow.email, selfDelivery: isPlainSelfSend });
 		} catch (cause) {
 			// Compensate only while this lease still owns PREPARED. An ambiguous
 			// SENDING commit or a replacement lease must retain its reservation.
@@ -1259,7 +1284,7 @@ const emailService = {
 			if (allInternal) {
 				const allAttachments = knownEmptyAttachments ? [] : await orm(c).select().from(att).where(eq(att.emailId, archived.emailId)).all();
 				await this.HandleOnSiteEmail(c, receiveEmail, { ...archive.plainRecord, emailId: archived.emailId }, allAttachments,
-					{ taskId: task.task_id, leaseToken });
+					{ taskId: task.task_id, leaseToken, dispatchIdentity: dispatch.dispatchIdentity });
 			} else {
 				const providerParams = { name, accountEmail: accountRow.email, receiveEmail, subject, text, html: providerHtml,
 					attachments: attachmentItems, sendType, messageId: emailRow.messageId,
@@ -1305,8 +1330,8 @@ const emailService = {
 				await mailDb.batch([assertion.before,
 					mailDb.prepare('UPDATE email SET status=CASE WHEN status=? THEN ? ELSE status END,resend_email_id=? WHERE email_id=? AND user_id=?')
 						.bind(emailConst.status.SAVING, emailConst.status.SENT, providerId, archived.emailId, userId),
-					mailDb.prepare("UPDATE mail_outbound_task SET state='ACCEPTED',provider_id=?,reserved_bytes=0,reserved_count=0,lease_until=0,updated_at=CURRENT_TIMESTAMP WHERE task_id=? AND state='SENDING' AND lease_token=?")
-						.bind(providerId, task.task_id, leaseToken), assertion.after]);
+					mailDb.prepare("UPDATE mail_outbound_task SET state='ACCEPTED',provider_id=?,counted_day=date('now'),counted_recipients=?,reserved_bytes=0,reserved_count=0,lease_until=0,updated_at=CURRENT_TIMESTAMP WHERE task_id=? AND state='SENDING' AND lease_token=?")
+						.bind(providerId, receiveEmail.length, task.task_id, leaseToken), assertion.after]);
 			} catch (_) {
 				// Dispatch may already be accepted. A local commit failure must
 				// never invite a second message or return its send-count reservation.
@@ -1317,11 +1342,6 @@ const emailService = {
 		if (providerId && !useCloudflareEmail) {
 			await this.replayProviderEventsFromLedger(c, providerId).catch(() => {});
 		}
-		try {
-			const dayKey = kvConst.SEND_DAY_COUNT + dayjs().format('YYYY-MM-DD');
-			const previous = Number(await c.env.kv.get(dayKey) || 0);
-			await c.env.kv.put(dayKey, String(previous + receiveEmail.length), { expirationTtl: 86400 });
-		} catch (_) { console.warn('Send statistics update failed'); }
 		return readArchived(dispatch.task, knownEmptyAttachments);
 	},
 
@@ -1648,9 +1668,11 @@ const emailService = {
 
 	async deliverWelcomeEmailToUser(c, userId, accountId, userEmail, overrideData = null) {
 		const settingData = await settingService.query(c);
-		if (!overrideData?.forceWelcome && !overrideData?.isBroadcast && settingData.welcomeAutoSend === 0) {
+		if (!overrideData?.repairMissing && !overrideData?.isBroadcast && settingData.welcomeAutoSend === 0) {
 			return null;
 		}
+
+		if (!overrideData?.isBroadcast && !overrideData?.repairMissing && await hasWelcomeReceipt(c, userId)) return null;
 
 		// 系统邮件默认必须为管理员发送的版本（不随收件人个人语言自动修改）
 		const adminLang = normalizeLangKey(overrideData?.lang || settingData.welcomeLang || settingData.defaultLang || 'zh');
@@ -1715,24 +1737,6 @@ const emailService = {
 		const contentSnapshot = interpolate(rawContent);
 		text = interpolate(text);
 
-		// Check if user already has an official welcome email (only check on auto-send on registration/ensure)
-		if (!overrideData?.isBroadcast) {
-			const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
-				and(
-					eq(email.userId, userId),
-					eq(email.isOfficial, 1)
-				)
-			).limit(1).get();
-
-			if (existing) {
-				try {
-					await c.env.kv.put('HAS_WELCOME_' + userId, '1');
-					await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
-				} catch (e) {}
-				return null;
-			}
-		}
-
 		const now = new Date().toISOString();
 		const snoozedEndTime = expireDays > 0 ? new Date(Date.now() + expireDays * 86400000).toISOString() : null;
 
@@ -1752,7 +1756,7 @@ const emailService = {
 			bcc: '[]',
 			inReplyTo: '',
 			relation: '',
-			messageId: '',
+			messageId: `welcome.${crypto.randomUUID()}@epocanvas.com`,
 			type: emailConst.type.RECEIVE,
 			status: 0,
 			unread: emailConst.unread.UNREAD,
@@ -1766,87 +1770,30 @@ const emailService = {
 		};
 
 		if (userId && emailCryptoUtils.shouldEncryptEmail(settingData?.allMailMode, welcomeData)) {
-			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			const cryptoKey = await emailCryptoUtils.getEmailRecordKey(c.env, userId);
 			welcomeData = await emailCryptoUtils.encryptEmailRecord(welcomeData, cryptoKey);
 		}
 
-		const emailRow = await orm(c).insert(email).values(welcomeData).returning().get();
-
-		if (emailRow && emailRow.emailId) {
-			// Automatically mark as Starred (重要)
-			await orm(c).insert(star).values({
-				userId: userId,
-				emailId: emailRow.emailId,
-				createTime: now
-			}).run().catch(() => {});
-		}
-
-		try {
-			await c.env.kv.put('HAS_WELCOME_' + userId, '1');
-			await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
-		} catch (e) {}
-
-		return emailRow;
+		return persistWelcome(c, welcomeData, overrideData || {});
 	},
 
-	async ensureWelcomeEmailForUser(c, userId, userEmail = null) {
-		if (!userId) return null;
-		try {
-			// Welcome mail is issued at most once per account. A separate marker
-			// survives the user permanently deleting the message, so a read-path
-			// ensure cannot recreate mail the user deliberately removed.
-			if (await c.env.kv.get('WELCOME_ISSUED_' + userId) === '1') return null;
-			// Migrate the legacy marker without re-sending: HAS_WELCOME_ was set
-			// only after a successful delivery in previous versions.
-			if (await c.env.kv.get('HAS_WELCOME_' + userId) === '1') {
-				await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
-				return null;
-			}
-		} catch (e) {}
+	async ensureWelcomeEmailForUser(c, userId, userEmail = null, { repairMissing = false } = {}) {
+		if (!Number.isSafeInteger(Number(userId)) || Number(userId) <= 0) return null;
+		if (!repairMissing && await cachedWelcome(c, userId)) return null;
+		const userEntity = (await import('../entity/user')).default;
+		const owner = await userOrm(c).select({ email: userEntity.email }).from(userEntity)
+			.where(and(eq(userEntity.userId, userId), eq(userEntity.status, 0), eq(userEntity.isDel, 0))).get();
+		if (!owner) return null;
+		const mailbox = await accountService.selectActiveForUser(c, userId, userEmail || owner.email);
+		if (!mailbox) return null;
 
-		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
-			and(
-				eq(email.userId, userId),
-				eq(email.isOfficial, 1)
-			)
-		).limit(1).get();
-
-		if (existing) {
-			try {
-				await c.env.kv.put('HAS_WELCOME_' + userId, '1');
-				await c.env.kv.put('WELCOME_ISSUED_' + userId, '1');
-			} catch (e) {}
-			await this.ensureGlobalEmailForUser(c, userId, userEmail).catch(() => {});
-			return null;
-		}
-
-		let emailAddress = userEmail;
-		if (!emailAddress) {
-			const userEntity = (await import('../entity/user')).default;
-			const userRow = await userOrm(c).select({ email: userEntity.email }).from(userEntity).where(eq(userEntity.userId, userId)).get();
-			if (userRow) {
-				emailAddress = userRow.email;
-			}
-		}
-		if (!emailAddress) return null;
-
-		let accountRow = await accountService.selectByEmail(c, emailAddress);
-		if (!accountRow) {
-			accountRow = await orm(c).select().from(account).where(
-				and(
-					eq(account.userId, userId),
-					eq(account.isDel, isDel.NORMAL)
-				)
-			).orderBy(desc(account.sort), asc(account.accountId)).limit(1).get();
-		}
-		if (!accountRow) return null;
-
-		const welcomeRes = await this.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, emailAddress, { forceWelcome: true });
-		await this.ensureGlobalEmailForUser(c, userId, emailAddress).catch(() => {});
-		return welcomeRes;
+		const result = await this.deliverWelcomeEmailToUser(c, userId, mailbox.accountId, mailbox.email, { repairMissing });
+		await this.ensureGlobalEmailForUser(c, userId, mailbox.email);
+		await completeWelcomeChecks(c, userId);
+		return result;
 	},
 
-	async deliverGlobalEmailToUser(c, userId, accountId, userEmail, options = {}) {
+	async deliverGlobalEmailToUser(c, userId, accountId, userEmail, options = {}, newUsersOnly = false) {
 		const {
 			subject,
 			content,
@@ -1926,7 +1873,7 @@ const emailService = {
 			bcc: '[]',
 			inReplyTo: '',
 			relation: '',
-			messageId: '',
+			messageId: `global.${crypto.randomUUID()}@epocanvas.com`,
 			type: emailConst.type.RECEIVE,
 			status: 0,
 			unread: emailConst.unread.UNREAD,
@@ -1940,85 +1887,20 @@ const emailService = {
 		};
 
 		if (userId && emailCryptoUtils.shouldEncryptEmail(settingData?.allMailMode, globalEmailData)) {
-			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			const cryptoKey = await emailCryptoUtils.getEmailRecordKey(c.env, userId);
 			globalEmailData = await emailCryptoUtils.encryptEmailRecord(globalEmailData, cryptoKey);
 		}
 
-		const emailRow = await orm(c).insert(email).values(globalEmailData).returning().get();
-
-		if (emailRow && emailRow.emailId && isStarred) {
-			await orm(c).insert(star).values({
-				userId: userId,
-				emailId: emailRow.emailId,
-				createTime: now
-			}).run().catch(() => {});
-		}
-
-		return emailRow;
+		return persistGlobal(c, globalEmailData, options, isStarred, newUsersOnly);
 	},
 
 	async ensureGlobalEmailForUser(c, userId, userEmail = null) {
 		if (!userId) return null;
-		let globalConfig = null;
-		try {
-			globalConfig = await c.env.kv.get('ACTIVE_GLOBAL_EMAIL', { type: 'json' });
-		} catch (e) {}
-
-		if (!globalConfig || !globalConfig.active || !globalConfig.sendToNewUsers) {
-			const settingData = await settingService.query(c);
-			globalConfig = settingData?.globalEmailConfig;
-			if (typeof globalConfig === 'string') {
-				try { globalConfig = JSON.parse(globalConfig); } catch (e) { globalConfig = null; }
-			}
-		}
-
-		if (!globalConfig || !globalConfig.active || !globalConfig.sendToNewUsers) {
-			return null;
-		}
-
-		const userEntity = (await import('../entity/user')).default;
-		const userRow = await userOrm(c).select().from(userEntity).where(eq(userEntity.userId, userId)).get();
-		if (!userRow) return null;
-
-		if (globalConfig.targetType === 'roles') {
-			const allowedRoles = globalConfig.targetRoleIds || [];
-			if (!allowedRoles.includes(userRow.type)) {
-				return null;
-			}
-		}
-
-		const kvKey = `HAS_GLOBAL_EMAIL_${userId}_${globalConfig.lastBroadcastTime || 'default'}`;
-		try {
-			const hasReceived = await c.env.kv.get(kvKey);
-			if (hasReceived === '1') return null;
-		} catch (e) {}
-
-		const existing = await orm(c).select({ emailId: email.emailId }).from(email).where(
-			and(
-				eq(email.userId, userId),
-				eq(email.isOfficial, 1),
-				eq(email.subject, globalConfig.subject),
-				eq(email.isDel, isDel.NORMAL)
-			)
-		).limit(1).get();
-
-		if (existing) {
-			try { await c.env.kv.put(kvKey, '1'); } catch (e) {}
-			return null;
-		}
-
-		let emailAddress = userEmail || userRow.email;
-		let accountRow = await accountService.selectByEmail(c, emailAddress);
-		if (!accountRow) {
-			accountRow = await orm(c).select().from(account).where(
-				and(eq(account.userId, userId), eq(account.isDel, isDel.NORMAL))
-			).orderBy(desc(account.sort), asc(account.accountId)).limit(1).get();
-		}
-		if (!accountRow) return null;
-
-		const result = await this.deliverGlobalEmailToUser(c, userId, accountRow.accountId, emailAddress, globalConfig);
-		try { await c.env.kv.put(kvKey, '1'); } catch (e) {}
-		return result;
+		const current = await authoritativeCampaign(c, userId, null, true);
+		if (!current) return null;
+		const mailbox = await accountService.selectActiveForUser(c, userId, userEmail || current.email);
+		if (!mailbox) return null;
+		return this.deliverGlobalEmailToUser(c, userId, mailbox.accountId, mailbox.email, current.config, true);
 	},
 
 	async selectById(c, emailId, expectedUserId = null, includeDel = false) {
@@ -2034,6 +1916,7 @@ const emailService = {
 		let emailRow = await orm(c)
 			.select({
 				...email,
+				hasFileAttachments,
 				starId: star.starId
 			})
 			.from(email)
@@ -2049,7 +1932,7 @@ const emailService = {
 		if (emailRow) {
 			emailRow.isStar = emailRow.starId != null ? 1 : 0;
 			if (emailRow.userId && hasEncryptedFields(emailRow)) {
-				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, emailRow.userId);
+				const cryptoKey = await emailCryptoUtils.getEmailRecordKey(c.env, emailRow.userId, [emailRow]);
 				if (emailCryptoUtils.needsEmailRecordMigration(emailRow, cryptoKey)) {
 					await emailKeyMigrationService.lazyReencryptEmailRow(c, emailRow, cryptoKey).catch(() => {});
 				}
@@ -2135,7 +2018,7 @@ const emailService = {
 		await this.emailAddAtt(c, list);
 
 		if (userId && list.some(hasEncryptedFields)) {
-			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			const cryptoKey = await emailCryptoUtils.getEmailRecordKey(c.env, userId, list);
 			list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
 		}
 
@@ -2697,17 +2580,16 @@ const emailService = {
 	},
 
 	async emailAddAtt(c, list) {
-
-		const emailIds = list.map(item => item.emailId);
-
-		if (emailIds.length > 0) {
-
-			const attList = await attService.selectByEmailIds(c, emailIds);
-
-			list.forEach(emailRow => {
-				const atts = attList.filter(attRow => attRow.emailId === emailRow.emailId);
-				emailRow.attList = atts;
-			});
+		const emailIds = list.filter(row => row.hasFileAttachments !== 0).map(row => row.emailId);
+		const attachments = emailIds.length ? await attService.selectByEmailIds(c, emailIds) : [];
+		const byEmail = new Map();
+		for (const row of attachments) {
+			if (!byEmail.has(row.emailId)) byEmail.set(row.emailId, []);
+			byEmail.get(row.emailId).push(row);
+		}
+		for (const row of list) {
+			delete row.hasFileAttachments;
+			row.attList = byEmail.get(row.emailId) || [];
 		}
 	},
 
@@ -2846,27 +2728,50 @@ const emailService = {
 			});
 			results = [...new Set(extracted)].filter(v => v.toLowerCase().includes(query.toLowerCase()));
 		} else if (isSubject) {
-			const list = await orm(c).select({ value: email.subject }).from(email)
-				.where(and(...conditionList))
-				.groupBy(email.subject)
-				.limit(25);
-			if (userId) {
-				const encrypted = list.some(item => emailCryptoUtils.inspectEncryptedValue(item.value).encrypted);
-				const cryptoKey = encrypted ? await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId) : null;
-				const decryptedSubjects = await Promise.all(list.map(async item => {
-					try {
-						const dec = cryptoKey ? await emailCryptoUtils.decryptText(item.value, cryptoKey) : item.value;
-						// 若解密结果依然是密文前缀，说明属于其他用户密文或解密未成功，予以安全剔除
-						if (typeof dec === 'string' && dec.startsWith('enc:v1:')) return null;
-						return dec;
-					} catch {
-						return null;
-					}
-				}));
-				results = [...new Set(decryptedSubjects.filter(v => v && v.toLowerCase().includes(query.toLowerCase())))].slice(0, 15);
-			} else {
-				results = list.map(item => item.value);
+			const prefix = emailCryptoUtils.CIPHER_PREFIX;
+			const needle = query.toLowerCase();
+			const asciiQuery = /^[\x00-\x7f]+$/.test(query);
+			let folded = sql`lower(${email.subject})`;
+			// SQLite folds ASCII. These two Unicode lowercase mappings can produce
+			// ASCII characters and matter even for an entirely ASCII search term.
+			if (needle.includes('k')) folded = sql`replace(${folded}, 'K', 'k')`;
+			if (needle.includes('i')) folded = sql`replace(${folded}, 'İ', 'i̇')`;
+			const encrypted = sql`substr(${email.subject}, 1, ${prefix.length}) = ${prefix}`;
+			const plainMatch = sql`instr(${folded}, ${needle}) > 0`;
+			const plain = await orm(c).selectDistinct({ value: email.subject }).from(email)
+				.where(and(...conditionList, sql`NOT (${encrypted})`, plainMatch)).limit(15).all();
+			const matches = new Set(plain.map(row => row.value).filter(value => value.toLowerCase().includes(needle)));
+			if (matches.size === 15) return [...matches];
+
+			// Only ciphertext and Unicode values which SQLite cannot compare need
+			// the bounded Worker scan. Common plaintext suggestions return above.
+			const candidates = asciiQuery ? encrypted : or(encrypted,
+				and(sql`length(${email.subject}) <> length(CAST(${email.subject} AS BLOB))`, sql`NOT (${plainMatch})`));
+			let cryptoKey;
+			let after = 0;
+			let scanned = 0;
+			while (matches.size < 15) {
+				const rows = await orm(c).select({ id: email.emailId, value: email.subject }).from(email)
+					.where(and(...conditionList, gt(email.emailId, after), candidates))
+					.orderBy(asc(email.emailId)).limit(ENCRYPTED_SEARCH_BATCH).all();
+				if (!rows.length) break;
+				if (scanned + rows.length > ENCRYPTED_SEARCH_MAX_ROWS) {
+					throw new BizError('Search is too broad; narrow the filters', 400, 'search_too_broad');
+				}
+				if (userId && !cryptoKey && rows.some(row => row.value.startsWith(prefix))) {
+					cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+				}
+				const values = await Promise.all(rows.map(row => row.value.startsWith(prefix) && cryptoKey
+					? emailCryptoUtils.decryptText(row.value, cryptoKey) : row.value));
+				for (const value of values) {
+					if (value && !value.startsWith(prefix) && value.toLowerCase().includes(needle)) matches.add(value);
+					if (matches.size === 15) break;
+				}
+				scanned += rows.length;
+				after = rows.at(-1).id;
+				if (rows.length < ENCRYPTED_SEARCH_BATCH) break;
 			}
+			results = [...matches];
 		}
 
 		return results;

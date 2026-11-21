@@ -215,7 +215,11 @@ describe('authentication service convergence over real D1 HTTP', () => {
   expect((await api('/my/passkey/last-key', { token, method: 'DELETE', body: { stepUpToken: proof.data.stepUpToken } })).code).toBe(200);
   const row = await env.db.prepare('SELECT passkey_history,totp_enabled,auth_version FROM user WHERE user_id=?').bind(UID).first();
   expect(row).toMatchObject({ passkey_history: 1, totp_enabled: 0, auth_version: 1 });
-  const fresh = await session(1);
+  expect((await api('/my/passkey/list', { token })).code).toBe(401);
+  const login = await api('/login', { body: { email: EMAIL, password: PASSWORD } });
+  expect(login.code).toBe(200);
+  expect(login.data.token).toEqual(expect.any(String));
+  const fresh = login.data.token;
   const enrollment = await reauth(fresh, 'passkey_add');
   expect(enrollment.proof.code).toBe(200);
   const setup = await api('/my/passkey/setup', { token: fresh, body: { stepUpToken: enrollment.proof.data.stepUpToken } });

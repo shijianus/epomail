@@ -2,11 +2,9 @@ import BizError from '../error/biz-error';
 import constant from '../const/constant';
 import dayjs from 'dayjs';
 import userService from '../service/user-service';
-import permService from '../service/perm-service';
 import { t } from '../i18n/i18n'
 import app from '../hono/hono';
 import { isAdminUser } from '../utils/admin-utils';
-import { getUserDb } from '../utils/db-accessor.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
 import { refreshSessionAuthInfo, readVerifiedBearerSession, revokeAllUserSessions } from '../utils/session-auth-store.js';
 
@@ -173,7 +171,10 @@ app.use('*', async (c, next) => {
 
 	const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('token');
 
-	const { claims: result, session } = await readVerifiedBearerSession(c, jwt);
+	const permissionKeys = requirePerms.some(prefix => pathMatches(path, prefix))
+		? Object.keys(premKey).filter(key => premKey[key].some(prefix => pathMatches(path, prefix)))
+		: null;
+	const { claims: result, session, currentUser } = await readVerifiedBearerSession(c, jwt, permissionKeys);
 
 	if (!result) {
 		throw new BizError(t('authExpired'), 401);
@@ -198,11 +199,7 @@ app.use('*', async (c, next) => {
 		throw new BizError(t('authExpired'), 401);
 	}
 
-	const currentUser = await getUserDb(c).prepare(
-		'SELECT user_id, email, type, is_del, status, auth_version FROM user WHERE user_id = ? LIMIT 1'
-	).bind(userId).first();
-
-	if (!currentUser || Number(currentUser.is_del) !== 0) {
+	if (currentUser?.user_id == null || Number(currentUser.is_del) !== 0) {
 		await revokeAllUserSessions(c, userId, { ignoreKvError: true });
 		throw new BizError(t('authExpired'), 401);
 	}
@@ -225,20 +222,8 @@ app.use('*', async (c, next) => {
 		authVersion: currentUser.auth_version
 	};
 
-	const permIndex = requirePerms.findIndex(item => pathMatches(path, item));
-
-	if (permIndex > -1) {
-
-		const permKeys = await permService.userPermKeys(c, currentIdentity.userId);
-
-		const userPaths = permKeyToPaths(permKeys);
-
-		const userPermIndex = userPaths.findIndex(item => pathMatches(path, item));
-
-		if (userPermIndex === -1 && !isAdminUser(c, currentIdentity)) {
-			throw new BizError(t('unauthorized'), 403);
-		}
-
+	if (permissionKeys !== null && !currentUser.allowed && !isAdminUser(c, currentIdentity)) {
+		throw new BizError(t('unauthorized'), 403);
 	}
 
 	const refreshTime = dayjs(authInfo.refreshTime).startOf('day');
@@ -256,16 +241,3 @@ app.use('*', async (c, next) => {
 
 	return await next();
 });
-
-function permKeyToPaths(permKeys) {
-
-	const paths = [];
-
-	for (const key of permKeys) {
-		const routeList = premKey[key];
-		if (routeList && Array.isArray(routeList)) {
-			paths.push(...routeList);
-		}
-	}
-	return paths;
-}

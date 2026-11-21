@@ -1,8 +1,10 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch, legacyUserEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 
 async function main() {
   console.log('🚀 Starting End-to-End Verification for Audit & External Appeal Integration...');
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
   const page = await context.newPage();
 
@@ -13,7 +15,7 @@ async function main() {
     // Test 1: Webmail Login - "忘记密码？" Guidance Modal to epomail-docs Short Link
     // -------------------------------------------------------------
     console.log('\n--- Step 1: Testing Webmail Login UI Forgot Password Modal ---');
-    await page.goto('https://mail.epocanvas.com/login/', { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(legacyOrigin + '/login/', { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(2000);
 
     // Type email in login form
@@ -188,20 +190,20 @@ async function main() {
     // Test 3: epocanvas-mail Admin Audit Console & Mode Presentation Rules
     // -------------------------------------------------------------
     console.log('\n--- Step 3: Testing Admin Audit Console & Multi-mode Presentation ---');
-    const loginRes = await fetch('https://mail.epocanvas.com/api/login', {
+    const loginRes = await fetch(legacyOrigin + '/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'audit_normal_1789140856529@epomail.bond', password: process.env.EPOMAIL_E2E_USER_PASSWORD || '' })
+      body: JSON.stringify({ email: legacyUserEmail, password: process.env.EPOMAIL_E2E_USER_PASSWORD || '' })
     });
     const loginJson = await loginRes.json();
     const token = loginJson.data?.token;
     console.log(`✓ Acquired master auth token from API (code: ${loginJson.code})`);
 
     // Set localStorage on mail.epocanvas.com origin
-    await page.goto('https://mail.epocanvas.com/login/', { waitUntil: 'domcontentloaded' });
+    await page.goto(legacyOrigin + '/login/', { waitUntil: 'domcontentloaded' });
     await page.evaluate(({ t }) => {
       localStorage.setItem('token', t);
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'audit_normal_1789140856529@epomail.bond' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyUserEmail }]));
     }, { t: token });
 
     await page.route('**/api/my/loginUserInfo', async (route) => {
@@ -212,7 +214,7 @@ async function main() {
           code: 200,
           data: {
             userId: 1,
-            email: 'admin@epomail.bond',
+            email: legacyAdminEmail,
             name: '站长',
             permKeys: ['*'],
             role: { roleId: 6, roleCode: 'master', name: '站长' }
@@ -221,7 +223,7 @@ async function main() {
       });
     });
 
-    await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/admin/audit', { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(legacyOrigin + '/mail/u/0/#manage/admin/audit', { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(2500);
 
     // Verify Breadcrumb Strip

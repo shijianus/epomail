@@ -2,6 +2,21 @@ import { emailConst } from '../const/entity-const';
 import { getUserDb, getMailDb } from '../utils/db-accessor';
 
 const analysisDao = {
+	async recordHardIntercept(c) {
+		await getMailDb(c).prepare(`INSERT INTO mail_ingress_stat(metric,total) VALUES ('hard_intercept',1)
+			ON CONFLICT(metric) DO UPDATE SET total=total+1`).run();
+	},
+
+	async hardIntercepts(c) {
+		const row = await getMailDb(c).prepare("SELECT total FROM mail_ingress_stat WHERE metric='hard_intercept'").first();
+		return row?.total || 0;
+	},
+
+	async countedRecipients(c, day) {
+		const row = await getMailDb(c).prepare('SELECT COALESCE(SUM(counted_recipients),0) AS total FROM mail_outbound_task WHERE counted_day=?').bind(day).first();
+		return row.total;
+	},
+
 	async numberCount(c) {
 		const mailDb = getMailDb(c);
 		const userDb = getUserDb(c);

@@ -6,6 +6,21 @@
 | `v1.3.0-beta.1` 及其他预发布后缀 | 已验收的 Worker、前端资源归档和 SHA-256，标记为 prerelease | 同分支、同 SHA 的 CI 和受保护的公测验收成功 |
 | `v1.3.0` | 同一已验收归档和 SHA-256，标记为 Latest | 与 beta 相同 |
 
+## 冻结归档复现
+
+Quality Gates 从同一提交检出两份绝对路径不同的干净工作树，在各自的依赖目录和 Wrangler 输出目录独立构建，逐字节比较完整归档后再验证并上传。两端 Vite 清单、受 Git 跟踪的公共文件及 PWA 输出共同界定发布资产。Wrangler 执行记录和临时构建清单留在构建目录内。仓库内源码路径、归档文件顺序、权限和时间统一规范化。门禁仍须验收实际发布分支 CI 产生的归档。
+
+在相同版本的 Node、pnpm、GNU tar 和 gzip 环境中，使用项目锁文件安装依赖。在干净 checkout 的仓库根运行以下命令，两个指定的输出目录须为新的仓库外路径。
+
+```sh
+sha=$(git rev-parse HEAD)
+raw=$(mktemp -d)
+release=$(mktemp -d)
+(cd mail-worker && EPOMAIL_FREEZE_MANIFEST=1 pnpm exec wrangler deploy --dry-run --outdir "$raw")
+node scripts/package-candidate.mjs "$raw" "$release/frozen" "$sha"
+(cd "$release/frozen" && sha256sum -c epomail-candidate.tar.gz.sha256)
+```
+
 ## 配置
 
 在 GitHub 建立 `public-beta-promotion` Environment，设置必需审核人并禁止自行审批，限定部署源为受保护的 `master`、`main` 或指定的 `release/*` 分支。分支、版本标签和工作流修改应受仓库的保护规则约束。把工作流加入默认分支后，可在 Actions 中选择实际候选分支发起手工验收。

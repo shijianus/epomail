@@ -3,8 +3,9 @@ import settingService from './setting-service';
 import { recordStorageProbeHistory } from '../utils/storage-probe-history.js';
 import s3Service from './s3-service';
 import r2Service from './r2-service';
-import user from '../entity/user';
-import { eq } from 'drizzle-orm';
+import BizError from '../error/biz-error.js';
+
+const cleanupPrefixes = ['VERIFY_TEMP_', 'HAS_WELCOME_', 'WELCOME_ISSUED_', 'USER_KNOWN_ENV_'];
 
 const isCount = value => Number.isSafeInteger(value) && value >= 0;
 
@@ -500,58 +501,56 @@ const storageScanService = {
 	/**
 	 * Safe cleanup of orphaned temporary keys in KV
 	 */
-	async cleanup(c) {
+	async cleanup(c, { prefix = cleanupPrefixes[0], cursor = '' } = {}) {
+		if (!cleanupPrefixes.includes(prefix) || typeof cursor !== 'string' || cursor.length > 2048) {
+			throw new BizError('Invalid storage cleanup page', 400, 'invalid_cleanup_page');
+		}
 		const startTime = Date.now();
 		let cleanedCount = 0;
-
-		if (c.env?.kv) {
-			try {
-				// Clean temporary verify records older than 24h
-				const listResult = await c.env.kv.list({ prefix: 'VERIFY_TEMP_', limit: 500 });
-				if (listResult.keys && listResult.keys.length > 0) {
-					await Promise.all(listResult.keys.map(k => c.env.kv.delete(k.name)));
-					cleanedCount += listResult.keys.length;
-				}
-
-				// 深度清理历史孤儿键：检查 HAS_WELCOME_ 与 USER_KNOWN_ENV_ 是否存在对应 D1 用户
-				const welcomeList = await c.env.kv.list({ prefix: 'HAS_WELCOME_', limit: 200 });
-				if (welcomeList?.keys?.length) {
-					for (const k of welcomeList.keys) {
-						const uid = Number(k.name.replace('HAS_WELCOME_', ''));
-						if (uid) {
-							const exists = await getUserDb(c).select({ userId: user.userId }).from(user).where(eq(user.userId, uid)).get();
-							if (!exists) {
-								await c.env.kv.delete(k.name);
-								cleanedCount++;
-							}
-						}
-					}
-				}
-
-				const envList = await c.env.kv.list({ prefix: 'USER_KNOWN_ENV_', limit: 200 });
-				if (envList?.keys?.length) {
-					for (const k of envList.keys) {
-						const uid = Number(k.name.replace('USER_KNOWN_ENV_', ''));
-						if (uid) {
-							const exists = await getUserDb(c).select({ userId: user.userId }).from(user).where(eq(user.userId, uid)).get();
-							if (!exists) {
-								await c.env.kv.delete(k.name);
-								cleanedCount++;
-							}
-						}
-					}
-				}
-			} catch (e) {
-				console.warn('Storage cleanup error:', e.message);
+		// One bounded page per request stays within Worker subrequest limits even
+		// when every listed key is an orphan. Unknown timestamps stay untouched.
+		try {
+			const kv = c.env.kv;
+			const page = await kv.list({ prefix, limit: 25, ...(cursor && { cursor }) });
+			if (!Array.isArray(page.keys) || typeof page.list_complete !== 'boolean'
+				|| (!page.list_complete && (!page.cursor || page.cursor === cursor))) {
+				throw new Error('KV cleanup cursor is unavailable');
 			}
+			const keys = page.keys.filter(k => typeof k.name === 'string' && k.name.startsWith(prefix));
+			let remove;
+			if (prefix === 'VERIFY_TEMP_') {
+				remove = keys.filter(k => {
+					// A provider TTL takes precedence over creation metadata.
+					if (k.expiration !== undefined) {
+						return Number.isSafeInteger(k.expiration) && k.expiration > 0 && k.expiration * 1000 <= startTime;
+					}
+					const created = k.metadata?.createdAt;
+					const ms = typeof created === 'string' ? Date.parse(created) : created;
+					return Number.isSafeInteger(ms) && ms >= 1e12 && ms <= startTime - 86400000;
+				});
+			} else {
+				const owners = keys.map(k => ({ name: k.name, id: Number(k.name.slice(prefix.length)) }))
+					.filter(k => Number.isSafeInteger(k.id) && k.id > 0 && k.name === prefix + k.id);
+				remove = [];
+				if (owners.length) {
+					const ids = owners.map(k => k.id);
+					const rows = await getUserDb(c).prepare(`SELECT user_id FROM user WHERE user_id IN (${ids.map(() => '?').join(',')})`)
+						.bind(...ids).all();
+					if (!Array.isArray(rows.results)) throw new Error('User lookup is incomplete');
+					const existing = new Set(rows.results.map(row => Number(row.user_id)));
+					remove = owners.filter(k => !existing.has(k.id));
+				}
+			}
+			for (const key of remove) {
+				await kv.delete(key.name);
+				cleanedCount++;
+			}
+			const following = cleanupPrefixes[cleanupPrefixes.indexOf(prefix) + 1];
+			const next = page.list_complete ? (following ? { prefix: following } : null) : { prefix, cursor: page.cursor };
+			return { ok: true, cleanedCount, durationMs: Date.now() - startTime, next };
+		} catch {
+			throw new BizError('Storage cleanup incomplete. Retrying is safe.', 503, 'storage_cleanup_incomplete');
 		}
-
-		return {
-			ok: true,
-			cleanedCount,
-			durationMs: Date.now() - startTime,
-			message: `存储空间安全清理完成，共回收 ${cleanedCount} 个临时与孤儿缓存键。`
-		};
 	}
 };
 

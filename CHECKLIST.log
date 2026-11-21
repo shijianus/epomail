@@ -1,3 +1,34 @@
+### 容量重验与派发授权（2026-11-21）
+
+- [x] 保留 f79e4a8 两轮容量的 1131/871 实测，按既有逐轮 960 门槛判第二轮失败。
+- [x] 完成发件邮箱归属、封禁、配额及邮件加解密热路径修改。完整开发提交和专项测试索引见 REPORTS.md 同日记录。
+- [x] 53ab 候选由原有仓库规则检出 5 处固定测试密钥；两份测试改用临时随机密钥，保留此前失败记录。
+- [ ] 冻结和公测放行按最终提交、官方归档及实际远端环境记录。
+
+### 邮件可读性、隔离验收与冻结复核（2026-11-21）
+
+- [x] `7ba703c2e054d4ad07818dd73d1cd1d663186239` 完整测试定位到六个欢迎模板不符合静态本地化资源契约。`3b47db2a2989fce314679b9cacdf7f5fcae8156b` 保持六语 Vue/Worker 的主题和正文输出逐字节不变，通过原四项国际化检查及四组故意引入错误的负例验证。
+- [x] 对 `02a228cca187cad48fe73d1801906e0d933bb739` 追加正文焦点截图，复现品牌框及 5 个功能插图栏为空。使用安全 HTML 修复 6 语新旧欢迎模板，修改为 `433c644d08cc6e94bf89749122e65429174a83f0`、`dbe8320f72d3b4327aacd978720e0872883dd95f`。补充 `e513ca7ff00be3f555f9bc1dae22ee59a46c4bfa` 的实拍和存量回归，真实邮箱通过 32/32。前一个候选的完整源码门禁为 Worker 811/811、Node 327/327。
+- [x] 在 `e89aec0eddbbd119edd934cca28610fa2943223f` 完成全套源码验收后，从真实 320 像素截图发现同色与过度缩放，并在旧归档验证新浏览器断言会失败。
+- [x] 核验欢迎、公告、普通宽表邮件、安全通知和受限长文书。修复与真实浏览器记录见 REPORTS.md，分别对应 `55503ea092ac43499f5561f11ac333ab2c2457dd`、`c1ad3bdcea15a5f1cc90b05bb5e5f5dbfaece32b`、`cbe2031b3699eefa1673552e511ea55797847a54`、`9d4fa89d65f398fb4675f6c561c57a7ad01bffac`。
+- [x] 将旧登录、多因素、系统邮件和管理动作切入隔离环境，复查旧验收会写到何处、哪些诊断会回显认证内容。提交 `6f68e3d5574a362e51595f71d7a541ebb67a6445`、`2be4941d00e661821ba6c7864b4ac7f938f9a583`、`28c1c08d309eac25782e2f2e7ca6533b56f124bd`、`e2e7ce7c06e1bb4321127b43ecea9927c15bccf2`。
+- [x] 精确限制旧 QA 的 Node 与浏览器出站。在合并后的 106 个旧入口上逐项做语法及错误目标拒绝或隔离包装核验，三个有明确测试数据的业务入口通过正向实测。工作提交为 `f35bd61eea21fa94f5f2fd3376f959a8999ca771`、`1a2ec15a6dc29c2cd346e74dac5305d77722affb`、`63d712a4987a9856bbf490b702870a868f6a24f3`。
+- [x] 对 7 份历史文档及 5 份旧测试按已登记指纹清理认证资料明文，代码提交 `c2ab2d9ec47a50e08e1b76e0b08e12379b924161`。发布候选从公开修复分支基线单次快进，保存完整修复后的树。以上为 Work 阶段验证使用的提交号。
+- [ ] 维护者在允许的发布分支取得实际候选同 SHA 的三项 push CI。开放公测前，归档受保护 Staging 的真实部署、收发、回滚、历史凭据处置和独立审批证据。
+
+### 公测候选的持久状态与冻结验收（2026-11-21）
+
+- [x] 按修前提交 `df6f52d64ac15a70c0c827e8c5e0aae1282eff6b` 运行源码、解包归档、分库和吞吐/长稳基线。
+- [x] 集成事务统计、配额和回执、会话/角色读取、清理分页与官方构建复现。代码提交 `e7112f6727ee36c6ea1c7abb97f65d7690770b10`，压测覆盖提交 `171f92e8d3b7df34bccc703b229d7fa838c6cffc`。
+- [x] 在隔离 Workerd/D1 运行发信、实时鉴权、欢迎与公告专项，另按 SQLite 查询计划核对活动预留和 UTF-8 正文用量索引。
+- [x] 在整合构建实测 8 个并发发送与 8 个同键重放，计数为 8/8。容量预试完成 1046/960。最终独立重建与重复验收按最终提交及制品 SHA-256 归档。
+- [x] `818f18dcf8f0fa4425804ae6b8a9ab93aa3b53dc` 的新旧 Worker 混写会话专项 15/15 通过。
+- [x] `9d2d31c6de7c39fea7ed104560a90c40cc6dd1d0` 管理广播在间断后补齐剩余受众，限制用户和已撤下活动由权威状态拦截。22/22 专项、4/4 迁移及 1/1 客户端重试通过。
+- 发布决策与证据按被测成品归档。请从交付记录读取最终 SHA 及摘要，再核对三项正式 CI 和受保护 Staging 的批准。[专项记录](REPORTS.md)
+
+- [x] 敏感操作后通过真实登录验证新会话，四项先前失败的断言已修复。两组测试提交为 `1cdf2068966123e72fb4783a6f3eaba3e8b20277` 与 `bc99b933887f96f8bacf2bb8140dcc4f4de507e6`。
+- [x] `c7aee7222d0df0c32d23fb7b6b6ed514c650c0eb` 保留失败重试所需的账号/别名归属，按当前归属清理登录计数。真实隐私服务 35/35 通过。
+
 ### 移动收件箱状态栏与容量诊断（2026-11-21）
 
 - 界面修复 `2795009632726315bcae8394a3a13463e87413a6`（`2795009`）。在 375×812 的实拍收件箱中，底部隐私模式与审计状态换行后被固定高度裁掉。移动状态栏现在随内容增高，两个标签均保留全文；写信按钮位于正文内，随底栏高度避让。
@@ -64,7 +95,7 @@
     - `Cloudflare Production (mail.epocanvas.com / mail.epomail.bond / mail.epomail.cyou)` — Version ID: `1aaa552b-fd34-4653-8ed6-3db0d2efb806` (Tag: `c3c434ddc375d40fe95adcc11f5fde827293cd1e`)
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
     - [x] 实现 D1 `user_session` 原子持久表 (`init.js` `v3_26DB` + `intDB`) + KV 边缘自愈机制 (`session-auth-store.js`)，覆盖所有会话验证 (`security.js` / `user-context.js` / `index.js` / `oauth-provider-service.js` / `public-service.js`) 与全部吊销路径。
-    - [x] 优化 `setting-service.js` `websiteConfig`，禁止向未启用 OAuth 或禁用提供商输出 `clientId` 等元数据，并清理生产 D1 历史废置 `github` 占位配置 (`"123456"`)。
+    - [x] 优化 `setting-service.js` `websiteConfig`，禁止向未启用 OAuth 或禁用提供商输出 `clientId` 等元数据，并清理生产 D1 历史废置 `github` 占位配置 (`"[REDACTED]"`)。
     - [x] 新增 `oauth-app-service.js` 原地加密迁移、`setting-api.js` `/setting/security/oauth-apps/migrate` 及 `x-init-secret` 门禁 `POST /api/init/security-migrate`。
     - [x] 物理清理 Staging 遗留 `p4-stress-6f5aa1a7` 角色与 794 条关联压测邮件，并在根 `package.json` 固定 `packageManager: pnpm@10.34.5`。
 *   **自动化测试与核验清单 (Verification Checklist)**:
@@ -861,7 +892,7 @@
 *   **关联提交 (Git Commit)**: `748643a8989c27b0a14dbed4922ed29759092bf0` (Short: `748643a`)；前置模块提交 `4aefb562a380f04d01d0290b5690b26769e6104f` (`4aefb56`)、`a1d080559b9a05e1751cfd44c993ef9d17626170` (`a1d0805`)
 *   **部署环境 (Deployment)**: 本地全真栈 workerd + D1/KV 隔离回归、Worker dry-run 打包、`mail-vue` 生产构建；**未执行任何远程部署或生产库修改，统一推送 `origin/release/2026-10-31`**
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
-    - [x] 模块 B（固定账号与初始化安全）：移除 `admin-utils.js` 与 `user-service.js` 中 `userId === 1` 超管提权及清理豁免；`init.js` 停止播种/复活 `admin@epomail.cyou` (`123456`) 并在生产冷启动缺失 `admin_initial_password` 时安全失败；将 6 个 `audit_*` 配置迁入 `setting_ext`（`setting` 表降至 96 列，彻底消除 D1 100 列上限报错）。
+    - [x] 模块 B（固定账号与初始化安全）：移除 `admin-utils.js` 与 `user-service.js` 中 `userId === 1` 超管提权及清理豁免；`init.js` 停止播种/复活 `admin@epomail.cyou` (`[REDACTED]`) 并在生产冷启动缺失 `admin_initial_password` 时安全失败；将 6 个 `audit_*` 配置迁入 `setting_ext`（`setting` 表降至 96 列，彻底消除 D1 100 列上限报错）。
     - [x] 模块 A（认证与 OAuth 服务端强制）：`oauthService` / `oauthApi` / `oauthIdentityService` 全端点统一 `assertProviderEnabled` 强制校验总开关、Provider 开关与完整凭据（含修复 Apple 空 `clientSecret` 假阳性）；禁用总开关或单 Provider 时通过 `oneTimeCredential.revokeClientFlows` 即时吊销在途 `state` / `login_code` / `bind` 凭证；补齐 OAuth 客户端 S256 PKCE 闭环、直调登录 `state` 强校验及内置 OAuth2 Provider 常量时间密钥比对与 scope 裁剪。
     - [x] 模块 C（核心邮件链路与跨用户隔离）：修复 `cascadeDeleteEmails` 未校验归属即跨用户物理删除附件/对象存储与星标的 P0 漏洞；收紧 `emailService.list` / `latest` 显式 `accountId` 归属校验与 `starService` 归属过滤及密文解密；在 `emailService.send` 外发前强制执行 `EMAIL_OUTBOUND_ENABLED`、`OUTBOUND_WHITELIST` 及附件数量/大小/配额预检；修复 `emailService.read` 缺失 `.run()` 及双库模式 `getMailDb`/`getUserDb` 路由。
     - [x] 交接归档：新增 `doc/rc-2026-10-31-handoff.md`，完整记录真实测试结果、`NOT-TESTED` 外部联调边界、生产存量 `admin@epomail.cyou` 独立处置 SQL 与下一阶段 Windows 兼容性清单。
@@ -5294,7 +5325,7 @@
     2. **[P0] 全新部署引导链三重断裂修复 (Fresh-Deploy Bootstrap Chain Fix)**:
        - **角色播种守卫重构**：`v3_13DB` 原以 `roleCount===0` 为播种条件，被 `v1_1DB` 先行插入的遗留「普通用户」(custom) 永久阻断成死代码；改为按六个标准 `role_code` 精准计数判定，保留「站长删除 LV.0/LV.1 不被强制复活」的原设计意图；
        - **缺失列补齐**：`email.labels`、`user.custom_labels`、`user.update_time` 三列在 drizzle entity 中声明但 CREATE TABLE 与全部 124 条迁移均未覆盖（邮件列表/注册/身份接口全新库直接 500）；`intDB` 的 CREATE TABLE 已内建三列，并在 `v3_14DB` 新增 pragma 检查式幂等 ALTER 兼容存量库，`custom_labels` 默认值与 entity 的 `getDefaultUserLabelsString()` 严格一致；
-       - **主站长账号引导**：`v3_14DB` 新增 `c.env.admin` 账号不存在时的 INSERT 路径（PBKDF2 哈希初始密码 123456 + master 角色 + 主信箱行），并在存在时兜底晋升 master；与 `adminReserved` 注册拦截闭环，全新部署仅需访问 `/api/init/<jwt_secret>` 即可完成全部引导；
+       - **主站长账号引导**：`v3_14DB` 新增 `c.env.admin` 账号不存在时的 INSERT 路径（PBKDF2 哈希初始密码 [REDACTED] + master 角色 + 主信箱行），并在存在时兜底晋升 master；与 `adminReserved` 注册拦截闭环，全新部署仅需访问 `/api/init/<jwt_secret>` 即可完成全部引导；
        - 顺带将 `v2_7DB` 的 `auto_refresh_time` RENAME 改为 pragma 条件执行，消除全新库迁移噪音告警。
     3. **[P2] zh-Hant 系统标签简繁映射修复 (zh-Hant Label Mapping)**:
        - 数据库预置标签实体「待办」在 zh-Hant 界面呈简体残留；`label-i18n.js` 补入 `待办`/`待辦` 变体映射（原仅覆盖 `代办`），单元断言 5/5 通过（zh-Hant `t(todoTag)=代辦`）。
@@ -5303,11 +5334,11 @@
        - 生产改由 `npx wrangler secret put jwt_secret` / `totp_enc_key` 注入（一次设置持久生效，部署不丢失）；本地开发由 gitignore 排除的 `mail-worker/.dev.vars` 承载（wrangler dev 实测自动加载 ✓），入库模板 `.dev.vars.example` 同步提供；
        - `.gitignore` 新增 `.dev.vars` / `**/.dev.vars`（保留 `.dev.vars.example`）；
        - 新增 `mail-worker/DEPLOY-SECRETS.md` 部署密钥指引（清单、注入命令、轮换、`/init` 门禁关联、初始密码提示）；
-       - 测试夹具脱敏：`totp-backend-fixes.spec.js`、`worker-configuration.d.ts`、`test-totp-backend-fixes.mjs` 中硬编码的生产 `totp_enc_key` 值替换为 `local-dev-totp-enc-key-NOT-FOR-PROD` 测试值；`git grep` 审计追踪文件零真实密钥残留。
+       - 测试夹具脱敏：`totp-backend-fixes.spec.js`、`worker-configuration.d.ts`、`test-totp-backend-fixes.mjs` 中硬编码的生产 `totp_enc_key` 值替换为 `[REDACTED]` 测试值；`git grep` 审计追踪文件零真实密钥残留。
     5. **[加固] `/email/latest` 缺参防御 (Latest Endpoint Hardening)**:
        - 原实现缺省 `accountId`/`allReceive` 时将 `undefined` 直接绑定 D1 抛 `D1_TYPE_ERROR`；现补 `emailId` 数值归一、accountId 缺省回退用户首个信箱、无信箱优雅返回空列表，前端契约（三参齐全）与非契约调用均实测 200。
 *   **自动化测试与完整核验 (Testing & Full Verification, 全部本地执行)**:
-    - **全新库端到端引导核验**：清空 `.wrangler/state` 后冷启动 `wrangler dev`，仅凭 `/api/init/<secret>` 完成引导——6 角色播种（visitor/master/user_lv0/user_lv1/moderator + 遗留 custom，权限 4~34 项齐备）、参观者与主站长双账号及其信箱自动创建、三列齐备，随后管理员 `123456` 直接登录成功；
+    - **全新库端到端引导核验**：清空 `.wrangler/state` 后冷启动 `wrangler dev`，仅凭 `/api/init/<secret>` 完成引导——6 角色播种（visitor/master/user_lv0/user_lv1/moderator + 遗留 custom，权限 4~34 项齐备）、参观者与主站长双账号及其信箱自动创建、三列齐备，随后管理员 `[REDACTED]` 直接登录成功；
     - **API 功能核验套件** `tests/verify-local-functional-20260919.mjs`：25 项断言 25/25 全绿（登录身份/信箱/邮件收发/设置/角色用户/注册欢迎邮件/OAuth/安全面），临时用户 `DELETE /user/delete?userIds=` 物理清理 code=200，零假数据残留；
     - **浏览器级 UI 核验**（Playwright，新构建产物）：`/inbox` 渲染 0 错误、`/admin` 主页内容完整且无 accountStore 错误、`/email`（非路由）正确落入 404 且无 profile 噪音错误、en 模式 CJK 残留 0、zh-Hant 模式简体特有字 0；
     - **回归套件**：`test-totp-login-ui-e2e.mjs` 8/8 全绿、`test-multilingual-email-templates-e2e.mjs` Part A 37/37 全绿、i18n 三件套（对称 2032 键/键缺失 0/硬编码扫描）持续全绿；
@@ -5895,7 +5926,7 @@
          - 修复 `admin-utils.js`，严格限定站长 `isAdminEmail` 与 `isAdminUser` 必须严格等于系统环境变量 `c.env.admin`（`admin@epomail.bond`）或 `User 1` 本身，绝不跨域名扩散至任何其他同名前缀的邮箱或账号；
          - 纯用户名登录仅支持在输入纯字符串 `"admin"`（不带 `@`）时作为快捷别名映射至 `c.env.admin`。
     2. **独立还原演示参观者账号 `admin@epomail.cyou` (Decoupled Demo Visitor Account)**:
-       - 账号与信箱彻底解耦：在 D1 数据库中物理重建独立的演示参观者用户（`user_id: 9`，`email: 'admin@epomail.cyou'`，统一安全密码 `123456`，角色类型 `type: 2`，对应 `role_code: 'visitor'`，参观者）；
+       - 账号与信箱彻底解耦：在 D1 数据库中物理重建独立的演示参观者用户（`user_id: 9`，`email: 'admin@epomail.cyou'`，统一安全密码 `[REDACTED]`，角色类型 `type: 2`，对应 `role_code: 'visitor'`，参观者）；
        - 信箱所有权物理对齐：在 `account` 表中将 `admin@epomail.cyou`（`account_id: 99`）的归属物理绑定至 User 9（参观者），超级管理员 User 1 名下仅保留系统主站长信箱 `admin@epomail.bond`（`account_id: 1`），两者完全隔离，绝不串号、绝不跨域共享；
        - `init.js` 自愈机制修正：废除 `v3_14DB` 中自动将各域名 `admin@...` 账号夺取并绑定至 User 1 的破坏性逻辑，改为持久化确保演示参观者账号独立运行于 `visitor` 角色之下。
     3. **参观者权限防线严格锁定与越权防御 (Strict Visitor Permissions Enforcement)**:
@@ -5960,11 +5991,11 @@
        - 在生产 D1 `account` 表中，为超级管理员（`user_id: 1`）完整绑定 `admin@epomail.cyou`（`account_id: 99, all_receive: 1`），与 `admin@epomail.bond` 并存；
        - 在 `init.js` 的 `v3_14DB` 中增加管理员多域名账号自愈同步机制，无论系统何时配置多域名，均自动为站长初始化所有域名的管理员专属信箱，双域名收发件与别名管理完全打通。
     3. **管理员登录凭证与密码核验 (Password Verification & Assurance)**:
-       - 确认站长管理员（User 1）密码在系统内确认为统一安全密码 `123456`，站长在登录界面可直接使用 `admin@epomail.cyou`（或 `admin@epomail.bond` 或 `admin`）搭配密码 `123456` 登录；
+       - 确认站长管理员（User 1）密码在系统内确认为统一安全密码 `[REDACTED]`，站长在登录界面可直接使用 `admin@epomail.cyou`（或 `admin@epomail.bond` 或 `admin`）搭配密码 `[REDACTED]` 登录；
        - 如需更换为其他自定义密码，站长可在登录后进入「个人设置 -> 安全」随时进行密码修改。
     4. **Playwright 生产环境真实端到端全维度审计 100% 全绿 (Comprehensive Live E2E Audit)**:
        - 升级专属审计脚本 `tests/audit-hardcoded-defaults-optimization.mjs`：
-         - 步骤 0：实测使用 `admin@epomail.cyou` + `123456` API 登录 100% 成功返回 Token；实测使用 `admin@epomail.bond` 与纯用户名 `admin` 登录 100% 成功；验证管理员账户列表同时拥有 `admin@epomail.cyou` 和 `admin@epomail.bond`；实测浏览器通过 `/login/index.html` 页面输入 `admin@epomail.cyou` 成功跳转进入 `/inbox`；
+         - 步骤 0：实测使用 `admin@epomail.cyou` + `[REDACTED]` API 登录 100% 成功返回 Token；实测使用 `admin@epomail.bond` 与纯用户名 `admin` 登录 100% 成功；验证管理员账户列表同时拥有 `admin@epomail.cyou` 和 `admin@epomail.bond`；实测浏览器通过 `/login/index.html` 页面输入 `admin@epomail.cyou` 成功跳转进入 `/inbox`；
          - 步骤 1：跨域名注册 `admin@epomail.cyou`、同名用户跨域名抢注、别名防抢占全链路拦截 100% 通过；
          - 步骤 2：参观者无 `user:query` 权限、后端防篡改、UI 禁用徽章、侧边栏隐藏、接口 403 严格拦截 100% 通过；
          - 步骤 3：OAuth 应用管理 `EpoCanvasImage` 与 `shijianus-blog` 完整保全与密钥脱敏 100% 通过；
@@ -8583,7 +8614,7 @@
         3. **未登录访客公开查看禁止状态（401拦截）**：`screenshot_public_profile_guest_blocked.png`
         4. **已登录账户专属查看状态**：`screenshot_public_profile_logged_in.png`
     *   执行 `npx wrangler deploy`，成功完成联合构建与 Cloudflare Workers 全网部署（Version ID: `dc176bba-24e3-4410-8a27-204a81758e75`）。
-    *   调用 `/init/123456` 成功触发生产端数据库无缝完成 `v3_5DB` 迁移。
+    *   调用 `/init/[REDACTED]` 成功触发生产端数据库无缝完成 `v3_5DB` 迁移。
 
 ### 优化：语境说明外置至个性化设置项并补充自定义前端UI失效提醒 (2026-08-21)
 *   **功能需求 (Feature)**: 

@@ -111,7 +111,7 @@
    - 在 `session-auth-store.js`、`init.js` (`v3_26DB` + `intDB`) 及 `security.js` / `user-context.js` / `index.js` / `oauth-provider-service.js` / `public-service.js` 与全部会话吊销路径上线 D1 `user_session` 原子持久表与 KV 边缘缓存自愈机制（`readAuthorizedSession`、`persistSessionRecord`、`revokeAllUserSessions`）。
    - Cloudflare Staging (`Version ID: e386552f-eb12-4939-b4f0-cf12f10315be`) 实网复测同用户 **`10` 并发登录 `10/10` 同步生效（`0` 丢更新）**，**`16` 并发峰值登录 `16/16` 返回 200 且原子收口最新 10 会话（`0` 次 `503`）**，单端登出精确吊销目标会话（`401` / 其余 `200`）。
 2. **公开配置 `websiteConfig.oauthProviders` 彻底脱敏与历史假配置清除 (`AUD-OPT-02`)**
-   - 修改 `setting-service.js`：当 `oauthLoginEnabled !== 1` 时 `websiteConfig` 直接返回 `oauthProviders: {}`，仅在开启后返回已启用的非未迁移提供商；同步清理生产 D1 废置 `github` 测试配置（原明文 `"clientSecret":"123456"` 与 `"clientId":"admin@epomail.bond"`）并刷新 KV 缓存，线上实测 `/api/setting/websiteConfig` 返回 `oauthProviders: {}`。
+   - 修改 `setting-service.js`：当 `oauthLoginEnabled !== 1` 时 `websiteConfig` 直接返回 `oauthProviders: {}`，仅在开启后返回已启用的非未迁移提供商；同步清理生产 D1 废置 `github` 测试配置（原明文 `"clientSecret":"[REDACTED]"` 与 `"clientId":"admin@epomail.bond"`）并刷新 KV 缓存，线上实测 `/api/setting/websiteConfig` 返回 `oauthProviders: {}`。
 3. **历史明文 `oauth_app` 凭证与 135 封历史密文邮件全量迁移闭环 (`AUD-OPT-03`)**
    - 为 `oauth-app-service.js`、`setting-api.js`、`init.js` / `init-api.js` 新增安全迁移接口（`/setting/security/oauth-apps/migrate` 与 `x-init-secret` 门禁 `POST /api/init/security-migrate`），原地加密 `oauth_app.client_secret` 而不改变第三方业务密钥原值，并在生产部署 (`Version ID: 1aaa552b-fd34-4653-8ed6-3db0d2efb806`) 实网完成迁移：
      - **3/3 `oauth_app`** 全部转为 `v1:` AES-GCM 密文（`plain_apps=0`）；

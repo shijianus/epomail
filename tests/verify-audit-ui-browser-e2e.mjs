@@ -42,7 +42,7 @@ async function getAdminToken() {
 		body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PWD })
 	});
 	const json = await res.json();
-	if (json?.code !== 200) throw new Error('admin login failed: ' + JSON.stringify(json));
+	if (json?.code !== 200) throw new Error('admin login failed: ' + Number(json?.code));
 	return json.data.token;
 }
 

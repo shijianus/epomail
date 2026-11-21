@@ -4,8 +4,11 @@ import { getMailDb, getUserDb } from '../src/utils/db-accessor.js';
 import { ensureMailReliabilitySchema } from '../src/utils/mail-reliability-schema.js';
 import {
 	prepareOutboundTask, reserveSendCount, compensateSendCount, claimPreparation, claimOutboundTask,
-	maintainOutboundTasks, retireOutboundForUser
+	maintainOutboundTasks, retireOutboundForUser, releasePreparation, closeExternalUnknown
 } from '../src/service/mail-outbound-service.js';
+import analysisDao from '../src/dao/analysis-dao.js';
+import analysisService from '../src/service/analysis-service.js';
+import kvConst from '../src/const/kv-const.js';
 import { emailConst } from '../src/const/entity-const.js';
 
 const c = { env: { ...env, orm_log: false } };
@@ -54,6 +57,7 @@ beforeAll(async () => {
 	)`).run();
 	await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_outbound_task
 		ON email(outbound_task_id) WHERE outbound_task_id IS NOT NULL`).run();
+	await userDb.prepare('CREATE TABLE IF NOT EXISTS audit_log (email TEXT, warning_type TEXT, status TEXT)').run();
 	await ensureMailReliabilitySchema(c);
 });
 
@@ -107,6 +111,7 @@ async function withFixture(run) {
 		f.guardTokens = new Set(((await db.prepare('SELECT token FROM mail_transaction_guard').all()).results || []).map(row => row.token));
 		network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected network access in outbound maintenance test'));
 		const address = `maintenance-${f.id}@test.invalid`;
+		f.address = address;
 		const owner = await userDb.prepare(`INSERT INTO user(email,password,salt,status,is_del,send_count)
 			VALUES (?,'local-only-not-a-login-password',?,0,0,'0')`).bind(address, f.id).run();
 		f.userId = Number(owner.meta.last_row_id);
@@ -136,9 +141,9 @@ async function prepared(f) {
 	});
 	const taskId = result.task.task_id;
 	f.taskIds.add(taskId);
-	const archive = await db.prepare(`INSERT INTO email(user_id,account_id,subject,text,content,type,status,outbound_task_id)
-		VALUES (?,?,'maintenance','body','<p>body</p>',?,?,?)`)
-		.bind(f.userId, f.accountId, emailConst.type.SEND, emailConst.status.SAVING, taskId).run();
+	const archive = await db.prepare(`INSERT INTO email(user_id,account_id,send_email,subject,text,content,type,status,outbound_task_id)
+		VALUES (?,?,?,'maintenance','body','<p>body</p>',?,?,?)`)
+		.bind(f.userId, f.accountId, f.address, emailConst.type.SEND, emailConst.status.SAVING, taskId).run();
 	const emailId = Number(archive.meta.last_row_id);
 	await db.prepare('UPDATE mail_outbound_task SET email_id=? WHERE task_id=?').bind(emailId, taskId).run();
 	await reserveSendCount(c, { taskId, userId: f.userId, quantity: 2, maxCount: 100, daily: false });
@@ -151,6 +156,67 @@ const reservation = task => userDb.prepare('SELECT * FROM mail_send_quota_reserv
 const sendCount = async f => Number((await userDb.prepare('SELECT send_count FROM user WHERE user_id=?').bind(f.userId).first()).send_count);
 
 describe('Real D1 outbound task maintenance', () => {
+	it('grants an insertion lease to one caller and keeps default preparation compatible', () => withFixture(async f => {
+		const request = { userId: f.userId, accountId: f.accountId, idempotencyKey: f.id, contentHash: 'body',
+			reservedBytes: 3, maxStorageBytes: 1000, maxEmails: 10, claimOnInsert: true };
+		const both = await Promise.all([prepareOutboundTask(c, request), prepareOutboundTask(c, request)]);
+		const winner = both.find(row => row.created);
+		const other = both.find(row => !row.created);
+		f.taskIds.add(winner.task.task_id);
+		expect(other.task.task_id).toBe(winner.task.task_id);
+		expect(winner.leaseToken).toBeTruthy();
+		expect(other.leaseToken).toBeUndefined();
+		await expect(claimPreparation(c, other.task.task_id)).rejects.toMatchObject({ errorCode: 'outbound_in_flight' });
+		await releasePreparation(c, winner.task.task_id, winner.leaseToken);
+		const recovered = await claimPreparation(c, winner.task.task_id);
+		expect(recovered.leaseToken).toBeTruthy();
+		expect(recovered.leaseToken).not.toBe(winner.leaseToken);
+		const plain = await prepareOutboundTask(c, { ...request, idempotencyKey: crypto.randomUUID(), claimOnInsert: false });
+		f.taskIds.add(plain.task.task_id);
+		expect(plain.leaseToken).toBeUndefined();
+		expect((await claimPreparation(c, plain.task.task_id)).leaseToken).toBeTruthy();
+	}));
+
+	it('accounts for accepted UNKNOWN sends exactly once on the UTC decision day, including legacy envelopes', () => withFixture(async f => {
+		const { today, yesterday } = await db.prepare("SELECT date('now') AS today,date('now','-1 day') AS yesterday").first();
+		const original = await analysisDao.countedRecipients(c, today);
+		const prior = await analysisDao.countedRecipients(c, yesterday);
+		for (const [payload, target, count] of [
+			['{"recipients":["a@test.invalid","b@test.invalid","c@test.invalid"]}', 'ACCEPTED', 3],
+			['malformed legacy payload', 'ACCEPTED', 2], ['{}', 'FAILED', 0]
+		]) {
+			const task = await prepared(f);
+			await db.prepare("UPDATE mail_outbound_task SET state='UNKNOWN',payload_json=? WHERE task_id=?")
+				.bind(payload, task.taskId).run();
+			await db.prepare('UPDATE email SET recipient=? WHERE email_id=? AND user_id=?')
+				.bind('[{"address":"a@test.invalid"},{"address":"b@test.invalid"}]', task.emailId, f.userId).run();
+			const decision = { taskId: task.taskId, state: target, reason: 'fixture resolved',
+				status: target === 'ACCEPTED' ? emailConst.status.SENT : emailConst.status.FAILED,
+				fromStatuses: [emailConst.status.SAVING] };
+			const attempts = await Promise.all([closeExternalUnknown(c, decision), closeExternalUnknown(c, decision)]);
+			expect(attempts.filter(Boolean)).toHaveLength(1);
+			const recorded = await taskRow(task);
+			expect(recorded.counted_day).toBe(target === 'ACCEPTED' ? today : null);
+			expect(recorded.counted_recipients).toBe(count);
+		}
+		expect(await analysisDao.countedRecipients(c, today)).toBe(original + 5);
+		expect(await analysisDao.countedRecipients(c, yesterday)).toBe(prior);
+		const legacyContext = { env: { ...c.env, kv: { get: async key => key === kvConst.SEND_DAY_COUNT + today ? '7' : null } } };
+		expect(await analysisService.daySendTotal(legacyContext, today)).toBe(original + 12);
+		expect(await analysisService.daySendTotal(legacyContext, yesterday)).toBe(prior);
+	}));
+
+	it('adds every concurrently recorded permanent rejection to the durable aggregate', async () => {
+		const original = await analysisDao.hardIntercepts(c);
+		try {
+			await Promise.all(Array.from({ length: 8 }, () => analysisDao.recordHardIntercept(c)));
+			expect(await analysisDao.hardIntercepts(c)).toBe(original + 8);
+		} finally {
+			if (original) await db.prepare("UPDATE mail_ingress_stat SET total=? WHERE metric='hard_intercept'").bind(original).run();
+			else await db.prepare("DELETE FROM mail_ingress_stat WHERE metric='hard_intercept'").run();
+		}
+	});
+
 	it('reserves count in one batch on first use and classifies existing, exhausted and released reservations', () => withFixture(async f => {
 		const reads = [];
 		const counted = { env: { USER_DB: {
@@ -214,14 +280,14 @@ describe('Real D1 outbound task maintenance', () => {
 	it('quarantines expired external SENDING as UNKNOWN and never makes an ambiguous send dispatchable again', () => withFixture(async f => {
 		const task = await prepared(f);
 		const owned = await claimPreparation(c, task.taskId);
-		await claimOutboundTask(c, task.taskId, owned.leaseToken);
+		await claimOutboundTask(c, task.taskId, owned.leaseToken, { userId: f.userId, senderAddress: f.address });
 		await db.prepare("UPDATE mail_outbound_task SET lease_until=unixepoch()-1,updated_at=datetime('now','-25 hours') WHERE task_id=?").bind(task.taskId).run();
 		await maintainOutboundTasks(c);
 		const unknown = await taskRow(task);
 		expect(unknown).toMatchObject({ state: 'UNKNOWN', provider: 'external', lease_until: 0, quota_reconciled: 0, reserved_bytes: 37, reserved_count: 1 });
 		for (let attempt = 0; attempt < 2; attempt++) {
 			await expect(claimPreparation(c, task.taskId)).rejects.toMatchObject({ errorCode: 'provider_unknown' });
-			await expect(claimOutboundTask(c, task.taskId, owned.leaseToken)).rejects.toMatchObject({ errorCode: 'outbound_lease_lost' });
+			await expect(claimOutboundTask(c, task.taskId, owned.leaseToken, { userId: f.userId, senderAddress: f.address })).rejects.toMatchObject({ errorCode: 'outbound_lease_lost' });
 			await maintainOutboundTasks(c);
 		}
 		expect(await taskRow(task)).toEqual(unknown);
@@ -249,7 +315,7 @@ describe('Real D1 outbound task maintenance', () => {
 	it('refuses account retirement while a SENDING lease is live even after user and MAIL_DB mailboxes are disabled', () => withFixture(async f => {
 		const task = await prepared(f);
 		const owned = await claimPreparation(c, task.taskId);
-		await claimOutboundTask(c, task.taskId, owned.leaseToken);
+		await claimOutboundTask(c, task.taskId, owned.leaseToken, { userId: f.userId, senderAddress: f.address });
 		await userDb.prepare('UPDATE user SET status=1,is_del=1 WHERE user_id=?').bind(f.userId).run();
 		await db.prepare('UPDATE account SET status=1,is_del=1 WHERE user_id=?').bind(f.userId).run();
 		const before = await taskRow(task);

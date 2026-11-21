@@ -293,7 +293,7 @@ export async function cascadeDeleteSystemEmails(c, emailIdList) {
  * transaction. The scoped rows cannot change between these statements. Object
  * storage is asynchronous; queued keys may still have surviving references.
  */
-export async function purgeOwnedMail(c, userId, accountId = null) {
+export async function purgeOwnedMail(c, userId, accountId = null, { mailbox, retainLocator = false } = {}) {
 	const uid = ownerId(userId);
 	const db = getMailDb(c);
 	const oneMailbox = accountId !== null;
@@ -307,12 +307,14 @@ export async function purgeOwnedMail(c, userId, accountId = null) {
 	const attachmentScope = `email_id IN (${mailIds}) OR ((${scope}) AND
 		NOT EXISTS(SELECT 1 FROM email parent WHERE parent.email_id = attachments.email_id))`;
 	const attachmentArgs = [...args, ...args];
-	const scopeGuard = oneMailbox ? `EXISTS(SELECT 1 FROM account WHERE ${scope}) AND` : '';
+	const snapshot = mailbox ? ` AND email=? AND name=?${retainLocator ? '' : ' AND is_del=1 AND status=1'}` : '';
+	const mailboxArgs = mailbox ? [...args, mailbox.email, mailbox.name] : args;
+	const scopeGuard = oneMailbox ? `EXISTS(SELECT 1 FROM account WHERE ${scope}${snapshot}) AND` : '';
 	const guard = mailTransactionGuard(c, `${scopeGuard}
 		NOT EXISTS(SELECT 1 FROM email e WHERE ${scope} AND NOT (${MUTABLE}))
 		AND NOT EXISTS(SELECT 1 FROM mail_outbound_task WHERE ${scope} AND state IN ('PREPARED','SENDING','UNKNOWN'))
 		AND NOT EXISTS(SELECT 1 FROM mail_receive_claim WHERE ${scope} AND state IN ('CLAIMED','SAVING','RETRY'))`,
-		[...(oneMailbox ? args : []), ...args, ...args, ...args]);
+		[...(oneMailbox ? mailboxArgs : []), ...args, ...args, ...args]);
 	const byteCount = ['subject', 'text', 'content', 'code']
 		.map(field => `LENGTH(CAST(IFNULL(${field}, '') AS BLOB))`).join(' + ');
 	const starDelete = oneMailbox
@@ -332,7 +334,9 @@ export async function purgeOwnedMail(c, userId, accountId = null) {
 			db.prepare(`DELETE FROM attachments WHERE ${attachmentScope}`).bind(...attachmentArgs),
 			starDelete,
 			query(`DELETE FROM email WHERE ${scope}`),
-			...(oneMailbox ? [query(`DELETE FROM account WHERE ${scope}`)] : []),
+			...(oneMailbox ? [query(retainLocator
+				? `UPDATE account SET is_del=1,status=1,all_receive=0 WHERE ${scope}`
+				: `DELETE FROM account WHERE ${scope}`)] : []),
 			guard.after
 		]);
 	} catch (error) {

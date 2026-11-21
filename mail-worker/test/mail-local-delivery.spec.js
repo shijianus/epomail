@@ -3,11 +3,12 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { getMailDb, getUserDb } from '../src/utils/db-accessor.js';
 import { ensureMailReliabilitySchema } from '../src/utils/mail-reliability-schema.js';
 import { deliverLocalMail } from '../src/service/mail-local-delivery-service.js';
+import { validatedMailQuotaCondition } from '../src/utils/mail-pipeline.js';
 import { claimPreparation, claimOutboundTask, maintainOutboundTasks, reserveSendCount, readSendStatus } from '../src/service/mail-outbound-service.js';
 import { attConst, emailConst, settingConst } from '../src/const/entity-const.js';
 import settingService from '../src/service/setting-service.js';
 import userService from '../src/service/user-service.js';
-import roleService from '../src/service/role-service.js';
+import storageQuotaService from '../src/service/storage-quota-service.js';
 import r2Service from '../src/service/r2-service.js';
 import attService from '../src/service/att-service.js';
 import telegramService from '../src/service/telegram-service.js';
@@ -113,16 +114,20 @@ function installMocks(f) {
 	vi.spyOn(settingService, 'query').mockImplementation(async () => ({ ...f.settings }));
 	// USER_DB is a separate authority. These snapshots include explicit status
 	// and isDel; the tests do not invent an atomic transaction across two DBs.
-	vi.spyOn(userService, 'selectByIdIncludeDel').mockImplementation(async (_c, userId) => {
+	vi.spyOn(storageQuotaService, 'selectMailPolicyIdentity').mockImplementation(async (_c, userId) => {
 		const owner = f.users.get(Number(userId));
-		return owner ? { ...owner } : undefined;
+		return owner && {
+			user: { storageQuotaMb: 0, byoStorageEnabled: 0, byoStorageConfig: '{}', ...owner },
+			role: f.role ? { roleCode: 'custom', storageQuotaMb: 5, ...f.role } : null
+		};
 	});
-	vi.spyOn(userService, 'getUserQuota').mockImplementation(async (_c, userId) => {
+	const readLimits = async (_c, userId) => {
 		const quota = f.quotas.get(Number(userId));
 		if (!quota) throw new Error('Local fixture quota owner is unavailable');
 		return { ...quota };
-	});
-	vi.spyOn(roleService, 'selectById').mockImplementation(async () => ({ ...f.role }));
+	};
+	vi.spyOn(userService, 'getUserQuota').mockImplementation(readLimits);
+	vi.spyOn(userService, 'getDeliveryLimits').mockImplementation(readLimits);
 	vi.spyOn(r2Service, 'resolveStorage').mockImplementation(async (_c, userId) => f.storage(userId));
 	vi.spyOn(r2Service, 'getObj').mockImplementation(f.readObject);
 	vi.spyOn(r2Service, 'putObj').mockImplementation(f.putObject);
@@ -307,7 +312,7 @@ async function retryWithNewLease(task) {
 	expect(await taskRow(task)).toMatchObject({ state: 'PREPARED', lease_token: null });
 	const owned = await claimPreparation(c, task.taskId);
 	expect(owned.leaseToken).not.toBe(task.leaseToken);
-	await claimOutboundTask(c, task.taskId, owned.leaseToken);
+	await claimOutboundTask(c, task.taskId, owned.leaseToken, { userId: task.sender.userId, senderAddress: task.sender.sendEmail });
 	task.leaseToken = owned.leaseToken;
 }
 
@@ -343,9 +348,14 @@ describe('deliverLocalMail with real D1 transactions and local-only object stora
 		const queries = prepares.mock.calls.map(([query]) => query);
 		const lookup = queries.find(query => query.includes('AS recorded'));
 		const plan = async (query, bindings) => (await db.prepare('EXPLAIN QUERY PLAN ' + query).bind(...bindings).all()).results.map(row => row.detail);
-		expect((await plan(lookup, [task.taskId, recipient.address])).join(' ')).toContain('idx_account_email_nocase');
-		const quota = queries.find(query => query.includes(' AS allowed'));
-		const steps = await plan(quota, Array(quota.match(/\?/g).length).fill(1));
+		expect((await plan(lookup, [task.taskId, recipient.normalized, sender.userId, sender.accountId,
+			task.sender.emailId, task.leaseToken])).join(' ')).toContain('idx_account_email_nocase');
+		const quota = validatedMailQuotaCondition({ userId: recipient.userId, incomingBytes: bodyBytes(task.sender),
+			...f.quotas.get(recipient.userId) });
+		expect(queries.some(query => query.includes('mail_transaction_guard') && query.includes(quota.sql))).toBe(true);
+		expect(queries.some(query => query.includes('SELECT email_stats.email_bytes'))).toBe(false);
+		expect(queries.some(query => query.includes(' AS allowed'))).toBe(false);
+		const steps = await plan('SELECT ' + quota.sql, quota.params);
 		for (const table of ['email', 'attachments', 'mail_receive_claim', 'mail_outbound_task']) {
 			expect(steps.filter(step => new RegExp(`(?:SCAN|SEARCH) ${table}\\b`).test(step))).toHaveLength(1);
 		}
@@ -471,6 +481,147 @@ describe('deliverLocalMail with real D1 transactions and local-only object stora
 		await expectFinished(task, fits ? emailConst.status.DELIVERED : emailConst.status.BOUNCED);
 	}));
 
+	it('delivers when a reservation expires after the preflight and before a quota bounce commits', () => withFixture(async f => {
+		const sender = await mailbox(f, 'sender');
+		const recipient = await mailbox(f, 'recipient');
+		const task = await sendTask(f, sender);
+		f.quotas.get(recipient.userId).maxEmails = 1;
+		const key = crypto.randomUUID();
+		await db.prepare(`INSERT INTO mail_receive_claim(claim_key,recipient,raw_sha256,raw_object_key,raw_expires_at,user_id,state,lease_until,reserved_count)
+			VALUES (?,?,'test','unused',unixepoch()+3600,?,'SAVING',unixepoch()+3600,1)`).bind(key, recipient.normalized, recipient.userId).run();
+		const realBatch = db.batch.bind(db);
+		vi.spyOn(db, 'batch').mockImplementationOnce(async statements => {
+			await db.prepare('UPDATE mail_receive_claim SET lease_until=unixepoch()-1 WHERE claim_key=?').bind(key).run();
+			return realBatch(statements);
+		});
+		await deliver(task, [recipient]);
+		expect(await receipts(task)).toMatchObject([{ recipient: recipient.normalized, state: 'DELIVERED' }]);
+		expect(await inbox(recipient)).toHaveLength(1);
+	}));
+
+	it.each([null, -1, 'invalid', 2 ** 53])('rejects corrupt historic attachment size %s without committing a permanent receipt', size => withFixture(async f => {
+		const sender = await mailbox(f, 'sender');
+		const recipient = await mailbox(f, 'recipient');
+		const task = await sendTask(f, sender);
+		f.quotas.set(recipient.userId, { ...f.quotas.get(recipient.userId), bypassStorage: true, maxEmails: 0, maxStorageBytes: 0 });
+		await db.prepare("INSERT INTO attachments(user_id,account_id,email_id,key,size) VALUES(?,?,?, 'quota-corrupt',?)")
+			.bind(recipient.userId, recipient.accountId, task.sender.emailId, size).run();
+		await expect(deliver(task, [recipient])).rejects.toMatchObject({ code: 503, errorCode: 'quota_unavailable' });
+		expect(await receipts(task)).toEqual([]);
+		expect(await inbox(recipient)).toEqual([]);
+	}));
+
+	it('records a confirmed quota bounce in the guarded batch without an intervening standalone usage read', () => withFixture(async f => {
+		const sender = await mailbox(f, 'sender'), recipient = await mailbox(f, 'recipient');
+		const task = await sendTask(f, sender);
+		f.quotas.get(recipient.userId).maxStorageBytes = 1;
+		const prepare = vi.spyOn(db, 'prepare');
+		await deliver(task, [recipient]);
+		const statements = prepare.mock.calls.map(([sql]) => sql);
+		expect(statements.filter(sql => sql.includes('TOTAL(reserved_bytes) AS bytes'))).toHaveLength(2);
+		expect(statements.some(sql => sql.endsWith(' AS allowed'))).toBe(false);
+		expect(await receipts(task)).toMatchObject([{ state: 'BOUNCED', reason: 'Recipient quota is exhausted' }]);
+		expect(await inbox(recipient)).toEqual([]);
+	}));
+
+	it('treats a corrupt active reservation as unknown even when another reservation offsets it', () => withFixture(async f => {
+		const sender = await mailbox(f, 'sender'), recipient = await mailbox(f, 'recipient');
+		const task = await sendTask(f, sender);
+		await quotaReservations(f, recipient);
+		await db.prepare("UPDATE mail_receive_claim SET reserved_bytes=-1 WHERE user_id=? AND state='CLAIMED'")
+			.bind(recipient.userId).run();
+		await expect(deliver(task, [recipient])).rejects.toMatchObject({ code: 503, errorCode: 'quota_unavailable' });
+		expect(await receipts(task)).toEqual([]);
+		expect(await inbox(recipient)).toEqual([]);
+	}));
+
+	it('admits a text receipt if capacity is released between the failed write and its conditional bounce', () => withFixture(async f => {
+		const sender = await mailbox(f, 'sender'), recipient = await mailbox(f, 'recipient');
+		const task = await sendTask(f, sender);
+		f.quotas.get(recipient.userId).maxEmails = 1;
+		const key = crypto.randomUUID();
+		await db.prepare(`INSERT INTO mail_receive_claim(claim_key,recipient,raw_sha256,raw_object_key,raw_expires_at,user_id,state,lease_until,reserved_count)
+			VALUES (?,?,'test','unused',unixepoch()+3600,?,'SAVING',unixepoch()+3600,1)`).bind(key, recipient.normalized, recipient.userId).run();
+		const realBatch = db.batch.bind(db);
+		let attempts = 0;
+		vi.spyOn(db, 'batch').mockImplementation(async statements => {
+			if (++attempts === 2) await db.prepare('UPDATE mail_receive_claim SET lease_until=0 WHERE claim_key=?').bind(key).run();
+			return realBatch(statements);
+		});
+		await deliver(task, [recipient]);
+		expect(attempts).toBeGreaterThanOrEqual(3);
+		expect(await receipts(task)).toMatchObject([{ state: 'DELIVERED' }]);
+		expect(await inbox(recipient)).toHaveLength(1);
+	}));
+
+	it('leaves a full recipient untouched if another lease takes over before the write', () => withFixture(async f => {
+		const sender = await mailbox(f, 'sender'), recipient = await mailbox(f, 'recipient');
+		const task = await sendTask(f, sender);
+		f.quotas.get(recipient.userId).maxStorageBytes = 1;
+		const realBatch = db.batch.bind(db);
+		vi.spyOn(db, 'batch').mockImplementationOnce(async statements => {
+			await db.prepare('UPDATE mail_outbound_task SET lease_token=? WHERE task_id=?')
+				.bind(crypto.randomUUID(), task.taskId).run();
+			return realBatch(statements);
+		});
+		await expect(deliver(task, [recipient])).rejects.toThrow();
+		expect(await receipts(task)).toEqual([]);
+		expect(await inbox(recipient)).toEqual([]);
+	}));
+
+	it('uses the immediate dispatch identity only for the same owner in a single attachment-free delivery', () => withFixture(async f => {
+		const sender = await mailbox(f, 'sender');
+		const other = await mailbox(f, 'other');
+		const read = storageQuotaService.selectMailPolicyIdentity;
+		const identity = await read(c, sender.userId);
+		for (const [addresses, attachmentCount, expectedOwners] of [
+			[[sender], 0, []], [[other], 0, [other.userId]],
+			[[sender, other], 0, [sender.userId, other.userId]], [[sender], 1, [sender.userId]]
+		]) {
+			const task = await sendTask(f, sender);
+			const files = await attachments(f, task, attachmentCount);
+			read.mockClear();
+			await deliverLocalMail(c, addresses.map(item => item.address), task.sender, files, { ...task, dispatchIdentity: identity });
+			expect(read.mock.calls.map(([, id]) => id)).toEqual(expectedOwners);
+		}
+	}));
+
+	it('retries a catch-all delivery when the address acquires an owner before publication', () => withFixture(async f => {
+		const sender = await mailbox(f, 'sender');
+		const recipient = await mailbox(f, 'newowner');
+		const task = await sendTask(f, sender);
+		f.settings.noRecipient = settingConst.noRecipient.OPEN;
+		await db.prepare('DELETE FROM account WHERE account_id=?').bind(recipient.accountId).run();
+		const realBatch = db.batch.bind(db);
+		vi.spyOn(db, 'batch').mockImplementationOnce(async statements => {
+			await db.prepare('INSERT INTO account(account_id,user_id,email) VALUES (?,?,?)')
+				.bind(recipient.accountId, recipient.userId, recipient.address).run();
+			return realBatch(statements);
+		});
+		await expect(deliver(task, [recipient])).rejects.toThrow();
+		await expectPending(task, [recipient]);
+		expect(await db.prepare('SELECT email_id FROM email WHERE user_id=0 AND to_email=?').bind(recipient.normalized).first()).toBeNull();
+		await retryWithNewLease(task);
+		await deliver(task, [recipient]);
+		expect(await inbox(recipient)).toHaveLength(1);
+	}));
+
+	it('retains a catch-all message when the address remains unassigned at publication', () => withFixture(async f => {
+		const sender = await mailbox(f, 'sender');
+		const task = await sendTask(f, sender);
+		const address = `unassigned-${f.id}@${DOMAIN}`;
+		f.settings.noRecipient = settingConst.noRecipient.OPEN;
+		try {
+			await deliver(task, [address]);
+			const [receipt] = await receipts(task);
+			expect(receipt).toMatchObject({ recipient: address, state: 'DELIVERED' });
+			expect(await db.prepare('SELECT user_id,account_id,status FROM email WHERE email_id=?').bind(receipt.email_id).first())
+				.toEqual({ user_id: 0, account_id: 0, status: emailConst.status.NOONE });
+		} finally {
+			await db.prepare('DELETE FROM email WHERE user_id=0 AND to_email=?').bind(address).run();
+		}
+	}));
+
 	it.each(['bytes', 'count'])('admits only one concurrent delivery to the last %s slot using the real D1 guard', dimension => withFixture(async f => {
 		const sender = await mailbox(f, 'sender');
 		const recipient = await mailbox(f, 'recipient');
@@ -535,14 +686,15 @@ describe('deliverLocalMail with real D1 transactions and local-only object stora
 			expect(r2Service.putObj).not.toHaveBeenCalled();
 		}));
 
-	it.each(['status', 'is_del'])('rolls back when account.%s changes after its lookup but before publication', column => withFixture(async f => {
+	it.each(['status', 'is_del', 'email'])('rolls back when account.%s changes after its lookup but before publication', column => withFixture(async f => {
 		const sender = await mailbox(f, 'sender');
 		const recipient = await mailbox(f, 'recipient');
 		const task = await sendTask(f, sender);
 		const source = await attachments(f, task, 1);
 		const realBatch = db.batch.bind(db);
 		vi.spyOn(db, 'batch').mockImplementationOnce(async statements => {
-			await db.prepare(`UPDATE account SET ${column}=1 WHERE account_id=?`).bind(recipient.accountId).run();
+			await db.prepare(`UPDATE account SET ${column}=? WHERE account_id=?`)
+				.bind(column === 'email' ? `renamed-${f.id}@${DOMAIN}` : 1, recipient.accountId).run();
 			return realBatch(statements);
 		});
 		await expect(deliver(task, [recipient], source)).rejects.toThrow();
@@ -570,14 +722,15 @@ describe('deliverLocalMail with real D1 transactions and local-only object stora
 		await retryWithNewLease(task);
 		r2Service.getObj.mockClear().mockRejectedValue(new Error('A replay must not read source objects'));
 		userService.getUserQuota.mockClear().mockRejectedValue(new Error('A replay must not recompute recipient quota'));
-		userService.selectByIdIncludeDel.mockClear().mockRejectedValue(new Error('A replay must use its existing receipt'));
+		storageQuotaService.selectMailPolicyIdentity.mockClear().mockRejectedValue(new Error('A replay must use its existing receipt'));
 		await deliver(task, [recipient.address.toUpperCase(), recipient.normalized], source);
 		expect(await receipts(task)).toEqual(savedReceipts);
 		expect(await inbox(recipient)).toEqual(before);
 		expect(await attachmentRows(before[0].email_id)).toEqual(metadata);
 		expect(r2Service.getObj).not.toHaveBeenCalled();
 		expect(userService.getUserQuota).not.toHaveBeenCalled();
-		expect(userService.selectByIdIncludeDel).not.toHaveBeenCalled();
+		expect(storageQuotaService.selectMailPolicyIdentity).not.toHaveBeenCalled();
+		expect(await taskRow(task)).toMatchObject({ counted_day: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), counted_recipients: 1 });
 		await expectFinished(task);
 	}));
 
