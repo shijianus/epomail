@@ -3,6 +3,8 @@
  * Pure Web Crypto implementation without external dependencies for Cloudflare Workers.
  */
 
+import safeLogger from './safe-logger.js';
+
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -290,7 +292,7 @@ const totpUtils = {
 			);
 			return decoder.decode(decryptedBuffer);
 		} catch (err) {
-			console.error('Failed to decrypt TOTP secret:', err);
+			safeLogger.error('totp_decrypt_failed', { error: err });
 			return '';
 		}
 	},

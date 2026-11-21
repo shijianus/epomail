@@ -42,8 +42,8 @@ export function userDeleteAccount(accountId) {
     return http.delete('/user/deleteAccount', {params:{accountId}})
 }
 
-export function userResetTotp(userId) {
-    return http.post('/user/resetTotp', { userId })
+export function userResetTotp(userId, operatorPassword = '') {
+    return http.post('/user/resetTotp', { userId, operatorPassword })
 }
 
 export function userPurgeEmails(userId) {

@@ -1,23 +1,25 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert';
 
 (async () => {
   console.log('=== 开始 Playwright 真实生产环境视觉与尺寸严格审计 ===');
-  const browser = await chromium.launch({ headless: true, args: ['--lang=zh-CN'] });
+  const browser = await launchIsolatedChromium(chromium, { headless: true, args: ['--lang=zh-CN'] });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: 'zh-CN'
   });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || 'https://epomail.epocanvas.workers.dev';
+  const BASE = legacyOrigin;
 
   console.log('1. 登录 Admin 账号...');
   const loginRes = await page.request.post(BASE + '/api/login', {
-    data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+    data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
     headers: { 'Content-Type': 'application/json' }
   });
   const loginData = await loginRes.json();
-  assert.strictEqual(loginData.code, 200, '登录失败: ' + JSON.stringify(loginData));
+  assert.strictEqual(loginData.code, 200, '登录失败: ' + Number(loginData?.code));
   const token = typeof loginData.data === 'string' ? loginData.data : loginData.data?.token;
 
   await page.goto(BASE + '/inbox', { waitUntil: 'domcontentloaded' });
@@ -93,7 +95,7 @@ import assert from 'node:assert';
 
   // 严格断言 Mode 2 (中文固定宽度 210px，字体 12px)
   assert.strictEqual(metricsMode2.isTruncated, false, 'Mode 2 文字绝不允许被截断！');
-  assert.ok(metricsMode2.textContent.includes('加密邮件模式 (Level 3 [E2EE])'), `文本必须完整包含 '加密邮件模式 (Level 3 [E2EE])'`);
+  assert.ok(metricsMode2.textContent.includes('加密邮件模式 (Level 3)'), `文本必须完整包含 '加密邮件模式 (Level 3)'`);
   assert.strictEqual(metricsMode2.selectWidth, 210, `中文环境下宽度必须严格固定为 210px，当前: ${metricsMode2.selectWidth}px`);
   assert.strictEqual(metricsMode2.fontSize, '12px', `Mode 2 字体必须自适应微调为 12px，当前: ${metricsMode2.fontSize}`);
 

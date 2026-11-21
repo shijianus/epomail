@@ -1,6 +1,7 @@
 name = "epomail-dev"
 main = "src/index.js"
 compatibility_date = "2025-06-04"
+compatibility_flags = ["nodejs_als"]
 keep_vars = true
 
 [observability]
@@ -11,12 +12,14 @@ ip = "127.0.0.1"
 
 [[d1_databases]]
 binding = "db"
-database_name = "epomail"
-database_id = "542cbca1-fce5-41c5-93f2-c1d04fa919e8"
+database_name = "epomail-local-development"
+database_id = "00000000-0000-4000-8000-000000000001"
+remote = false
 
 [[kv_namespaces]]
 binding = "kv"
-id = "e708c64d291e42c3a03b896914d42575"
+id = "00000000000000000000000000000001"
+remote = false
 
 #[[r2_buckets]]
 #binding = "r2"
@@ -40,6 +43,11 @@ crons = ["0 0 * * *", "*/5 * * * *"]
 
 [vars]
 DEV = "true"
+ENVIRONMENT = "development"
+EMAIL_OUTBOUND_ENABLED = "false"
+OUTBOUND_WHITELIST_ENFORCE = "true"
+OUTBOUND_WHITELIST = ""
+ALLOW_URL_INIT = "false"
 ai_model = ""
 analysis_cache = false
 orm_log = false

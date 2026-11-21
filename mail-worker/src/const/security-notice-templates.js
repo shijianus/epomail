@@ -117,6 +117,9 @@ const COMMON_I18N = {
     deviceLabel: '设备与系统',
     browserLabel: '客户端',
     networkLabel: '网络服务商',
+    keyLabel: '通行密钥',
+    appLabel: '授权应用',
+    forwardLabel: '转发目标',
     detailLabel: '操作明细',
     actionBtnText: '前往安全中心管理账户',
     wasYouTitle: '如果是您本人执行的操作：',
@@ -129,10 +132,13 @@ const COMMON_I18N = {
     greeting: '{name}，您好：',
     timeLabel: '發生時間',
     ipLabel: 'IP 位址',
-    locationLabel: '登录地点',
+    locationLabel: '登入地點',
     deviceLabel: '裝置與系統',
     browserLabel: '用戶端',
     networkLabel: '網路服務商',
+    keyLabel: '通行金鑰',
+    appLabel: '授權應用程式',
+    forwardLabel: '轉寄目標',
     detailLabel: '操作細節',
     actionBtnText: '前往安全中心管理帳戶',
     wasYouTitle: '如果是您本人執行的操作：',
@@ -149,6 +155,9 @@ const COMMON_I18N = {
     deviceLabel: 'Device & OS',
     browserLabel: 'Browser',
     networkLabel: 'Network / ISP',
+    keyLabel: 'Passkey Name',
+    appLabel: 'Application',
+    forwardLabel: 'Forward Target',
     detailLabel: 'Details',
     actionBtnText: 'Manage Security Settings',
     wasYouTitle: 'If this was you:',
@@ -165,6 +174,9 @@ const COMMON_I18N = {
     deviceLabel: 'Dispositivo y SO',
     browserLabel: 'Navegador',
     networkLabel: 'Red / ISP',
+    keyLabel: 'Nombre de la clave de acceso',
+    appLabel: 'Aplicación',
+    forwardLabel: 'Destino del reenvío',
     detailLabel: 'Detalles',
     actionBtnText: 'Gestionar seguridad de la cuenta',
     wasYouTitle: 'Si fuiste tú:',
@@ -181,6 +193,9 @@ const COMMON_I18N = {
     deviceLabel: 'Appareil et système',
     browserLabel: 'Navigateur',
     networkLabel: 'Réseau / FAI',
+    keyLabel: 'Nom de la clé d’accès',
+    appLabel: 'Application',
+    forwardLabel: 'Adresse de transfert',
     detailLabel: 'Détails',
     actionBtnText: 'Gérer la sécurité du compte',
     wasYouTitle: 'S\'il s\'agissait de vous :',
@@ -197,6 +212,9 @@ const COMMON_I18N = {
     deviceLabel: 'Apparaat en OS',
     browserLabel: 'Browser',
     networkLabel: 'Netwerk / Provider',
+    keyLabel: 'Naam van de toegangssleutel',
+    appLabel: 'Toepassing',
+    forwardLabel: 'Doorstuuradres',
     detailLabel: 'Details',
     actionBtnText: 'Beveiligingsinstellingen beheren',
     wasYouTitle: 'Als u dit zelf was:',
@@ -1109,24 +1127,21 @@ export function renderSecurityNoticeEmail(firstArg, secondArg, thirdArg) {
     rows.push({ label: common.detailLabel, value: detail, isMono: false });
   }
   if (params.keyName) {
-    const keyLabel = normLang === 'zh-Hant' ? '通行金鑰' : (normLang === 'zh' ? '通行密钥' : 'Passkey Name');
-    rows.push({ label: keyLabel, value: params.keyName, isMono: false });
+    rows.push({ label: common.keyLabel, value: params.keyName, isMono: false });
   }
   if (params.appName) {
-    const appLabel = normLang === 'zh-Hant' ? '授權應用' : (normLang === 'zh' ? '授权应用' : 'Application');
-    rows.push({ label: appLabel, value: params.appName, isMono: false });
+    rows.push({ label: common.appLabel, value: params.appName, isMono: false });
   }
   if (params.forwardTarget) {
-    const fwdLabel = normLang === 'zh-Hant' ? '轉發目標' : (normLang === 'zh' ? '转发目标' : 'Forward Target');
-    rows.push({ label: fwdLabel, value: params.forwardTarget, isMono: false });
+    rows.push({ label: common.forwardLabel, value: params.forwardTarget, isMono: false });
   }
 
   const rowsHtml = rows.map((r, idx) => `
     <tr style="border-bottom: ${idx === rows.length - 1 ? 'none' : '1px solid #f1f5f9'};">
-      <td style="padding: 10px 16px; font-size: 13px; color: #64748b; font-weight: 500; width: 120px; white-space: nowrap; vertical-align: middle;">
+      <td style="padding: 8px; font-size: 14px; color: #64748b; font-weight: 500; width: 36%; overflow-wrap: anywhere; vertical-align: middle;">
         ${r.label}
       </td>
-      <td style="padding: 10px 16px; font-size: 13px; color: #0f172a; font-weight: 500; word-break: break-all; vertical-align: middle;${r.isMono ? ' font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;' : ''}">
+      <td style="padding: 8px; font-size: 14px; color: #0f172a; font-weight: 500; overflow-wrap: anywhere; vertical-align: middle;${r.isMono ? ' font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px;' : ''}">
         ${escapeHtml(r.value)}
       </td>
     </tr>
@@ -1142,33 +1157,33 @@ export function renderSecurityNoticeEmail(firstArg, secondArg, thirdArg) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(eventTexts.subject)}</title>
 </head>
-<body style="margin: 0; padding: 28px 12px; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #0f172a;">
-  <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);">
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #0f172a;">
+  <div style="max-width: 580px; margin: 0 auto; overflow-wrap: anywhere; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);">
     
     <!-- Clean Minimalist Header -->
-    <div style="padding: 24px 32px 18px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between;">
+    <div style="padding: 18px 16px; border-bottom: 1px solid #f1f5f9; display: block; overflow-wrap: anywhere;">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <div style="width: 32px; height: 32px; border-radius: 8px; background: ${levelConfig.primaryColor}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <div style="width: 32px; height: 32px; border-radius: 8px; background-color: ${levelConfig.primaryColor}; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
         </div>
         <div>
           <div style="font-size: 15px; font-weight: 700; color: #0f172a; line-height: 1.2; letter-spacing: -0.01em;">
-            Epocanvas Mail <span style="font-size: 13px; font-weight: 500; color: #64748b;">官方安全中心</span>
+            Epocanvas Mail <span style="font-size: 14px; font-weight: 500; color: #64748b;">官方安全中心</span>
           </div>
-          <div style="font-size: 11px; color: #94a3b8; line-height: 1.2; margin-top: 2px;">
+          <div style="font-size: 13px; color: #475569; line-height: 1.2; margin-top: 2px;">
             Security Team &middot; announcement@epocanvas.com
           </div>
         </div>
       </div>
-      <div style="font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; background: ${levelConfig.badgeBg}; color: ${levelConfig.primaryColor}; border: 1px solid ${levelConfig.badgeBorder};">
+      <div style="display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; background-color: ${levelConfig.badgeBg}; color: ${levelConfig.badgeColor}; border: 1px solid ${levelConfig.badgeBorder};">
         ${eventTexts.badge}
       </div>
     </div>
 
     <!-- Main Body Container -->
-    <div style="padding: 28px 32px;">
+    <div style="padding: 20px 16px;">
       
       <!-- Headline -->
       <h1 style="margin: 0 0 16px; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.015em; line-height: 1.35;">
@@ -1184,8 +1199,8 @@ export function renderSecurityNoticeEmail(firstArg, secondArg, thirdArg) {
       </p>
 
       <!-- Operation Metadata Card -->
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin: 0 0 22px;">
-        <table role="presentation" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin: 0 0 22px;">
+        <table role="presentation" style="width: 100%; table-layout: fixed; border-collapse: collapse; text-align: left; font-size: 14px;">
           <tbody>
             ${rowsHtml}
           </tbody>
@@ -1193,23 +1208,23 @@ export function renderSecurityNoticeEmail(firstArg, secondArg, thirdArg) {
       </div>
 
       <!-- Humanized Decision Guidance -->
-      <div style="margin: 0 0 24px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="margin: 0 0 24px; display: block;">
         <!-- Legitimate Operation -->
-        <div style="background: #f0fdf4; border: 1px solid #dcfce7; border-radius: 8px; padding: 12px 16px;">
-          <div style="font-size: 13px; font-weight: 600; color: #166534; margin-bottom: 2px;">
+        <div style="background-color: #f0fdf4; border: 1px solid #dcfce7; border-radius: 8px; padding: 12px 16px;">
+          <div style="font-size: 14px; font-weight: 600; color: #166534; margin-bottom: 2px;">
             ✓ ${escapeHtml(common.wasYouTitle)}
           </div>
-          <div style="font-size: 12.5px; color: #15803d; line-height: 1.55;">
+          <div style="font-size: 14px; color: #15803d; line-height: 1.55;">
             ${escapeHtml(common.wasYouDesc)}
           </div>
         </div>
 
         <!-- Suspicious / Unauthorized Operation -->
-        <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 12px 16px;">
-          <div style="font-size: 13px; font-weight: 600; color: #9a3412; margin-bottom: 2px;">
+        <div style="margin-top: 10px; background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 12px 16px;">
+          <div style="font-size: 14px; font-weight: 600; color: #9a3412; margin-bottom: 2px;">
             ⚠️ ${escapeHtml(common.wasNotYouTitle)}
           </div>
-          <div style="font-size: 12.5px; color: #c2410c; line-height: 1.55;">
+          <div style="font-size: 14px; color: #c2410c; line-height: 1.55;">
             ${escapeHtml(common.wasNotYouDesc)}
           </div>
         </div>
@@ -1217,17 +1232,17 @@ export function renderSecurityNoticeEmail(firstArg, secondArg, thirdArg) {
 
       <!-- Action Button -->
       <div style="margin: 24px 0 28px; text-align: left;">
-        <a href="${actionUrl}" style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; font-size: 13.5px; font-weight: 500; padding: 10px 22px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);">
+        <a href="${actionUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 500; padding: 10px 22px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);">
           ${escapeHtml(common.actionBtnText)} &rarr;
         </a>
       </div>
 
       <!-- Divider -->
       <div style="border-top: 1px solid #f1f5f9; padding-top: 18px;">
-        <p style="margin: 0 0 6px; font-size: 11.5px; color: #94a3b8; line-height: 1.6;">
+        <p style="margin: 0 0 6px; font-size: 13px; color: #475569; line-height: 1.6;">
           ${escapeHtml(common.officialFooter)}
         </p>
-        <p style="margin: 0; font-size: 11px; color: #cbd5e1;">
+        <p style="margin: 0; font-size: 13px; color: #475569;">
           &copy; 2026 EpoCanvas Mail &middot; Security &amp; Privacy Operations
         </p>
       </div>
@@ -1242,13 +1257,8 @@ ${greeting}
 
 ${eventTexts.summary}
 
-[${common.timeLabel}]: ${timeStr}
-[${common.ipLabel}]: ${ip}
-[${common.locationLabel}]: ${location}
-[${common.deviceLabel}]: ${device}
-${browser ? `[${common.browserLabel}]: ${browser}
-` : ''}${network ? `[${common.networkLabel}]: ${network}
-` : ''}
+${rows.map(row => `[${row.label}]: ${row.value}`).join('\n')}
+
 ${common.wasYouTitle} ${common.wasYouDesc}
 ${common.wasNotYouTitle} ${common.wasNotYouDesc}
 

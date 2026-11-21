@@ -35,7 +35,7 @@
                       @change="change"
                       style="min-width: 125px; width: auto;"
                       v-model="setting.autoRefresh"
-                      placeholder="Select"
+                      :placeholder="$t('select')"
                   >
                     <el-option
                         v-for="item in authRefreshOptions"
@@ -254,7 +254,7 @@
     <el-drawer
         v-model="drawerVisible"
         direction="rtl"
-        size="450px"
+        size="min(450px, 100vw)"
         :before-close="handleDrawerClose"
         class="unified-drawer"
     >
@@ -348,7 +348,7 @@
     <!-- Email Settings: resend token form -->
     <el-dialog v-model="resendTokenFormShow" :title="$t('resendToken')" width="340" @closed="cleanResendTokenForm">
       <form>
-        <el-select style="margin-bottom: 15px" v-model="resendTokenForm.domain" placeholder="Select">
+        <el-select style="margin-bottom: 15px" v-model="resendTokenForm.domain" :placeholder="$t('select')">
           <el-option
               v-for="item in settingStore.domainList"
               :key="item"
@@ -385,6 +385,7 @@ import { storeToRefs } from 'pinia'
 import { isDomain, isEmail } from '@/utils/verify-utils.js'
 import { getTextWidth } from '@/utils/text.js'
 import { useI18n } from 'vue-i18n'
+import { formatUiNumber } from '@/utils/ui-locale.js'
 
 const { t, locale } = useI18n()
 
@@ -401,11 +402,10 @@ const { settings: setting } = storeToRefs(settingStore)
 // ── Email Setting refs ────────────────────────────────────────────────
 const authRefreshOptions = computed(() => [
   { label: t('disable'), value: 0 },
-  { label: '3s', value: 3 },
-  { label: '5s', value: 5 },
-  { label: '10s', value: 10 },
-  { label: '15s', value: 15 },
-  { label: '20s', value: 20 },
+  ...[3, 5, 10, 15, 20].map(value => ({
+    label: formatUiNumber(value, locale.value, {style: 'unit', unit: 'second', unitDisplay: 'short'}),
+    value
+  }))
 ])
 
 const resendTokenFormShow = ref(false)
@@ -1002,11 +1002,11 @@ async function saveDrawer() {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(440px, 100%), 1fr));
   padding: 20px;
   gap: 20px;
   @media (max-width: 500px) {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   }
   @media (max-width: 1023px) {
     gap: 15px;
@@ -1050,7 +1050,7 @@ async function saveDrawer() {
 
 .setting-item {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   font-weight: normal;
 
@@ -1205,6 +1205,7 @@ form .el-button {
 
 .drawer-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-bottom: 12px;

@@ -1,16 +1,18 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 
 (async () => {
   console.log("=== 启动 Role Form Dialog 视觉与几何布局审计 ===");
-  const browser = await chromium.launch({ headless: true, args: ["--lang=zh-CN"] });
+  const browser = await launchIsolatedChromium(chromium, { headless: true, args: ["--lang=zh-CN"] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   try {
     // 1. 登录
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();

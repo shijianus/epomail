@@ -1,16 +1,18 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
-const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
-const ADMIN_EMAIL = "admin@epomail.bond";
-const ADMIN_PASS = "123456";
+const BASE = legacyOrigin;
+const ADMIN_EMAIL = legacyAdminEmail;
+const ADMIN_PASS = process.env.EPOMAIL_E2E_ADMIN_PASSWORD;
 
 async function run() {
   console.log("==========================================================================");
   console.log("=== 开始测试：多片并发负载均衡分片系统、长邮件零截断与图片OCR单独覆盖展示 ===");
   console.log("==========================================================================\n");
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 960 },
     locale: "zh-CN"
@@ -41,7 +43,7 @@ async function run() {
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, "登录失败: " + JSON.stringify(loginJson));
+    assert.strictEqual(loginJson.code, 200, "登录失败: " + Number(loginJson?.code));
     const token = typeof loginJson.data === "string" ? loginJson.data : loginJson.data?.token;
     assert.ok(token, "必须获取到有效 Token");
     console.log("  ✓ Admin 登录成功，Token 提取正常\n");
@@ -220,7 +222,7 @@ async function run() {
     await page.goto(BASE + "/login/", { waitUntil: "networkidle" });
     await page.evaluate(({ token, longEmailHtml }) => {
       localStorage.setItem("token", token);
-      localStorage.setItem("loginEmail", "admin@epomail.bond");
+      localStorage.setItem("loginEmail", legacyAdminEmail);
       localStorage.setItem("ui", JSON.stringify({ dark: true, locale: "zh" }));
       document.documentElement.classList.add("dark");
     }, { token, longEmailHtml });

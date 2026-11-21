@@ -70,7 +70,7 @@ async function runWorkerdRealIntegration() {
   assert.strictEqual(initRes.data, 'success');
   console.log('  ✓ 真实 workerd D1 数据库初始化成功');
 
-  // Step 2: 管理员登录 (admin@example.com / 123456)
+  // Step 2: 使用测试配置的管理员身份登录
   console.log('\n--- STEP 2: 管理员登录获取真实 Token ---');
   const adminLoginRes = await req('/api/login', {
     method: 'POST',

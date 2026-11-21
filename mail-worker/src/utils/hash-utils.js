@@ -6,12 +6,11 @@
 
 const encoder = new TextEncoder();
 
-function bufferToBase64Url(uint8) {
-  let binary = '';
-  for (let i = 0; i < uint8.byteLength; i++) {
-    binary += String.fromCharCode(uint8[i]);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const base64Options = { alphabet: 'base64url', omitPadding: true };
+function bufferToBase64Url(bytes) {
+  if (bytes.toBase64) return bytes.toBase64(base64Options);
+  // Both fields (3-byte salt or 15-byte token) encode without padding.
+  return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_');
 }
 
 function base64UrlToBuffer(str) {
@@ -41,6 +40,20 @@ async function getHmacKey(secret) {
   );
 }
 
+async function encodeWithKey(numId, userId, key, salt) {
+  const saltStr = bufferToBase64Url(salt);
+  const [mask, signature] = await Promise.all([
+    crypto.subtle.sign('HMAC', key, encoder.encode('mask:' + saltStr)),
+    crypto.subtle.sign('HMAC', key, encoder.encode(`${numId}:${userId}:${saltStr}`))
+  ]);
+
+  const token = new Uint8Array(15);
+  token.set(salt);
+  new DataView(token.buffer).setUint32(3, numId ^ new DataView(mask).getUint32(0));
+  token.set(new Uint8Array(signature, 0, 8), 7);
+  return bufferToBase64Url(token);
+}
+
 export const hashUtils = {
   /**
    * Encode an emailId into an opaque, URL-safe hash string
@@ -54,35 +67,21 @@ export const hashUtils = {
     if (!numId || isNaN(numId)) return '';
 
     const key = await getHmacKey(secret);
-    const salt = new Uint8Array(3);
-    crypto.getRandomValues(salt);
-    const saltStr = bufferToBase64Url(salt);
+    return encodeWithKey(numId, userId, key, crypto.getRandomValues(new Uint8Array(3)));
+  },
 
-    // 4-byte pseudo-random mask derived from HMAC(secret, 'mask:' + salt)
-    const maskSig = new Uint8Array(
-      await crypto.subtle.sign('HMAC', key, encoder.encode('mask:' + saltStr))
-    );
-    const mask = maskSig.subarray(0, 4);
-
-    const buf = new Uint8Array(15);
-    buf.set(salt, 0); // bytes 0..2: salt
-
-    const rawIdBytes = new Uint8Array(4);
-    new DataView(rawIdBytes.buffer).setUint32(0, numId, false);
-    for (let i = 0; i < 4; i++) {
-      buf[3 + i] = rawIdBytes[i] ^ mask[i]; // bytes 3..6: masked emailId
+  async addEmailHashes(rows, secret, getUserId) {
+    if (!rows.length) return;
+    const key = await getHmacKey(secret);
+    // Bound the outstanding signatures and draw independent 24-bit salts in one call per batch.
+    for (let offset = 0; offset < rows.length; offset += 128) {
+      const page = rows.slice(offset, offset + 128);
+      const salts = crypto.getRandomValues(new Uint8Array(3 * page.length));
+      await Promise.all(page.map(async (row, index) => {
+        const id = Number(row.emailId);
+        row.hash = id ? await encodeWithKey(id, getUserId(row), key, salts.subarray(3 * index, 3 * index + 3)) : '';
+      }));
     }
-
-    // bytes 7..14: 8-byte HMAC signature covering (emailId, userId, salt)
-    const sigBuf = await crypto.subtle.sign(
-      'HMAC',
-      key,
-      encoder.encode(`${numId}:${userId}:${saltStr}`)
-    );
-    const sig = new Uint8Array(sigBuf).subarray(0, 8);
-    buf.set(sig, 7);
-
-    return bufferToBase64Url(buf);
   },
 
   /**
@@ -122,11 +121,11 @@ export const hashUtils = {
       );
       const expectedSig = new Uint8Array(expectedSigBuf).subarray(0, 8);
 
-      let valid = true;
+      let diff = 0;
       for (let i = 0; i < 8; i++) {
-        if (sig[i] !== expectedSig[i]) valid = false;
+        diff |= sig[i] ^ expectedSig[i];
       }
-      if (valid && emailId > 0) {
+      if (diff === 0 && emailId > 0) {
         return emailId;
       }
       return null;

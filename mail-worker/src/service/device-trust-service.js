@@ -1,4 +1,7 @@
 import KvConst from '../const/kv-const.js';
+import { getUserDb } from '../utils/db-accessor.js';
+import { deleteKvMatching } from '../utils/kv-revocation.js';
+import { timingSafeEqual } from '../utils/crypto-utils.js';
 
 /**
  * Autonomous Black-Box Device Attestation & Trust Transition Oracle
@@ -73,7 +76,10 @@ const deviceTrustService = {
 	/**
 	 * Issue a cryptographically sealed Trusted Device token
 	 */
-	async issueTrust(c, userId, deviceTag) {
+	async issueTrust(c, userId, deviceTag, expectedAuthVersion) {
+		const current = await getUserDb(c).prepare('SELECT auth_version FROM user WHERE user_id=? AND is_del=0 AND status=0').bind(userId).first();
+		if (!current || current.auth_version !== expectedAuthVersion) return null;
+		const authVersion = current.auth_version;
 		if (!userId) return null;
 		const secret = c.env?.jwt_secret;
 		if (!secret || typeof secret !== 'string' || !secret.trim()) {
@@ -88,7 +94,7 @@ const deviceTrustService = {
 		const nonceHex = Array.from(nonceBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
 		// Key for token signature & masking
-		const tokenKey = await getHmacKey(secret, 'device_token_v1');
+		const tokenKey = await getHmacKey(secret, 'device_token_v2');
 		const maskBytes = await hmacSha256(tokenKey, `mask:${nonceHex}`);
 		const maskUint = readUint32(maskBytes, 0);
 
@@ -96,18 +102,19 @@ const deviceTrustService = {
 		const maskedT0 = (nowSec ^ maskUint) >>> 0;
 
 		// Cryptographic signature
-		const sigData = `${userId}:${deviceHash}:${nowSec}:${nonceHex}`;
+		const sigData = `${userId}:${deviceHash}:${nowSec}:${nonceHex}:${authVersion}`;
 		const sigBytes = await hmacSha256(tokenKey, sigData);
 		const sigB64 = base64url(sigBytes.slice(0, 20));
 
 		const payloadObj = {
 			u: userId,
+			v: authVersion,
 			d: deviceHash,
 			m: maskedT0,
 			n: nonceHex
 		};
 		const payloadB64 = base64url(new TextEncoder().encode(JSON.stringify(payloadObj)));
-		const token = `epodt_v1.${payloadB64}.${sigB64}`;
+		const token = `epodt_v2.${payloadB64}.${sigB64}`;
 
 		// Persist in KV with 60-day horizon (HORIZON_OMEGA)
 		const kvKey = (KvConst.DEVICE_TRUST || 'dev_trust:') + `${deviceHash}:${userId}`;
@@ -115,6 +122,7 @@ const deviceTrustService = {
 			kvKey,
 			JSON.stringify({
 				userId,
+				authVersion,
 				deviceHash,
 				t0: nowSec,
 				createdAt: nowSec
@@ -143,7 +151,7 @@ const deviceTrustService = {
 			return { canBypass2FA: false, state: 0, reason: 'RISK_OVERRIDE_TAMPER' };
 		}
 
-		if (!clientToken || typeof clientToken !== 'string' || !clientToken.startsWith('epodt_v1.')) {
+		if (!clientToken || typeof clientToken !== 'string' || !clientToken.startsWith('epodt_v2.')) {
 			return { canBypass2FA: false, state: 0, reason: 'MISSING_OR_INVALID_TOKEN' };
 		}
 
@@ -165,6 +173,8 @@ const deviceTrustService = {
 			return { canBypass2FA: false, state: 0, reason: 'USER_MISMATCH' };
 		}
 
+		const current = await getUserDb(c).prepare('SELECT auth_version FROM user WHERE user_id=? AND is_del=0 AND status=0').bind(userId).first();
+		if (!current || payload.v !== current.auth_version) return {canBypass2FA:false,state:0,reason:'AUTH_VERSION_CHANGED'};
 		const deviceHash = await this.hashDevice(c, userId, deviceTag);
 		if (payload.d !== deviceHash) {
 			return { canBypass2FA: false, state: 0, reason: 'DEVICE_MISMATCH' };
@@ -174,24 +184,24 @@ const deviceTrustService = {
 		if (!secret || typeof secret !== 'string' || !secret.trim()) {
 			return { canBypass2FA: false, state: 0, reason: 'SECRET_NOT_CONFIGURED' };
 		}
-		const tokenKey = await getHmacKey(secret, 'device_token_v1');
+		const tokenKey = await getHmacKey(secret, 'device_token_v2');
 
 		// Unmask T0
 		const maskBytes = await hmacSha256(tokenKey, `mask:${payload.n}`);
 		const maskUint = readUint32(maskBytes, 0);
 		const t0 = (payload.m ^ maskUint) >>> 0;
 
-		// Verify signature
-		const expectedSigBytes = await hmacSha256(tokenKey, `${userId}:${deviceHash}:${t0}:${payload.n}`);
+		// Verify signature (timing-safe to prevent remote statistical side-channel)
+		const expectedSigBytes = await hmacSha256(tokenKey, `${userId}:${deviceHash}:${t0}:${payload.n}:${payload.v}`);
 		const expectedSigB64 = base64url(expectedSigBytes.slice(0, 20));
-		if (sigB64 !== expectedSigB64) {
+		if (!timingSafeEqual(sigB64, expectedSigB64)) {
 			return { canBypass2FA: false, state: 0, reason: 'SIGNATURE_MISMATCH' };
 		}
 
 		// Verify KV state (dual-layer defense against revocation)
 		const kvKey = (KvConst.DEVICE_TRUST || 'dev_trust:') + `${deviceHash}:${userId}`;
 		const kvData = await c.env.kv.get(kvKey, { type: 'json' });
-		if (!kvData || kvData.t0 !== t0) {
+		if (!kvData || kvData.t0 !== t0 || kvData.authVersion !== payload.v) {
 			return { canBypass2FA: false, state: 0, reason: 'REVOKED_OR_KV_EXPIRED' };
 		}
 
@@ -238,11 +248,15 @@ const deviceTrustService = {
 	 * Explicitly revoke trust for a specific device
 	 */
 	async revokeTrust(c, userId, deviceTag) {
-		try {
-			const deviceHash = await this.hashDevice(c, userId, deviceTag);
-			const kvKey = (KvConst.DEVICE_TRUST || 'dev_trust:') + `${deviceHash}:${userId}`;
-			await c.env.kv.delete(kvKey);
-		} catch (e) {}
+		const deviceHash = await this.hashDevice(c, userId, deviceTag);
+		const kvKey = (KvConst.DEVICE_TRUST || 'dev_trust:') + `${deviceHash}:${userId}`;
+		await c.env.kv.delete(kvKey);
+	},
+
+	/** The owner is the suffix, so enumerate all pages, not only the first 100. */
+	async revokeAllTrust(c, userId) {
+		return deleteKvMatching(c.env.kv, KvConst.DEVICE_TRUST, key =>
+			key.name.endsWith(`:${Number(userId)}`));
 	}
 };
 

@@ -40,6 +40,14 @@ const analysisService = {
 		await Promise.all(keys.map(key => this.refreshEchartsCacheByKey(c, key.name)));
 	},
 
+	async daySendTotal(c, day) {
+		// Older workers recorded their accepted sends in a short-lived daily KV key.
+		const [legacy, current] = await Promise.all([
+			c.env.kv.get(kvConst.SEND_DAY_COUNT + day), analysisDao.countedRecipients(c, day)
+		]);
+		return Number(legacy || 0) + current;
+	},
+
 	async queryEcharts(c, params) {
 
 		const { timeZone } = params;
@@ -67,8 +75,9 @@ const analysisService = {
 			receiveDayCountRaw,
 			sendDayCountRaw,
 			interceptDayCountRaw,
-			daySendTotalRaw,
-			hardInterceptTotalRaw,
+			daySendTotal,
+			legacyHardInterceptTotal,
+			durableHardIntercepts,
 			aiTotalRaw,
 			...aiDayRawList
 		] = await Promise.all([
@@ -87,8 +96,9 @@ const analysisService = {
 			analysisDao.sendDayCount(c, diffHours),
 			analysisDao.interceptDayCount(c, diffHours),
 
-			c.env.kv.get(kvConst.SEND_DAY_COUNT + dayjs().format('YYYY-MM-DD')),
+			this.daySendTotal(c, toUtc().format('YYYY-MM-DD')),
 			c.env.kv.get(kvConst.HARD_INTERCEPT_TOTAL),
+			analysisDao.hardIntercepts(c),
 			c.env.kv.get(kvConst.AI_TOTAL_USAGE, { type: 'json' }).catch(() => null),
 			...previousDays.map(day => c.env.kv.get(kvConst.AI_DAY_USAGE + day, { type: 'json' }).catch(() => null))
 		]);
@@ -98,8 +108,7 @@ const analysisService = {
 		const sendDayCount = this.filterEmptyDay(sendDayCountRaw, previousDays);
 		const interceptDayCount = this.filterEmptyDay(interceptDayCountRaw, previousDays);
 
-		const daySendTotal = daySendTotalRaw || 0;
-		const hardInterceptTotal = Number(hardInterceptTotalRaw || 0);
+		const hardInterceptTotal = Number(legacyHardInterceptTotal || 0) + durableHardIntercepts;
 
 		// AI 用量走势与模型分布
 		const aiDayCount = previousDays.map((day, idx) => {

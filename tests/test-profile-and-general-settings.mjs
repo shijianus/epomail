@@ -1,26 +1,28 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
 (async () => {
   console.log("=== 开始测试「个人 (Profile)」与「常规 (General)」全功能与 Gmail 视图体系 ===");
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ 
     viewport: { width: 1440, height: 900 },
     locale: "zh-CN"
   });
   const page = await context.newPage();
 
-  const BASE = "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   try {
     // 1. 登录
-    console.log("1. 正在登录 Cloudflare 生产环境...");
+    console.log("1. 正在登录 本地隔离环境...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "登录失败: " + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, "登录失败: " + Number(loginData?.code));
     const token = loginData.data?.token;
     console.log("✓ 登录成功");
 
@@ -75,7 +77,7 @@ import assert from "assert";
     assert.ok(profilePageText.includes("EpoCanvas 密码") || profilePageText.includes("密码"), "应包含EpoCanvas密码");
 
     // 验证电子邮件只读展示 (包含用户主邮箱且无修改按钮)
-    assert.ok(profilePageText.includes("admin@epomail.bond"), "电子邮箱应展示当前用户邮箱");
+    assert.ok(profilePageText.includes(legacyAdminEmail), "电子邮箱应展示当前用户邮箱");
     const emailItemText = await page.locator(".item:has-text('电子邮件')").innerText();
     assert.ok(!emailItemText.includes("只读不可修改"), "不应暴露多余冗余解释文本");
 

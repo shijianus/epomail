@@ -83,7 +83,7 @@ const existIds = new Set();
 useEmailPolling({
   routeName: 'user-all-email',
   tick: async () => {
-    if (!scroll.value.firstLoad) return
+    if (!scroll.value || scroll.value.firstLoad) return
     const latestId = scroll.value.latestEmail?.emailId
 
     const accountId = accountStore.currentAccountId

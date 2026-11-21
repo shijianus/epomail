@@ -6,6 +6,8 @@ import userContext from "../security/user-context";
 import { isAdminUser } from "../utils/admin-utils";
 import BizError from "../error/biz-error";
 import rateLimit from '../utils/rate-limit.js';
+import safeLogger from '../utils/safe-logger.js';
+import readJsonObject from '../utils/request-body.js';
 
 function redirectToLogin(c, params) {
 	const query = new URLSearchParams(params);
@@ -53,10 +55,17 @@ async function handleBindCallback(c, provider, params, stateRow) {
 	const origin = new URL(c.req.url).origin;
 
 	const finish = (outcome, claimToken = '') => {
+		// The mail app routes on the fragment (`/mail/u/N/#settings/security`).
+		// A bare `/settings/security#oauth_link=...` is rewritten by its custom
+		// history on first load, which drops both the path and the claim before
+		// the settings page can redeem it. Keep the claim inside the fragment
+		// so it is still never sent to a server.
+		const rawIndex = Number(stateRow?.intent?.accountIndex);
+		const accountIndex = Number.isInteger(rawIndex) && rawIndex >= 0 && rawIndex < 100 ? rawIndex : 0;
 		const query = new URLSearchParams({ oauth_bind: outcome });
 		if (stateRow.clientState) query.set('oauth_client_state', stateRow.clientState);
-		const fragment = claimToken ? `#oauth_link=${encodeURIComponent(claimToken)}` : '';
-		return c.redirect(`${origin}/settings/security?${query.toString()}${fragment}`);
+		if (claimToken) query.set('oauth_link', claimToken);
+		return c.redirect(`${origin}/mail/u/${accountIndex}/#settings/security?${query.toString()}`);
 	};
 
 	try {
@@ -69,17 +78,17 @@ async function handleBindCallback(c, provider, params, stateRow) {
 		}
 		return finish('conflict');
 	} catch (err) {
-		console.warn(`OAuth bind callback failed for ${provider}: ${err?.message || 'unknown error'}`);
+		safeLogger.warn('oauth_bind_callback_failed', { provider, error: err });
 		return finish('error');
 	}
 }
 
 async function handleOAuthCallback(c) {
-	const provider = c.req.param('provider');
+	const provider = (c.req.param('provider') || '').trim().toLowerCase();
 	try {
 		const params = await readCallbackParams(c);
 		if (params.error) {
-			console.warn(`OAuth provider ${provider} returned an authorization error`);
+			safeLogger.warn('oauth_provider_auth_error', { provider });
 			return redirectToLogin(c, { error: 'oauth_denied' });
 		}
 		if (!params.code && !params.id_token) {
@@ -92,7 +101,7 @@ async function handleOAuthCallback(c) {
 		try {
 			stateRow = await oauthService.consumeState(c, provider, params.state);
 		} catch (_) {
-			console.warn(`OAuth state rejected for provider ${provider}`);
+			safeLogger.warn('oauth_state_rejected', { provider });
 			return redirectToLogin(c, { error: 'oauth_state_invalid' });
 		}
 
@@ -102,11 +111,14 @@ async function handleOAuthCallback(c) {
 			return await handleBindCallback(c, provider, params, stateRow);
 		}
 
+		await oauthService.assertProviderEnabled(c, provider);
+
 		const loginInfo = await oauthService.exchangeCodeAndLogin(c, provider, {
 			code: params.code,
 			id_token: params.id_token,
 			redirectUri: stateRow.redirectUri,
-			nonce: stateRow.nonce
+			nonce: stateRow.nonce,
+			codeVerifier: stateRow.codeVerifier || ''
 		});
 
 		if (loginInfo.token || loginInfo.mfa) {
@@ -137,8 +149,9 @@ async function handleOAuthCallback(c) {
 		}
 		return c.redirect(`/login?${query.toString()}#oauth_bind=${bindProof}`);
 	} catch (err) {
-		console.warn(`OAuth callback failed for ${provider}: ${err?.message || 'unknown error'}`);
-		return redirectToLogin(c, { error: 'oauth_failed' });
+		safeLogger.warn('oauth_callback_failed', { provider, error: err });
+		const isPolicyDisabled = ['oauth_disabled', 'oauth_provider_disabled', 'oauth_provider_unconfigured'].includes(err?.errorCode);
+		return redirectToLogin(c, { error: isPolicyDisabled ? 'oauth_disabled' : 'oauth_failed' });
 	}
 }
 
@@ -149,8 +162,12 @@ app.get('/oauth/providers', async (c) => {
 });
 
 // Public: get OAuth authorization URL for a provider
-app.get('/oauth/authorize/:provider', async (c) => {
+app.get('/oauth/authorize/:provider', async (c, next) => {
 	const provider = c.req.param('provider');
+	if (provider === 'info') {
+		return next();
+	}
+	await rateLimit.check(c, { scope: 'oauth-authorize', limit: 60, windowSeconds: 900 });
 	const redirectUri = c.req.query('redirect_uri') || '';
 	const state = c.req.query('state') || '';
 	const url = await oauthService.getAuthorizeUrl(c, provider, redirectUri, state);
@@ -159,16 +176,43 @@ app.get('/oauth/authorize/:provider', async (c) => {
 
 // Public: direct login with OAuth authorization code or ID token
 app.post('/oauth/:provider/login', async (c) => {
-	const provider = c.req.param('provider');
-	const body = await c.req.json();
-	const loginInfo = await oauthService.exchangeCodeAndLogin(c, provider, body);
+	const provider = (c.req.param('provider') || '').trim().toLowerCase();
+	const body = await readJsonObject(c);
+	await oauthService.assertProviderEnabled(c, provider);
+
+	let loginParams = { ...body };
+	const hasIdentityToken = typeof body?.id_token === 'string' && body.id_token.trim().length > 0;
+	if ((body?.code || hasIdentityToken) && (!body.state || typeof body.state !== 'string')) {
+		// A client-supplied identity token is a bearer credential. Without the
+		// server-issued state (and its nonce binding) a stolen Apple/SSO token
+		// can be replayed directly against this endpoint.
+		throw new BizError('Missing OAuth state', 400, 'oauth_state_required');
+	}
+	if (body?.code) {
+		const stateRow = await oauthService.consumeState(c, provider, body.state);
+		loginParams = {
+			...body,
+			redirectUri: stateRow.redirectUri,
+			nonce: stateRow.nonce,
+			codeVerifier: stateRow.codeVerifier || ''
+		};
+	} else if (hasIdentityToken || body?.state) {
+		const stateRow = await oauthService.consumeState(c, provider, body.state);
+		loginParams = {
+			...body,
+			redirectUri: stateRow.redirectUri,
+			nonce: stateRow.nonce
+		};
+	}
+
+	const loginInfo = await oauthService.exchangeCodeAndLogin(c, provider, loginParams);
 	return c.json(result.ok(loginInfo));
 });
 
 // Public: exchange the short-lived callback code for the real mailbox token
 app.post('/oauth/exchange', async (c) => {
 	await rateLimit.check(c, { scope: 'oauth-exchange', limit: 60, windowSeconds: 900 });
-	const body = await c.req.json().catch(() => ({}));
+	const body = await readJsonObject(c);
 	const exchange = await oauthService.consumeLoginExchangeCode(c, body.code);
 	if (exchange.mfa) {
 		return c.json(result.ok({
@@ -182,27 +226,12 @@ app.post('/oauth/exchange', async (c) => {
 
 // Admin only: test / verify provider configuration and network reachability
 app.post('/oauth/verify/:provider', async (c) => {
-	let user = userContext.getUser(c);
-	if (!user) {
-		const jwt = c.req.header('token') || c.req.header('jwt');
-		if (jwt) {
-			const jwtUtils = (await import('../utils/jwt-utils.js')).default;
-			const decoded = await jwtUtils.verifyToken(c, jwt);
-			if (decoded?.userId) {
-				const KvConst = (await import('../const/kv-const.js')).default;
-				const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + decoded.userId, { type: 'json' });
-				if (authInfo?.user && authInfo.tokens?.includes(decoded.token)) {
-					user = authInfo.user;
-					c.set('user', user);
-				}
-			}
-		}
-	}
+	const user = userContext.getUser(c);
 	if (!user || !isAdminUser(c, user)) {
 		throw new BizError('Admin permission required to verify OAuth provider');
 	}
 	const provider = c.req.param('provider');
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const verifyResult = await oauthService.verifyProvider(c, provider, body);
 	return c.json(result.ok(verifyResult));
 });
@@ -213,12 +242,22 @@ app.post('/oauth/callback/:provider', handleOAuthCallback);
 
 // Backwards compatibility for LinuxDo
 app.post('/oauth/linuxDo/login', async (c) => {
-	const loginInfo = await oauthService.linuxDoLogin(c, await c.req.json());
+	const body = await readJsonObject(c);
+	await oauthService.assertProviderEnabled(c, 'linuxdo');
+	if (!body?.state || typeof body.state !== 'string') {
+		throw new BizError('Missing OAuth state', 400, 'oauth_state_required');
+	}
+	const stateRow = await oauthService.consumeState(c, 'linuxdo', body.state);
+	const loginInfo = await oauthService.linuxDoLogin(c, {
+		...body,
+		redirectUri: stateRow.redirectUri,
+		codeVerifier: stateRow.codeVerifier || ''
+	});
 	return c.json(result.ok(loginInfo));
 });
 
 // Bind user with email
 app.put('/oauth/bindUser', async (c) => {
-	const loginInfo = await oauthService.bindUser(c, await c.req.json());
+	const loginInfo = await oauthService.bindUser(c, await readJsonObject(c));
 	return c.json(result.ok(loginInfo));
 });

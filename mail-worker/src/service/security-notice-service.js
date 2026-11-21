@@ -164,7 +164,7 @@ const securityNoticeService = {
       }
       return null;
     } catch (err) {
-      console.error('[securityNoticeService] checkAndTriggerLoginEnvironmentNotice error:', err);
+      console.error('[securityNoticeService] Login environment notice failed');
       return null;
     }
   },
@@ -177,7 +177,7 @@ const securityNoticeService = {
 
     try {
       const userDb = c._mockOrm || orm(c);
-      const mailDb = c._mockOrm || (c.env?.mail_db ? mailOrm(c) : orm(c));
+      const mailDb = c._mockOrm || mailOrm(c);
 
       // 1. Fetch user record
       const userRow = await userDb.select().from(user).where(
@@ -267,7 +267,7 @@ const securityNoticeService = {
         createTime: now
       };
 
-      // Encrypt if user has E2E mailbox encryption active
+      // Apply the configured server-side encryption policy to stored notice fields
       let allMailMode = 1;
       try {
         const cachedSetting = await c.env?.kv?.get?.(KvConst.SETTING, { type: 'json' });
@@ -299,7 +299,7 @@ const securityNoticeService = {
         ...(inserted || {})
       };
     } catch (err) {
-      console.error('[securityNoticeService] sendNotice error:', err);
+      console.error('[securityNoticeService] Security notice delivery failed');
       return null;
     }
   }

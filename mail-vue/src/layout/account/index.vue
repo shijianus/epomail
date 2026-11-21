@@ -144,6 +144,7 @@ import {useUserStore} from "@/store/user.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
 import {AccountAllReceiveEnum} from "@/enums/account-enum.js";
+import { getCurrentLoginEmail, updateCurrentIdentity } from '@/utils/tab-session.js';
 
 const {t} = useI18n();
 const userStore = useUserStore();
@@ -341,7 +342,7 @@ function changeAccount(account) {
   accountStore.currentAccountId = account.accountId
   accountStore.currentAccount = account
   if (account.email) {
-    localStorage.setItem('loginEmail', account.email)
+    updateCurrentIdentity({ accountEmail: account.email });
     if (userStore.user) {
       userStore.user.account = account
       userStore.user.email = account.email
@@ -416,7 +417,7 @@ function getAccountList() {
       noLoading.value = true
     }
     if (accounts.length === 0 && list.length > 0) {
-      const storedLoginEmail = localStorage.getItem('loginEmail');
+      const storedLoginEmail = getCurrentLoginEmail();
       const matched = list.find(a => 
         (storedLoginEmail && a.email && a.email.toLowerCase() === storedLoginEmail.toLowerCase()) ||
         (accountStore.currentAccountId && a.accountId === accountStore.currentAccountId)

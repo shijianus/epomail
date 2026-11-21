@@ -5,12 +5,16 @@ import './style.css';
 import '@/icons/index.js';
 import { init } from '@/init/init.js';
 import { createPinia } from 'pinia';
-import piniaPersistedState from 'pinia-plugin-persistedstate';
+import { createPersistedState } from 'pinia-plugin-persistedstate';
 import 'element-plus/theme-chalk/dark/css-vars.css';
 import 'flag-icons/css/flag-icons.min.css';
 import 'nprogress/nprogress.css';
 import perm from "@/perm/perm.js";
-const pinia = createPinia().use(piniaPersistedState)
+import { installDeviceCleanupListener, createPrivateStorage } from '@/utils/device-privacy.js';
+import { tabSession } from '@/utils/tab-session.js';
+tabSession.bootstrap();
+installDeviceCleanupListener();
+const pinia = createPinia().use(createPersistedState({ storage: createPrivateStorage() }))
 import i18n from "@/i18n/index.js";
 const app = createApp(App).use(pinia)
 try {

@@ -3,19 +3,20 @@ import roleService from '../service/role-service';
 import userContext from '../security/user-context';
 import result from '../model/result';
 import permService from '../service/perm-service';
+import { readJsonObject } from '../utils/request-body.js';
 
 app.post('/role/add', async (c) => {
-	await roleService.add(c, await c.req.json(), userContext.getUserId(c));
+	await roleService.add(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/role/setDefault', async (c) => {
-	await roleService.setDefault(c, await c.req.json(), userContext.getUserId(c));
+	await roleService.setDefault(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/role/set', async (c) => {
-	const res = await roleService.setRole(c, await c.req.json(), userContext.getUserId(c));
+	const res = await roleService.setRole(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok(res));
 });
 

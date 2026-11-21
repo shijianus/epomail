@@ -1,8 +1,10 @@
+import { legacyOrigin, legacyUserEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = process.env.TARGET_URL || 'https://mail.epocanvas.com';
-const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
+const BASE = legacyOrigin;
+const USER_EMAIL = legacyUserEmail;
 const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
 let pass = 0, fail = 0;
@@ -21,9 +23,9 @@ function ok(cond, label) {
 
 async function run() {
   console.log('================================================================');
-  console.log('=== 公网生产全真端到端核验：Gmail级多账户前缀隔离与Hash防越权路由 ===');
+  console.log('=== 本地隔离全真端到端核验：Gmail级多账户前缀隔离与Hash防越权路由 ===');
   console.log('================================================================');
-  console.log(`[目标公网环境] 基地址: ${BASE}`);
+  console.log(`[目标隔离环境] 基地址: ${BASE}`);
 
   let browser;
 
@@ -36,12 +38,12 @@ async function run() {
       body: JSON.stringify({ email: USER_EMAIL, password: USER_PWD })
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, `登录必须成功: ${JSON.stringify(loginJson)}`);
+    assert.strictEqual(loginJson.code, 200, `登录必须成功: ${Number(loginJson?.code)}`);
     const token = loginJson.data?.token;
     ok(!!token, '公网线上 JWT Token 获取就绪');
 
     // 启动浏览器
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'

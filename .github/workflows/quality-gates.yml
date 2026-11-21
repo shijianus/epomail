@@ -12,11 +12,15 @@ on:
       - master
       - main
       - 'review/**'
+      - 'release/**'
+      - 'fix/**'
   pull_request:
     branches:
       - master
       - main
       - 'review/**'
+      - 'release/**'
+      - 'fix/**'
   workflow_dispatch:
 
 permissions:
@@ -34,10 +38,11 @@ env:
 jobs:
   diff-hygiene:
     name: Diff hygiene (whitespace & conflict markers)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
@@ -63,28 +68,33 @@ jobs:
 
   secret-scan:
     name: Secret scan (working tree)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Scan working tree
         run: node scripts/secret-scan.mjs
 
+      - name: Staged metadata and secret-file regression tests
+        run: node --test tests/check-staged-files.test.mjs tests/historical-credential-docs.test.mjs
+
   i18n:
     name: i18n gates (6-language dictionaries)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -100,20 +110,24 @@ jobs:
       - name: Login sub-app dictionary gate (symmetry / duplicates / missing / code refs)
         run: node scripts/i18n-auth-locale.mjs
 
+      - name: i18n gate regression tests (positive and negative fixtures)
+        run: node --test tests/test-i18n-gates.mjs
+
   login-ui:
     name: Login UI (typecheck + unit tests + build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
         with:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -121,6 +135,9 @@ jobs:
 
       - name: Install dependencies (frozen lockfile)
         run: pnpm --dir temp_login_ui install --frozen-lockfile
+
+      - name: Login UI dependency security audit
+        run: pnpm --dir temp_login_ui audit --registry=https://registry.npmjs.org --prod --audit-level=high
 
       - name: TypeScript typecheck (tsc --noEmit)
         run: pnpm --dir temp_login_ui run typecheck
@@ -132,7 +149,7 @@ jobs:
         run: pnpm --dir temp_login_ui run build
 
       - name: Upload built login bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: login-dist
           path: temp_login_ui/dist
@@ -142,26 +159,32 @@ jobs:
   login-ui-e2e:
     name: Login UI OAuth browser regression (Playwright, local only)
     needs: login-ui
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install Playwright runtime (frozen lockfile)
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Download built login bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
         with:
           name: login-dist
           path: temp_login_ui/dist
@@ -173,18 +196,19 @@ jobs:
 
   worker:
     name: Worker (full test suite + deploy dry-run)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
         with:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -193,30 +217,181 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: pnpm --dir mail-worker install --frozen-lockfile
 
+      - name: Worker dependency security audit
+        run: pnpm --dir mail-worker audit --registry=https://registry.npmjs.org --prod --audit-level=high
+
       - name: Worker test suite
         run: pnpm --dir mail-worker test
+
+      - name: JWT verification key rotation and request isolation
+        run: node --test tests/jwt-verification-key.test.mjs
+
+      - name: Isolated stack and bounded load-runner tests
+        run: node --test tests/helpers/local-stack.test.mjs tests/helpers/load-runner.test.mjs tests/legacy-test-safety.test.mjs tests/legacy-local-target.test.mjs
 
       # wrangler.toml 的 [build] 钩子会执行 scripts/build-prod.mjs（先 temp_login_ui 后 mail-vue），
       # 因此该步骤同时验证了真实部署路径的可构建性；dry-run 不连接 Cloudflare 账户、不上传任何产物。
       - name: Wrangler deploy dry-run
         working-directory: mail-worker
+        env:
+          EPOMAIL_FREEZE_MANIFEST: '1'
         run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-dry-run"
 
-  mail-vue-build:
-    name: mail-vue production build
-    needs: login-ui
-    runs-on: ubuntu-latest
+      - name: Install browser test dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Release preflight and evidence contract
+        run: |
+          node scripts/verify-production-readiness.mjs
+          node scripts/verify-staging-config.mjs --sandbox-outbound
+          node --test tests/verify-production-readiness.test.mjs tests/verify-staging-config.test.mjs tests/public-beta-gate.test.mjs tests/release-promotion.test.mjs tests/recovery-directory.test.mjs tests/candidate-package.test.mjs
+
+      - name: Freeze two independent builds and compare the release archives
+        shell: bash
+        env:
+          EPOMAIL_FREEZE_MANIFEST: '1'
+        run: |
+          node scripts/package-candidate.mjs "$RUNNER_TEMP/worker-dry-run" "$RUNNER_TEMP/frozen-release" "$GITHUB_SHA"
+          rebuild="$RUNNER_TEMP/epomail-independent-rebuild"
+          git worktree add --detach "$rebuild" "$GITHUB_SHA"
+          (
+            cd "$rebuild"
+            pnpm --dir mail-worker install --frozen-lockfile
+            (cd mail-worker && pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-rebuild")
+            node scripts/package-candidate.mjs "$RUNNER_TEMP/worker-rebuild" "$RUNNER_TEMP/rebuilt-release" "$GITHUB_SHA"
+          )
+          cmp "$RUNNER_TEMP/frozen-release/epomail-candidate.tar.gz" "$RUNNER_TEMP/rebuilt-release/epomail-candidate.tar.gz"
+
+      - name: Verify and dry-run the extracted staging candidate
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/frozen-release"
+          sha256sum -c epomail-candidate.tar.gz.sha256
+          extracted="$RUNNER_TEMP/extracted-candidate"
+          mkdir "$extracted"
+          tar -xzf epomail-candidate.tar.gz -C "$extracted"
+          test "$(cat "$extracted/SOURCE_SHA")" = "$GITHUB_SHA"
+          cd "$extracted"
+          node "$GITHUB_WORKSPACE/scripts/verify-staging-config.mjs" --config "$extracted/wrangler.toml" --sandbox-outbound
+          "$GITHUB_WORKSPACE/mail-worker/node_modules/.bin/wrangler" deploy --dry-run --env staging --no-bundle --config wrangler.toml --outdir "$RUNNER_TEMP/candidate-deploy"
+          cmp bundle/index.js "$RUNNER_TEMP/candidate-deploy/index.js"
+          echo "EPOMAIL_CANDIDATE_DIR=$extracted" >> "$GITHUB_ENV"
+
+      - name: Cold-start full-stack smoke (extracted candidate, local D1/KV)
+        run: node tests/fullstack-smoke.mjs
+
+      - name: Privacy full-stack regression (extracted candidate, local D1/KV)
+        run: node tests/privacy-fullstack.mjs
+
+      - name: Full-stack browser regression (extracted candidate)
+        run: |
+          node tests/fullstack-browser-e2e.mjs
+          node --test tests/compose-draft-browser.mjs
+          node --test tests/restricted-notice-browser.mjs
+          node tests/test-security-notices-browser.mjs
+          node tests/verify-public-global-dialog.mjs
+          node --test tests/helpers/legacy-browser.test.mjs
+
+      - name: Upload candidate package
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: epomail-candidate-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/frozen-release/epomail-candidate.tar.gz
+            ${{ runner.temp }}/frozen-release/epomail-candidate.tar.gz.sha256
+          retention-days: 14
+          if-no-files-found: error
+
+  backend-load:
+    name: Backend load and recovery (isolated local Worker)
+    needs: worker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      EXTENDED_BETA: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/fix/public-beta') }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
         with:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: mail-worker/pnpm-lock.yaml
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm --dir mail-worker install --frozen-lockfile
+
+      - name: Download candidate package
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: epomail-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate-package
+
+      - name: Verify candidate assets
+        id: verify_candidate
+        shell: bash
+        run: |
+          package="$RUNNER_TEMP/candidate-package"
+          (cd "$package" && sha256sum -c epomail-candidate.tar.gz.sha256)
+          tar -xzf "$package/epomail-candidate.tar.gz" -C "$package"
+          test "$(cat "$package/SOURCE_SHA")" = "$(git rev-parse HEAD)"
+          test -s "$package/bundle/index.js"
+          test -s "$package/dist/login/index.html"
+          echo "EPOMAIL_CANDIDATE_DIR=$package" >> "$GITHUB_ENV"
+
+      - name: Bounded local backend load and recovery
+        run: |
+          soak=3m
+          if [[ "$EXTENDED_BETA" == true ]]; then soak=15m; fi
+          node tests/backend-stress.mjs --profile=limited-beta --soak="$soak" --out=tests/artifacts/backend-stress.json
+
+      - name: Repeat capacity qualification twice on the verified archive
+        if: ${{ !cancelled() && steps.verify_candidate.outcome == 'success' && env.EXTENDED_BETA == 'true' }}
+        shell: bash
+        run: |
+          failed=0
+          for attempt in 1 2; do
+            node tests/backend-stress.mjs --profile=capacity --soak=1m --out="tests/artifacts/capacity-${attempt}.json" || failed=1
+          done
+          exit "$failed"
+
+      - name: Save backend verification evidence
+        if: always()
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: backend-stress-${{ github.sha }}
+          path: |
+            tests/artifacts/backend-stress.json
+            tests/artifacts/capacity-*.json
+          retention-days: 14
+          if-no-files-found: error
+
+  mail-vue-build:
+    name: mail-vue production build
+    needs: login-ui
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -224,7 +399,7 @@ jobs:
 
       # mail-vue 的 build 会调用 scripts/copy-login-dist.mjs，必须拿到 temp_login_ui 的产物
       - name: Download built login bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
         with:
           name: login-dist
           path: temp_login_ui/dist
@@ -232,5 +407,11 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: pnpm --dir mail-vue install --frozen-lockfile
 
+      - name: Vue frontend dependency security audit
+        run: pnpm --dir mail-vue audit --registry=https://registry.npmjs.org --prod --audit-level=high
+
       - name: Vite production build
         run: pnpm --dir mail-vue run build
+
+      - name: UI localization and public audit display regression tests
+        run: node --test tests/ui-localization.test.mjs tests/audit-visitor-display.test.mjs

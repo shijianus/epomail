@@ -487,69 +487,69 @@ export function buildScenarioNotificationPreview({ row, scenario, verdictMeta, c
   const recipient = row.email || '-';
   const cNo = caseNumber || row.ticketId || row.id || '-';
   const reasonCode = row.reasonCode || 'POLICY_VIOLATION';
-  const publicReason = `${row.reportCategory || t('auditCategorySecurity') || '安全风控'} [${reasonCode}]`;
+  const publicReason = `${row.reportCategory || t('auditCategorySecurity')} [${reasonCode}]`;
 
   let subject = '';
   let decisionSummary = '';
   let effectiveCondition = '';
   let affectedCapabilities = verdictMeta.capabilityDesc || '';
-  let appealPath = t('auditPreviewAppealPathSupported') || '可通过帮助中心与服务条款提交申诉';
-  let reachabilityNote = t('auditPreviewReachableNormal') || '账号处于正常通信状态，若接入内部通知用户可在收件箱查看（当前后端未接入自动发信）';
+  let appealPath = t('auditPreviewAppealPathSupported');
+  let reachabilityNote = t('auditPreviewReachableNormal');
 
   // 1. 首次违规裁决
   if (scenario === SCENARIO_TYPES.FIRST_ADJUDICATION) {
     if (verdictMeta.key === 'ban_account') {
-      subject = t('auditNoticeSubjectFirstBan', { caseId: cNo }) || `【系统通知】账号违规处置与使用限制说明 (${cNo})`;
-      decisionSummary = t('auditNoticeDecisionFirstBan', { email: recipient, reason: publicReason }) || `经安全合规研判，您的账号 (${recipient}) 违反平台服务规范（原因：${publicReason}），已被执行封禁管控措施。`;
-      effectiveCondition = t('auditPreviewEffectiveImmediate') || '裁决提交后即时生效';
-      reachabilityNote = t('auditPreviewReachableRejectGap') || '系统处置通道：裁决时同事务入库通知 Outbox 并直投内部信箱；受限用户可查阅通知并申诉';
+      subject = t('auditNoticeSubjectFirstBan', { caseId: cNo });
+      decisionSummary = t('auditNoticeDecisionFirstBan', { email: recipient, reason: publicReason });
+      effectiveCondition = t('auditPreviewEffectiveImmediate');
+      reachabilityNote = t('auditPreviewReachableRejectGap');
     } else if (verdictMeta.key === 'no_penalty') {
-      subject = t('auditNoticeSubjectDismiss', { caseId: cNo }) || `【系统通知】账号安全审查结案通知 (${cNo})`;
-      decisionSummary = t('auditNoticeDecisionDismiss', { email: recipient }) || `经安全研判复核，关于您的账号 (${recipient}) 的安全审查已结案，未发现实质违规，未对账号施加任何限制。`;
-      effectiveCondition = t('auditPreviewEffectiveImmediate') || '裁决提交后即时生效';
-      appealPath = t('auditNoticeAppealNoneNeeded') || '本案未施加任何限制，无需提交申诉';
+      subject = t('auditNoticeSubjectDismiss', { caseId: cNo });
+      decisionSummary = t('auditNoticeDecisionDismiss', { email: recipient });
+      effectiveCondition = t('auditPreviewEffectiveImmediate');
+      appealPath = t('auditNoticeAppealNoneNeeded');
     } else if (verdictMeta.key === 'blacklist_sender') {
-      subject = `【系统通知】外部发信地址拦截说明 (${cNo})`;
-      decisionSummary = `经核查，外部发信人 (${recipient}) 存在恶意内容或投递欺诈，已被列入系统全局黑名单。`;
-      effectiveCondition = '即时生效，边界丢弃';
-      reachabilityNote = '外部邮件已被系统拦截';
+      subject = t('auditNoticeSubjectBlacklist', { caseId: cNo });
+      decisionSummary = t('auditNoticeDecisionBlacklist', { email: recipient });
+      effectiveCondition = t('auditPreviewEffectiveBlacklist');
+      reachabilityNote = t('auditPreviewReachableExternalBlocked');
     } else if (verdictMeta.key === 'archive_routine') {
-      subject = `【系统通知】例行合规检查归档说明 (${cNo})`;
-      decisionSummary = `例行安全基线检查已完成，您的账号 (${recipient}) 符合安全基线规范，检查记录已归档。`;
-      effectiveCondition = '即时归档';
+      subject = t('auditNoticeSubjectArchive', { caseId: cNo });
+      decisionSummary = t('auditNoticeDecisionArchive', { email: recipient });
+      effectiveCondition = t('auditPreviewEffectiveArchive');
     }
   }
 
   // 2. 既有处置复核
   else if (scenario === SCENARIO_TYPES.SANCTION_REVIEW) {
     if (verdictMeta.key === 'maintain_ban') {
-      subject = t('auditNoticeSubjectMaintainBan', { caseId: cNo }) || `【系统通知】账号封禁处置复核维持说明 (${cNo})`;
-      decisionSummary = t('auditNoticeDecisionMaintainBan', { email: recipient }) || `经管理团队复核，您的账号 (${recipient}) 维持原封禁处置，继续阻断服务。`;
-      effectiveCondition = '复核确认，维持阻断';
-      reachabilityNote = t('auditPreviewReachableRejectGap') || '系统处置通道：裁决时同事务入库通知 Outbox 并直投内部信箱；受限用户可查阅通知并申诉';
+      subject = t('auditNoticeSubjectMaintainBan', { caseId: cNo });
+      decisionSummary = t('auditNoticeDecisionMaintainBan', { email: recipient });
+      effectiveCondition = t('auditPreviewEffectiveMaintainBan');
+      reachabilityNote = t('auditPreviewReachableRejectGap');
     } else if (verdictMeta.key === 'unban') {
-      subject = t('auditNoticeSubjectUnban', { caseId: cNo }) || `【系统通知】账号解除限制与恢复服务通知 (${cNo})`;
-      decisionSummary = t('auditNoticeDecisionUnban', { email: recipient }) || `经管理团队复核，关于您的账号 (${recipient}) 的封禁限制已解除，服务已恢复正常。`;
-      effectiveCondition = t('auditPreviewEffectiveImmediate') || '裁决提交后即时生效';
+      subject = t('auditNoticeSubjectUnban', { caseId: cNo });
+      decisionSummary = t('auditNoticeDecisionUnban', { email: recipient });
+      effectiveCondition = t('auditPreviewEffectiveImmediate');
     }
   }
 
   // 3. 用户申诉审核
   else if (scenario === SCENARIO_TYPES.APPEAL_AUDIT) {
     if (verdictMeta.key === 'approve_appeal') {
-      subject = t('auditPreviewSubjectApprove', { caseId: cNo }) || `【系统通知】申诉复核通过与服务恢复说明 (${cNo})`;
-      decisionSummary = t('auditNoticeDecisionApproveAppeal', { email: recipient, caseId: cNo }) || `您针对案件 (${cNo}) 提交的解封申诉已复核通过，您的账号 (${recipient}) 限制已解除，已恢复正常服务。`;
-      effectiveCondition = t('auditPreviewEffectiveImmediate') || '裁决提交后即时生效';
+      subject = t('auditPreviewSubjectApprove', { caseId: cNo });
+      decisionSummary = t('auditNoticeDecisionApproveAppeal', { email: recipient, caseId: cNo });
+      effectiveCondition = t('auditPreviewEffectiveImmediate');
     } else if (verdictMeta.key === 'reject_appeal') {
-      subject = t('auditNoticeSubjectRejectAppeal', { caseId: cNo }) || `【系统通知】申诉复核结论与驳回说明 (${cNo})`;
-      decisionSummary = t('auditNoticeDecisionRejectAppeal', { email: recipient, caseId: cNo }) || `您针对案件 (${cNo}) 提交的解封申诉经合规团队复核未予支持，维持原封禁决定。`;
-      effectiveCondition = '申诉驳回，维持原处置';
-      reachabilityNote = t('auditPreviewReachableRejectGap') || '系统处置通道：裁决时同事务入库通知 Outbox 并直投内部信箱；受限用户可查阅通知并申诉';
+      subject = t('auditNoticeSubjectRejectAppeal', { caseId: cNo });
+      decisionSummary = t('auditNoticeDecisionRejectAppeal', { email: recipient, caseId: cNo });
+      effectiveCondition = t('auditPreviewEffectiveRejectAppeal');
+      reachabilityNote = t('auditPreviewReachableRejectGap');
     }
   }
 
   return {
-    statusBadge: t('auditPreviewStatusNotConnected') || '通知模板预览（裁决时同事务写入 Outbox 自动投递）',
+    statusBadge: t('auditPreviewStatusNotConnected'),
     sender: 'Epocanvas Mail Security <system-security@epocanvas.com>',
     recipient,
     reachabilityNote,

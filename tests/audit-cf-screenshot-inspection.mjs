@@ -1,8 +1,10 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 
-const BASE = process.env.TARGET_URL || 'https://mail.epocanvas.com';
+const BASE = legacyOrigin;
 const SHOT_DIR = path.resolve('doc/validation/audit-cf');
 
 if (!fs.existsSync(SHOT_DIR)) {
@@ -11,7 +13,7 @@ if (!fs.existsSync(SHOT_DIR)) {
 
 async function run() {
   console.log('====================================================================');
-  console.log(`=== 启动 CF 生产环境实机截图审计: ${BASE} ===`);
+  console.log(`=== 启动 本地隔离环境实机截图审计: ${BASE} ===`);
   console.log('====================================================================\n');
 
   // 1. 获取登录凭据
@@ -19,18 +21,18 @@ async function run() {
   const loginRes = await fetch(`${BASE}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@epomail.cyou', password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') })
+    body: JSON.stringify({ email: legacyAdminEmail, password: (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') })
   });
   const loginJson = await loginRes.json();
   if (loginJson.code !== 200 || !loginJson.data?.token) {
-    throw new Error(`登录失败: ${JSON.stringify(loginJson)}`);
+    throw new Error(`登录失败: ${Number(loginJson?.code)}`);
   }
   const token = loginJson.data.token;
   console.log('  ✓ 登录成功，Token 获取成功\n');
 
   // 2. 启动浏览器
   console.log('[步骤 2] 启动 Chromium 并注入登录态...');
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: 'zh-CN'
@@ -38,8 +40,8 @@ async function run() {
 
   await context.addInitScript(({ t }) => {
     localStorage.setItem('token', t);
-    localStorage.setItem('user', JSON.stringify({ email: 'admin@epomail.cyou', role: 'admin' }));
-    localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'admin@epomail.cyou' }]));
+    localStorage.setItem('user', JSON.stringify({ email: legacyAdminEmail, role: 'admin' }));
+    localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyAdminEmail }]));
   }, { t: token });
 
   const page = await context.newPage();
@@ -53,7 +55,7 @@ async function run() {
         code: 200,
         data: {
           userId: 9,
-          email: 'admin@epomail.cyou',
+          email: legacyAdminEmail,
           name: '开源体验',
           permKeys: ['*'],
           role: { roleId: 6, roleCode: 'master', name: '站长' }
@@ -157,7 +159,7 @@ async function run() {
 
   await browser.close();
   console.log('====================================================================');
-  console.log('=== CF 生产环境 5 大视图实机截图全部完成！ ===');
+  console.log('=== 本地隔离环境 5 大视图实机截图全部完成！ ===');
   console.log('====================================================================\n');
 }
 

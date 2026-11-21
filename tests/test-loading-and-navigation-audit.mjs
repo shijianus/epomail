@@ -1,3 +1,5 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 /**
  * Production Playwright Audit: Loading Screen & Route Accessibility Verification
  * Ensures:
@@ -10,7 +12,7 @@
 
 import { chromium } from 'playwright';
 
-const BASE_URL = 'https://epomail.epocanvas.workers.dev';
+const BASE_URL = legacyOrigin;
 
 (async () => {
   console.log('================================================================');
@@ -18,7 +20,7 @@ const BASE_URL = 'https://epomail.epocanvas.workers.dev';
   console.log('目标环境:', BASE_URL);
   console.log('================================================================');
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -69,7 +71,7 @@ const BASE_URL = 'https://epomail.epocanvas.workers.dev';
   const submitBtn = page.locator('button[type="submit"]').first();
 
   await emailInput.waitFor({ state: 'visible', timeout: 5000 });
-  await emailInput.fill('admin@epomail.bond');
+  await emailInput.fill(legacyAdminEmail);
   await pwdInput.fill(process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
 
   console.log('提交登录表单...');

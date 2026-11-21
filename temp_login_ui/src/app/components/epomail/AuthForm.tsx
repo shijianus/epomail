@@ -24,6 +24,10 @@ import {
 import type { CanvasHandle } from "./CanvasBackground";
 import { cameraState } from "./cameraStore";
 import { createT, resolveAuthLang } from "../../i18n/authLocale";
+import { registrationErrorKey, registrationNoticeUrl } from "../../registration-legal";
+import { useRegistrationLegal } from "../../use-registration-legal";
+import { RegistrationNotice } from "./RegistrationNotice";
+import { persistLoginSession } from '../../session';
 import {
   buildOAuthBindPayload,
   classifyBindPolicyError,
@@ -560,21 +564,17 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   const bindFlowRef = useRef(false);
 
   const lang = useMemo(() => resolveAuthLang(), []);
-  const getAppealUrl = (targetEmail?: string) => {
-    let langCode = 'zh';
-    if (lang === 'zh-Hant') langCode = 'zh-tw';
-    else if (lang === 'en') langCode = 'en';
-    else if (lang === 'es') langCode = 'es';
-    else if (lang === 'fr') langCode = 'fr';
-    else if (lang === 'nl') langCode = 'nl';
-    const base = 'https://docs.epocanvas.com/epomail/appeal/';
-    const params = new URLSearchParams();
-    params.set('type', 'password');
-    params.set('lang', langCode);
-    if (targetEmail) params.set('email', targetEmail);
-    return `${base}?${params.toString()}`;
-  };
+  const appealUrl = useMemo(() => {
+    const docs = new URL(registrationNoticeUrl(sysConfig?.docsUrl) || 'https://docs.epocanvas.com/epomail');
+    docs.search = '';
+    docs.hash = '';
+    docs.pathname = docs.pathname.replace(/\/+$/, '') + '/appeal/';
+    docs.searchParams.set('type', 'password');
+    docs.searchParams.set('lang', lang === 'zh-Hant' ? 'zh-tw' : lang);
+    return docs;
+  }, [sysConfig?.docsUrl, lang]);
   const t = useMemo(() => createT(lang), [lang]);
+  const bindLegal = useRegistrationLegal(sysConfig, lang, stage === 'bind');
   const reduceMotion = !!useReducedMotion();
   // 主提交按钮的 hover 抬升反馈；reduced-motion 下只保留亮度变化，不做位移
   const submitHover = reduceMotion
@@ -640,31 +640,18 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     const storeSession = (oauthToken: string, uInfo: any) => {
       const activeEmail = uInfo.email || uInfo.name || 'oauth_user';
 
-      let sessions: any[] = [];
       try {
-        const raw = localStorage.getItem('epo_sessions');
-        if (raw) sessions = JSON.parse(raw) || [];
-      } catch (_) {}
-
-      const idx = sessions.findIndex(s => s.email === activeEmail);
-      if (idx >= 0) {
-        sessions[idx].token = oauthToken;
-        sessions[idx].name = uInfo.name || uInfo.nickname || activeEmail;
-      } else {
-        sessions.push({
-          u: sessions.length,
+        const identity = persistLoginSession({
           token: oauthToken,
           email: activeEmail,
-          name: uInfo.name || uInfo.nickname || activeEmail
+          userId: uInfo.userId || uInfo.user_id || null,
+          name: uInfo.name || uInfo.nickname || activeEmail,
         });
+        syncLangToMainApp();
+        return identity.u;
+      } catch (_) {
+        throw new Error('Unable to persist session');
       }
-
-      try {
-        localStorage.setItem('epo_sessions', JSON.stringify(sessions));
-        localStorage.setItem('token', oauthToken);
-        localStorage.setItem('loginEmail', activeEmail);
-      } catch (_) {}
-      syncLangToMainApp();
     };
 
     if (oauthCode) {
@@ -718,7 +705,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
           if (!userRes || userRes.code !== 200) {
             throw new Error('OAuth session lookup failed');
           }
-          storeSession(res.data.token, userRes.data || {});
+          const targetU = storeSession(res.data.token, userRes.data || {});
 
           setStatus("success");
           cameraState.authSuccessOpacity = 1;
@@ -727,7 +714,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
           canvasRef.current?.burst({ strength: 2.5, color: "cyan" });
 
           setTimeout(() => {
-            window.location.href = '/mail/u/0/#inbox';
+            window.location.href = `/mail/u/${targetU}/#inbox`;
           }, 600);
         })
         .catch(() => {
@@ -914,7 +901,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
       const isAddAccount = searchParams.get("action") === "addAccount" || searchParams.get("addAccount") === "true" || searchParams.get("addAccount") === "1";
       const urlEmail = searchParams.get("email");
-      const storedEmail = localStorage.getItem("loginEmail");
+      const storedEmail = sessionStorage.getItem('epomail_login_email');
       if (urlEmail) {
         setEmail(urlEmail);
       } else if (storedEmail && !isAddAccount) {
@@ -1160,57 +1147,19 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     const isAddAccount = searchParams.get("action") === "addAccount" || searchParams.get("addAccount") === "true" || searchParams.get("addAccount") === "1";
 
     let targetU = 0;
-    let sessions: Array<{ u: number; token: string; email: string; name?: string }> = [];
     try {
-      const raw = localStorage.getItem('epo_sessions');
-      if (raw) sessions = JSON.parse(raw);
-    } catch (_) {}
-
-    if (isAddAccount) {
-      const existingToken = localStorage.getItem('token');
-      const existingEmail = localStorage.getItem('loginEmail');
-      if (sessions.length === 0 && existingToken && existingEmail) {
-        sessions.push({ u: 0, token: existingToken, email: existingEmail });
-      }
-
-      const existingIdx = sessions.findIndex(s => s.email && s.email.toLowerCase() === activeEmail.toLowerCase());
-      if (existingIdx >= 0) {
-        sessions[existingIdx].token = token;
-        targetU = sessions[existingIdx].u;
-      } else {
-        const uParam = searchParams.get("u");
-        if (uParam !== null && !isNaN(parseInt(uParam, 10))) {
-          targetU = parseInt(uParam, 10);
-        } else {
-          const maxU = sessions.reduce((max, s) => Math.max(max, s.u), -1);
-          targetU = maxU + 1;
-        }
-        sessions.push({
-          u: targetU,
-          token: token,
-          email: activeEmail,
-          name: data.data?.name || data.data?.nickname || activeEmail
-        });
-      }
-    } else {
-      targetU = 0;
-      sessions = [{
-        u: 0,
-        token: token,
+      const identity = persistLoginSession({
+        token,
         email: activeEmail,
-        name: data.data?.name || data.data?.nickname || activeEmail
-      }];
-    }
-
-    try {
-      localStorage.setItem('epo_sessions', JSON.stringify(sessions));
-    } catch (_) {}
-
-    if (token) {
-      localStorage.setItem('token', token);
-    }
-    if (activeEmail) {
-      localStorage.setItem('loginEmail', activeEmail);
+        userId: data.data?.userId || data.data?.user_id || null,
+        name: data.data?.name || data.data?.nickname || activeEmail,
+        preferredSlot: isAddAccount ? Number(searchParams.get('u')) : 0,
+      });
+      targetU = identity.u;
+    } catch (_) {
+      setStatus('idle');
+      setErrorMsg(t('opFailed'));
+      return;
     }
 
     syncLangToMainApp();
@@ -1236,6 +1185,13 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     } else {
       canvasRef.current?.pulse({ strength: 2 });
       canvasRef.current?.burst({ strength: 2 });
+    }
+
+    const recoveredBackupCodes = Array.isArray(data.data?.backupCodes) ? data.data.backupCodes : [];
+    if (recoveredBackupCodes.length > 0) {
+      try {
+        window.alert(`${t('backupCodesRecovered')}\n\n${recoveredBackupCodes.join('\n')}`);
+      } catch (_) {}
     }
 
     setTimeout(() => {
@@ -1269,8 +1225,8 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   // Server policy rejections are mapped to the field that caused them, so the
   // user is taken straight to the value that needs correcting. The proof stays
   // valid for every rejection routed here.
-  const applyBindFailure = (rawMsg: string, fallbackKey: string) => {
-    const classified = classifyBindPolicyError(rawMsg);
+  const applyBindFailure = (rawMsg: string, fallbackKey: string, errorCode?: unknown) => {
+    const classified = classifyBindPolicyError(rawMsg, errorCode);
     const message = classified ? tr(classified.key) : tr(fallbackKey);
     cameraState.authErrorOpacity = 1;
 
@@ -1290,6 +1246,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
   };
 
   const handleBindRestart = () => {
+    bindLegal.reset();
     setBindContext(null);
     setBindCode('');
     setBindFieldError(null);
@@ -1314,6 +1271,13 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
     if (isRegisterClosed) {
       setErrorMsg(t('regClosedNotice'));
+      cameraState.authErrorOpacity = 1;
+      return;
+    }
+
+    const acceptance = bindLegal.payload;
+    if (!acceptance) {
+      setErrorMsg(t(bindLegal.policy.ready ? 'legalAcceptanceRequired' : 'legalRegistrationUnready'));
       cameraState.authErrorOpacity = 1;
       return;
     }
@@ -1349,8 +1313,8 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     try {
       const res = await fetch('/api/oauth/bindUser', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildOAuthBindPayload(bindContext, { email: cleanEmail, code: bindCode }))
+        headers: { 'Content-Type': 'application/json', 'Accept-Language': lang },
+        body: JSON.stringify(buildOAuthBindPayload(bindContext, { email: cleanEmail, code: bindCode }, acceptance))
       });
       data = await res.json().catch(() => null);
     } catch (_) {
@@ -1358,6 +1322,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
     }
 
     const outcome = classifyBindResponse(data);
+    const legalError = registrationErrorKey(data?.errorCode);
+    if (legalError && (outcome.kind === 'retry' || outcome.kind === 'restart')) {
+      bindLegal.handleError(data.errorCode);
+    }
 
     if (outcome.kind === 'restart') {
       setStatus('idle');
@@ -1367,9 +1335,11 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       setBindCode('');
       setBindFieldError(null);
       setStage('password');
-      const classified = classifyBindPolicyError(data?.message);
+      const classified = classifyBindPolicyError(data?.message, data?.errorCode);
       setErrorMsg(
-        outcome.reason === 'invalid_proof'
+        legalError
+          ? `${t(legalError)} ${tr('oauthBindExpired')}`
+          : outcome.reason === 'invalid_proof'
           ? tr('oauthBindExpired')
           : (classified ? tr(classified.key) : tr('oauthBindExpired'))
       );
@@ -1384,7 +1354,10 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       // Keep bindContext: the server rejected the request before spending the
       // proof, so the user can correct the invite code and resubmit. 425 means
       // an earlier submit is still running; the same proof remains valid.
-      if (outcome.reason === 'in_progress') {
+      if (legalError) {
+        setErrorMsg(t(legalError));
+        cameraState.authErrorOpacity = 1;
+      } else if (outcome.reason === 'in_progress') {
         setErrorMsg(tr('oauthBindInProgress'));
         cameraState.authErrorOpacity = 1;
         cameraState.shakeIntensity = 20;
@@ -1392,7 +1365,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
       } else if (outcome.reason === 'policy') {
         // Map the protocol key to its field; fall back to "check and retry"
         // without ever telling the user to restart a proof that is still valid.
-        applyBindFailure(data?.message, 'oauthBindRetry');
+        applyBindFailure(data?.message, 'oauthBindRetry', data?.errorCode);
       } else {
         setErrorMsg(tr('oauthBindRetry'));
         cameraState.authErrorOpacity = 1;
@@ -1860,12 +1833,12 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     <h3 className="text-base font-semibold text-white tracking-wide">
                       {tr('forgotPasswordModalTitle')}
                     </h3>
-                    <p className="text-[12px] text-cyan-300/80">epomail-docs</p>
+                    <p className="text-[12px] text-cyan-300/80">{appealUrl.hostname}</p>
                   </div>
                 </div>
 
                 <p className="text-[13px] leading-relaxed text-[#c7d2fe] mb-4">
-                  {tr('forgotPasswordModalDesc')}
+                  {t('forgotPasswordModalDesc')}
                 </p>
 
                 {email && (
@@ -1877,7 +1850,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
 
                 <div className="flex flex-col gap-2.5">
                   <a
-                    href={getAppealUrl(email)}
+                    href={appealUrl.href}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex h-11 w-full items-center justify-center gap-2 rounded-xl text-[14px] font-medium text-white transition-all duration-200 hover:brightness-110 cursor-pointer shadow-lg"
@@ -1887,7 +1860,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     }}
                     onClick={() => setShowForgotModal(false)}
                   >
-                    <span>{tr('forgotPasswordModalGo')}</span>
+                    <span>{t('forgotPasswordModalGo')}</span>
                     <ExternalLink size={15} />
                   </a>
 
@@ -2006,7 +1979,7 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                     {tr('stayInOrbit')}
                   </label>
                   <a
-                    href={getAppealUrl(email)}
+                    href={appealUrl.href}
                     onClick={(e) => {
                       e.preventDefault();
                       setShowForgotModal(true);
@@ -2274,15 +2247,17 @@ export function AuthForm({ canvasRef, onSwitch, sysConfig }: AuthFormProps) {
                 {tr('oauthBindPasswordNote')}
               </p>
 
+              <RegistrationNotice legal={bindLegal} lang={lang} disabled={status !== 'idle' || isRegisterClosed} />
+
               <p role="status" aria-live="polite" className="sr-only">
                 {status === 'warping' ? tr('bindSubmitting') : ''}
               </p>
 
               <motion.button
                 type="submit"
-                whileHover={isRegisterClosed ? undefined : submitHover}
-                whileTap={{ scale: isRegisterClosed ? 1 : 0.96 }}
-                disabled={status !== "idle" || isRegisterClosed}
+                whileHover={isRegisterClosed || !bindLegal.payload ? undefined : submitHover}
+                whileTap={{ scale: isRegisterClosed || !bindLegal.payload ? 1 : 0.96 }}
+                disabled={status !== "idle" || isRegisterClosed || !bindLegal.payload}
                 aria-busy={status === "warping"}
                 aria-describedby={isRegisterClosed ? 'epo-bind-closed' : undefined}
                 className="epomail-display relative mt-1 flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl text-[15px] tracking-wide text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67e8f9] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0e22] disabled:cursor-not-allowed disabled:opacity-60"

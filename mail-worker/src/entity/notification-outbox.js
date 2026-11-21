@@ -12,9 +12,14 @@ export const notificationOutbox = sqliteTable('notification_outbox', {
 	templateCode: text('template_code').notNull(),
 	subject: text('subject').notNull(),
 	content: text('content').notNull(),
+	textContent: text('text_content'),
 	reasonCode: text('reason_code'),
-	status: text('status').notNull().default('pending'), // 'pending' | 'delivered' | 'failed' | 'dead_letter'
+	status: text('status').notNull().default('pending'), // pending | processing | sent | delivered | unknown | failed | dead_letter | complained | cancelled
 	providerMessageId: text('provider_message_id'),
+	providerAttemptedAt: text('provider_attempted_at'), // immutable FIRST provider attempt; bounds key reuse
+	claimantId: text('claimant_id'),
+	leaseExpiresAt: text('lease_expires_at'),
+	leaseVersion: integer('lease_version').notNull().default(0),
 	retryCount: integer('retry_count').notNull().default(0),
 	maxRetries: integer('max_retries').notNull().default(5),
 	lastError: text('last_error'),

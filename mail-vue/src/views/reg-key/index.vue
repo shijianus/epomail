@@ -42,7 +42,7 @@
               </div>
               <div class="info-left-item">
                 <div>{{ $t('remainingUses') }}：</div>
-                <div v-if="item.count">{{ item.count }}</div>
+                <div v-if="item.count">{{ formatUiNumber(item.count, locale) }}</div>
                 <el-tag v-else type="danger">{{ $t('exhausted') }}</el-tag>
               </div>
               <div class="info-left-item">
@@ -120,7 +120,7 @@
       <el-table v-if="!historyLoading" :data="historyList" :fit="true" style="height: 100%">
         <el-table-column :min-width="emailColumnWidth" property="email" :label="$t('user')"
                          :show-overflow-tooltip="true"/>
-        <el-table-column :width="createTimeColumnWidth" :formatter="formatUserCreateTime" property="createTime"
+        <el-table-column :min-width="createTimeColumnWidth" :formatter="formatUserCreateTime" property="createTime"
                          :label="$t('date')" fixed="right" :show-overflow-tooltip="true"/>
       </el-table>
     </el-dialog>
@@ -137,8 +137,7 @@ import {roleSelectUse} from "@/request/role.js";
 import {useRoleStore} from "@/store/role.js";
 import {regKeyAdd, regKeyList, regKeyClearNotUse, regKeyDelete, regKeyHistory} from "@/request/reg-key.js";
 import {getTextWidth} from "@/utils/text.js";
-import dayjs from "dayjs";
-import {tzDayjs} from "@/utils/day.js";
+import {formatUiDate, formatUiNumber} from "@/utils/ui-locale.js";
 import {useI18n} from "vue-i18n";
 
 defineOptions({
@@ -152,7 +151,7 @@ const params = reactive({
   code: '',
 })
 
-const {t} = useI18n()
+const {t, locale} = useI18n()
 const regKeyData = reactive([])
 
 const isVisitor = computed(() => {
@@ -169,7 +168,7 @@ const regKeyFirst = ref(true)
 const showRegKeyHistory = ref(false)
 const historyList = reactive([])
 const emailColumnWidth = ref(0)
-const createTimeColumnWidth = ref(0)
+const createTimeColumnWidth = computed(() => Math.max(170, ...historyList.map(item => getTextWidth(formatRegistryDate(item.createTime, true)) + 24)))
 const historyLoading = ref(false)
 const isMobile = window.innerWidth < 1025
 
@@ -209,10 +208,6 @@ function openHistory(regKey) {
 
       emailColumnWidth.value = getTextWidth(email) + 30
       emailColumnWidth.value = emailColumnWidth.value < 300 ? emailColumnWidth.value : 300
-      const createTime = list.reduce((a, b) =>
-          compareByLengthAndUpperCase(a, b, 'createTime')
-      ).createTime;
-      createTimeColumnWidth.value = getTextWidth(createTime)
     }
 
   }).finally(() => {
@@ -230,37 +225,21 @@ const compareByLengthAndUpperCase = (a, b, key) => {
   return a[key].length > b[key].length ? a : b;
 };
 
+function formatRegistryDate(value, includeTime = false) {
+  return formatUiDate(value, locale.value, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    ...(includeTime ? { hour: '2-digit', minute: '2-digit' } : {})
+  });
+}
+
 function formatUserCreateTime(regKey) {
-  const createTime = tzDayjs(regKey.createTime);
-  const currentYear = dayjs().year();
-  const expireYear = createTime.year();
-
-  if (settingStore.lang === 'zh' || settingStore.lang === 'zh-Hant') {
-    return expireYear === currentYear
-      ? createTime.format('M月D日 HH:mm')
-      : createTime.format('YYYY年M月D日 HH:mm');
-  } else {
-    return expireYear === currentYear
-      ? createTime.format('MMM D, HH:mm')
-      : createTime.format('MMM D, YYYY HH:mm');
-  }
-
+  return formatRegistryDate(regKey.createTime, true);
 }
 
 function formatExpireTime(expireTime) {
-  const expireDate = tzDayjs(expireTime);
-  const currentYear = dayjs().year();
-  const expireYear = expireDate.year();
-
-  if (settingStore.lang === 'zh' || settingStore.lang === 'zh-Hant') {
-    return expireYear === currentYear
-        ? expireDate.format('M月D日')
-        : expireDate.format('YYYY年M月D日');
-  } else {
-    return expireYear === currentYear
-        ? expireDate.format('MMM D')
-        : expireDate.format('MMM D, YYYY');
-  }
+  return formatRegistryDate(expireTime);
 }
 
 function refresh() {
@@ -482,7 +461,7 @@ function openAdd() {
   .code-box {
     padding: 16px 2px 25px 2px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
     gap: 16px;
 
     .code-item {
@@ -509,6 +488,9 @@ function openAdd() {
 
           .info-left-item {
             display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            overflow-wrap: anywhere;
             padding-top: 5px;
 
             .code {
@@ -539,7 +521,9 @@ function openAdd() {
 
               .masked-tag {
                 font-size: 11px;
-                height: 20px;
+                height: auto;
+                min-height: 20px;
+                white-space: normal;
                 line-height: 18px;
                 padding: 0 6px;
                 border-radius: 4px;

@@ -17,7 +17,7 @@
         <span class="search-icon" @click="handleSearch" :title="$t('search') || 'Search'">
           <Icon icon="lucide:search" width="18" height="18"/>
         </span>
-        <input ref="searchInputRef" type="text" :placeholder="isSettingsMode && route.name !== 'all-email' ? (route.name === 'manage-audit' ? $t('auditSearchCasesPlaceholder') : (route.name === 'data-setting' ? $t('searchSettingsOrApps') : $t('searchSettings'))) : route.name === 'all-email' ? $t('searchAllMail') : $t('searchMail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
+        <input ref="searchInputRef" type="text" :placeholder="isSettingsMode && route.name !== 'manage-mail' ? (route.name === 'manage-audit' ? $t('auditSearchCasesPlaceholder') : (route.name === 'data-setting' ? $t('searchSettingsOrApps') : $t('searchSettings'))) : route.name === 'manage-mail' ? $t('searchAllMail') : $t('searchMail')" v-model="emailStore.searchKeyword" @input="handleSearchInput" @keyup.enter="handleSearch" @keydown.tab.prevent="handleTabComplete" @focus="searchFocus = true" @blur="onSearchBlur" />
         <span class="clear-icon" v-show="emailStore.searchKeyword" @mousedown.prevent @click.stop="clearSearch" :title="$t('clear')">
           <Icon icon="lucide:x" width="15" height="15"/>
         </span>
@@ -26,7 +26,7 @@
         </button>
         
         <!-- Dropdown for all-email syntax suggestions -->
-        <div v-if="route.name === 'all-email' && searchFocus && allEmailSuggestions.length > 0" class="settings-search-dropdown" style="padding: 4px 0;">
+        <div v-if="route.name === 'manage-mail' && searchFocus && allEmailSuggestions.length > 0" class="settings-search-dropdown" style="padding: 4px 0;">
            <div class="settings-search-item" v-for="(item) in allEmailSuggestions" :key="item.token" @mousedown.prevent="applySuggestion(item)" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
              <span><strong style="color:var(--el-color-primary)">$</strong>{{ item.display }}</span>
              <span style="color:var(--el-text-color-secondary); font-size:11px; white-space:nowrap;">{{ item.desc }}</span>
@@ -34,7 +34,7 @@
         </div>
 
         <!-- Dropdown for Settings Search -->
-        <div v-else-if="isSettingsMode && route.name !== 'all-email' && route.name !== 'manage-audit' && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
+        <div v-else-if="isSettingsMode && route.name !== 'manage-mail' && route.name !== 'manage-audit' && emailStore.searchKeyword.trim() && searchFocus" class="settings-search-dropdown">
            <div v-for="group in settingsSearchResults" :key="group.route" class="settings-search-group">
              <div class="settings-search-title">{{ group.title }}</div>
              <div class="settings-search-item" v-for="item in group.items" :key="item.text" @mousedown.prevent="goToSetting(group.route, item.id)">
@@ -98,8 +98,8 @@
             <!-- Standalone Storage Progress Bar right below profile row (Clickable, no extra explanations) -->
             <div class="gac-single-storage" @click="openStorageSettings" :title="$t('manageStorage')" style="cursor: pointer;">
               <div class="gac-single-storage-header">
-                <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ storageData.usedMb }} MB / {{ storageData.quotaDisplay }}</span>
-                <span class="gac-single-storage-pct" :style="{ color: storageProgressColor }">{{ storageData.usedPercentage }}%</span>
+                <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ formattedStorageUsedMb }} MB / {{ formattedQuotaDisplay }}</span>
+                <span class="gac-single-storage-pct" :style="{ color: storageProgressColor }">{{ formattedStoragePercentage }}%</span>
               </div>
               <div class="gac-progress-track">
                 <div 
@@ -210,8 +210,8 @@
             <!-- Storage Progress Bar (aligned sizing with cards) -->
             <div class="gac-single-storage" @click="openStorageSettings" :title="$t('manageStorage')" style="cursor: pointer;">
               <div class="gac-single-storage-header">
-                <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ storageData.usedMb }} MB / {{ storageData.quotaDisplay }}</span>
-                <span class="gac-single-storage-pct" :style="{ color: storageProgressColor }">{{ storageData.usedPercentage }}%</span>
+                <span class="gac-single-storage-title">{{ $t('storageSpace') }}: {{ formattedStorageUsedMb }} MB / {{ formattedQuotaDisplay }}</span>
+                <span class="gac-single-storage-pct" :style="{ color: storageProgressColor }">{{ formattedStoragePercentage }}%</span>
               </div>
               <div class="gac-progress-track">
                 <div 
@@ -246,12 +246,12 @@
     <!-- Built-in Terms of Service Dialog -->
     <el-dialog v-model="termsDialogVisible" :title="$t('termsDialogTitle')" width="min(640px, 92vw)" class="legal-doc-dialog" append-to-body>
       <div class="legal-doc-content">
-        <h4>1. 服务协议与使用准则</h4>
-        <p>欢迎使用 Epocanvas Mail。本平台提供纯净、私密且高效的邮件收发与云端协作体验。用户承诺遵守当地法律法规，不利用本服务从事垃圾邮件群发、网络钓鱼或传播有害代码等违规活动。</p>
-        <h4>2. 存储与系统保护机制</h4>
-        <p>系统为每个账户设立合理的存储限额，并永久保留 2% 应急缓冲区。当存储用量达到 95% 时，系统将自动对垃圾桶执行物理清理以释放空间；当用量达到 98% 时，将暂停接收新邮件直到空间释放。</p>
-        <h4>3. 免责声明与知识产权</h4>
-        <p>在适用法律允许的最大范围内，平台对因不可抗力导致的偶发性服务中断不承担连带责任。用户保留其通信内容的全部知识产权与数据所有权。</p>
+        <h4>{{ $t('termsDialogUsageTitle') }}</h4>
+        <p>{{ $t('termsDialogUsageBody') }}</p>
+        <h4>{{ $t('termsDialogStorageTitle') }}</h4>
+        <p>{{ $t('termsDialogStorageBody') }}</p>
+        <h4>{{ $t('termsDialogDisclaimerTitle') }}</h4>
+        <p>{{ $t('termsDialogDisclaimerBody') }}</p>
       </div>
       <template #footer>
         <el-button type="primary" @click="termsDialogVisible = false">{{ $t('confirm') }}</el-button>
@@ -261,12 +261,12 @@
     <!-- Built-in Privacy Policy Dialog -->
     <el-dialog v-model="privacyDialogVisible" :title="$t('privacyDialogTitle')" width="min(640px, 92vw)" class="legal-doc-dialog" append-to-body>
       <div class="legal-doc-content">
-        <h4>1. 零冗余与隐私保护原则</h4>
-        <p>Epocanvas Mail 严格践行数据主权与最小化收集原则。我们绝不出售、共享或商业化分析您的个人邮件、通信录或附件数据。</p>
-        <h4>2. 密码学端到端与数据隔离</h4>
-        <p>系统采用先进的密码学 Hash 索引与用户租户隔离架构，彻底杜绝 IDOR 与横向越权。在隐私/加密模式下，邮件正文及附件受密码学密钥严格保护，管理员接口默认阻断访问。</p>
-        <h4>3. 自主管理与遗忘权</h4>
-        <p>用户随时可通过账户中心导出其数据或彻底注销账号。注销后，名下全部邮件、附件及认证元数据将执行不可逆的物理级彻底销毁。</p>
+        <h4>{{ $t('privacyDialogPrinciplesTitle') }}</h4>
+        <p>{{ $t('privacyDialogPrinciplesBody') }}</p>
+        <h4>{{ $t('privacyDialogIsolationTitle') }}</h4>
+        <p>{{ $t('privacyDialogIsolationBody') }}</p>
+        <h4>{{ $t('privacyDialogErasureTitle') }}</h4>
+        <p>{{ $t('privacyDialogErasureBody') }}</p>
       </div>
       <template #footer>
         <el-button type="primary" @click="privacyDialogVisible = false">{{ $t('confirm') }}</el-button>
@@ -376,6 +376,9 @@ import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
 import {setExtend} from "@/utils/day.js"
+import { normalizeUiLocale, formatUiNumber, buildDocsPageUrl, resolvePolicyUrl } from "@/utils/ui-locale.js"
+import { clearCurrentSession } from '@/utils/device-privacy.js';
+import { listSessionRecords, getTabIdentity, tabSession } from '@/utils/tab-session.js';
 
 const {t, locale} = useI18n();
 const route = useRoute();
@@ -502,7 +505,17 @@ const storageFillWidth = computed(() => {
   return Math.min(98, Math.max(0, storageData.usedPercentage));
 });
 
-// Multi-account mode flag
+const formattedStorageUsedMb = computed(() => formatUiNumber(Number(storageData.usedMb || 0), normalizeUiLocale(locale.value || settingStore.lang || 'zh'), { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+const formattedStoragePercentage = computed(() => formatUiNumber(storageData.usedPercentage, normalizeUiLocale(locale.value || settingStore.lang || 'zh'), { maximumFractionDigits: 1 }))
+const formattedQuotaDisplay = computed(() => {
+  if (storageData.isUnlimited) return t('unlimitedQuota') || 'Unlimited'
+  const quota = Number(storageData.quotaMb || 0)
+  const lang = normalizeUiLocale(locale.value || settingStore.lang || 'zh')
+  return quota >= 1024
+    ? `${formatUiNumber(quota / 1024, lang, { maximumFractionDigits: 1 })} GB`
+    : `${formatUiNumber(quota, lang)} MB`
+})
+
 const isMultiAccountEnabled = computed(() => {
   if (Number(settingStore.settings?.multiAccountEnabled) === 1) return true;
   try {
@@ -516,13 +529,7 @@ const isMultiAccountEnabled = computed(() => {
         return true;
       }
     }
-    const sessionsRaw = localStorage.getItem('epo_sessions');
-    if (sessionsRaw) {
-      const sessions = JSON.parse(sessionsRaw);
-      if (Array.isArray(sessions) && sessions.length > 1) {
-        return true;
-      }
-    }
+    if (listSessionRecords().length > 1) return true;
   } catch (e) {}
   return false;
 });
@@ -548,23 +555,21 @@ async function loadOtherAccounts() {
   try {
     const urlMatch = window.location.pathname.match(/\/mail\/u\/(\d+)/);
     currentU = urlMatch ? parseInt(urlMatch[1], 10) : 0;
-    const raw = localStorage.getItem('epo_sessions');
-    if (raw) {
-      const sessions = JSON.parse(raw);
-      if (Array.isArray(sessions)) {
-        for (const s of sessions) {
-          if (s.u !== currentU && s.token && s.email) {
-            const sEmail = s.email.toLowerCase().trim();
-            if (sEmail !== currentEmail && !others.some(o => o.email.toLowerCase().trim() === sEmail)) {
-              others.push({
-                isSession: true,
-                u: s.u,
-                email: s.email,
-                name: s.name || s.email,
-                roleName: s.roleName || ''
-              });
-            }
-          }
+    const records = listSessionRecords();
+    for (const s of records) {
+      if (s.u !== currentU && s.token && s.email) {
+        const sEmail = s.email.toLowerCase().trim();
+        if (sEmail !== currentEmail && !others.some(o => o.email.toLowerCase().trim() === sEmail)) {
+          others.push({
+            isSession: true,
+            u: s.u,
+            email: s.email,
+            token: s.token,
+            sessionId: s.sessionId,
+            userId: s.userId,
+            name: s.name || s.email,
+            roleName: s.roleName || ''
+          });
         }
       }
     }
@@ -602,26 +607,18 @@ async function loadOtherAccounts() {
 function switchAccount(acc) {
   closeDropdown();
   if (acc.isSession) {
-    try {
-      const rawSessions = localStorage.getItem('epo_sessions');
-      if (rawSessions) {
-        const sessions = JSON.parse(rawSessions);
-        const targetS = sessions.find(s => s.u === acc.u);
-        if (targetS && targetS.token) {
-          localStorage.setItem('token', targetS.token);
-          if (targetS.email) {
-            localStorage.setItem('loginEmail', targetS.email);
-          }
-        }
-      }
-    } catch (_) {}
+    if (!tabSession.select(acc)) {
+      ElMessage.warning(t('authExpired'));
+      loadOtherAccounts();
+      return;
+    }
     window.location.href = `/mail/u/${acc.u}/#inbox`;
     return;
   }
   accountStore.currentAccountId = acc.accountId;
   accountStore.currentAccount = acc;
   if (acc.email) {
-    localStorage.setItem('loginEmail', acc.email);
+    tabSession.update({ accountEmail: acc.email });
     if (userStore.user) {
       userStore.user.account = acc;
       userStore.user.email = acc.email;
@@ -664,8 +661,7 @@ function openAddAccount() {
   }
   let targetU = 1;
   try {
-    const rawSessions = localStorage.getItem('epo_sessions');
-    const sessions = rawSessions ? JSON.parse(rawSessions) : [];
+    const sessions = listSessionRecords();
     const existingUs = new Set(sessions.map(s => s.u));
     while (existingUs.has(targetU)) {
       targetU++;
@@ -676,9 +672,7 @@ function openAddAccount() {
 
 // 账户外链回退：指向文档站生产域，并按当前界面语言选择文档语言目录（zh 为文档站根语言，无前缀）
 function docsPageUrl(path) {
-  const l = String(locale.value || 'zh');
-  const prefix = (l === 'zh' || l === 'zh-CN') ? '' : (l === 'zh-Hant' || l === 'zh-TW') ? 'zh-tw' : l;
-  return `https://docs.epocanvas.com/epomail/${prefix ? prefix + '/' : ''}${path}`;
+  return buildDocsPageUrl(path, normalizeUiLocale(locale.value || settingStore.lang || 'zh'), settingStore.settings?.docsUrl);
 }
 
 function openProjectIntro() {
@@ -689,13 +683,13 @@ function openProjectIntro() {
 
 function openPrivacyPolicy() {
   closeDropdown();
-  const extUrl = settingStore.settings?.privacyUrl || docsPageUrl('mail/privacy-policy/');
+  const extUrl = resolvePolicyUrl(settingStore.settings?.privacyUrl, 'mail/privacy-policy/', normalizeUiLocale(locale.value || settingStore.lang || 'zh'), settingStore.settings?.docsUrl);
   window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
 function openTermsOfService() {
   closeDropdown();
-  const extUrl = settingStore.settings?.termsUrl || docsPageUrl('mail/terms-of-service/');
+  const extUrl = resolvePolicyUrl(settingStore.settings?.termsUrl, 'mail/terms-of-service/', normalizeUiLocale(locale.value || settingStore.lang || 'zh'), settingStore.settings?.docsUrl);
   window.open(extUrl, '_blank', 'noopener,noreferrer');
 }
 
@@ -728,7 +722,7 @@ const ALL_EMAIL_OPTS = computed(() => [
 ]);
 
 const allEmailSuggestions = computed(() => {
-   if (route.name !== 'all-email' || !searchFocus.value) return [];
+   if (route.name !== 'manage-mail' || !searchFocus.value) return [];
    const input = emailStore.searchKeyword || '';
    const match = input.match(/(?:^|\s)\$(\S*)$/);
    if (!match) return [];
@@ -752,7 +746,7 @@ function applySuggestion(opt) {
 }
 
 function handleTabComplete() {
-  if (route.name === 'all-email') {
+  if (route.name === 'manage-mail') {
     const suggestions = allEmailSuggestions.value;
     if (suggestions.length > 0) {
       applySuggestion(suggestions[0]);
@@ -763,7 +757,7 @@ function handleTabComplete() {
 // Debounced real-time search for all-email
 let searchDebounceTimer = null;
 function handleSearchInput() {
-  if (route.name !== 'all-email') return;
+  if (route.name !== 'manage-mail') return;
   clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(() => {
     triggerAllEmailSearch();
@@ -966,7 +960,7 @@ const settingsSearchResults = computed(() => {
   // 严格基于当前用户实际权限进行前置安全过滤，未授权路由绝不向用户呈现，彻底杜绝 404
   const accessibleGroups = settingsMap.value.filter(group => {
     if (group.perm && !hasPerm(group.perm)) return false;
-    if (group.route === 'all-email' && Number(settingStore.settings?.allMailMode) === 2) return false;
+    if (group.route === 'manage-mail' && Number(settingStore.settings?.allMailMode) === 2) return false;
     return true;
   });
 
@@ -1063,7 +1057,7 @@ function onSearchBlur() {
 function clearSearch() {
   emailStore.searchKeyword = '';
   clearHighlightOnPage();
-  if (['email', 'user-all-email', 'star', 'snoozed', 'spam', 'trash', 'draft', 'send', 'all-email'].includes(route.name)) {
+  if (['email', 'user-all-email', 'star', 'snoozed', 'spam', 'trash', 'draft', 'send', 'all-email', 'manage-mail'].includes(route.name)) {
     if (emailStore.emailScroll && emailStore.emailScroll.refreshList) {
       emailStore.emailScroll.refreshList();
     } else if (route.name === 'draft') {
@@ -1091,7 +1085,7 @@ function handleSearch() {
     window.dispatchEvent(new CustomEvent('manage-audit-search', { detail: emailStore.searchKeyword }));
     return;
   }
-  if (isSettingsMode.value && route.name !== 'all-email') {
+  if (isSettingsMode.value && route.name !== 'manage-mail') {
     return;
   }
 
@@ -1116,7 +1110,7 @@ function handleSearch() {
     return;
   }
 
-  if (route.name === 'all-email') {
+  if (route.name === 'manage-mail') {
     if (emailStore.emailScroll) {
       emailStore.emailScroll.refreshList();
     }
@@ -1219,10 +1213,13 @@ const emailStatus = computed(() => {
 });
 
 const formatSize = (bytes) => {
-  if (!bytes) return '0 B';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  const value = Number(bytes)
+  const lang = normalizeUiLocale(locale.value || settingStore.lang || 'zh')
+  if (!Number.isFinite(value) || value <= 0) return '0 B'
+  if (value < 1024) return `${formatUiNumber(value, lang)} B`
+  if (value < 1024 * 1024) return `${formatUiNumber(value / 1024, lang, { maximumFractionDigits: 1 })} KB`
+  if (value < 1024 * 1024 * 1024) return `${formatUiNumber(value / (1024 * 1024), lang, { maximumFractionDigits: 1 })} MB`
+  return `${formatUiNumber(value / (1024 * 1024 * 1024), lang, { maximumFractionDigits: 1 })} GB`
 };
 
 async function copyEmail(email) {
@@ -1246,8 +1243,9 @@ async function copyEmail(email) {
 }
 
 function changeLang(lang) {
-  setExtend(lang === 'en' ? 'en' : 'zh-cn')
-  settingStore.lang = lang
+  const normalizedLang = normalizeUiLocale(lang)
+  setExtend(normalizedLang)
+  settingStore.lang = normalizedLang
 }
 
 function openNotice() {
@@ -1302,21 +1300,21 @@ function changeAside() {
 }
 
 function goToLogin() {
-  localStorage.removeItem("token")
-  window.location.replace('/login/')
+  const session = getTabIdentity();
+  clearCurrentSession({ session });
+  window.location.replace(`/login/?u=${session?.u ?? 0}`)
 }
 
 function clickLogout() {
+  if (logoutLoading.value) return;
   logoutLoading.value = true
+  const session = getTabIdentity();
   const finalizeLogout = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("ui")
-    localStorage.removeItem("epo_sessions")
-    try {
-      sessionStorage.clear()
-    } catch (_) {}
     uiStore.resetToDefaults()
-    window.location.replace('/login/')
+    // Explicit logout clears the current account's cached mail/recipients.
+    // It must not silently erase any account's unsent IndexedDB drafts.
+    clearCurrentSession({ session });
+    window.location.replace(`/login/?u=${session?.u ?? 0}`)
   }
   logout().then(() => {
     finalizeLogout()

@@ -1,7 +1,11 @@
 name = "epomail"
 main = "src/index.js"
 compatibility_date = "2025-06-04"
+compatibility_flags = ["nodejs_als"]
 keep_vars = true
+
+[version_metadata]
+binding = "CF_VERSION_METADATA"
 
 [observability]
 enabled = true
@@ -52,6 +56,12 @@ crons = ["0 16 * * *", "*/5 * * * *"]	#每天夜间例行任务 + 每5分钟通�
 
 
 [vars]
+ENVIRONMENT = "production"
+# Enable only with a verified PAT resource server; existing tokens can always be listed/revoked.
+ENABLE_PAT_ISSUANCE = "false"
+ALLOW_URL_INIT = "false"
+EMAIL_OUTBOUND_ENABLED = "false"
+PERSONAL_FORWARDING_ENABLED = "false"
 #ai_model = ""			#ai模型,不填默认使用@cf/meta/llama-3.1-8b-instruct
 #analysis_cache = false			#是否开启分析数据缓存
 #orm_log = false			#是否sql日志
@@ -60,17 +70,20 @@ admin = "admin@epomail.bond"				#管理员的邮箱	示例: admin@example.com
 #AVATAR_UPLOAD_URL = ""			#头像外部图床(可选)。不配置时头像落实例自有对象存储(KV)；配置示例: "https://img.example.com"
 #CORS_ORIGINS = ""			#允许跨域访问 API 的前端源(逗号分隔)。留空时仅允许同源；OAuth token/userinfo 端点始终允许第三方调用。
 
-# ⚠️ 安全约束：jwt_secret、totp_enc_key、admin_initial_password、init_secret、resend_webhook_secret、email_enc_key
+# ⚠️ 安全约束：jwt_secret、totp_enc_key、oauth_client_enc_key、admin_initial_password、init_secret、resend_webhook_secret、email_enc_key
 # 均属机密变量，严禁写入本文件（本仓库为公开仓库，写入即泄漏）！
 # 正确做法（Cloudflare Secrets，一次设置持久生效，部署不丢失）：
 #   npx wrangler secret put jwt_secret
 #   npx wrangler secret put totp_enc_key
+#   npx wrangler secret put oauth_client_enc_key
+# 个人 Telegram Bot Token 在保存设置时以同一根密钥、独立用户 AAD 加密。
+# 旧明文在重新保存前仍可投递；轮换该密钥前请将已绑定的个人机器人纳入凭证轮换与回滚计划。
 #   npx wrangler secret put admin_initial_password   # 首次 /init 创建站长账号时必需
-#   npx wrangler secret put init_secret              # 可选，不回退 jwt_secret
+#   npx wrangler secret put init_secret              # 生产/Staging 必需；仅本地/测试回退 jwt_secret
 #   npx wrangler secret put resend_webhook_secret    # 使用 Resend Webhook 时必需
 #   npx wrangler secret put email_enc_key            # 可选，建议与 totp_enc_key 分离
 # 本地开发请在 mail-worker/.dev.vars 中配置（已被 .gitignore 排除，不会入库），模板参见 .dev.vars.example。
-# 注意：/init 初始化门禁优先使用 init_secret，未配置时回退 jwt_secret；推荐使用 POST + x-init-secret 请求头。
+# 注意：/init 初始化门禁优先使用 init_secret；生产/Staging 未配置时直接拒绝，仅本地/测试回退 jwt_secret；推荐使用 POST + x-init-secret 请求头。
 
 [build]
 # 顺序约束：temp_login_ui 必须先于 mail-vue 构建（详见 scripts/build-prod.mjs）。
@@ -86,7 +99,10 @@ command = "node ./build.mjs"
 [env.staging]
 name = "epomail-staging"
 compatibility_date = "2025-06-04"
-keep_vars = true
+compatibility_flags = ["nodejs_als"]
+
+[env.staging.version_metadata]
+binding = "CF_VERSION_METADATA"
 
 [env.staging.observability]
 enabled = true
@@ -97,24 +113,24 @@ enabled = true
 [[env.staging.d1_databases]]
 binding = "USER_DB"
 database_name = "epomail-staging-db"
-database_id = "PLACEHOLDER_STAGING_D1_DATABASE_ID"
+database_id = "c3a49885-603e-4387-b4df-82a1117e963a"
 
 [[env.staging.d1_databases]]
 binding = "MAIL_DB"
 database_name = "epomail-staging-db"
-database_id = "PLACEHOLDER_STAGING_D1_DATABASE_ID"
+database_id = "c3a49885-603e-4387-b4df-82a1117e963a"
 
 [[env.staging.d1_databases]]
 binding = "db"
 database_name = "epomail-staging-db"
-database_id = "PLACEHOLDER_STAGING_D1_DATABASE_ID"
+database_id = "c3a49885-603e-4387-b4df-82a1117e963a"
 
 # --------------------------------------------------------------------------------------
 # Staging 独立 KV 命名空间绑定 (严格物理隔离，禁止复用生产环境KV命名空间)
 # --------------------------------------------------------------------------------------
 [[env.staging.kv_namespaces]]
 binding = "kv"
-id = "PLACEHOLDER_STAGING_KV_NAMESPACE_ID"
+id = "c5a59d7cfc6a4091b792238ec569e315"
 
 # AI 绑定 (用于测试文本与规则智能研判)
 [env.staging.ai]
@@ -127,19 +143,23 @@ directory = "./dist"
 not_found_handling = "single-page-application"
 run_worker_first = true
 
-# 定时调度 (夜间清理 + 每 5 分钟 Outbox 调度与租约检查)
+# 定时调度 (每 5 分钟 Outbox 调度、对账、转发重试与租约清理)
+# Cloudflare 账户免费额度最多 5 个 Cron（当前生产 2 + vitals 2），Staging 使用第 5 个配额运行 5 分钟真实 Cron；夜间 0 16 * * * 通过受保护 /api/scheduled 演练
 [env.staging.triggers]
-crons = ["0 16 * * *", "*/5 * * * *"]
+crons = ["*/5 * * * *"]
 
 # Staging 环境变量隔离配置
 [env.staging.vars]
 ENVIRONMENT = "staging"
+ENABLE_PAT_ISSUANCE = "false"
 ALLOW_URL_INIT = "false"
-# 预发布域名与管理员配置（等待用户提供真实分配域名，使用显式占位符）
-domain = ["PLACEHOLDER_STAGING_DOMAIN"]
-admin = "admin@PLACEHOLDER_STAGING_DOMAIN"
-# 邮件外发总开关 (第一阶段默认关闭，严防任意真实外发)
-EMAIL_OUTBOUND_ENABLED = "false"
-# 官方测试白名单 (第二阶段启用)
+# 预发布域名与管理员配置
+domain = ["epomail-staging.epocanvas.workers.dev"]
+admin = "admin@epomail-staging.epocanvas.workers.dev"
+# 邮件外发沙箱策略（显式启用外发并强制限制为白名单测试地址）
+EMAIL_OUTBOUND_ENABLED = "true"
+OUTBOUND_WHITELIST_ENFORCE = "true"
+PERSONAL_FORWARDING_ENABLED = "false"
+# 官方测试白名单
 OUTBOUND_WHITELIST = "delivered@resend.dev,bounced@resend.dev,complained@resend.dev"
 

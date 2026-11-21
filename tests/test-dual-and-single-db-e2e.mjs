@@ -1,3 +1,6 @@
+import { initializeLegacyStack } from './helpers/legacy-initialize.mjs';
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 import { getUserDb, getMailDb, isDualDbMode, getDbModeInfo } from "../mail-worker/src/utils/db-accessor.js";
@@ -45,32 +48,29 @@ import analysisDao from "../mail-worker/src/dao/analysis-dao.js";
   // E2E Test: 生产环境真实 API 运行链路与向下兼容验证
   // ---------------------------------------------------------------------------
   console.log("\n[Step 2] 端到端验证: 生产环境 D1 数据链路与核心业务闭环...");
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: "zh-CN"
   });
   const page = await context.newPage();
 
-  const BASE = "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
   let authToken = null;
 
   try {
-    // 2.1 验证数据库初始化端点 (/api/init/:secret)
-    console.log("  -> 触发 /api/init/123456 验证 DDL 分发与幂等升级...");
-    const initRes = await page.request.get(BASE + "/api/init/123456");
-    const initText = await initRes.text();
-    assert.strictEqual(initText, "success", "数据库初始化必须返回 success");
+    // 2.1 验证数据库初始化端点 (POST /api/init)
+    await initializeLegacyStack();
     console.log("  ✓ 数据库 DDL 幂等升级顺利完成");
 
     // 2.2 管理员登录
     console.log("  -> 执行管理员登录获取会话...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "登录必须返回 HTTP 200: " + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, "登录必须返回 HTTP 200: " + Number(loginData?.code));
     authToken = loginData.data?.token;
     assert.ok(authToken, "必须获取到有效的 JWT Token");
     console.log("  ✓ 登录成功，获取管理员 Token");

@@ -29,6 +29,10 @@
     </div>
 
     <div ref="scroll" class="scroll">
+      <div v-if="loadError !== null" class="load-error" role="alert">
+        {{ t('mailListLoadFailed') }}
+        <el-button size="small" @click="getEmailList(loadError)">{{ t('mailListLoadRetry') }}</el-button>
+      </div>
       <UseVirtualList ref="scrollbarRef"
                         @scroll="onScroll"
                         :list="list"
@@ -84,7 +88,7 @@
                     >
                       {{ item.threadCount }}
                     </span>
-                    <span v-if="item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || item.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
+                    <span v-if="item.isOfficial === 1" class="official-verified-badge" :title="$t('officialVerified')">
                       <Icon icon="ri:verified-badge-fill" width="15" height="15" style="color: #0284c7; vertical-align: middle; margin-left: 3px;" />
                     </span>
                   </div>
@@ -148,16 +152,16 @@
                 <div class="email-right" :style="showUserInfo ? 'align-self: start;':''">
                   <span class="email-time" :class="{ 'is-unread': item.unread === EmailUnreadEnum.UNREAD && showUnread }">{{ item.formatCreateTime }}</span>
                   <div class="quick-actions">
-                    <el-tooltip :content="$t('snooze') || 'Snooze'" placement="top" v-if="['email'].includes(props.type)">
+                    <el-tooltip :content="$t('snooze')" placement="top" v-if="['email'].includes(props.type)">
                       <Icon icon="ic:outline-access-time" width="18" height="18" class="quick-icon" @click.stop="handleSnooze(item.emailId)" />
                     </el-tooltip>
                     <el-tooltip :content="$t('delete')" placement="top" v-if="!['trash'].includes(props.type)">
-                      <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(item.emailId)" />
+                      <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(type === 'draft' ? item.draftId : item.emailId)" />
                     </el-tooltip>
-                    <el-tooltip :content="$t('permanentDelete') || 'Delete forever'" placement="top" v-if="['trash', 'spam'].includes(props.type)">
+                    <el-tooltip :content="$t('permanentDelete')" placement="top" v-if="['trash', 'spam'].includes(props.type)">
                       <Icon icon="uiw:delete" width="16" height="16" class="quick-icon" @click.stop="rightDelete(item.emailId, true)" />
                     </el-tooltip>
-                    <el-tooltip :content="$t('restore') || 'Restore'" placement="top" v-if="['trash', 'spam', 'snoozed'].includes(props.type)">
+                    <el-tooltip :content="$t('restore')" placement="top" v-if="['trash', 'spam', 'snoozed'].includes(props.type)">
                       <Icon icon="ic:outline-restore" width="18" height="18" class="quick-icon" @click.stop="handleRestore(item.emailId)" />
                     </el-tooltip>
                     <el-tooltip :content="$t('markRead')" placement="top" v-if="item.unread === EmailUnreadEnum.UNREAD && showUnread">
@@ -195,7 +199,7 @@
                        :showStatus="showStatus"
                        :showUserInfo="showUserInfo"
                        :type="type"/>
-      <div class="empty" v-if="noLoading && emailList.length === 0 && !loading">
+      <div class="empty" v-if="loadError === null && noLoading && emailList.length === 0 && !loading">
         <el-empty :image-size="isMobile ? 120 : null" :description="$t('noMoreData')"/>
       </div>
     </div>
@@ -233,7 +237,7 @@
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="ic:outline-access-time" width="20" height="20" />
-                <span>{{t('snooze') || 'Snooze'}}</span>
+                <span>{{t('snooze')}}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -241,7 +245,7 @@
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="ic:outline-report-gmailerrorred" width="20" height="20" />
-                <span>{{t('spam') || 'Spam'}}</span>
+                <span>{{t('spam')}}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -293,7 +297,7 @@
               </div>
             </template>
           </el-dropdown-item>
-          <el-dropdown-item v-if="!['trash'].includes(props.type)" @click="rightDelete(rightClickEmail.emailId)">
+          <el-dropdown-item v-if="!['trash'].includes(props.type)" @click="rightDelete(type === 'draft' ? rightClickEmail.draftId : rightClickEmail.emailId)">
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="uiw:delete" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
@@ -305,7 +309,7 @@
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="uiw:delete" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
-                <span>{{t('permanentDelete') || 'Delete forever'}}</span>
+                <span>{{t('permanentDelete')}}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -313,7 +317,7 @@
             <template #default>
               <div class="right-dropdown-item">
                 <Icon icon="ic:outline-restore" width="16" height="20" style="margin-left: 1px;margin-right: 3px" />
-                <span>{{t('restore') || 'Restore'}}</span>
+                <span>{{t('restore')}}</span>
               </div>
             </template>
           </el-dropdown-item>
@@ -324,27 +328,27 @@
     <!-- Snooze Dialog -->
     <el-dialog
       v-model="snoozeDialogVisible"
-      :title="t('snooze') || 'Snooze'"
-      width="400px"
+      :title="t('snooze')"
+      width="min(400px, calc(100vw - 32px))"
       class="snooze-dialog"
       :append-to-body="true"
     >
       <el-form label-position="top">
-        <el-form-item :label="t('snoozeStartTime') || 'Start Time'">
+        <el-form-item :label="t('snoozeStartTime')">
           <el-date-picker
             v-model="snoozeForm.time"
             type="datetime"
-            :placeholder="t('selectTime') || 'Select Time'"
+            :placeholder="t('selectTime')"
             style="width: 100%"
             value-format="YYYY-MM-DD HH:mm:ss"
             :disabled-date="disabledSnoozeDate"
           />
         </el-form-item>
-        <el-form-item :label="t('snoozeEndTime') || 'End Time'">
+        <el-form-item :label="t('snoozeEndTime')">
           <el-date-picker
             v-model="snoozeForm.endTime"
             type="datetime"
-            :placeholder="t('selectTime') || 'Select Time'"
+            :placeholder="t('selectTime')"
             style="width: 100%"
             value-format="YYYY-MM-DD HH:mm:ss"
             :disabled-date="disabledSnoozeDate"
@@ -353,9 +357,9 @@
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="snoozeDialogVisible = false">{{ t('cancel') || 'Cancel' }}</el-button>
+          <el-button @click="snoozeDialogVisible = false">{{ t('cancel') }}</el-button>
           <el-button type="primary" @click="confirmSnooze" :loading="snoozeLoading">
-            {{ t('confirm') || 'Confirm' }}
+            {{ t('confirm') }}
           </el-button>
         </span>
       </template>
@@ -436,6 +440,7 @@ const settingStore = useSettingStore()
 const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const loading = ref(false);
+const loadError = ref(null);
 const followLoading = ref(false);
 const noLoading = ref(false);
 const emailList = reactive([])
@@ -449,6 +454,7 @@ let scrollTop = 0
 const latestEmail = ref(null)
 const scrollbarRef = ref(null)
 let reqLock = false
+let requestSeq = 0
 let isMobile = ref(innerWidth < 1367)
 // 与 CSS 两行化断点 @media (max-width: 767px) 严格同源，避免行高契约在 768~1366px 区间错位
 let isNarrowRow = ref(innerWidth <= 767)
@@ -710,7 +716,7 @@ const list = computed(() => {
     } else if (props.type === 'all-email') {
       isCurrent = true;
     } else {
-      isCurrent = !item.isDel && !item.isSpam && (!item.snoozedTime || item.sendEmail === 'announcement@epocanvas.com' || item.sendEmail === 'admin@epocanvas.com' || item.isOfficial) && item.type === 0;
+      isCurrent = !item.isDel && !item.isSpam && (!item.snoozedTime || item.isOfficial === 1) && item.type === 0;
     }
     
     if (isCurrent) {
@@ -724,7 +730,7 @@ const list = computed(() => {
   if (otherPartition.length > 0) {
     finalResult = [
       ...currentPartition,
-      { emailId: 'separator-1', expand: 'separator', title: t('otherFolders') || 'Other Folders' },
+      { emailId: 'separator-1', expand: 'separator', title: t('otherFolders') },
       ...otherPartition
     ];
   } else {
@@ -769,7 +775,7 @@ watch(followLoading, (isFollowLoading) => {
     })
   } else {
     const index = expandList.findIndex(item => item.expand === 'loading')
-    expandList.splice(index, 1);
+    if (index >= 0) expandList.splice(index, 1);
   }
 });
 
@@ -781,14 +787,14 @@ watch(noLoading, (isNoLoading) => {
     })
   } else {
     const index = expandList.findIndex(item => item.expand === 'noMoreData')
-    expandList.splice(index, 1);
+    if (index >= 0) expandList.splice(index, 1);
   }
 })
 
 
 // 监听是否到达底部
 watch(() => arrivedState.bottom, (isBottom) => {
-  if (isBottom && !loading.value) {
+  if (isBottom && !loading.value && loadError.value === null) {
     loadData();
   }
 });
@@ -883,17 +889,17 @@ function handleSnooze(emailId) {
 
 function confirmSnooze() {
   if (!snoozeForm.time || !snoozeForm.endTime) {
-    ElMessage.error(t('selectTime') || 'Please select time');
+    ElMessage.error(t('selectTime'));
     return;
   }
   if (new Date(snoozeForm.endTime).getTime() < new Date(snoozeForm.time).getTime()) {
-    ElMessage.error(t('endTimeBeforeStartTime') || 'End time cannot be earlier than start time');
+    ElMessage.error(t('endTimeBeforeStartTime'));
     return;
   }
 
   snoozeLoading.value = true;
   emailSnooze(snoozeForm.emailId, snoozeForm.time, snoozeForm.endTime).then(() => {
-    ElMessage.success(t('snoozedSuccess') || 'Email snoozed');
+    ElMessage.success(t('snoozedSuccess'));
     deleteEmailFromList([snoozeForm.emailId]);
     emailStore.refreshSidebarStats();
     snoozeDialogVisible.value = false;
@@ -904,7 +910,7 @@ function confirmSnooze() {
 
 function handleSpam(emailId) {
   emailSpam(emailId, true).then(() => {
-    ElMessage.success(t('spamSuccess') || 'Marked as spam');
+    ElMessage.success(t('spamSuccess'));
     deleteEmailFromList([emailId]);
     emailStore.refreshSidebarStats();
   });
@@ -912,7 +918,7 @@ function handleSpam(emailId) {
 
 function handleRestore(emailId) {
   emailRestore(emailId).then(() => {
-    ElMessage.success(t('restoreSuccessMsg') || 'Email restored');
+    ElMessage.success(t('restoreSuccessMsg'));
     deleteEmailFromList([emailId]);
     emailStore.refreshSidebarStats();
   });
@@ -1074,6 +1080,10 @@ function localRead(emailIds) {
 }
 
 function rightDelete(emailId, physical = false) {
+  if (props.type === 'draft') {
+    emit('delete-draft', [emailId])
+    return
+  }
 
   if (props.type === 'all-email') {
     ElMessageBox.confirm(t('delOneEmailConfirm'), {
@@ -1259,8 +1269,13 @@ function jumpDetails(email) {
 
 function getEmailList(refresh = false) {
 
-  if (reqLock) return;
+  // A refresh may supersede an in-flight page load (for example when the user
+  // switches alias or changes the query). Only the newest response is allowed
+  // to write the list; older responses are ignored instead of overwriting the
+  // new mailbox state.
+  if (reqLock && !refresh) return;
 
+  const seq = ++requestSeq;
   let emailId = emailList.length > 0 ? emailList.at(-1).emailId : 0;
 
   reqLock = true
@@ -1268,7 +1283,7 @@ function getEmailList(refresh = false) {
   if (!refresh) {
 
     if (loading.value || noLoading.value) {
-      reqLock = false
+      if (seq === requestSeq) reqLock = false
       return
     }
 
@@ -1284,14 +1299,17 @@ function getEmailList(refresh = false) {
   } else {
     followLoading.value = !refresh;
   }
+  loadError.value = null
   let start = Date.now();
 
-  props.getEmailList(emailId, queryParam.size).then(async data => {
+  Promise.resolve().then(() => props.getEmailList(emailId, queryParam.size)).then(async data => {
+    if (seq !== requestSeq) return;
     let end = Date.now();
     let duration = end - start;
     if (duration < 300 && !emailId) {
         await sleep(300 - duration)
     }
+    if (seq !== requestSeq) return;
     firstLoad.value = false
 
     let list = data.list.map(item => ({
@@ -1310,11 +1328,21 @@ function getEmailList(refresh = false) {
     emailList.push(...list);
     if (refresh) scrollbarRef.value?.setScrollTop(0);
 
-    noLoading.value = data.list.length < queryParam.size;
-    followLoading.value = data.list.length >= queryParam.size;
+    noLoading.value = data.complete === true || data.list.length < queryParam.size;
+    followLoading.value = !noLoading.value;
 
     total.value = data.total;
+  }).catch(() => {
+    if (seq !== requestSeq) return
+    firstLoad.value = false
+    followLoading.value = false
+    if (refresh) {
+      emailList.length = 0
+      total.value = 0
+    }
+    loadError.value = refresh
   }).finally(() => {
+    if (seq !== requestSeq) return;
     loading.value = false
     reqLock = false
   })
@@ -1346,7 +1374,7 @@ function handleList(list) {
 function refresh() {
   emit('refresh-before')
   if (props.skeleton) {
-    scrollbarRef.value.setScrollTop(0)
+    scrollbarRef.value?.setScrollTop(0)
   }
   refreshList()
 }
@@ -1375,6 +1403,8 @@ function loadData() {
   overflow: hidden;
   height: 100%;
 }
+
+.load-error { padding: 8px 16px; }
 
 .scroll {
   margin: 0;

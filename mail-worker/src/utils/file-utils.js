@@ -91,7 +91,10 @@ const fileUtils = {
 	},
 
 	base64ToUint8Array(base64) {
-		const binaryStr = atob(base64);
+		const raw = typeof base64 === 'string' && base64.startsWith('data:')
+			? (base64.split(',')[1] || '')
+			: String(base64 || '');
+		const binaryStr = atob(raw.replace(/\s+/g, ''));
 		const len = binaryStr.length;
 		const bytes = new Uint8Array(len);
 		for (let i = 0; i < len; i++) {

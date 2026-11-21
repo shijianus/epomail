@@ -19,21 +19,20 @@
           <Main />
         </el-main>
       </el-container>
+      <button
+          v-if="!isSettingsMode && isMobile && hasPerm('email:send')"
+          class="compose-fab"
+          :aria-label="$t('writeEmail')"
+          @click="uiStore.writerRef?.open?.()"
+      >
+        <Icon icon="material-symbols:edit-outline-sharp" width="26" height="26"/>
+      </button>
     </el-container>
     <el-footer class="custom-footer" height="22px">
       <StatusBar />
     </el-footer>
   </el-container>
   <writer ref="writerRef" />
-  <!-- 移动端写信悬浮按钮：写信入口只在侧栏抽屉内，移动端直达 -->
-  <button
-      v-if="!isSettingsMode && isMobile && hasPerm('email:send')"
-      class="compose-fab"
-      :aria-label="$t('writeEmail')"
-      @click="uiStore.writerRef?.open?.()"
-  >
-    <Icon icon="material-symbols:edit-outline-sharp" width="26" height="26"/>
-  </button>
 </template>
 
 <script setup>
@@ -145,6 +144,14 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+@media (max-width: 767px) {
+  .custom-footer {
+    height: auto;
+    min-height: 22px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
 .el-aside-hide {
   transition: all 0.2s ease;
   z-index: 100;
@@ -224,9 +231,9 @@ onBeforeUnmount(() => {
 
 /* 移动端写信 FAB */
 .compose-fab {
-  position: fixed;
+  position: absolute;
   right: 18px;
-  bottom: 36px;
+  bottom: 14px;
   z-index: 90;
   width: 54px;
   height: 54px;

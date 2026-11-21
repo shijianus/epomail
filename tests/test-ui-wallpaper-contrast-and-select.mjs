@@ -1,3 +1,5 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "node:assert";
 
@@ -6,7 +8,7 @@ import assert from "node:assert";
   console.log("=== 启动视觉与架构审计：el-select 完整显示、壁纸方框优化与注册密钥层级校准 ===");
   console.log("==========================================================================");
 
-  const browser = await chromium.launch({
+  const browser = await launchIsolatedChromium(chromium, {
     headless: true,
     args: ["--lang=zh-CN"]
   });
@@ -15,7 +17,7 @@ import assert from "node:assert";
     locale: "zh-CN"
   });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   let adminToken = null;
 
@@ -25,11 +27,11 @@ import assert from "node:assert";
     // --------------------------------------------------------------------------------------
     console.log("\n[步骤 1] 登录 Admin 账号...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, "Admin 登录失败: " + JSON.stringify(loginJson));
+    assert.strictEqual(loginJson.code, 200, "Admin 登录失败: " + Number(loginJson?.code));
     adminToken = typeof loginJson.data === "string" ? loginJson.data : loginJson.data?.token;
     console.log("  ✓ Admin 登录成功");
 
@@ -167,7 +169,7 @@ import assert from "node:assert";
     assert(mailModeSelectMetrics.width === 210, `邮件模式 el-select 宽度必须严格固定为 210px（固定尺寸不随内容改变），实测: ${mailModeSelectMetrics.width}px`);
     assert(!mailModeSelectMetrics.isTruncated, `邮件模式文字绝不能被截断！当前展示: '${mailModeSelectMetrics.text}'`);
     assert(
-      mailModeSelectMetrics.text.includes("加密邮件模式 (Level 3 [E2EE])") ||
+      mailModeSelectMetrics.text.includes("加密邮件模式 (Level 3)") ||
       mailModeSelectMetrics.text.includes("隐私邮件模式 (Level 2 [推荐])") ||
       mailModeSelectMetrics.text.includes("全部邮件模式 (Level 1)"),
       `邮件模式必须完整显示相应级别名称与等级，当前: '${mailModeSelectMetrics.text}'`

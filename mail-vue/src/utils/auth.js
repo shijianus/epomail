@@ -1,34 +1,47 @@
 import i18n from "@/i18n/index.js";
+import { clearCurrentSession, isLocalSessionEnded } from '@/utils/device-privacy.js';
+import { getTabIdentity, isSameTabIdentity, tabSession } from '@/utils/tab-session.js';
 
 let isLoggingOut = false;
+let pendingClosure = 0;
+let deferredMessage;
 
-/**
- * 清除所有本地身份凭证（保留 loginEmail 便于在登录页回填）
- */
+// A deletion request disables the server session before cleanup finishes.
+// Defer polling 401 redirects until the UI can show the actual deletion result.
+export function deferForcedLogout() {
+  pendingClosure++;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    pendingClosure--;
+    if (!pendingClosure && deferredMessage !== undefined) {
+      const deferred = deferredMessage;
+      deferredMessage = undefined;
+      if (!isLocalSessionEnded()) forceLogoutToLogin(deferred.message, deferred.session);
+    }
+  };
+}
+
+/** Clear the current sign-in and sensitive caches; keep local drafts. */
 export function clearAuthStorage(options = {}) {
-  const { preserveEmail = true } = options;
-  const savedEmail = preserveEmail ? localStorage.getItem('loginEmail') : null;
-
-  localStorage.removeItem('token');
-  localStorage.removeItem('ui');
-  if (!preserveEmail) {
-    localStorage.removeItem('loginEmail');
-  } else if (savedEmail) {
-    localStorage.setItem('loginEmail', savedEmail);
-  }
+  return clearCurrentSession({ preserveEmail: true, ...options });
 }
 
 /**
  * 统一被动/强制退出至登录界面
  * @param {string} [message] 退出原因提示信息
  */
-export function forceLogoutToLogin(message) {
-  if (isLoggingOut) return;
+export function forceLogoutToLogin(message, session = getTabIdentity()) {
+  if (!session || !isSameTabIdentity(session, tabSession.current())) return false;
+  if (isLocalSessionEnded()) return false;
+  if (pendingClosure) { deferredMessage = { message: message || '', session }; return false; }
+  if (isLoggingOut) return false;
   isLoggingOut = true;
 
-  clearAuthStorage({ preserveEmail: true });
+  clearAuthStorage({ preserveEmail: true, session });
 
-  const expiredMsg = message || (i18n?.global?.t ? i18n.global.t('authExpired') : '') || '登录凭证已过期，请重新登录';
+  const expiredMsg = message || i18n.global.t('authExpired');
 
   try {
     sessionStorage.setItem('auth_expired_msg', expiredMsg);

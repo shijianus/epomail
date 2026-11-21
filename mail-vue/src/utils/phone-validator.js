@@ -335,6 +335,8 @@ export function validatePhoneNumber(countryCode, rawNumber) {
   if (!rawNumber || !rawNumber.trim()) {
     return {
       valid: false,
+      errorCode: 'REQUIRED',
+      params: {},
       msgZh: '请输入电话号码',
       msgEn: 'Please enter a phone number',
       cleanNum: '',
@@ -358,6 +360,8 @@ export function validatePhoneNumber(countryCode, rawNumber) {
   if (!digitsOnly) {
     return {
       valid: false,
+      errorCode: 'NO_DIGITS',
+      params: {},
       msgZh: '号码中必须包含有效数字',
       msgEn: 'Number must contain valid digits',
       cleanNum: '',
@@ -384,6 +388,8 @@ export function validatePhoneNumber(countryCode, rawNumber) {
     };
     return {
       valid: false,
+      errorCode: Object.hasOwn(lenMsgsZh, lenError) ? lenError : 'COUNTRY_LENGTH',
+      params: { digits: digitsOnly.length, countryCode: country.code },
       msgZh: lenMsgsZh[lenError] || `${country.nameZh}电话号码长度不正确`,
       msgEn: lenMsgsEn[lenError] || `Invalid ${country.nameEn} phone number length`,
       cleanNum: digitsOnly,
@@ -398,6 +404,8 @@ export function validatePhoneNumber(countryCode, rawNumber) {
   } catch (e) {
     return {
       valid: false,
+      errorCode: 'INVALID_FORMAT',
+      params: { countryCode: country.code },
       msgZh: `${country.nameZh}电话号码格式不正确`,
       msgEn: `Invalid ${country.nameEn} phone number format`,
       cleanNum: digitsOnly,
@@ -408,6 +416,8 @@ export function validatePhoneNumber(countryCode, rawNumber) {
   if (!parsed || !parsed.isValid()) {
     return {
       valid: false,
+      errorCode: 'INVALID_NUMBER',
+      params: {},
       msgZh: '无效的电话号码或号段未分配',
       msgEn: 'Invalid phone number or unassigned area/prefix',
       cleanNum: digitsOnly,
@@ -417,6 +427,8 @@ export function validatePhoneNumber(countryCode, rawNumber) {
 
   return {
     valid: true,
+    errorCode: null,
+    params: {},
     msgZh: '',
     msgEn: '',
     type: parsed.getType(),

@@ -34,9 +34,6 @@ const roleService = {
 				}
 			}
 
-			// Check if roles have been initialized once
-			const roleCount = await userDb.prepare(`SELECT count(*) as cnt FROM role`).first();
-			const hasRoles = roleCount && Number(roleCount.cnt) > 0;
 
 			let hasSeeded = false;
 			try {
@@ -44,7 +41,7 @@ const roleService = {
 				hasSeeded = flag === '1';
 			} catch (_) {}
 
-			if (hasRoles || hasSeeded) {
+				if (hasSeeded) {
 				// 已经存在角色：绝不复活已被站长删除的空选项（如 user_lv0/user_lv1），绝不覆盖站长已自订的权限与属性
 				// 仅确保站长 (master) 角色及管理员账户绑定
 				if (c?.env?.admin) {
@@ -66,7 +63,7 @@ const roleService = {
 					name: '参观者',
 					key: 'visitor',
 					sort: 1,
-					isDefault: 1,
+					isDefault: 0,
 					sendType: 'ban',
 					sendCount: 0,
 					accountCount: 0,
@@ -82,7 +79,7 @@ const roleService = {
 					name: '普通用户',
 					key: 'user_base',
 					sort: 2,
-					isDefault: 0,
+					isDefault: 1,
 					sendType: 'day',
 					sendCount: 5,
 					accountCount: 1,
@@ -183,14 +180,17 @@ const roleService = {
 					if (roleId) {
 						await this.assignPermsInternal(userDb, roleId, defRole.permKeys);
 					}
+				} else {
+					await this.assignPermsInternal(userDb, existing.role_id, defRole.permKeys);
 				}
 			}
 
-			try {
-				if (c?.env?.kv) {
-					await c.env.kv.put('roles_seeded_v2', '1');
-				}
-			} catch (_) {}
+			const seeded = await userDb.prepare(`
+				SELECT COUNT(DISTINCT role_code) AS count FROM role
+				WHERE role_code IN ('visitor','user_base','user_lv0','user_lv1','moderator','master')
+			`).first();
+			if (Number(seeded?.count) !== 6) throw new Error('Standard role bootstrap is incomplete');
+			if (c?.env?.kv) await c.env.kv.put('roles_seeded_v2', '1');
 
 			if (c?.env?.admin) {
 				const masterRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
@@ -199,7 +199,7 @@ const roleService = {
 				}
 			}
 		} catch (e) {
-			console.warn('ensureStandardRoles warning:', e.message);
+			throw new Error('Standard role bootstrap failed', { cause: e });
 		}
 	},
 
@@ -221,7 +221,7 @@ const roleService = {
 				SELECT DISTINCT ?, pid FROM perm WHERE perm_key IN (${placeholders}) AND pid > 0
 			`).bind(roleId, ...permKeys, roleId, ...permKeys).run();
 		} catch (e) {
-			console.warn('assignPermsInternal warning:', e.message);
+			throw new Error('Standard role permission bootstrap failed', { cause: e });
 		}
 	},
 

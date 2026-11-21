@@ -56,7 +56,7 @@ export function RegisterCard({ canvasRef, onSwitch, sysConfig }: RegisterCardPro
       >
         {/* Acrylic prism block */}
         <div
-          className="relative overflow-hidden rounded-3xl p-8 sm:p-10 h-[620px] sm:h-[670px] min-h-[620px] sm:min-h-[670px] max-h-[620px] sm:max-h-[670px] flex flex-col justify-center box-border"
+          className="relative overflow-hidden rounded-3xl p-6 sm:p-10 min-h-[620px] sm:min-h-[670px] flex flex-col justify-center box-border"
           style={{
             background:
               "linear-gradient(145deg, rgba(16,20,46,0.72), rgba(8,10,26,0.56))",

@@ -1,11 +1,13 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = 'https://mail.epocanvas.com';
+const BASE = legacyOrigin;
 
 async function run() {
   console.log('====================================================================');
-  console.log('=== 公网生产全真栈核验：申诉审计死局时间专属 "*天" 与默认全量表保留详细时间 ===');
+  console.log('=== 本地隔离全真栈核验：申诉审计死局时间专属 "*天" 与默认全量表保留详细时间 ===');
   console.log('====================================================================\n');
 
   let browser;
@@ -14,14 +16,14 @@ async function run() {
     const loginRes = await fetch(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@epomail.cyou', password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') })
+      body: JSON.stringify({ email: legacyAdminEmail, password: (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') })
     });
     const loginJson = await loginRes.json();
     assert.strictEqual(loginJson.code, 200, '登录接口返回成功');
     const token = loginJson.data?.token;
 
     console.log('\n[步骤 2] 启动无头 Chromium 浏览器访问生产页面...');
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'
@@ -29,7 +31,7 @@ async function run() {
 
     await context.addInitScript(({ t }) => {
       localStorage.setItem('token', t);
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'admin@epomail.cyou' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyAdminEmail }]));
     }, { t: token });
 
     const page = await context.newPage();

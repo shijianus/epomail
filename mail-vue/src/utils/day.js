@@ -7,6 +7,7 @@ import 'dayjs/locale/nl'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import {useSettingStore} from "@/store/setting.js";
+import {getUiLocaleMetadata, normalizeUiLocale} from "@/utils/ui-locale.js";
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -14,17 +15,12 @@ dayjs.extend(timezone)
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 function getDayjsLocale(lang) {
-    if (lang === 'zh-Hant') return 'zh-tw';
-    if (lang === 'fr') return 'fr';
-    if (lang === 'es') return 'es';
-    if (lang === 'nl') return 'nl';
-    if (lang === 'en') return 'en';
-    return 'zh-cn';
+    return getUiLocaleMetadata(normalizeUiLocale(lang)).dayjsLocale;
 }
 
 export function fromNow(date) {
     const settingStore = useSettingStore();
-    const lang = settingStore.lang || 'zh';
+    const lang = normalizeUiLocale(settingStore.lang || 'zh');
     const dayjsLocale = getDayjsLocale(lang);
     const d = dayjs.utc(date).tz(timeZone).locale(dayjsLocale);
     const now = dayjs().tz(timeZone).locale(dayjsLocale);
@@ -120,7 +116,7 @@ export function updateNow(date) {
 
 export function formatDetailDate(time) {
     const settingStore = useSettingStore();
-    const lang = settingStore.lang || 'zh';
+    const lang = normalizeUiLocale(settingStore.lang || 'zh');
     const dayjsLocale = getDayjsLocale(lang);
     const d = dayjs.utc(time).tz(timeZone).locale(dayjsLocale);
     const now = dayjs().tz(timeZone);
@@ -154,7 +150,7 @@ export function formatDetailDate(time) {
 
 export function tzDayjs(time) {
     const settingStore = useSettingStore();
-    const dayjsLocale = getDayjsLocale(settingStore.lang);
+    const dayjsLocale = getDayjsLocale(normalizeUiLocale(settingStore.lang));
     return dayjs.utc(time).tz(timeZone).locale(dayjsLocale);
 }
 
@@ -163,5 +159,5 @@ export function toUtc(time) {
 }
 
 export function setExtend(lang) {
-    dayjs.locale(getDayjsLocale(lang));
+    dayjs.locale(getDayjsLocale(normalizeUiLocale(lang)));
 }

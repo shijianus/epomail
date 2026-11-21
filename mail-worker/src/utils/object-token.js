@@ -31,7 +31,7 @@ async function importKey(c) {
 }
 
 function signedMessage(key, expiresAt, ownerUserId) {
-	return `epomail-object-v1\n${key}\n${expiresAt}\n${ownerUserId || 0}`;
+	return `epomail-object-v2\n${key}\n${expiresAt}\n${ownerUserId || 0}`;
 }
 
 function clampTtl(ttlSeconds) {
@@ -54,6 +54,7 @@ export async function signObjectAccess(c, key, { ttlSeconds = DEFAULT_TTL_SECOND
 		encoder.encode(signedMessage(key, expiresAt, ownerUserId))
 	);
 	return {
+		v: 2,
 		exp: expiresAt,
 		uid: ownerUserId,
 		sig: base64UrlEncode(signature)
@@ -63,6 +64,7 @@ export async function signObjectAccess(c, key, { ttlSeconds = DEFAULT_TTL_SECOND
 export async function buildSignedObjectUrl(c, key, options = {}) {
 	const token = await signObjectAccess(c, key, options);
 	const params = new URLSearchParams({
+		v: String(token.v),
 		exp: String(token.exp),
 		uid: String(token.uid),
 		sig: token.sig
@@ -77,6 +79,10 @@ export async function buildSignedObjectUrl(c, key, options = {}) {
 export async function verifyObjectAccess(c, key, url) {
 	try {
 		if (!key || typeof key !== 'string') return null;
+		// Legacy v1 links included Telegram-derived capabilities without share
+		// provenance. Retire them together rather than leave a revocation bypass.
+		// Refreshing an authenticated attachment view mints a new v2 URL.
+		if (url?.searchParams?.get('v') !== '2') return null;
 		const exp = Number(url?.searchParams?.get('exp'));
 		const uid = Number(url?.searchParams?.get('uid') || 0);
 		const sig = url?.searchParams?.get('sig') || '';

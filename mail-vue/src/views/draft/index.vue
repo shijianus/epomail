@@ -14,7 +14,7 @@
                :type="'draft'"
   >
     <template #name="props">
-      <span class="send-email">{{ props.email.receiveEmail?.join(',') || '(' + $t('noRecipient') + ')' }}</span>
+      <span class="send-email">{{ props.item.receiveEmail?.join(',') || '(' + $t('noRecipient') + ')' }}</span>
     </template>
     <template #subject="props">
       {{ props.email.subject || '(' + $t('noSubject') + ')' }}
@@ -26,11 +26,15 @@
 import emailScroll from "@/components/email-scroll/index.vue"
 import {emailDelete} from "@/request/email.js";
 import {starAdd, starCancel} from "@/request/star.js";
-import {defineOptions, ref, watch, toRaw} from "vue";
+import {defineOptions, ref, watch} from "vue";
 import {useUiStore} from "@/store/ui.js";
 import {userDraftStore} from "@/store/draft.js";
 import {useEmailStore} from "@/store/email.js";
 import db from "@/db/db.js"
+import { deleteDraftsAndAttachments } from '@/utils/device-privacy.js';
+import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 
 defineOptions({
   name: 'draft'
@@ -41,62 +45,50 @@ const uiStore = useUiStore();
 const emailStore = useEmailStore();
 const scroll = ref({})
 
-watch(() => draftStore.setDraft, async () => {
-
-  const draft = toRaw(draftStore.setDraft)
-  const draftId = draft.draftId
-  const attachments = toRaw(draftStore.setDraft.attachments)
-
-  delete draft.draftId
-  delete draft.attachments
-
-  if (!draft.content && !draft.subject && !(draft.receiveEmail.length > 0)) {
-    await db.value.draft.delete(draftId);
-    await db.value.att.delete(draftId);
-    draftStore.refreshList++
-    return;
-  }
-
-  await db.value.draft.update(draftId, draft);
-  await db.value.att.update(draftId, {attachments: attachments});
-  draftStore.refreshList++
-}, {
-  deep: true
-})
-
-watch(() => draftStore.refreshList, async () => {
-  const {list} = await getEmailList();
-    scroll.value.emailList.length = 0
-    scroll.value.handleList(list);
-    scroll.value.emailList.push(...list)
-})
+watch(() => draftStore.refreshList, () => scroll.value?.refreshList?.())
 
 function getEmailList() {
-  return new Promise((resolve, reject) => {
-    db.value.draft.orderBy('createTime').reverse().toArray().then(list => {
-      const keyword = emailStore.searchParsed.cleanKeyword;
-      if (keyword) {
-        list = list.filter(item => {
-          const lkeyword = keyword.toLowerCase();
-          return (item.subject && item.subject.toLowerCase().includes(lkeyword)) ||
-                 (item.content && item.content.toLowerCase().includes(lkeyword)) ||
-                 (item.receiveEmail && item.receiveEmail.join(',').toLowerCase().includes(lkeyword));
-        });
-      }
-      resolve({list})
-    })
-  })
+  return db.value.draft.orderBy('createTime').reverse().toArray().then(list => {
+    const keyword = emailStore.searchParsed.cleanKeyword;
+    if (keyword) {
+      const lkeyword = keyword.toLowerCase();
+      list = list.filter(item => (item.subject && item.subject.toLowerCase().includes(lkeyword)) ||
+        (item.content && item.content.toLowerCase().includes(lkeyword)) ||
+        (item.receiveEmail && item.receiveEmail.join(',').toLowerCase().includes(lkeyword)));
+    }
+    return { list, total: list.length, complete: true };
+  });
 }
 
 async function deleteDraft(draftIds) {
-  await db.value.draft.bulkDelete(draftIds);
-  draftStore.refreshList++
+  try {
+    const database = db.value;
+    await database.transaction('rw', database.draft, database.att, async () => {
+      const drafts = await database.draft.bulkGet(draftIds);
+      if (drafts.some(draft => draft?.attemptKey)) throw new Error('draft_pending');
+      await deleteDraftsAndAttachments(database, draftIds);
+    });
+    draftStore.refreshList++;
+  } catch (error) {
+    ElMessage.error(error.message === 'draft_pending' ? t('composeAttemptPending') : t('privacySettings.draftDeleteFailed'));
+  }
 }
 
 async function jumpContent(email) {
-  const att = await db.value.att.get(email.draftId)
-  email.attachments = att.attachments
-  uiStore.writerRef.openDraft(email);
+  const database = db.value
+  try {
+    const draft = await database.transaction('r', database.draft, database.att, async () => {
+      const row = await database.draft.get(email.draftId)
+      if (!row) return null
+      const att = await database.att.get(email.draftId)
+      return { ...row, attachments: att?.attachments || [] }
+    })
+    if (database !== db.value) return
+    if (draft) uiStore.writerRef.openDraft(draft)
+    else scroll.value?.refreshList?.()
+  } catch {
+    ElMessage.error(t('mailListLoadFailed'))
+  }
 }
 
 </script>

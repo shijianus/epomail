@@ -1,0 +1,4342 @@
+{
+  "schema": "epomail.backend-stress.v1",
+  "startedAt": "2026-11-15T16:56:14.148Z",
+  "finishedAt": "2026-11-15T16:59:34.887Z",
+  "gitSha": "6db7b38bb9ad9089c4e611c572383dbe64537322",
+  "environment": {
+    "localOnly": true,
+    "host": "127.0.0.1",
+    "egressBlockedByHarness": true,
+    "providerCalls": "not-measured",
+    "browser": false,
+    "deployment": false
+  },
+  "limits": {
+    "maxConcurrency": 32,
+    "maxRequestsPerStage": 10000,
+    "maxStageMs": 300000,
+    "maxTotalMs": 1800000,
+    "requestTimeoutMs": 8000,
+    "shutdownGraceMs": 1000
+  },
+  "configuration": {
+    "soakMs": 120000,
+    "profile": "capacity"
+  },
+  "stages": [
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:56:28.588Z",
+      "name": "baseline",
+      "concurrency": 1,
+      "ratePerSecond": 2,
+      "durationMs": 10000,
+      "maxRequests": 30,
+      "startedAt": 1794761778587,
+      "finishedAt": 1794761788588,
+      "elapsedMs": 10001,
+      "drainMs": 1,
+      "stageCompleted": true,
+      "scheduledRequests": 20,
+      "ignoredAbort": 0,
+      "stopReason": "stage_deadline",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 20,
+        "diagnostics": [],
+        "success": 18,
+        "expected4xx": 2,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 20,
+          "p50": 15.86,
+          "p95": 77.62,
+          "p99": 107.98
+        },
+        "throughputPerSecond": 2,
+        "elapsedMs": 10000.68,
+        "statusCounts": {
+          "200": 18,
+          "403": 2
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 15.59,
+            "p95": 17.25,
+            "p99": 17.4
+          },
+          "throughputPerSecond": 0.3,
+          "elapsedMs": 9982.68,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "sidebar": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 16.14,
+            "p95": 53.62,
+            "p99": 56.96
+          },
+          "throughputPerSecond": 0.32,
+          "elapsedMs": 9494.07,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "search": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 7.32,
+            "p95": 7.55,
+            "p99": 7.57
+          },
+          "throughputPerSecond": 0.33,
+          "elapsedMs": 8992.54,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "account": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 8.48,
+            "p95": 12.48,
+            "p99": 12.84
+          },
+          "throughputPerSecond": 0.35,
+          "elapsedMs": 8492,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "detail": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 66.57,
+            "p95": 110.67,
+            "p99": 114.59
+          },
+          "throughputPerSecond": 0.25,
+          "elapsedMs": 7872.36,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-internal": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 42.16,
+            "p95": 44.79,
+            "p99": 45.03
+          },
+          "throughputPerSecond": 0.27,
+          "elapsedMs": 7459.93,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-replay": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 73.52,
+            "p95": 75.42,
+            "p99": 75.58
+          },
+          "throughputPerSecond": 0.29,
+          "elapsedMs": 6927.88,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-external-disabled": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 2,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 20.19,
+            "p95": 27.97,
+            "p99": 28.66
+          },
+          "throughputPerSecond": 0.31,
+          "elapsedMs": 6487.91,
+          "statusCounts": {
+            "403": 2
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:56:38.350Z",
+      "name": "ramp-1",
+      "concurrency": 1,
+      "ratePerSecond": 4,
+      "durationMs": 10000,
+      "maxRequests": 40,
+      "startedAt": 1794761788589,
+      "finishedAt": 1794761798349,
+      "elapsedMs": 9760,
+      "drainMs": 0,
+      "stageCompleted": true,
+      "scheduledRequests": 40,
+      "ignoredAbort": 0,
+      "stopReason": "request_limit",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 40,
+        "diagnostics": [],
+        "success": 35,
+        "expected4xx": 5,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 40,
+          "p50": 13.12,
+          "p95": 71.78,
+          "p99": 98.39
+        },
+        "throughputPerSecond": 4.1,
+        "elapsedMs": 9760.57,
+        "statusCounts": {
+          "200": 35,
+          "403": 5
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 14.17,
+            "p95": 23.28,
+            "p99": 24.54
+          },
+          "throughputPerSecond": 0.51,
+          "elapsedMs": 9735.52,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "sidebar": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 6.3,
+            "p95": 9.05,
+            "p99": 9.42
+          },
+          "throughputPerSecond": 0.53,
+          "elapsedMs": 9504.45,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "search": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 7.19,
+            "p95": 9.52,
+            "p99": 9.94
+          },
+          "throughputPerSecond": 0.54,
+          "elapsedMs": 9253.32,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "account": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 6.98,
+            "p95": 19.38,
+            "p99": 21.19
+          },
+          "throughputPerSecond": 0.56,
+          "elapsedMs": 8988.75,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "detail": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 18.78,
+            "p95": 56.36,
+            "p99": 63.12
+          },
+          "throughputPerSecond": 0.57,
+          "elapsedMs": 8743.6,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "send-internal": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 37.37,
+            "p95": 51.74,
+            "p99": 53.96
+          },
+          "throughputPerSecond": 0.59,
+          "elapsedMs": 8477.45,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "send-replay": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 70.97,
+            "p95": 101.87,
+            "p99": 104.79
+          },
+          "throughputPerSecond": 0.61,
+          "elapsedMs": 8189.42,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "send-external-disabled": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 5,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 10.05,
+            "p95": 14.13,
+            "p99": 14.54
+          },
+          "throughputPerSecond": 0.63,
+          "elapsedMs": 7996.02,
+          "statusCounts": {
+            "403": 5
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:56:48.295Z",
+      "name": "ramp-4",
+      "concurrency": 4,
+      "ratePerSecond": 16,
+      "durationMs": 10000,
+      "maxRequests": 160,
+      "startedAt": 1794761798350,
+      "finishedAt": 1794761808295,
+      "elapsedMs": 9945,
+      "drainMs": 0,
+      "stageCompleted": true,
+      "scheduledRequests": 160,
+      "ignoredAbort": 0,
+      "stopReason": "request_limit",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 160,
+        "diagnostics": [],
+        "success": 140,
+        "expected4xx": 20,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 160,
+          "p50": 13.52,
+          "p95": 87.39,
+          "p99": 241
+        },
+        "throughputPerSecond": 16.09,
+        "elapsedMs": 9945.5,
+        "statusCounts": {
+          "200": 140,
+          "403": 20
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 12.31,
+            "p95": 65.82,
+            "p99": 147.19
+          },
+          "throughputPerSecond": 2.01,
+          "elapsedMs": 9936.25,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "sidebar": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 7.04,
+            "p95": 24.65,
+            "p99": 133.93
+          },
+          "throughputPerSecond": 2.03,
+          "elapsedMs": 9875.28,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "search": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 7.25,
+            "p95": 24.53,
+            "p99": 30.56
+          },
+          "throughputPerSecond": 2.04,
+          "elapsedMs": 9807.53,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "account": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 7.92,
+            "p95": 18.72,
+            "p99": 24.12
+          },
+          "throughputPerSecond": 2.05,
+          "elapsedMs": 9744.35,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "detail": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 18.74,
+            "p95": 55.91,
+            "p99": 225.56
+          },
+          "throughputPerSecond": 2.07,
+          "elapsedMs": 9676.15,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "send-internal": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 32.62,
+            "p95": 57.95,
+            "p99": 170.46
+          },
+          "throughputPerSecond": 2.09,
+          "elapsedMs": 9588.92,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "send-external-disabled": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 20,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 8.56,
+            "p95": 49.17,
+            "p99": 187.64
+          },
+          "throughputPerSecond": 2.11,
+          "elapsedMs": 9488.99,
+          "statusCounts": {
+            "403": 20
+          }
+        },
+        "send-replay": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 59.46,
+            "p95": 160.47,
+            "p99": 337.84
+          },
+          "throughputPerSecond": 2.11,
+          "elapsedMs": 9466.06,
+          "statusCounts": {
+            "200": 20
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:56:58.393Z",
+      "name": "ramp-8",
+      "concurrency": 8,
+      "ratePerSecond": 32,
+      "durationMs": 10000,
+      "maxRequests": 320,
+      "startedAt": 1794761808295,
+      "finishedAt": 1794761818392,
+      "elapsedMs": 10097,
+      "drainMs": 97,
+      "stageCompleted": true,
+      "scheduledRequests": 320,
+      "ignoredAbort": 0,
+      "stopReason": "request_limit",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 320,
+        "diagnostics": [],
+        "success": 280,
+        "expected4xx": 40,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 320,
+          "p50": 16.68,
+          "p95": 302.27,
+          "p99": 526.2
+        },
+        "throughputPerSecond": 31.69,
+        "elapsedMs": 10097.02,
+        "statusCounts": {
+          "200": 280,
+          "403": 40
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 12.66,
+            "p95": 292.69,
+            "p99": 364.99
+          },
+          "throughputPerSecond": 3.97,
+          "elapsedMs": 10086.36,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "sidebar": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 5.29,
+            "p95": 267.01,
+            "p99": 327.15
+          },
+          "throughputPerSecond": 3.98,
+          "elapsedMs": 10061,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "search": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 5.42,
+            "p95": 242.79,
+            "p99": 278.99
+          },
+          "throughputPerSecond": 3.99,
+          "elapsedMs": 10029.21,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "account": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 6.1,
+            "p95": 217.91,
+            "p99": 365.45
+          },
+          "throughputPerSecond": 4,
+          "elapsedMs": 9997.09,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "detail": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 15.01,
+            "p95": 435.32,
+            "p99": 523.25
+          },
+          "throughputPerSecond": 4.02,
+          "elapsedMs": 9960.39,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "send-internal": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 33.3,
+            "p95": 297.57,
+            "p99": 426.37
+          },
+          "throughputPerSecond": 4.06,
+          "elapsedMs": 9843.93,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "send-external-disabled": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 40,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 12.49,
+            "p95": 342.64,
+            "p99": 391.43
+          },
+          "throughputPerSecond": 4.07,
+          "elapsedMs": 9821.98,
+          "statusCounts": {
+            "403": 40
+          }
+        },
+        "send-replay": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 60.48,
+            "p95": 579.19,
+            "p99": 671.49
+          },
+          "throughputPerSecond": 4.09,
+          "elapsedMs": 9773.56,
+          "statusCounts": {
+            "200": 40
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:57:08.728Z",
+      "name": "ramp-16",
+      "concurrency": 16,
+      "ratePerSecond": 64,
+      "durationMs": 10000,
+      "maxRequests": 640,
+      "startedAt": 1794761818393,
+      "finishedAt": 1794761828727,
+      "elapsedMs": 10334,
+      "drainMs": 334,
+      "stageCompleted": true,
+      "scheduledRequests": 623,
+      "ignoredAbort": 0,
+      "stopReason": "stage_deadline",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 623,
+        "diagnostics": [],
+        "success": 546,
+        "expected4xx": 77,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 623,
+          "p50": 169.47,
+          "p95": 619.88,
+          "p99": 810.83
+        },
+        "throughputPerSecond": 60.29,
+        "elapsedMs": 10334.22,
+        "statusCounts": {
+          "200": 546,
+          "403": 77
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 147.32,
+            "p95": 336,
+            "p99": 500.13
+          },
+          "throughputPerSecond": 7.55,
+          "elapsedMs": 10327.57,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "sidebar": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 141.92,
+            "p95": 263.67,
+            "p99": 435.49
+          },
+          "throughputPerSecond": 7.56,
+          "elapsedMs": 10313.98,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "search": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 118.32,
+            "p95": 238.41,
+            "p99": 411.24
+          },
+          "throughputPerSecond": 7.57,
+          "elapsedMs": 10298.51,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "account": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 140.72,
+            "p95": 309.39,
+            "p99": 486.08
+          },
+          "throughputPerSecond": 7.59,
+          "elapsedMs": 10283.29,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "detail": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 284.01,
+            "p95": 526.56,
+            "p99": 625.98
+          },
+          "throughputPerSecond": 7.6,
+          "elapsedMs": 10260.71,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "send-internal": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 220.67,
+            "p95": 458.43,
+            "p99": 512.73
+          },
+          "throughputPerSecond": 7.63,
+          "elapsedMs": 10229.26,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "send-external-disabled": {
+          "requests": 77,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 77,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 77,
+            "p50": 154.71,
+            "p95": 347.14,
+            "p99": 518.58
+          },
+          "throughputPerSecond": 7.55,
+          "elapsedMs": 10192,
+          "statusCounts": {
+            "403": 77
+          }
+        },
+        "send-replay": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 588.96,
+            "p95": 836.45,
+            "p99": 979.6
+          },
+          "throughputPerSecond": 7.67,
+          "elapsedMs": 10166.73,
+          "statusCounts": {
+            "200": 78
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:57:19.089Z",
+      "name": "ramp-32",
+      "concurrency": 32,
+      "ratePerSecond": 128,
+      "durationMs": 10000,
+      "maxRequests": 1280,
+      "startedAt": 1794761828728,
+      "finishedAt": 1794761839088,
+      "elapsedMs": 10360,
+      "drainMs": 360,
+      "stageCompleted": true,
+      "scheduledRequests": 692,
+      "ignoredAbort": 0,
+      "stopReason": "stage_deadline",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 692,
+        "diagnostics": [],
+        "success": 606,
+        "expected4xx": 86,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 692,
+          "p50": 355.35,
+          "p95": 1053.28,
+          "p99": 1316.32
+        },
+        "throughputPerSecond": 66.8,
+        "elapsedMs": 10359.83,
+        "statusCounts": {
+          "200": 606,
+          "403": 86
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 87,
+          "diagnostics": [],
+          "success": 87,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 87,
+            "p50": 313.5,
+            "p95": 555.67,
+            "p99": 617.16
+          },
+          "throughputPerSecond": 8.41,
+          "elapsedMs": 10345.58,
+          "statusCounts": {
+            "200": 87
+          }
+        },
+        "sidebar": {
+          "requests": 87,
+          "diagnostics": [],
+          "success": 87,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 87,
+            "p50": 300.93,
+            "p95": 524.41,
+            "p99": 604.05
+          },
+          "throughputPerSecond": 8.41,
+          "elapsedMs": 10341.73,
+          "statusCounts": {
+            "200": 87
+          }
+        },
+        "search": {
+          "requests": 87,
+          "diagnostics": [],
+          "success": 87,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 87,
+            "p50": 280.28,
+            "p95": 524.16,
+            "p99": 627.13
+          },
+          "throughputPerSecond": 8.43,
+          "elapsedMs": 10320.22,
+          "statusCounts": {
+            "200": 87
+          }
+        },
+        "account": {
+          "requests": 87,
+          "diagnostics": [],
+          "success": 87,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 87,
+            "p50": 304.04,
+            "p95": 535.5,
+            "p99": 640.75
+          },
+          "throughputPerSecond": 8.44,
+          "elapsedMs": 10309.19,
+          "statusCounts": {
+            "200": 87
+          }
+        },
+        "send-internal": {
+          "requests": 86,
+          "diagnostics": [],
+          "success": 86,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 86,
+            "p50": 397.4,
+            "p95": 619.23,
+            "p99": 751.19
+          },
+          "throughputPerSecond": 8.39,
+          "elapsedMs": 10247.2,
+          "statusCounts": {
+            "200": 86
+          }
+        },
+        "detail": {
+          "requests": 86,
+          "diagnostics": [],
+          "success": 86,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 86,
+            "p50": 621.96,
+            "p95": 963.94,
+            "p99": 1019.23
+          },
+          "throughputPerSecond": 8.43,
+          "elapsedMs": 10204.19,
+          "statusCounts": {
+            "200": 86
+          }
+        },
+        "send-external-disabled": {
+          "requests": 86,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 86,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 86,
+            "p50": 323.46,
+            "p95": 509.43,
+            "p99": 638.12
+          },
+          "throughputPerSecond": 8.43,
+          "elapsedMs": 10199.49,
+          "statusCounts": {
+            "403": 86
+          }
+        },
+        "send-replay": {
+          "requests": 86,
+          "diagnostics": [],
+          "success": 86,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 86,
+            "p50": 999.08,
+            "p95": 1329.38,
+            "p99": 1594.69
+          },
+          "throughputPerSecond": 8.74,
+          "elapsedMs": 9843.42,
+          "statusCounts": {
+            "200": 86
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:57:24.117Z",
+      "name": "burst",
+      "concurrency": 32,
+      "ratePerSecond": 32,
+      "durationMs": 5000,
+      "maxRequests": 160,
+      "startedAt": 1794761839089,
+      "finishedAt": 1794761844117,
+      "elapsedMs": 5028,
+      "drainMs": 28,
+      "stageCompleted": true,
+      "scheduledRequests": 160,
+      "ignoredAbort": 0,
+      "stopReason": "request_limit",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 160,
+        "diagnostics": [],
+        "success": 140,
+        "expected4xx": 20,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 160,
+          "p50": 22.96,
+          "p95": 139.44,
+          "p99": 236.96
+        },
+        "throughputPerSecond": 31.82,
+        "elapsedMs": 5028.39,
+        "statusCounts": {
+          "200": 140,
+          "403": 20
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 21.26,
+            "p95": 54,
+            "p99": 107.02
+          },
+          "throughputPerSecond": 3.99,
+          "elapsedMs": 5016.29,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "sidebar": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 10.46,
+            "p95": 66.35,
+            "p99": 81.46
+          },
+          "throughputPerSecond": 4.01,
+          "elapsedMs": 4990.49,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "search": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 7.22,
+            "p95": 47.24,
+            "p99": 130.94
+          },
+          "throughputPerSecond": 4.03,
+          "elapsedMs": 4960.4,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "account": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 8.37,
+            "p95": 48.53,
+            "p99": 135.84
+          },
+          "throughputPerSecond": 4.06,
+          "elapsedMs": 4929.44,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "detail": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 22.81,
+            "p95": 64.03,
+            "p99": 206.63
+          },
+          "throughputPerSecond": 4.1,
+          "elapsedMs": 4873.58,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "send-internal": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 42.82,
+            "p95": 124.38,
+            "p99": 170.61
+          },
+          "throughputPerSecond": 4.13,
+          "elapsedMs": 4838.52,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "send-external-disabled": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 20,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 21.32,
+            "p95": 84.64,
+            "p99": 137.72
+          },
+          "throughputPerSecond": 4.17,
+          "elapsedMs": 4798.87,
+          "statusCounts": {
+            "403": 20
+          }
+        },
+        "send-replay": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 95.94,
+            "p95": 237.57,
+            "p99": 303.1
+          },
+          "throughputPerSecond": 4.25,
+          "elapsedMs": 4701.58,
+          "statusCounts": {
+            "200": 20
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:57:34.131Z",
+      "name": "recovery",
+      "concurrency": 2,
+      "ratePerSecond": 2,
+      "durationMs": 10000,
+      "maxRequests": 30,
+      "startedAt": 1794761844118,
+      "finishedAt": 1794761854130,
+      "elapsedMs": 10012,
+      "drainMs": 12,
+      "stageCompleted": true,
+      "scheduledRequests": 20,
+      "ignoredAbort": 0,
+      "stopReason": "stage_deadline",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 20,
+        "diagnostics": [],
+        "success": 18,
+        "expected4xx": 2,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 20,
+          "p50": 15.08,
+          "p95": 82.23,
+          "p99": 85.2
+        },
+        "throughputPerSecond": 2,
+        "elapsedMs": 10012.14,
+        "statusCounts": {
+          "200": 18,
+          "403": 2
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 18.87,
+            "p95": 28.85,
+            "p99": 29.74
+          },
+          "throughputPerSecond": 0.3,
+          "elapsedMs": 9982.08,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "sidebar": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 9.71,
+            "p95": 12.37,
+            "p99": 12.61
+          },
+          "throughputPerSecond": 0.32,
+          "elapsedMs": 9503.38,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "search": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 10.42,
+            "p95": 15.91,
+            "p99": 16.39
+          },
+          "throughputPerSecond": 0.33,
+          "elapsedMs": 9006.06,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "account": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 7.45,
+            "p95": 8.39,
+            "p99": 8.48
+          },
+          "throughputPerSecond": 0.35,
+          "elapsedMs": 8503.48,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "detail": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 31.03,
+            "p95": 32.1,
+            "p99": 32.19
+          },
+          "throughputPerSecond": 0.25,
+          "elapsedMs": 7982.57,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-internal": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 67.26,
+            "p95": 84.07,
+            "p99": 85.57
+          },
+          "throughputPerSecond": 0.27,
+          "elapsedMs": 7461.08,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-replay": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 78.54,
+            "p95": 81.69,
+            "p99": 81.97
+          },
+          "throughputPerSecond": 0.29,
+          "elapsedMs": 6937.36,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-external-disabled": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 2,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 25.16,
+            "p95": 36.58,
+            "p99": 37.6
+          },
+          "throughputPerSecond": 0.31,
+          "elapsedMs": 6469.24,
+          "statusCounts": {
+            "403": 2
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:59:34.746Z",
+      "name": "soak",
+      "concurrency": 8,
+      "ratePerSecond": 32,
+      "durationMs": 120000,
+      "maxRequests": 10000,
+      "startedAt": 1794761854131,
+      "finishedAt": 1794761974735,
+      "elapsedMs": 120604,
+      "drainMs": 604,
+      "stageCompleted": true,
+      "scheduledRequests": 3791,
+      "ignoredAbort": 0,
+      "stopReason": "stage_deadline",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 3791,
+        "diagnostics": [],
+        "success": 3318,
+        "expected4xx": 473,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 3791,
+          "p50": 73.12,
+          "p95": 467.99,
+          "p99": 835.72
+        },
+        "throughputPerSecond": 31.43,
+        "elapsedMs": 120604.02,
+        "statusCounts": {
+          "200": 3318,
+          "403": 473
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 63.14,
+            "p95": 267.1,
+            "p99": 500.18
+          },
+          "throughputPerSecond": 3.93,
+          "elapsedMs": 120485.6,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "search": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 38.28,
+            "p95": 245.05,
+            "p99": 383.58
+          },
+          "throughputPerSecond": 3.93,
+          "elapsedMs": 120459.8,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "account": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 32.16,
+            "p95": 274.65,
+            "p99": 547.54
+          },
+          "throughputPerSecond": 3.93,
+          "elapsedMs": 120459.73,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "sidebar": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 53.16,
+            "p95": 271.83,
+            "p99": 519.44
+          },
+          "throughputPerSecond": 3.93,
+          "elapsedMs": 120459.69,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "detail": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 85.61,
+            "p95": 466.65,
+            "p99": 770.41
+          },
+          "throughputPerSecond": 3.94,
+          "elapsedMs": 120441.45,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "send-internal": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 85.64,
+            "p95": 349.13,
+            "p99": 615.03
+          },
+          "throughputPerSecond": 3.94,
+          "elapsedMs": 120397.55,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "send-external-disabled": {
+          "requests": 473,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 473,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 473,
+            "p50": 64.15,
+            "p95": 278.47,
+            "p99": 593.56
+          },
+          "throughputPerSecond": 3.93,
+          "elapsedMs": 120303.78,
+          "statusCounts": {
+            "403": 473
+          }
+        },
+        "send-replay": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 214.79,
+            "p95": 888.55,
+            "p99": 1172.46
+          },
+          "throughputPerSecond": 3.94,
+          "elapsedMs": 120266.99,
+          "statusCounts": {
+            "200": 474
+          }
+        }
+      }
+    }
+  ],
+  "slo": null,
+  "log": [
+    {
+      "event": "stack-started",
+      "at": "2026-11-15T16:56:16.158Z",
+      "host": "127.0.0.1",
+      "port": 46471
+    },
+    {
+      "event": "fixture-ready",
+      "at": "2026-11-15T16:56:18.586Z",
+      "role": {
+        "name": "Local stress 1794761777483-6-0f95e927",
+        "roleId": 7,
+        "sendCount": 10000,
+        "storageQuotaMb": 64
+      },
+      "quota": "positive-finite",
+      "egress": "blocked-by-harness",
+      "providerCalls": "not-measured"
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:56:28.588Z",
+      "name": "baseline",
+      "concurrency": 1,
+      "ratePerSecond": 2,
+      "durationMs": 10000,
+      "maxRequests": 30,
+      "startedAt": 1794761778587,
+      "finishedAt": 1794761788588,
+      "elapsedMs": 10001,
+      "drainMs": 1,
+      "stageCompleted": true,
+      "scheduledRequests": 20,
+      "ignoredAbort": 0,
+      "stopReason": "stage_deadline",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 20,
+        "diagnostics": [],
+        "success": 18,
+        "expected4xx": 2,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 20,
+          "p50": 15.86,
+          "p95": 77.62,
+          "p99": 107.98
+        },
+        "throughputPerSecond": 2,
+        "elapsedMs": 10000.68,
+        "statusCounts": {
+          "200": 18,
+          "403": 2
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 15.59,
+            "p95": 17.25,
+            "p99": 17.4
+          },
+          "throughputPerSecond": 0.3,
+          "elapsedMs": 9982.68,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "sidebar": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 16.14,
+            "p95": 53.62,
+            "p99": 56.96
+          },
+          "throughputPerSecond": 0.32,
+          "elapsedMs": 9494.07,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "search": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 7.32,
+            "p95": 7.55,
+            "p99": 7.57
+          },
+          "throughputPerSecond": 0.33,
+          "elapsedMs": 8992.54,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "account": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 8.48,
+            "p95": 12.48,
+            "p99": 12.84
+          },
+          "throughputPerSecond": 0.35,
+          "elapsedMs": 8492,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "detail": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 66.57,
+            "p95": 110.67,
+            "p99": 114.59
+          },
+          "throughputPerSecond": 0.25,
+          "elapsedMs": 7872.36,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-internal": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 42.16,
+            "p95": 44.79,
+            "p99": 45.03
+          },
+          "throughputPerSecond": 0.27,
+          "elapsedMs": 7459.93,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-replay": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 73.52,
+            "p95": 75.42,
+            "p99": 75.58
+          },
+          "throughputPerSecond": 0.29,
+          "elapsedMs": 6927.88,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-external-disabled": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 2,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 20.19,
+            "p95": 27.97,
+            "p99": 28.66
+          },
+          "throughputPerSecond": 0.31,
+          "elapsedMs": 6487.91,
+          "statusCounts": {
+            "403": 2
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:56:38.350Z",
+      "name": "ramp-1",
+      "concurrency": 1,
+      "ratePerSecond": 4,
+      "durationMs": 10000,
+      "maxRequests": 40,
+      "startedAt": 1794761788589,
+      "finishedAt": 1794761798349,
+      "elapsedMs": 9760,
+      "drainMs": 0,
+      "stageCompleted": true,
+      "scheduledRequests": 40,
+      "ignoredAbort": 0,
+      "stopReason": "request_limit",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 40,
+        "diagnostics": [],
+        "success": 35,
+        "expected4xx": 5,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 40,
+          "p50": 13.12,
+          "p95": 71.78,
+          "p99": 98.39
+        },
+        "throughputPerSecond": 4.1,
+        "elapsedMs": 9760.57,
+        "statusCounts": {
+          "200": 35,
+          "403": 5
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 14.17,
+            "p95": 23.28,
+            "p99": 24.54
+          },
+          "throughputPerSecond": 0.51,
+          "elapsedMs": 9735.52,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "sidebar": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 6.3,
+            "p95": 9.05,
+            "p99": 9.42
+          },
+          "throughputPerSecond": 0.53,
+          "elapsedMs": 9504.45,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "search": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 7.19,
+            "p95": 9.52,
+            "p99": 9.94
+          },
+          "throughputPerSecond": 0.54,
+          "elapsedMs": 9253.32,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "account": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 6.98,
+            "p95": 19.38,
+            "p99": 21.19
+          },
+          "throughputPerSecond": 0.56,
+          "elapsedMs": 8988.75,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "detail": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 18.78,
+            "p95": 56.36,
+            "p99": 63.12
+          },
+          "throughputPerSecond": 0.57,
+          "elapsedMs": 8743.6,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "send-internal": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 37.37,
+            "p95": 51.74,
+            "p99": 53.96
+          },
+          "throughputPerSecond": 0.59,
+          "elapsedMs": 8477.45,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "send-replay": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 5,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 70.97,
+            "p95": 101.87,
+            "p99": 104.79
+          },
+          "throughputPerSecond": 0.61,
+          "elapsedMs": 8189.42,
+          "statusCounts": {
+            "200": 5
+          }
+        },
+        "send-external-disabled": {
+          "requests": 5,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 5,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 5,
+            "p50": 10.05,
+            "p95": 14.13,
+            "p99": 14.54
+          },
+          "throughputPerSecond": 0.63,
+          "elapsedMs": 7996.02,
+          "statusCounts": {
+            "403": 5
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:56:48.295Z",
+      "name": "ramp-4",
+      "concurrency": 4,
+      "ratePerSecond": 16,
+      "durationMs": 10000,
+      "maxRequests": 160,
+      "startedAt": 1794761798350,
+      "finishedAt": 1794761808295,
+      "elapsedMs": 9945,
+      "drainMs": 0,
+      "stageCompleted": true,
+      "scheduledRequests": 160,
+      "ignoredAbort": 0,
+      "stopReason": "request_limit",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 160,
+        "diagnostics": [],
+        "success": 140,
+        "expected4xx": 20,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 160,
+          "p50": 13.52,
+          "p95": 87.39,
+          "p99": 241
+        },
+        "throughputPerSecond": 16.09,
+        "elapsedMs": 9945.5,
+        "statusCounts": {
+          "200": 140,
+          "403": 20
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 12.31,
+            "p95": 65.82,
+            "p99": 147.19
+          },
+          "throughputPerSecond": 2.01,
+          "elapsedMs": 9936.25,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "sidebar": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 7.04,
+            "p95": 24.65,
+            "p99": 133.93
+          },
+          "throughputPerSecond": 2.03,
+          "elapsedMs": 9875.28,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "search": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 7.25,
+            "p95": 24.53,
+            "p99": 30.56
+          },
+          "throughputPerSecond": 2.04,
+          "elapsedMs": 9807.53,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "account": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 7.92,
+            "p95": 18.72,
+            "p99": 24.12
+          },
+          "throughputPerSecond": 2.05,
+          "elapsedMs": 9744.35,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "detail": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 18.74,
+            "p95": 55.91,
+            "p99": 225.56
+          },
+          "throughputPerSecond": 2.07,
+          "elapsedMs": 9676.15,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "send-internal": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 32.62,
+            "p95": 57.95,
+            "p99": 170.46
+          },
+          "throughputPerSecond": 2.09,
+          "elapsedMs": 9588.92,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "send-external-disabled": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 20,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 8.56,
+            "p95": 49.17,
+            "p99": 187.64
+          },
+          "throughputPerSecond": 2.11,
+          "elapsedMs": 9488.99,
+          "statusCounts": {
+            "403": 20
+          }
+        },
+        "send-replay": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 59.46,
+            "p95": 160.47,
+            "p99": 337.84
+          },
+          "throughputPerSecond": 2.11,
+          "elapsedMs": 9466.06,
+          "statusCounts": {
+            "200": 20
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:56:58.393Z",
+      "name": "ramp-8",
+      "concurrency": 8,
+      "ratePerSecond": 32,
+      "durationMs": 10000,
+      "maxRequests": 320,
+      "startedAt": 1794761808295,
+      "finishedAt": 1794761818392,
+      "elapsedMs": 10097,
+      "drainMs": 97,
+      "stageCompleted": true,
+      "scheduledRequests": 320,
+      "ignoredAbort": 0,
+      "stopReason": "request_limit",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 320,
+        "diagnostics": [],
+        "success": 280,
+        "expected4xx": 40,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 320,
+          "p50": 16.68,
+          "p95": 302.27,
+          "p99": 526.2
+        },
+        "throughputPerSecond": 31.69,
+        "elapsedMs": 10097.02,
+        "statusCounts": {
+          "200": 280,
+          "403": 40
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 12.66,
+            "p95": 292.69,
+            "p99": 364.99
+          },
+          "throughputPerSecond": 3.97,
+          "elapsedMs": 10086.36,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "sidebar": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 5.29,
+            "p95": 267.01,
+            "p99": 327.15
+          },
+          "throughputPerSecond": 3.98,
+          "elapsedMs": 10061,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "search": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 5.42,
+            "p95": 242.79,
+            "p99": 278.99
+          },
+          "throughputPerSecond": 3.99,
+          "elapsedMs": 10029.21,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "account": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 6.1,
+            "p95": 217.91,
+            "p99": 365.45
+          },
+          "throughputPerSecond": 4,
+          "elapsedMs": 9997.09,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "detail": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 15.01,
+            "p95": 435.32,
+            "p99": 523.25
+          },
+          "throughputPerSecond": 4.02,
+          "elapsedMs": 9960.39,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "send-internal": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 33.3,
+            "p95": 297.57,
+            "p99": 426.37
+          },
+          "throughputPerSecond": 4.06,
+          "elapsedMs": 9843.93,
+          "statusCounts": {
+            "200": 40
+          }
+        },
+        "send-external-disabled": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 40,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 12.49,
+            "p95": 342.64,
+            "p99": 391.43
+          },
+          "throughputPerSecond": 4.07,
+          "elapsedMs": 9821.98,
+          "statusCounts": {
+            "403": 40
+          }
+        },
+        "send-replay": {
+          "requests": 40,
+          "diagnostics": [],
+          "success": 40,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 40,
+            "p50": 60.48,
+            "p95": 579.19,
+            "p99": 671.49
+          },
+          "throughputPerSecond": 4.09,
+          "elapsedMs": 9773.56,
+          "statusCounts": {
+            "200": 40
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:57:08.728Z",
+      "name": "ramp-16",
+      "concurrency": 16,
+      "ratePerSecond": 64,
+      "durationMs": 10000,
+      "maxRequests": 640,
+      "startedAt": 1794761818393,
+      "finishedAt": 1794761828727,
+      "elapsedMs": 10334,
+      "drainMs": 334,
+      "stageCompleted": true,
+      "scheduledRequests": 623,
+      "ignoredAbort": 0,
+      "stopReason": "stage_deadline",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 623,
+        "diagnostics": [],
+        "success": 546,
+        "expected4xx": 77,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 623,
+          "p50": 169.47,
+          "p95": 619.88,
+          "p99": 810.83
+        },
+        "throughputPerSecond": 60.29,
+        "elapsedMs": 10334.22,
+        "statusCounts": {
+          "200": 546,
+          "403": 77
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 147.32,
+            "p95": 336,
+            "p99": 500.13
+          },
+          "throughputPerSecond": 7.55,
+          "elapsedMs": 10327.57,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "sidebar": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 141.92,
+            "p95": 263.67,
+            "p99": 435.49
+          },
+          "throughputPerSecond": 7.56,
+          "elapsedMs": 10313.98,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "search": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 118.32,
+            "p95": 238.41,
+            "p99": 411.24
+          },
+          "throughputPerSecond": 7.57,
+          "elapsedMs": 10298.51,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "account": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 140.72,
+            "p95": 309.39,
+            "p99": 486.08
+          },
+          "throughputPerSecond": 7.59,
+          "elapsedMs": 10283.29,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "detail": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 284.01,
+            "p95": 526.56,
+            "p99": 625.98
+          },
+          "throughputPerSecond": 7.6,
+          "elapsedMs": 10260.71,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "send-internal": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 220.67,
+            "p95": 458.43,
+            "p99": 512.73
+          },
+          "throughputPerSecond": 7.63,
+          "elapsedMs": 10229.26,
+          "statusCounts": {
+            "200": 78
+          }
+        },
+        "send-external-disabled": {
+          "requests": 77,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 77,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 77,
+            "p50": 154.71,
+            "p95": 347.14,
+            "p99": 518.58
+          },
+          "throughputPerSecond": 7.55,
+          "elapsedMs": 10192,
+          "statusCounts": {
+            "403": 77
+          }
+        },
+        "send-replay": {
+          "requests": 78,
+          "diagnostics": [],
+          "success": 78,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 78,
+            "p50": 588.96,
+            "p95": 836.45,
+            "p99": 979.6
+          },
+          "throughputPerSecond": 7.67,
+          "elapsedMs": 10166.73,
+          "statusCounts": {
+            "200": 78
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:57:19.089Z",
+      "name": "ramp-32",
+      "concurrency": 32,
+      "ratePerSecond": 128,
+      "durationMs": 10000,
+      "maxRequests": 1280,
+      "startedAt": 1794761828728,
+      "finishedAt": 1794761839088,
+      "elapsedMs": 10360,
+      "drainMs": 360,
+      "stageCompleted": true,
+      "scheduledRequests": 692,
+      "ignoredAbort": 0,
+      "stopReason": "stage_deadline",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 692,
+        "diagnostics": [],
+        "success": 606,
+        "expected4xx": 86,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 692,
+          "p50": 355.35,
+          "p95": 1053.28,
+          "p99": 1316.32
+        },
+        "throughputPerSecond": 66.8,
+        "elapsedMs": 10359.83,
+        "statusCounts": {
+          "200": 606,
+          "403": 86
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 87,
+          "diagnostics": [],
+          "success": 87,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 87,
+            "p50": 313.5,
+            "p95": 555.67,
+            "p99": 617.16
+          },
+          "throughputPerSecond": 8.41,
+          "elapsedMs": 10345.58,
+          "statusCounts": {
+            "200": 87
+          }
+        },
+        "sidebar": {
+          "requests": 87,
+          "diagnostics": [],
+          "success": 87,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 87,
+            "p50": 300.93,
+            "p95": 524.41,
+            "p99": 604.05
+          },
+          "throughputPerSecond": 8.41,
+          "elapsedMs": 10341.73,
+          "statusCounts": {
+            "200": 87
+          }
+        },
+        "search": {
+          "requests": 87,
+          "diagnostics": [],
+          "success": 87,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 87,
+            "p50": 280.28,
+            "p95": 524.16,
+            "p99": 627.13
+          },
+          "throughputPerSecond": 8.43,
+          "elapsedMs": 10320.22,
+          "statusCounts": {
+            "200": 87
+          }
+        },
+        "account": {
+          "requests": 87,
+          "diagnostics": [],
+          "success": 87,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 87,
+            "p50": 304.04,
+            "p95": 535.5,
+            "p99": 640.75
+          },
+          "throughputPerSecond": 8.44,
+          "elapsedMs": 10309.19,
+          "statusCounts": {
+            "200": 87
+          }
+        },
+        "send-internal": {
+          "requests": 86,
+          "diagnostics": [],
+          "success": 86,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 86,
+            "p50": 397.4,
+            "p95": 619.23,
+            "p99": 751.19
+          },
+          "throughputPerSecond": 8.39,
+          "elapsedMs": 10247.2,
+          "statusCounts": {
+            "200": 86
+          }
+        },
+        "detail": {
+          "requests": 86,
+          "diagnostics": [],
+          "success": 86,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 86,
+            "p50": 621.96,
+            "p95": 963.94,
+            "p99": 1019.23
+          },
+          "throughputPerSecond": 8.43,
+          "elapsedMs": 10204.19,
+          "statusCounts": {
+            "200": 86
+          }
+        },
+        "send-external-disabled": {
+          "requests": 86,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 86,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 86,
+            "p50": 323.46,
+            "p95": 509.43,
+            "p99": 638.12
+          },
+          "throughputPerSecond": 8.43,
+          "elapsedMs": 10199.49,
+          "statusCounts": {
+            "403": 86
+          }
+        },
+        "send-replay": {
+          "requests": 86,
+          "diagnostics": [],
+          "success": 86,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 86,
+            "p50": 999.08,
+            "p95": 1329.38,
+            "p99": 1594.69
+          },
+          "throughputPerSecond": 8.74,
+          "elapsedMs": 9843.42,
+          "statusCounts": {
+            "200": 86
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:57:24.117Z",
+      "name": "burst",
+      "concurrency": 32,
+      "ratePerSecond": 32,
+      "durationMs": 5000,
+      "maxRequests": 160,
+      "startedAt": 1794761839089,
+      "finishedAt": 1794761844117,
+      "elapsedMs": 5028,
+      "drainMs": 28,
+      "stageCompleted": true,
+      "scheduledRequests": 160,
+      "ignoredAbort": 0,
+      "stopReason": "request_limit",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 160,
+        "diagnostics": [],
+        "success": 140,
+        "expected4xx": 20,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 160,
+          "p50": 22.96,
+          "p95": 139.44,
+          "p99": 236.96
+        },
+        "throughputPerSecond": 31.82,
+        "elapsedMs": 5028.39,
+        "statusCounts": {
+          "200": 140,
+          "403": 20
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 21.26,
+            "p95": 54,
+            "p99": 107.02
+          },
+          "throughputPerSecond": 3.99,
+          "elapsedMs": 5016.29,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "sidebar": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 10.46,
+            "p95": 66.35,
+            "p99": 81.46
+          },
+          "throughputPerSecond": 4.01,
+          "elapsedMs": 4990.49,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "search": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 7.22,
+            "p95": 47.24,
+            "p99": 130.94
+          },
+          "throughputPerSecond": 4.03,
+          "elapsedMs": 4960.4,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "account": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 8.37,
+            "p95": 48.53,
+            "p99": 135.84
+          },
+          "throughputPerSecond": 4.06,
+          "elapsedMs": 4929.44,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "detail": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 22.81,
+            "p95": 64.03,
+            "p99": 206.63
+          },
+          "throughputPerSecond": 4.1,
+          "elapsedMs": 4873.58,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "send-internal": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 42.82,
+            "p95": 124.38,
+            "p99": 170.61
+          },
+          "throughputPerSecond": 4.13,
+          "elapsedMs": 4838.52,
+          "statusCounts": {
+            "200": 20
+          }
+        },
+        "send-external-disabled": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 20,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 21.32,
+            "p95": 84.64,
+            "p99": 137.72
+          },
+          "throughputPerSecond": 4.17,
+          "elapsedMs": 4798.87,
+          "statusCounts": {
+            "403": 20
+          }
+        },
+        "send-replay": {
+          "requests": 20,
+          "diagnostics": [],
+          "success": 20,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 20,
+            "p50": 95.94,
+            "p95": 237.57,
+            "p99": 303.1
+          },
+          "throughputPerSecond": 4.25,
+          "elapsedMs": 4701.58,
+          "statusCounts": {
+            "200": 20
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:57:34.131Z",
+      "name": "recovery",
+      "concurrency": 2,
+      "ratePerSecond": 2,
+      "durationMs": 10000,
+      "maxRequests": 30,
+      "startedAt": 1794761844118,
+      "finishedAt": 1794761854130,
+      "elapsedMs": 10012,
+      "drainMs": 12,
+      "stageCompleted": true,
+      "scheduledRequests": 20,
+      "ignoredAbort": 0,
+      "stopReason": "stage_deadline",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 20,
+        "diagnostics": [],
+        "success": 18,
+        "expected4xx": 2,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 20,
+          "p50": 15.08,
+          "p95": 82.23,
+          "p99": 85.2
+        },
+        "throughputPerSecond": 2,
+        "elapsedMs": 10012.14,
+        "statusCounts": {
+          "200": 18,
+          "403": 2
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 18.87,
+            "p95": 28.85,
+            "p99": 29.74
+          },
+          "throughputPerSecond": 0.3,
+          "elapsedMs": 9982.08,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "sidebar": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 9.71,
+            "p95": 12.37,
+            "p99": 12.61
+          },
+          "throughputPerSecond": 0.32,
+          "elapsedMs": 9503.38,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "search": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 10.42,
+            "p95": 15.91,
+            "p99": 16.39
+          },
+          "throughputPerSecond": 0.33,
+          "elapsedMs": 9006.06,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "account": {
+          "requests": 3,
+          "diagnostics": [],
+          "success": 3,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 3,
+            "p50": 7.45,
+            "p95": 8.39,
+            "p99": 8.48
+          },
+          "throughputPerSecond": 0.35,
+          "elapsedMs": 8503.48,
+          "statusCounts": {
+            "200": 3
+          }
+        },
+        "detail": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 31.03,
+            "p95": 32.1,
+            "p99": 32.19
+          },
+          "throughputPerSecond": 0.25,
+          "elapsedMs": 7982.57,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-internal": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 67.26,
+            "p95": 84.07,
+            "p99": 85.57
+          },
+          "throughputPerSecond": 0.27,
+          "elapsedMs": 7461.08,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-replay": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 2,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 78.54,
+            "p95": 81.69,
+            "p99": 81.97
+          },
+          "throughputPerSecond": 0.29,
+          "elapsedMs": 6937.36,
+          "statusCounts": {
+            "200": 2
+          }
+        },
+        "send-external-disabled": {
+          "requests": 2,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 2,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 2,
+            "p50": 25.16,
+            "p95": 36.58,
+            "p99": 37.6
+          },
+          "throughputPerSecond": 0.31,
+          "elapsedMs": 6469.24,
+          "statusCounts": {
+            "403": 2
+          }
+        }
+      }
+    },
+    {
+      "event": "stage-complete",
+      "at": "2026-11-15T16:59:34.746Z",
+      "name": "soak",
+      "concurrency": 8,
+      "ratePerSecond": 32,
+      "durationMs": 120000,
+      "maxRequests": 10000,
+      "startedAt": 1794761854131,
+      "finishedAt": 1794761974735,
+      "elapsedMs": 120604,
+      "drainMs": 604,
+      "stageCompleted": true,
+      "scheduledRequests": 3791,
+      "ignoredAbort": 0,
+      "stopReason": "stage_deadline",
+      "timedOut": false,
+      "timedOutRequests": 0,
+      "stats": {
+        "requests": 3791,
+        "diagnostics": [],
+        "success": 3318,
+        "expected4xx": 473,
+        "unexpected4xx": 0,
+        "unexpected5xx": 0,
+        "contractFailure": 0,
+        "operationFailure": 0,
+        "timeout": 0,
+        "transportError": 0,
+        "ignoredAbort": 0,
+        "latencyMs": {
+          "count": 3791,
+          "p50": 73.12,
+          "p95": 467.99,
+          "p99": 835.72
+        },
+        "throughputPerSecond": 31.43,
+        "elapsedMs": 120604.02,
+        "statusCounts": {
+          "200": 3318,
+          "403": 473
+        }
+      },
+      "byKind": {
+        "list": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 63.14,
+            "p95": 267.1,
+            "p99": 500.18
+          },
+          "throughputPerSecond": 3.93,
+          "elapsedMs": 120485.6,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "search": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 38.28,
+            "p95": 245.05,
+            "p99": 383.58
+          },
+          "throughputPerSecond": 3.93,
+          "elapsedMs": 120459.8,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "account": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 32.16,
+            "p95": 274.65,
+            "p99": 547.54
+          },
+          "throughputPerSecond": 3.93,
+          "elapsedMs": 120459.73,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "sidebar": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 53.16,
+            "p95": 271.83,
+            "p99": 519.44
+          },
+          "throughputPerSecond": 3.93,
+          "elapsedMs": 120459.69,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "detail": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 85.61,
+            "p95": 466.65,
+            "p99": 770.41
+          },
+          "throughputPerSecond": 3.94,
+          "elapsedMs": 120441.45,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "send-internal": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 85.64,
+            "p95": 349.13,
+            "p99": 615.03
+          },
+          "throughputPerSecond": 3.94,
+          "elapsedMs": 120397.55,
+          "statusCounts": {
+            "200": 474
+          }
+        },
+        "send-external-disabled": {
+          "requests": 473,
+          "diagnostics": [],
+          "success": 0,
+          "expected4xx": 473,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 473,
+            "p50": 64.15,
+            "p95": 278.47,
+            "p99": 593.56
+          },
+          "throughputPerSecond": 3.93,
+          "elapsedMs": 120303.78,
+          "statusCounts": {
+            "403": 473
+          }
+        },
+        "send-replay": {
+          "requests": 474,
+          "diagnostics": [],
+          "success": 474,
+          "expected4xx": 0,
+          "unexpected4xx": 0,
+          "unexpected5xx": 0,
+          "contractFailure": 0,
+          "operationFailure": 0,
+          "timeout": 0,
+          "transportError": 0,
+          "ignoredAbort": 0,
+          "latencyMs": {
+            "count": 474,
+            "p50": 214.79,
+            "p95": 888.55,
+            "p99": 1172.46
+          },
+          "throughputPerSecond": 3.94,
+          "elapsedMs": 120266.99,
+          "statusCounts": {
+            "200": 474
+          }
+        }
+      }
+    }
+  ],
+  "cleanup": {
+    "processTreeStopped": true,
+    "temporaryDirectoryRemoved": true
+  },
+  "error": {
+    "name": "AggregateError",
+    "message": "stage ramp-32 sample count too low (692/1280, floor 960)"
+  }
+}

@@ -21,7 +21,7 @@ async function run() {
       body: JSON.stringify({ email: USER_EMAIL, password: USER_PWD })
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, `登录必须成功: ${JSON.stringify(loginData)}`);
+    assert.strictEqual(loginData.code, 200, `登录必须成功: ${Number(loginData?.code)}`);
     const token = loginData.data?.token;
     assert.ok(token, '返回数据必须包含 JWT Token');
     console.log('  ✓ 登录成功，Token 获取就绪');

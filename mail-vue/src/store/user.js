@@ -3,6 +3,7 @@ import {loginUserInfo} from "@/request/my.js";
 import { useUiStore } from "@/store/ui.js";
 import { useSettingStore } from "@/store/setting.js";
 import i18n from "@/i18n/index.js";
+import { normalizeUiLocale } from "@/utils/ui-locale.js";
 
 export const useUserStore = defineStore('user', {
     state: () => ({
@@ -61,14 +62,17 @@ export const useUserStore = defineStore('user', {
             }
 
             // 8. Language: bound to user if specified
-            if (user.lang && user.lang !== settingStore.lang) {
-                settingStore.lang = user.lang
-                try {
-                    let setting = JSON.parse(localStorage.getItem('setting') || '{}')
-                    localStorage.setItem('setting', JSON.stringify({ ...setting, lang: user.lang }))
-                } catch (e) {}
-                if (i18n && i18n.global) {
-                    i18n.global.locale.value = user.lang
+            if (user.lang) {
+                const lang = normalizeUiLocale(user.lang, settingStore.lang || 'zh')
+                if (lang !== settingStore.lang) {
+                    settingStore.lang = lang
+                    try {
+                        let setting = JSON.parse(localStorage.getItem('setting') || '{}')
+                        localStorage.setItem('setting', JSON.stringify({ ...setting, lang }))
+                    } catch (e) {}
+                    if (i18n && i18n.global) {
+                        i18n.global.locale.value = lang
+                    }
                 }
             }
 

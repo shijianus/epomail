@@ -1,11 +1,13 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = 'https://mail.epocanvas.com';
+const BASE = legacyOrigin;
 
 async function run() {
   console.log('====================================================================');
-  console.log('=== 公网生产全真栈视觉验证：操作报告抽屉四种变体与大厂级 UI 质感核验 ===');
+  console.log('=== 本地隔离全真栈视觉验证：操作报告抽屉四种变体与大厂级 UI 质感核验 ===');
   console.log('====================================================================\n');
 
   let browser;
@@ -15,7 +17,7 @@ async function run() {
     const loginRes = await fetch(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@epomail.cyou', password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') })
+      body: JSON.stringify({ email: legacyAdminEmail, password: (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') })
     });
     const loginJson = await loginRes.json();
     assert.strictEqual(loginJson.code, 200, '登录接口返回成功');
@@ -23,7 +25,7 @@ async function run() {
     assert.ok(token, '登录成功获取有效 JWT Token');
 
     console.log('\n[步骤 2] 启动 Playwright 浏览器，设置视口 1440x900...');
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'
@@ -31,7 +33,7 @@ async function run() {
 
     await context.addInitScript(({ t }) => {
       localStorage.setItem('token', t);
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'admin@epomail.cyou' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyAdminEmail }]));
     }, { t: token });
 
     const page = await context.newPage();
@@ -170,7 +172,7 @@ async function run() {
     console.log('  📸 已保存截图: tests/visual_deeplink_active.png');
 
     console.log('\n====================================================================');
-    console.log('=== 恭喜！公网生产环境 4 种抽屉变体与视觉质感核验 100% 全部通过！ ===');
+    console.log('=== 恭喜！本地隔离环境 4 种抽屉变体与视觉质感核验 100% 全部通过！ ===');
     console.log('====================================================================\n');
 
   } catch (err) {

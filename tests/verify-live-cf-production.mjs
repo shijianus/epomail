@@ -1,14 +1,16 @@
+import { legacyOrigin, legacyFetch as fetch, legacyUserEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 
 async function runLiveCFVerification() {
   console.log('================================================================');
   console.log('🚀 100% REAL LIVE CLOUDFLARE PUBLIC PRODUCTION VERIFICATION');
-  console.log('   Target Webmail: https://mail.epocanvas.com');
+  console.log('   Target Webmail: <本地测试地址>');
   console.log('   Target Docs:    https://epomail-docs.pages.dev');
   console.log('   Policy: ZERO page.route MOCKS - 100% Live Cloudflare Network');
   console.log('================================================================\n');
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: 'zh-CN',
@@ -23,7 +25,7 @@ async function runLiveCFVerification() {
     // PART 1: Webmail Login Page & Forgot Password Modal
     // -------------------------------------------------------------
     console.log('📌 PART 1: Testing Webmail Login UI & Forgot Password Guidance Modal');
-    await page.goto('https://mail.epocanvas.com/login/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto(legacyOrigin + '/login/', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
 
     const emailInput = page.locator('input[type="email"], input#email, input[name="email"], input[placeholder*="@"], input[placeholder*="坐标"]').first();
@@ -148,23 +150,23 @@ async function runLiveCFVerification() {
     // PART 3: Master Admin Real Login & Auth against Live Backend
     // -------------------------------------------------------------
     console.log('\n📌 PART 3: Testing Master Admin Real Authentication on Live Backend');
-    const loginRes = await fetch('https://mail.epocanvas.com/api/login', {
+    const loginRes = await fetch(legacyOrigin + '/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'audit_normal_1789140856529@epomail.bond', password: process.env.EPOMAIL_E2E_USER_PASSWORD || '' })
+      body: JSON.stringify({ email: legacyUserEmail, password: process.env.EPOMAIL_E2E_USER_PASSWORD || '' })
     });
     const loginJson = await loginRes.json();
     if (loginJson.code !== 200 || !loginJson.data?.token) {
-      throw new Error(`Live login failed: ${JSON.stringify(loginJson)}`);
+      throw new Error(`Live login failed: ${Number(loginJson?.code)}`);
     }
     const token = loginJson.data.token;
     console.log(`  ✓ Authenticated with live backend API! Token acquired.`);
     passedAssertions++;
 
-    await page.goto('https://mail.epocanvas.com/login/', { waitUntil: 'domcontentloaded' });
+    await page.goto(legacyOrigin + '/login/', { waitUntil: 'domcontentloaded' });
     await page.evaluate(({ t }) => {
       localStorage.setItem('token', t);
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'audit_normal_1789140856529@epomail.bond' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyUserEmail }]));
     }, { t: token });
 
     await page.route('**/api/my/loginUserInfo', async (route) => {
@@ -175,7 +177,7 @@ async function runLiveCFVerification() {
           code: 200,
           data: {
             userId: 133,
-            email: 'audit_normal_1789140856529@epomail.bond',
+            email: legacyUserEmail,
             name: '站长',
             permKeys: ['*'],
             role: { roleId: 6, roleCode: 'master', name: '站长' }
@@ -198,7 +200,7 @@ async function runLiveCFVerification() {
     // PART 4: User Management Console Multi-mode Column Adaptation
     // -------------------------------------------------------------
     console.log('\n📌 PART 4: Testing User Management Console (/user) Multi-mode Column Adaptation');
-    await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/admin/user', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.goto(legacyOrigin + '/mail/u/0/#manage/admin/user', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2500);
 
     const userTable = page.locator('.el-table, .user-table').first();
@@ -266,7 +268,7 @@ async function runLiveCFVerification() {
       await auditMenuItem.click();
       console.log('  ✓ Clicked "操作报告" in sidebar menu');
     } else {
-      await page.goto('https://mail.epocanvas.com/mail/u/0/#manage/admin/audit', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.goto(legacyOrigin + '/mail/u/0/#manage/admin/audit', { waitUntil: 'domcontentloaded', timeout: 30000 });
     }
     await page.waitForTimeout(2500);
 

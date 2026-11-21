@@ -1,3 +1,5 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 import { createRequire } from 'module';
@@ -11,8 +13,8 @@ const require = createRequire(import.meta.url);
  * Part C: （可选 RUN_DELIVERY_TESTS=1）按收件人语言投递欢迎邮件的全链路验证 + 测试用户物理清理
  */
 
-const BASE = process.env.BASE_URL || 'https://epomail.epocanvas.workers.dev';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@epomail.bond';
+const BASE = process.env.BASE_URL || legacyOrigin;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || legacyAdminEmail;
 const ADMIN_PASSWORD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';
 
 let passCount = 0;
@@ -76,7 +78,7 @@ if (process.env.SKIP_UI_TESTS === '1') {
 }
 
 console.log('\n=== Part B: 全域公告邮件多语言模板 UI 与配置回环 ===');
-const browser = await chromium.launch({ headless: true });
+const browser = await launchIsolatedChromium(chromium, { headless: true });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
 const page = await context.newPage();
 page.on('pageerror', err => console.log('  [Page Exception]:', err.message));
@@ -114,7 +116,7 @@ try {
   await page.goto(BASE + '/login/', { waitUntil: 'domcontentloaded' });
   await page.evaluate(({ token }) => {
     localStorage.setItem('token', token);
-    localStorage.setItem('loginEmail', 'admin@epomail.bond');
+    localStorage.setItem('loginEmail', legacyAdminEmail);
     localStorage.setItem('ui', JSON.stringify({ dark: false, locale: 'zh' }));
   }, { token });
   await page.goto(BASE + '/system-setting', { waitUntil: 'domcontentloaded' });
@@ -203,7 +205,7 @@ try {
 // ============================== Part C ==============================
 if (process.env.RUN_DELIVERY_TESTS === '1') {
   console.log('\n=== Part C: 按收件人语言投递欢迎邮件全链路（会创建并清理测试用户） ===');
-  const browserC = await chromium.launch({ headless: true });
+  const browserC = await launchIsolatedChromium(chromium, { headless: true });
   const ctxC = await browserC.newContext({ locale: 'en-US' });
   const pageC = await ctxC.newPage();
   try {
@@ -245,7 +247,7 @@ if (process.env.RUN_DELIVERY_TESTS === '1') {
       headers: { token: userToken, Authorization: userToken }
     })).json();
     const rows = listRes?.data?.list || listRes?.data?.records || listRes?.data || [];
-    const official = (Array.isArray(rows) ? rows : []).find(r => r.sendEmail === 'announcement@epocanvas.com' || r.sendEmail === 'admin@epocanvas.com');
+    const official = (Array.isArray(rows) ? rows : []).find(r => r.sendEmail === 'announcement@epocanvas.com' || r.sendEmail === legacyAdminEmail);
     ok(!!official, '测试用户收到官方欢迎邮件');
     if (official) {
       ok(/Bienvenue|Epocanvas/.test(official.subject || ''), `欢迎邮件主题为法语版本: ${official.subject}`);

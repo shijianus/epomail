@@ -1,19 +1,21 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 
-const BASE_URL = 'https://epomail.epocanvas.workers.dev';
+const BASE_URL = legacyOrigin;
 
 (async () => {
   console.log('=== 开始测试 电话号码直接在 el-input__inner 转换展示及退格逻辑 ===');
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 }
   });
   const page = await context.newPage();
 
-  console.log('1. 登录 Cloudflare 生产环境...');
+  console.log('1. 登录 本地隔离环境...');
   const res = await page.request.post(BASE_URL + '/api/login', {
-    data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' }
+    data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' }
   });
   const token = (await res.json()).data?.token;
   if (!token) throw new Error('登录获取 token 失败');

@@ -6,7 +6,8 @@
  * tree; they are expected to start passing once the defects are fixed.
  */
 import { env, SELF } from 'cloudflare:test';
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import settingService, { personalTokenPolicy } from '../src/service/setting-service.js';
 import oauthService from '../src/service/oauth-service.js';
 import loginService from '../src/service/login-service.js';
 import userService from '../src/service/user-service.js';
@@ -17,6 +18,20 @@ import saltHashUtils from '../src/utils/crypto-utils.js';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import { buildSignedObjectUrl } from '../src/utils/object-token.js';
 import { ensureOtcTable, seedOtc, ensureBindClaimTable, clearBindClaim } from './helpers/one-time-credential.js';
+
+const CREATE_USER = `
+CREATE TABLE IF NOT EXISTS user (
+	user_id INTEGER PRIMARY KEY,
+	email TEXT NOT NULL,
+	type INTEGER NOT NULL DEFAULT 2,
+	status INTEGER NOT NULL DEFAULT 0,
+	is_del INTEGER NOT NULL DEFAULT 0,
+	auth_version INTEGER NOT NULL DEFAULT 0,
+	telegram_share_version INTEGER NOT NULL DEFAULT 0,
+	deletion_requested_at TEXT DEFAULT '', deletion_status TEXT DEFAULT '',
+	byo_storage_enabled INTEGER NOT NULL DEFAULT 0,
+	byo_storage_config TEXT NOT NULL DEFAULT '{}'
+)`;
 
 const CREATE_OAUTH = `
 CREATE TABLE IF NOT EXISTS oauth (
@@ -84,9 +99,11 @@ async function signRs256(privateKey, header, payload) {
 }
 
 async function seedAuth(userId, email, sessionToken) {
-	const token = await jwtUtils.generateToken({ env }, { userId, token: sessionToken }, 3600);
+	await env.db.prepare('INSERT INTO user (user_id, email, type, status, is_del, auth_version) VALUES (?, ?, 2, 0, 0, 0)')
+		.bind(userId, email).run();
+	const token = await jwtUtils.generateToken({ env }, { userId, token: sessionToken, authVersion: 0 }, 3600);
 	await env.kv.put(`auth-uid:${userId}`, JSON.stringify({
-		user: { userId, email, isDel: 0, status: 0, type: 2 },
+		user: { userId, email, isDel: 0, status: 0, type: 2, authVersion: 0 },
 		tokens: [sessionToken],
 		refreshTime: new Date().toISOString()
 	}), { expirationTtl: 3600 });
@@ -95,8 +112,14 @@ async function seedAuth(userId, email, sessionToken) {
 
 async function cleanupObjectRows() {
 	await env.db.prepare('DELETE FROM attachments').run();
+	await env.db.prepare('DELETE FROM user WHERE user_id = 2').run();
 	await env.db.prepare('DELETE FROM oauth_one_time_credential').run();
+	await env.db.prepare('DELETE FROM oauth').run();
+	await clearBindClaim(env.db);
 	for (const key of [
+		'rate-limit:oauth-login:local',
+		'rate-limit:oauth-bind:local',
+		'rate-limit:oauth-exchange:local',
 		'auth-uid:2',
 		'attachments/review-round2.txt',
 		'setting:',
@@ -107,28 +130,26 @@ async function cleanupObjectRows() {
 }
 
 beforeAll(async () => {
+	await env.db.prepare(CREATE_USER).run();
 	await env.db.prepare(CREATE_OAUTH).run();
 	await env.db.prepare(CREATE_ATTACHMENTS).run();
 	await ensureOtcTable(env.db);
 	await ensureBindClaimTable(env.db);
 });
 
-afterAll(async () => {
-	await cleanupObjectRows();
-	await env.db.prepare('DELETE FROM oauth').run();
-	await clearBindClaim(env.db);
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth_bind_claim').run();
-	await env.db.prepare('DROP TABLE IF EXISTS attachments').run();
-});
+afterAll(cleanupObjectRows);
 
-afterEach(() => {
-	vi.restoreAllMocks();
-	vi.unstubAllGlobals();
+afterEach(async () => {
+	try {
+		await cleanupObjectRows();
+	} finally {
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+	}
 });
 
 describe('Apple id_token is verified on the real HTTP login route', () => {
-	it('accepts a correctly signed id_token and returns only a bind proof for a new identity', async () => {
+	it('rejects a direct id_token without a server-issued state even when its signature is valid', async () => {
 		const { pair, jwk } = await createSigningMaterial('review-kid');
 		await env.kv.put('apple_jwks_v1', JSON.stringify({ keys: [jwk] }), { expirationTtl: 3600 });
 		await env.kv.put('setting:', JSON.stringify({
@@ -161,9 +182,9 @@ describe('Apple id_token is verified on the real HTTP login route', () => {
 			body: JSON.stringify({ id_token: token })
 		});
 		const body = await response.json();
-		expect(body.code, JSON.stringify(body)).toBe(200);
-		expect(body.data.bindToken).toBeTruthy();
-		expect(body.data.token).toBeFalsy();
+		expect(body.code, JSON.stringify(body)).toBe(400);
+		expect(JSON.stringify(body)).toContain('oauth_state_required');
+		expect(JSON.stringify(body)).not.toContain('bindToken');
 
 		await env.db.prepare('DELETE FROM oauth WHERE oauth_user_id = ?').bind('apple:review-apple-user').run();
 	});
@@ -345,6 +366,12 @@ describe('OAuth bind result shape at the production login service boundary', () 
 			ttlSeconds: 600
 		});
 
+		await env.kv.put('setting:', JSON.stringify({
+			oauthLoginEnabled: 1,
+			oauthProviders: {
+				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+			}
+		}), { expirationTtl: 3600 });
 		vi.spyOn(loginService, 'validateRegistration').mockResolvedValue({});
 		vi.spyOn(loginService, 'register').mockResolvedValue({ userId: 2, reservedRegKey: false });
 		vi.spyOn(loginService, 'login').mockResolvedValue({
@@ -411,7 +438,15 @@ describe('Role assignment boundary on privileged creation paths', () => {
 });
 
 describe('Signed object URL as consumed by the browser', () => {
+	beforeEach(() => {
+		// Explicit settings fixture; keep real BYO lookup, signatures and KV bodies.
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			userByoStorage: 1, r2Domain: '', bucket: '', endpoint: '', s3AccessKey: '', s3SecretKey: ''
+		});
+	});
+
 	it('serves the same capability on the root attachment route', async () => {
+		await env.db.prepare('INSERT INTO user (user_id, email) VALUES (2, ?)').bind('review2@example.com').run();
 		await env.db.prepare('DELETE FROM attachments').run();
 		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
 			.bind(2, 10, 20, 'attachments/review-round2.txt', 'review-round2.txt', 17, 0).run();
@@ -449,15 +484,19 @@ describe('Signed object URL as consumed by the browser', () => {
 });
 
 describe('Exception sanitization at the public OAuth entry point', () => {
-	it('returns a generic 500 body for a malformed JSON request', async () => {
+	it('returns a validation response for a malformed JSON request', async () => {
 		const response = await SELF.fetch('http://example.com/api/oauth/github/login', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: '{'
 		});
 		const body = await response.json();
-		expect(body.code).toBe(500);
-		expect(body.message).toBe('Internal Server Error');
+		expect(response.status).toBe(400);
+		expect(body).toMatchObject({
+			code: 400,
+			message: 'Invalid JSON request body',
+			errorCode: 'INVALID_JSON'
+		});
 		expect(JSON.stringify(body)).not.toMatch(/SyntaxError|at JSON\.parse|\/D:/);
 	});
 });
@@ -467,5 +506,109 @@ describe('Capacity unit semantics', () => {
 		const row = await env.db.prepare("SELECT length('中') AS sql_length").first();
 		expect(row.sql_length).toBe(1);
 		expect(new Blob(['中']).size).toBe(3);
+	});
+});
+
+describe('Personal access token storage hardening', () => {
+	const userId = 424242;
+	const profileKey = 'USER_PROFILE_' + userId;
+
+	afterAll(async () => {
+		await env.kv.delete(profileKey);
+	});
+
+	it('persists only a SHA-256 marker and never the plaintext token', async () => {
+		const settingSpy = vi.spyOn(settingService, 'query').mockResolvedValue({ userApiSupport: 1 });
+		try {
+			const created = await userService.createApiToken({ env }, userId, {
+				name: 'review-token',
+				expiresInDays: 1,
+				scopes: ['emails:read']
+			});
+			expect(created.token).toMatch(/^epo_live_[a-f0-9]{48}$/);
+			const profile = JSON.parse(await env.kv.get(profileKey));
+			expect(profile.apiTokens[0].token).toBeUndefined();
+			expect(profile.apiTokens[0].tokenHash).toMatch(/^[a-f0-9]{64}$/);
+			expect(profile.apiTokens[0].tokenPrefix).toBe(created.token.slice(0, 16));
+			expect(await env.kv.get('API_TOKEN_' + created.token)).toBeNull();
+
+			const listed = await userService.getApiTokens({ env }, userId);
+			expect(listed[0].token).toBeUndefined();
+			expect(listed[0].tokenHash).toBeUndefined();
+			expect(listed[0].tokenPrefix).toBe(created.token.slice(0, 16));
+		} finally {
+			settingSpy.mockRestore();
+		}
+	});
+
+	it('disables new production and staging PATs by default and preserves management of existing tokens', async () => {
+		const settings = vi.spyOn(settingService, 'query').mockResolvedValue({ userApiSupport: 1 });
+		try {
+			for (const environment of ['production', 'staging']) {
+				const gatedEnv = { ...env, ENVIRONMENT: environment, ENABLE_PAT_ISSUANCE: undefined };
+				expect(personalTokenPolicy(gatedEnv, { userApiSupport: 1 }).userApiSupport).toBe(0);
+				await expect(userService.createApiToken({ env: gatedEnv }, userId, { name: 'disabled' }))
+					.rejects.toMatchObject({ code: 403, errorCode: 'pat_issuance_disabled' });
+			}
+			const optedIn = { ...env, ENVIRONMENT: 'staging', ENABLE_PAT_ISSUANCE: 'true' };
+			expect(personalTokenPolicy(optedIn, { userApiSupport: 0 }).userApiSupport).toBe(0);
+			const created = await userService.createApiToken({ env: optedIn }, userId, { name: 'compatible', scopes: ['emails:read'] });
+			const off = { env: { ...optedIn, ENABLE_PAT_ISSUANCE: 'false' } };
+			expect(await userService.getApiTokens(off, userId)).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.id })]));
+			await userService.deleteApiToken(off, userId, created.id);
+			expect((await userService.getApiTokens(off, userId)).some(item => item.id === created.id)).toBe(false);
+		} finally {
+			settings.mockRestore();
+		}
+	});
+
+	it('rejects explicitly empty, mixed or unrecognized scopes before issuing credentials', async () => {
+		const settings = vi.spyOn(settingService, 'query').mockResolvedValue({ userApiSupport: 1 });
+		try {
+			for (const scopes of [[], null, 'emails:read', ['unknown'], ['emails:read', 'unknown']]) {
+				await expect(userService.createApiToken({ env }, userId, { name: 'scope-test', scopes }))
+					.rejects.toMatchObject({ code: 400, errorCode: 'invalid_scope' });
+			}
+		} finally {
+			settings.mockRestore();
+		}
+	});
+
+	it('migrates a legacy plaintext token on read and removes its KV index', async () => {
+		const legacy = 'epo_live_' + 'a'.repeat(48);
+		await env.kv.put(profileKey, JSON.stringify({
+			apiTokens: [{ id: 'legacy-1', name: 'legacy', token: legacy, scopes: ['emails:read'] }]
+		}));
+		await env.kv.put('API_TOKEN_' + legacy, JSON.stringify({ userId }));
+		const listed = await userService.getApiTokens({ env }, userId);
+		expect(listed[0].token).toBeUndefined();
+		expect(listed[0].tokenPrefix).toBe(legacy.slice(0, 16));
+		const profile = JSON.parse(await env.kv.get(profileKey));
+		expect(profile.apiTokens[0].token).toBeUndefined();
+		expect(profile.apiTokens[0].tokenHash).toMatch(/^[a-f0-9]{64}$/);
+		expect(await env.kv.get('API_TOKEN_' + legacy)).toBeNull();
+	});
+});
+
+describe('Telegram test endpoint binding', () => {
+	it('refuses to probe a different bot than the saved personal configuration', async () => {
+		const userId = 424243;
+		const savedToken = '123456:abcdefghijklmnopqrstuvwxyz123456';
+		await env.kv.put('USER_PROFILE_' + userId, JSON.stringify({
+			personalTelegram: { enabled: true, botToken: savedToken, chatId: '12345' }
+		}));
+		await env.db.prepare('INSERT INTO user (user_id, email) VALUES (?, ?)').bind(userId, 'telegram-review@example.com').run();
+		const settingsSpy = vi.spyOn(settingService, 'query').mockResolvedValue({ userTgForward: 1 });
+		try {
+			const { default: telegramService } = await import('../src/service/telegram-service.js');
+			await expect(telegramService.testPersonalBot({ env }, {
+				botToken: '654321:zyxwvutsrqponmlkjihgfedcba654321',
+				chatId: '12345'
+			}, userId)).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
+		} finally {
+			settingsSpy.mockRestore();
+			await env.db.prepare('DELETE FROM user WHERE user_id = ?').bind(userId).run();
+			await env.kv.delete('USER_PROFILE_' + userId);
+		}
 	});
 });

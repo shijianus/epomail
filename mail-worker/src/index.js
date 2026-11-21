@@ -12,19 +12,119 @@ import jwtUtils from './utils/jwt-utils';
 import { isAdminUser } from './utils/admin-utils';
 import permService from './service/perm-service';
 import KvConst from './const/kv-const';
+import { getUserDb } from './utils/db-accessor.js';
+import { authVersionOf } from './utils/one-time-credential.js';
+import { purgeAiBudgets } from './utils/ai-budget.js';
+import { cleanupExpiredInboundClaims } from './service/mail-reliability-service.js';
+import { maintainOutboundTasks } from './service/mail-outbound-service.js';
+import { clearNoOne } from './service/mail-lifecycle-service.js';
+import forwardService from './service/mail-forward-service.js';
+import { readAuthorizedSession } from './utils/session-auth-store.js';
 
-async function checkScheduledAuth(req, env) {
+function scheduledTimingSafeEqual(a, b) {
+	if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+	let diff = 0;
+	for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+	return diff === 0;
+}
+
+const DEFAULT_SECURITY_HEADERS = {
+	'Referrer-Policy': 'strict-origin-when-cross-origin',
+	'X-Content-Type-Options': 'nosniff',
+	'X-Frame-Options': 'DENY',
+	'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+	'Content-Security-Policy': [
+		"default-src 'self'",
+		"base-uri 'self'",
+		"object-src 'none'",
+		"frame-ancestors 'none'",
+		"form-action 'self'",
+		"img-src 'self' data: blob: https:",
+		"style-src 'self' 'unsafe-inline'",
+		"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+		"frame-src 'self' https://challenges.cloudflare.com",
+		"font-src 'self' data: https:",
+		"connect-src 'self' https: wss:"
+	].join('; ')
+};
+
+function withSecurityHeaders(response, request) {
+	const headers = new Headers(response?.headers);
+	for (const [name, value] of Object.entries(DEFAULT_SECURITY_HEADERS)) {
+		if (!headers.has(name)) headers.set(name, value);
+	}
+	const protocol = new URL(request.url).protocol;
+	if (protocol === 'https:') {
+		headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+	}
+	return new Response(response?.body, {
+		status: response?.status ?? 500,
+		statusText: response?.statusText,
+		headers
+	});
+}
+
+function redirectHttpToHttps(request, env) {
+	const url = new URL(request.url);
+	if (url.protocol !== 'http:' || !['staging', 'production'].includes(env?.ENVIRONMENT)) return null;
+	url.protocol = 'https:';
+	return Response.redirect(url.toString(), 308);
+}
+
+export async function checkScheduledAuth(req, env) {
 	if (req.method !== 'POST') {
 		return { ok: false, status: 405, message: 'Method Not Allowed: Scheduled trigger requires POST' };
 	}
 
-	// 1. 系统内部安全头校验 (共享机密)
-	const secretHeader = req.headers.get('x-scheduled-secret') || req.headers.get('x-admin-secret');
-	if (env?.jwt_secret && secretHeader && secretHeader === env.jwt_secret) {
-		return { ok: true };
+	// 1. x-admin-secret 历史兼容入口必须坚决废弃
+	if (req.headers.get('x-admin-secret')) {
+		return { ok: false, status: 401, message: 'x-admin-secret is deprecated and forbidden' };
 	}
 
-	// 2. 真实管理员凭据校验 (JWT + KV 真实会话 + 封禁状态 + RBAC 真实角色判权)
+	// 2. 系统内部安全头校验 (独立 scheduled_secret 专用校验，与管理员 JWT 严格分离)
+	const secretHeader = req.headers.get('x-scheduled-secret');
+	if (secretHeader !== null && secretHeader !== undefined) {
+		if (typeof secretHeader !== 'string' || secretHeader.length === 0 || secretHeader.trim() !== secretHeader) {
+			return { ok: false, status: 401, message: 'Invalid scheduled secret format' };
+		}
+
+		const isProdOrStaging = env?.ENVIRONMENT === 'staging' || env?.ENVIRONMENT === 'production' || (!env?.dev && !env?.DEV && env?.ENVIRONMENT !== 'development');
+		const expected = env?.scheduled_secret;
+
+		if (isProdOrStaging) {
+			// Staging 与 Production 必须配置独立的 scheduled_secret，严禁回退至 jwt_secret
+			if (!expected) {
+				return { ok: false, status: 500, message: 'scheduled_secret is not configured' };
+			}
+
+			// 强物理隔离：scheduled_secret 严禁与其他机密发生碰撞
+			if (
+				(env?.jwt_secret && expected === env.jwt_secret) ||
+				(env?.init_secret && expected === env.init_secret) ||
+				(env?.totp_enc_key && expected === env.totp_enc_key) ||
+				(env?.email_enc_key && expected === env.email_enc_key)
+			) {
+				return { ok: false, status: 500, message: 'scheduled_secret must be isolated from other secrets' };
+			}
+
+			if (scheduledTimingSafeEqual(secretHeader, expected)) {
+				return { ok: true };
+			}
+			return { ok: false, status: 401, message: 'Invalid scheduled secret' };
+		}
+
+		// 本地开发环境仅在显式开发模式下允许降级
+		if (expected) {
+			if (scheduledTimingSafeEqual(secretHeader, expected)) return { ok: true };
+			return { ok: false, status: 401, message: 'Invalid scheduled secret' };
+		}
+		if (env?.jwt_secret && scheduledTimingSafeEqual(secretHeader, env.jwt_secret)) {
+			return { ok: true };
+		}
+		return { ok: false, status: 500, message: 'scheduled_secret is not configured' };
+	}
+
+	// 3. 真实管理员凭据校验 (JWT + KV 真实会话 + 封禁状态 + RBAC 真实角色判权)
 	const authHeader = req.headers.get('Authorization') || req.headers.get('authorization') || req.headers.get('token');
 	if (!authHeader) {
 		return { ok: false, status: 401, message: '未授权的调度触发请求 (Unauthorized scheduled trigger)' };
@@ -49,10 +149,19 @@ async function checkScheduledAuth(req, env) {
 			return { ok: false, status: 500, message: '系统 KV 服务不可用 (KV storage unavailable)' };
 		}
 
-		const authInfo = await env.kv.get(KvConst.AUTH_INFO + payload.userId, { type: 'json' });
+		const authInfo = await readAuthorizedSession({ env }, payload.userId, payload.token);
 		if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(payload.token)) {
 			return { ok: false, status: 401, message: '会话已过期或已被注销 (Session expired or revoked)' };
 		}
+
+		const current = await getUserDb({ env }).prepare(
+			'SELECT user_id, email, type, auth_version, status, is_del FROM user WHERE user_id = ?'
+		).bind(payload.userId).first();
+		if (!current || current.is_del !== 0 || current.status !== 0 || payload.purpose
+			|| authVersionOf(payload) !== authVersionOf(current)) {
+			return { ok: false, status: 401, message: 'Session expired or revoked' };
+		}
+		authInfo.user = { userId: current.user_id, email: current.email, type: current.type, status: current.status, isDel: current.is_del };
 
 		if (authInfo.user && authInfo.user.status === 1) {
 			return { ok: false, status: 403, message: '该账号已被封禁 (Banned user cannot trigger scheduled tasks)' };
@@ -75,37 +184,53 @@ async function checkScheduledAuth(req, env) {
 		}
 
 		return { ok: true, user: authInfo.user };
-	} catch (err) {
-		return { ok: false, status: 401, message: '凭据校验失败: ' + err.message };
-	}
+		} catch (_) {
+			return { ok: false, status: 401, message: 'Authentication verification failed' };
+		}
 }
 
 export default {
 	 async fetch(req, env, ctx) {
 
 		const url = new URL(req.url)
+		const httpsRedirect = redirectHttpToHttps(req, env);
+		if (httpsRedirect) return withSecurityHeaders(httpsRedirect, req);
+
+		if (url.pathname === '/api/version' && req.method === 'GET') {
+			const version = env.CF_VERSION_METADATA;
+			const sha = version?.tag;
+			const versionId = version?.id;
+			const identified = typeof sha === 'string' && /^[0-9a-f]{40}$/.test(sha)
+				&& typeof versionId === 'string' && versionId.length > 0;
+			return withSecurityHeaders(Response.json(identified
+				? { sha, versionId }
+				: { errorCode: 'release_identity_unavailable' }, {
+				status: identified ? 200 : 503,
+				headers: { 'Cache-Control': 'no-store' }
+			}), req);
+		}
 
 		if (url.pathname === '/api/scheduled' || url.pathname.startsWith('/api/scheduled')) {
 			const auth = await checkScheduledAuth(req, env);
 			if (!auth.ok) {
-				return new Response(JSON.stringify({ code: auth.status, message: auth.message }), {
+				return withSecurityHeaders(new Response(JSON.stringify({ code: auth.status, message: auth.message }), {
 					status: auth.status,
 					headers: { 'Content-Type': 'application/json' }
-				});
+				}), req);
 			}
 
 			const cronParam = url.searchParams.get('cron') || '*/5 * * * *';
 			await this.scheduled({ cron: cronParam, type: 'scheduled', scheduledTime: Date.now() }, env, ctx);
-			return new Response(JSON.stringify({ success: true, ran: cronParam }), {
+			return withSecurityHeaders(new Response(JSON.stringify({ success: true, ran: cronParam }), {
 				status: 200,
 				headers: { 'Content-Type': 'application/json' }
-			});
+			}), req);
 		}
 
 		if (url.pathname.startsWith('/api/')) {
 			url.pathname = url.pathname.replace('/api', '')
 			req = new Request(url.toString(), req)
-			return app.fetch(req, env, ctx);
+			return withSecurityHeaders(await app.fetch(req, env, ctx), req);
 		}
 
 		if (
@@ -117,17 +242,17 @@ export default {
 			url.pathname === '/oauth/authorize/info' ||
 			(url.pathname === '/oauth/authorize' && req.method === 'POST')
 		) {
-			return app.fetch(req, env, ctx);
+			return withSecurityHeaders(await app.fetch(req, env, ctx), req);
 		}
 
 		if (url.pathname.startsWith('/cdn-cgi/handler/scheduled')) {
 			const auth = await checkScheduledAuth(req, env);
 			if (!auth.ok) {
-				return new Response(auth.message, { status: auth.status });
+				return withSecurityHeaders(new Response(auth.message, { status: auth.status }), req);
 			}
 			const cronParam = url.searchParams.get('cron') || '*/5 * * * *';
 			await this.scheduled({ cron: cronParam, type: 'scheduled', scheduledTime: Date.now() }, env, ctx);
-			return new Response('Ran scheduled event: ' + cronParam, { status: 200 });
+			return withSecurityHeaders(new Response('Ran scheduled event: ' + cronParam, { status: 200 }), req);
 		}
 
 		 // Avatars and backgrounds are public by policy. This route reads through
@@ -138,7 +263,7 @@ export default {
 		 // workerd throw an uncaught exception for a merely malformed URL.
 		 if (url.pathname.startsWith('/static/')) {
 			 const response = await readObjectForRequest({ env }, url.pathname.substring(1), url);
-			 return response || new Response('Object Not Found', { status: 404 });
+				 return withSecurityHeaders(response || new Response('Object Not Found', { status: 404 }), req);
 		 }
 
 		 // Signed attachment capabilities are minted as origin-relative
@@ -148,7 +273,7 @@ export default {
 		 // ever be served.
 		 if (url.pathname.startsWith('/oss/')) {
 			 const response = await readObjectForRequest({ env }, url.pathname.slice('/oss/'.length), url);
-			 return response || new Response('Object Not Found', { status: 404 });
+				 return withSecurityHeaders(response || new Response('Object Not Found', { status: 404 }), req);
 		 }
 
 		 // Legacy alias kept for previously issued links. The path prefix here
@@ -156,46 +281,80 @@ export default {
 		 // slash (`attachments/<name>`) — not the text after `/attachments/`.
 		 if (url.pathname.startsWith('/attachments/')) {
 			 const response = await readObjectForRequest({ env }, url.pathname.substring(1), url);
-			 return response || new Response('Object Not Found', { status: 404 });
+				 return withSecurityHeaders(response || new Response('Object Not Found', { status: 404 }), req);
 		 }
 
 		if (url.pathname.startsWith('/login/challenge/')) {
 			const loginReq = new Request(new URL('/login/' + url.search, req.url), req);
-			return env.assets.fetch(loginReq);
+			return withSecurityHeaders(await env.assets.fetch(loginReq), req);
 		}
 
-		return env.assets.fetch(req);
+		return withSecurityHeaders(await env.assets.fetch(req), req);
 	},
 	email: email,
 	async scheduled(c, env, ctx) {
-		console.log('SCHEDULED EVENT RECEIVED:', c);
-		try {
-			// Replay the durable object-deletion outbox first: a deletion that
-			// failed in an earlier request must not depend on another user
-			// action to complete.
-			await attService.drainObjectDeletionQueue({ env }, null, { limit: 200 }).catch(e => {
-				console.warn('[scheduled] object deletion queue drain failed:', e.message);
-			});
-
-			if (c?.cron === '*/30 * * * *') {
-				await analysisService.refreshEchartsCache({ env });
-				return;
+		const failures = [];
+		const run = async (name, task) => {
+			try {
+				await task();
+			} catch (_) {
+				failures.push(name);
+				console.error(JSON.stringify({ event: 'maintenance_failed', task: name }));
 			}
-
-			if (c?.cron === '*/5 * * * *' || c?.cron === '* * * * *' || !c?.cron) {
-				await decisionNoticeService.processOutboxBatch({ env });
-				if (c?.cron === '*/5 * * * *' || c?.cron === '* * * * *') return;
+		};
+		await run('object_deletion', () => attService.drainObjectDeletionQueue({ env }, null, { limit: 200 }));
+		await run('ai_budget_cleanup', () => purgeAiBudgets({ env }));
+		await run('inbound_raw_cleanup', () => cleanupExpiredInboundClaims({ env }, { limit: 100 }));
+		await run('outbound_tasks', () => maintainOutboundTasks({ env }, { limit: 100 }));
+		await run('outbound_reconcile', () => emailService.reconcileUnknownOutbound({ env }, { limit: 20 }));
+		await run('forward_tasks', () => forwardService.processForwardTasks({ env }, { limit: 20 }));
+		await run('security_operation_cleanup', async () => {
+			const db = getUserDb({ env });
+			const tables = [
+				{ name: 'auth_security_operation', sql: 'DELETE FROM auth_security_operation WHERE rowid IN (SELECT rowid FROM auth_security_operation WHERE expires_at < unixepoch() LIMIT 500)' },
+				{ name: 'auth_totp_replay', sql: 'DELETE FROM auth_totp_replay WHERE rowid IN (SELECT rowid FROM auth_totp_replay WHERE expires_at < unixepoch() LIMIT 500)' }
+			];
+			for (const t of tables) {
+				for (let round = 0; round < 10; round++) {
+					const r = await db.prepare(t.sql).run();
+					if (!r.meta?.changes) break;
+				}
 			}
-
-			await verifyRecordService.clearRecord({ env }).catch(() => {});
-			await userService.resetDaySendCount({ env }).catch(() => {});
-			await emailService.completeReceiveAll({ env }).catch(() => {});
-			await emailService.clearTrashAndSpam({ env }).catch(() => {});
-			await oauthService.clearNoBindOathUser({ env }).catch(() => {});
-			await decisionNoticeService.processOutboxBatch({ env }).catch(() => {});
-			await analysisService.refreshEchartsCache({ env }).catch(() => {});
-		} catch (err) {
-			console.warn('[scheduled error]:', err.message);
+		});
+		// Keep this separate: a pre-migration database without the new table must
+		// not roll back the auth-table cleanup above.
+		await run('session_revocation_cleanup', async () => {
+			const db = getUserDb({ env });
+			await db.prepare(`DELETE FROM session_revocation WHERE rowid IN
+				(SELECT rowid FROM session_revocation WHERE expires_at < unixepoch() LIMIT 500)`).run();
+			await db.prepare(`DELETE FROM session_capacity WHERE user_id IN
+				(SELECT user_id FROM session_capacity WHERE expires_at < unixepoch() LIMIT 500)`).run();
+		});
+		await run('rate_limit_cleanup', async () => {
+			const db = getUserDb({ env });
+			for (let round = 0; round < 10; round++) {
+				const r = await db.prepare(
+					'DELETE FROM rate_limit_counter WHERE rowid IN (SELECT rowid FROM rate_limit_counter WHERE expires_at < unixepoch() LIMIT 500)'
+				).run();
+				if (!r.meta?.changes) break;
+			}
+		});
+		if (c?.cron === '*/30 * * * *') {
+			await run('analytics', () => analysisService.refreshEchartsCache({ env }));
+		} else {
+			await run('notification_outbox', () => decisionNoticeService.processOutboxBatch({ env }));
+			if (c?.cron !== '*/5 * * * *' && c?.cron !== '* * * * *') {
+				await run('verification_records', () => verifyRecordService.clearRecord({ env }));
+				await run('daily_send_counts', () => userService.resetDaySendCount({ env }));
+				await run('unbound_identities', () => oauthService.clearNoBindOathUser({ env }));
+				await run('analytics', () => analysisService.refreshEchartsCache({ env }));
+			}
 		}
+		// Run the bounded retention sweep on every scheduled invocation. A daily
+		// 50-per-phase budget cannot drain a mailbox receiving more than 50
+		// spam/trash items per day.
+		await run('trash_retention', () => emailService.clearTrashAndSpam({ env }));
+		await run('noone_retention', () => clearNoOne({ env }));
+		if (failures.length) throw new Error(`Maintenance tasks failed: ${failures.join(', ')}`);
 	},
 };

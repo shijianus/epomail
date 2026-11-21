@@ -1,7 +1,9 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert';
 
-const BASE = 'https://mail.epocanvas.com';
+const BASE = legacyOrigin;
 
 async function run() {
   console.log('====================================================================');
@@ -17,17 +19,17 @@ async function run() {
     const loginRes = await fetch(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@epomail.cyou', password: (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') })
+      body: JSON.stringify({ email: legacyAdminEmail, password: (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '') })
     });
     const loginJson = await loginRes.json();
     assert.strictEqual(loginJson.code, 200, '公网生产登录接口必须返回 200');
     const token = loginJson.data?.token;
     assert.ok(token, '成功获取生产 JWT Token');
-    console.log('  ✓ 生产 Token 获取成功:', token.slice(0, 24) + '...');
+    console.log('  ✓ 生产 Token 获取成功:');
 
     // 2. 启动 Playwright 浏览器
     console.log('\n[步骤 2] 启动 Playwright 浏览器 (1440x900)...');
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'
@@ -35,9 +37,9 @@ async function run() {
 
     await context.addInitScript(({ t }) => {
       localStorage.setItem('token', t);
-      localStorage.setItem('loginEmail', 'admin@epomail.cyou');
+      localStorage.setItem('loginEmail', legacyAdminEmail);
       localStorage.setItem('role', 'admin');
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'admin@epomail.cyou' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyAdminEmail }]));
     }, { t: token });
 
     const page = await context.newPage();
@@ -47,7 +49,7 @@ async function run() {
     });
 
     // 3. 打开生产 /audit-report 控制台
-    console.log('\n[步骤 3] 访问生产控制台 https://mail.epocanvas.com/audit-report ...');
+    console.log('\n[步骤 3] 访问生产控制台 <本地测试地址>/audit-report ...');
     await page.goto(`${BASE}/audit-report`, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(2000);
 
@@ -74,7 +76,7 @@ async function run() {
 
     const drawer = page.locator('.audit-detail-drawer');
     await drawer.waitFor({ state: 'visible', timeout: 10000 });
-    console.log('  ✓ 抽屉成功在 Cloudflare 生产环境滑出！');
+    console.log('  ✓ 抽屉成功在 本地隔离环境滑出！');
 
     // 4.1 标题纯净化核验
     const titleText = (await drawer.locator('.drawer-title').textContent()).trim();

@@ -3,44 +3,20 @@ export const WELCOME_TEMPLATES = {
     lang: 'zh',
     name: '中文 (简体)',
     subject: "🎉 欢迎来到 Epocanvas Mail · 开启你的专属独立域名邮箱体验",
-    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
+    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
   <!-- Top Full-Width Banner with Microsoft Azure Gradient & Official EpoMail Brand Logo -->
-  <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
+  <div style="background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #075985 35%, #1d4ed8 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
-      <div style="flex: 1; min-width: 300px;">
+      <div style="flex: 1 1 260px; min-width: 0;">
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 5px 14px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 14px; backdrop-filter: blur(8px);">
           <span>✨ 你的专属独立域名邮箱已就绪</span>
         </div>
         <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">嗨 {{user_name}}，很高兴认识你！</h1>
         <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.95); font-size: 14.5px; line-height: 1.55;">零门槛免配置 · 纯净无广告 · 国内极速秒开 · 专属极客身份</p>
       </div>
-      <!-- Official EpoMail Cloud Logo SVG Artwork -->
+      <!-- Official EpoMail brand mark -->
       <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 92px; height: 92px; background: rgba(255, 255, 255, 0.18); border-radius: 22px; border: 1.5px solid rgba(255, 255, 255, 0.38); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18); backdrop-filter: blur(10px);">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="76" height="76" style="display:block; flex-shrink:0;">
-          <defs>
-            <linearGradient id="epomailLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#00F5D4" />
-              <stop offset="40%" stop-color="#0072FF" />
-              <stop offset="100%" stop-color="#5B24FF" />
-            </linearGradient>
-            <mask id="epomailCutout">
-              <rect width="100%" height="100%" fill="white" />
-              <path d="M 15 210 L 200 270 L 385 210" fill="none" stroke="black" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
-              <line x1="60" y1="320" x2="140" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <line x1="340" y1="320" x2="260" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <circle cx="200" cy="270" r="26" fill="white" />
-              <circle cx="200" cy="270" r="26" fill="none" stroke="black" stroke-width="10" />
-              <circle cx="200" cy="270" r="4.5" fill="black" />
-              <line x1="200" y1="270" x2="188" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-              <line x1="200" y1="270" x2="215" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-            </mask>
-          </defs>
-          <path d="M 60 110 Q 70 110 70 100 Q 70 110 80 110 Q 70 110 70 120 Q 70 110 60 110 Z" fill="#00F5D4" opacity="0.85" />
-          <path d="M 330 90 Q 335 90 335 85 Q 335 90 340 90 Q 335 90 335 95 Q 335 90 330 90 Z" fill="#FF369B" opacity="0.9" />
-          <circle cx="85" cy="180" r="2.5" fill="#5B24FF" opacity="0.6" />
-          <circle cx="320" cy="180" r="3" fill="#0072FF" opacity="0.7" />
-          <path d="M 40 220 A 60 60 0 0 1 120 155 A 85 85 0 0 1 280 155 A 60 60 0 0 1 360 220 L 360 260 C 360 325 290 335 200 335 C 110 335 40 325 40 260 Z" fill="url(#epomailLogoGrad)" mask="url(#epomailCutout)" />
-        </svg>
+        <span style="display: block; margin: auto; text-align: center; color: #fff; line-height: 1.2"><span aria-hidden="true" style="display: block; font-size: 32px">✉</span><strong style="display: block; font-size: 15px">EpoMail</strong></span>
       </div>
     </div>
   </div>
@@ -55,8 +31,8 @@ export const WELCOME_TEMPLATES = {
     <div style="margin: 28px 0; display: flex; flex-direction: column; gap: 20px;">
       
       <!-- Section 1 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f0f7ff; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 120, 212, 0.1); border: 1px solid rgba(0, 120, 212, 0.25); padding: 4px 12px; border-radius: 9999px; color: #0078D4; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🌐 专属极客名片 · 免买域名免配置
           </div>
@@ -69,62 +45,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🏷️ 多顶级域名随心选</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#EF4444"/>
-            <circle cx="28" cy="18" r="4" fill="#F59E0B"/>
-            <circle cx="40" cy="18" r="4" fill="#10B981"/>
-            <rect x="56" y="8" width="248" height="20" rx="6" fill="#F1F5F9"/>
-            <circle cx="68" cy="18" r="3" fill="#10B981"/>
-            <text x="78" y="22" fill="#0284C7" font-size="10" font-weight="600" font-family="monospace">https://epomail.bond/@me</text>
-            <rect x="20" y="52" width="280" height="110" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2" filter="drop-shadow(0 4px 12px rgba(0,0,0,0.04))"/>
-            <circle cx="50" cy="86" r="18" fill="#0078D4"/>
-            <text x="50" y="92" fill="#FFFFFF" font-size="13" font-weight="800" text-anchor="middle">@</text>
-            <text x="80" y="80" fill="#0F172A" font-size="13" font-weight="700">专属极客域名名片</text>
-            <text x="80" y="96" fill="#64748B" font-size="11" font-weight="500" font-family="monospace">user@epomail.bond</text>
-            <rect x="220" y="70" width="64" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="252" y="84" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">● DNS 激活</text>
-            <line x1="32" y1="120" x2="288" y2="120" stroke="#F1F5F9" stroke-width="1"/>
-            <rect x="32" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="70" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">SPF 权威验证</text>
-            <rect x="116" y="130" width="80" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="156" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DKIM 密钥签发</text>
-            <rect x="204" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="242" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DMARC 100%</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">专属极客域名名片</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">https://epomail.bond/@me</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">user@epomail.bond</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● DNS 激活</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">SPF 权威验证</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DKIM 密钥签发</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DMARC 100%</span></div></div>
         </div>
       </div>
 
       <!-- Section 2 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#10B981"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">隐私与数据安全监控台</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="270" y="22" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">100% 私密</text>
-            <rect x="18" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="30" y="70" fill="#64748B" font-size="10" font-weight="600">商业广告扫描</text>
-            <text x="30" y="90" fill="#059669" font-size="14" font-weight="800">0 追踪 / 0 广告</text>
-            <rect x="166" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="178" y="70" fill="#64748B" font-size="10" font-weight="600">传输加密标准</text>
-            <text x="178" y="90" fill="#0078D4" font-size="14" font-weight="800">TLS 1.3 / AES</text>
-            <rect x="18" y="112" width="284" height="50" rx="8" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1.2"/>
-            <circle cx="38" cy="137" r="10" fill="#059669"/>
-            <path d="M34 137L37 140L42 134" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <text x="56" y="134" fill="#065F46" font-size="11.5" font-weight="700">绝不向第三方出售用户数据与信件画像</text>
-            <text x="56" y="149" fill="#047857" font-size="10" font-weight="500">零开屏 · 零弹窗 · 纯粹邮箱通讯本位</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #ecfdf5; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">隐私与数据安全监控台</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">100% 私密</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">商业广告扫描</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">0 追踪 / 0 广告</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">传输加密标准</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">TLS 1.3 / AES</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">绝不向第三方出售用户数据与信件画像</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">零开屏 · 零弹窗 · 纯粹邮箱通讯本位</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 12px; border-radius: 9999px; color: #059669; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🛡️ 纯粹私密 · 零广告零商业变现
           </div>
@@ -140,8 +71,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 3 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fffbeb; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); padding: 4px 12px; border-radius: 9999px; color: #d97706; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             ⚡ 全球边缘网络 · 国内极速秒开
           </div>
@@ -154,62 +85,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🌍 全球边缘直达</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#F59E0B"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">全球边缘 CDN 网络直连</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1"/>
-            <text x="270" y="22" fill="#D97706" font-size="10" font-weight="700" text-anchor="middle">⚡ &lt; 20ms</text>
-            <rect x="18" y="50" width="284" height="112" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <line x1="60" y1="106" x2="160" y2="106" stroke="#0078D4" stroke-width="2" stroke-dasharray="4 3"/>
-            <line x1="160" y1="106" x2="260" y2="106" stroke="#10B981" stroke-width="2"/>
-            <circle cx="60" cy="106" r="16" fill="#EFF6FF" stroke="#0078D4" stroke-width="1.5"/>
-            <text x="60" y="110" fill="#0078D4" font-size="11" font-weight="800" text-anchor="middle">用户</text>
-            <text x="60" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">国内直连</text>
-            <circle cx="160" cy="106" r="20" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.8"/>
-            <text x="160" y="109" fill="#D97706" font-size="10" font-weight="800" text-anchor="middle">EDGE</text>
-            <text x="160" y="120" fill="#B45309" font-size="8" font-weight="700" text-anchor="middle">CDN</text>
-            <text x="160" y="144" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">300+ 节点</text>
-            <circle cx="260" cy="106" r="16" fill="#ECFDF5" stroke="#10B981" stroke-width="1.5"/>
-            <text x="260" y="110" fill="#059669" font-size="11" font-weight="800" text-anchor="middle">全球</text>
-            <text x="260" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">秒级送达</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">全球边缘 CDN 网络直连</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⚡ &lt; 20ms</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">用户</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">国内直连</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">EDGE</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">CDN</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">300+ 节点</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">全球</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">秒级送达</span></div></div>
         </div>
       </div>
 
       <!-- Section 4 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#7C3AED"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">智能收件箱代办流</text>
-            <rect x="226" y="8" width="78" height="20" rx="10" fill="#EDE9FE" stroke="#DDD6FE" stroke-width="1"/>
-            <text x="265" y="22" fill="#6D28D9" font-size="10" font-weight="700" text-anchor="middle">⏰ 稍后代办</text>
-            <rect x="18" y="48" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="65" r="5" fill="#7C3AED"/>
-            <text x="48" y="69" fill="#0F172A" font-size="11" font-weight="700">项目周报与架构评审</text>
-            <rect x="220" y="55" width="72" height="20" rx="4" fill="#F5F3FF"/>
-            <text x="256" y="69" fill="#7C3AED" font-size="9.5" font-weight="700" text-anchor="middle">⏰ 明天 09:00</text>
-            <rect x="18" y="88" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
-            <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">GitHub 安全警报通知</text>
-            <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
-            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ 重要星标</text>
-            <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
-            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 毫秒级全文即时检索...</text>
-            <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
-            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">回车检索</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f5f3ff; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">智能收件箱代办流</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ 稍后代办</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">项目周报与架构评审</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ 明天 09:00</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">GitHub 安全警报通知</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⭐ 重要星标</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔍 毫秒级全文即时检索...</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">回车检索</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             📥 进阶工作流 · 极简轻快
           </div>
@@ -225,8 +111,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 5 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fff1f2; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🔀 别名隔离 · 垃圾邮件一键熔断
           </div>
@@ -239,37 +125,8 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ 真实主号隐身</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#E11D48"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">多别名分发与单向熔断器</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FFE4E6" stroke="#FECDD3" stroke-width="1"/>
-            <text x="270" y="22" fill="#E11D48" font-size="10" font-weight="700" text-anchor="middle">🛡️ 保护主号</text>
-            <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
-            <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
-            <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">主</text>
-            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">主邮箱</text>
-            <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 安全隐身</text>
-            <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 142H130C140 142 140 150 150 150H170" stroke="#E11D48" stroke-width="1.8" stroke-dasharray="3 3"/>
-            <rect x="170" y="48" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="68" fill="#0F172A" font-size="10" font-weight="600">github@alias</text>
-            <rect x="254" y="54" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="68" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● 通畅</text>
-            <rect x="170" y="91" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="111" fill="#0F172A" font-size="10" font-weight="600">steam@alias</text>
-            <rect x="254" y="97" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="111" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● 通畅</text>
-            <rect x="170" y="134" width="132" height="32" rx="6" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1.2"/>
-            <text x="180" y="154" fill="#9F1239" font-size="10" font-weight="600">spam@alias</text>
-            <rect x="254" y="140" width="42" height="20" rx="4" fill="#FFE4E6"/>
-            <text x="275" y="154" fill="#E11D48" font-size="9" font-weight="700" text-anchor="middle">✕ 已熔断</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">多别名分发与单向熔断器</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🛡️ 保护主号</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">主</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">主邮箱</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔒 安全隐身</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">github@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● 通畅</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">steam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● 通畅</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">spam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">✕ 已熔断</span></div></div>
         </div>
       </div>
 
@@ -277,7 +134,7 @@ export const WELCOME_TEMPLATES = {
 
     <!-- Full-Width Interactive Call-To-Action (CTA) Buttons -->
     <div style="text-align: center; margin: 32px 0 24px;">
-      <a href="/inbox" style="display: inline-block; background: linear-gradient(135deg, #0078D4 0%, #2563eb 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
+      <a href="/inbox" style="display: inline-block; background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #1d4ed8 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
         🚀 开启我的收件箱
       </a>
       <a href="/settings/profile" style="display: inline-block; background: #ffffff; color: #0078D4; text-decoration: none; font-weight: 600; font-size: 14.5px; padding: 12px 28px; border-radius: 9999px; border: 1.5px solid #bfdbfe; margin: 0 10px 10px;">
@@ -288,9 +145,7 @@ export const WELCOME_TEMPLATES = {
     <!-- 3-Step Quick Start Guide -->
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px 26px; margin: 24px 0;">
       <div style="font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#0078D4"/>
-        </svg>
+        <span aria-hidden="true" style="color: #1854a0; font-size: 18px">★</span>
         <span>新手 3 步快速上手指引</span>
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
@@ -300,7 +155,7 @@ export const WELCOME_TEMPLATES = {
       </div>
     </div>
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #52647b; line-height: 1.65;">
       <div>📌 <strong>贴心提示：</strong> 这是一封官方系统引导信件。站长设置了自动清理周期，到期后会自动安全清理，无需手动删除。</div>
       <div style="margin-top: 10px; font-weight: 600; color: #64748b;">Epocanvas Mail 开发者团队 · 陪你开启高效每一天</div>
     </div>
@@ -311,44 +166,20 @@ export const WELCOME_TEMPLATES = {
     lang: 'zh-Hant',
     name: '正體中文 (繁體)',
     subject: "🎉 歡迎來到 Epocanvas Mail · 開啟你的專屬獨立域名郵箱體驗",
-    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
+    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
   <!-- Top Full-Width Banner with Microsoft Azure Gradient & Official EpoMail Brand Logo -->
-  <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
+  <div style="background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #075985 35%, #1d4ed8 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
-      <div style="flex: 1; min-width: 300px;">
+      <div style="flex: 1 1 260px; min-width: 0;">
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 5px 14px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 14px; backdrop-filter: blur(8px);">
           <span>✨ 你的專屬獨立域名郵箱已就緒</span>
         </div>
         <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">嗨 {{user_name}}，很高興認識你！</h1>
         <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.95); font-size: 14.5px; line-height: 1.55;">零門檻免配置 · 純淨無廣告 · 國內極速秒開 · 專屬極客身份</p>
       </div>
-      <!-- Official EpoMail Cloud Logo SVG Artwork -->
+      <!-- Official EpoMail brand mark -->
       <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 92px; height: 92px; background: rgba(255, 255, 255, 0.18); border-radius: 22px; border: 1.5px solid rgba(255, 255, 255, 0.38); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18); backdrop-filter: blur(10px);">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="76" height="76" style="display:block; flex-shrink:0;">
-          <defs>
-            <linearGradient id="epomailLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#00F5D4" />
-              <stop offset="40%" stop-color="#0072FF" />
-              <stop offset="100%" stop-color="#5B24FF" />
-            </linearGradient>
-            <mask id="epomailCutout">
-              <rect width="100%" height="100%" fill="white" />
-              <path d="M 15 210 L 200 270 L 385 210" fill="none" stroke="black" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
-              <line x1="60" y1="320" x2="140" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <line x1="340" y1="320" x2="260" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <circle cx="200" cy="270" r="26" fill="white" />
-              <circle cx="200" cy="270" r="26" fill="none" stroke="black" stroke-width="10" />
-              <circle cx="200" cy="270" r="4.5" fill="black" />
-              <line x1="200" y1="270" x2="188" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-              <line x1="200" y1="270" x2="215" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-            </mask>
-          </defs>
-          <path d="M 60 110 Q 70 110 70 100 Q 70 110 80 110 Q 70 110 70 120 Q 70 110 60 110 Z" fill="#00F5D4" opacity="0.85" />
-          <path d="M 330 90 Q 335 90 335 85 Q 335 90 340 90 Q 335 90 335 95 Q 335 90 330 90 Z" fill="#FF369B" opacity="0.9" />
-          <circle cx="85" cy="180" r="2.5" fill="#5B24FF" opacity="0.6" />
-          <circle cx="320" cy="180" r="3" fill="#0072FF" opacity="0.7" />
-          <path d="M 40 220 A 60 60 0 0 1 120 155 A 85 85 0 0 1 280 155 A 60 60 0 0 1 360 220 L 360 260 C 360 325 290 335 200 335 C 110 335 40 325 40 260 Z" fill="url(#epomailLogoGrad)" mask="url(#epomailCutout)" />
-        </svg>
+        <span style="display: block; margin: auto; text-align: center; color: #fff; line-height: 1.2"><span aria-hidden="true" style="display: block; font-size: 32px">✉</span><strong style="display: block; font-size: 15px">EpoMail</strong></span>
       </div>
     </div>
   </div>
@@ -363,8 +194,8 @@ export const WELCOME_TEMPLATES = {
     <div style="margin: 28px 0; display: flex; flex-direction: column; gap: 20px;">
       
       <!-- Section 1 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f0f7ff; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 120, 212, 0.1); border: 1px solid rgba(0, 120, 212, 0.25); padding: 4px 12px; border-radius: 9999px; color: #0078D4; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🌐 專屬極客名片 · 免買域名免配置
           </div>
@@ -377,62 +208,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🏷️ 多頂級域名隨心選</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#EF4444"/>
-            <circle cx="28" cy="18" r="4" fill="#F59E0B"/>
-            <circle cx="40" cy="18" r="4" fill="#10B981"/>
-            <rect x="56" y="8" width="248" height="20" rx="6" fill="#F1F5F9"/>
-            <circle cx="68" cy="18" r="3" fill="#10B981"/>
-            <text x="78" y="22" fill="#0284C7" font-size="10" font-weight="600" font-family="monospace">https://epomail.bond/@me</text>
-            <rect x="20" y="52" width="280" height="110" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2" filter="drop-shadow(0 4px 12px rgba(0,0,0,0.04))"/>
-            <circle cx="50" cy="86" r="18" fill="#0078D4"/>
-            <text x="50" y="92" fill="#FFFFFF" font-size="13" font-weight="800" text-anchor="middle">@</text>
-            <text x="80" y="80" fill="#0F172A" font-size="13" font-weight="700">專屬極客域名名片</text>
-            <text x="80" y="96" fill="#64748B" font-size="11" font-weight="500" font-family="monospace">user@epomail.bond</text>
-            <rect x="220" y="70" width="64" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="252" y="84" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">● DNS 啟用</text>
-            <line x1="32" y1="120" x2="288" y2="120" stroke="#F1F5F9" stroke-width="1"/>
-            <rect x="32" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="70" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">SPF 權威驗證</text>
-            <rect x="116" y="130" width="80" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="156" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DKIM 金鑰簽發</text>
-            <rect x="204" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="242" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DMARC 100%</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">專屬極客域名名片</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">https://epomail.bond/@me</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">user@epomail.bond</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● DNS 啟用</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">SPF 權威驗證</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DKIM 金鑰簽發</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DMARC 100%</span></div></div>
         </div>
       </div>
 
       <!-- Section 2 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#10B981"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">隱私與資料安全監控臺</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="270" y="22" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">100% 私密</text>
-            <rect x="18" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="30" y="70" fill="#64748B" font-size="10" font-weight="600">商業廣告掃描</text>
-            <text x="30" y="90" fill="#059669" font-size="14" font-weight="800">0 追蹤 / 0 廣告</text>
-            <rect x="166" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="178" y="70" fill="#64748B" font-size="10" font-weight="600">傳輸加密標準</text>
-            <text x="178" y="90" fill="#0078D4" font-size="14" font-weight="800">TLS 1.3 / AES</text>
-            <rect x="18" y="112" width="284" height="50" rx="8" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1.2"/>
-            <circle cx="38" cy="137" r="10" fill="#059669"/>
-            <path d="M34 137L37 140L42 134" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <text x="56" y="134" fill="#065F46" font-size="11.5" font-weight="700">絕不向第三方出售使用者資料與信件畫像</text>
-            <text x="56" y="149" fill="#047857" font-size="10" font-weight="500">零開屏 · 零彈窗 · 純粹郵箱通訊本位</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #ecfdf5; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">隱私與資料安全監控臺</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">100% 私密</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">商業廣告掃描</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">0 追蹤 / 0 廣告</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">傳輸加密標準</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">TLS 1.3 / AES</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">絕不向第三方出售使用者資料與信件畫像</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">零開屏 · 零彈窗 · 純粹郵箱通訊本位</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 12px; border-radius: 9999px; color: #059669; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🛡️ 純粹私密 · 零廣告零商業變現
           </div>
@@ -448,8 +234,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 3 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fffbeb; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); padding: 4px 12px; border-radius: 9999px; color: #d97706; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             ⚡ 全球邊緣網路 · 國內極速秒開
           </div>
@@ -462,62 +248,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🌍 全球邊緣直達</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#F59E0B"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">全球邊緣 CDN 網路直連</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1"/>
-            <text x="270" y="22" fill="#D97706" font-size="10" font-weight="700" text-anchor="middle">⚡ &lt; 20ms</text>
-            <rect x="18" y="50" width="284" height="112" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <line x1="60" y1="106" x2="160" y2="106" stroke="#0078D4" stroke-width="2" stroke-dasharray="4 3"/>
-            <line x1="160" y1="106" x2="260" y2="106" stroke="#10B981" stroke-width="2"/>
-            <circle cx="60" cy="106" r="16" fill="#EFF6FF" stroke="#0078D4" stroke-width="1.5"/>
-            <text x="60" y="110" fill="#0078D4" font-size="11" font-weight="800" text-anchor="middle">使用者</text>
-            <text x="60" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">國內直連</text>
-            <circle cx="160" cy="106" r="20" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.8"/>
-            <text x="160" y="109" fill="#D97706" font-size="10" font-weight="800" text-anchor="middle">EDGE</text>
-            <text x="160" y="120" fill="#B45309" font-size="8" font-weight="700" text-anchor="middle">CDN</text>
-            <text x="160" y="144" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">300+ 節點</text>
-            <circle cx="260" cy="106" r="16" fill="#ECFDF5" stroke="#10B981" stroke-width="1.5"/>
-            <text x="260" y="110" fill="#059669" font-size="11" font-weight="800" text-anchor="middle">全球</text>
-            <text x="260" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">秒級送達</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">全球邊緣 CDN 網路直連</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⚡ &lt; 20ms</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">使用者</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">國內直連</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">EDGE</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">CDN</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">300+ 節點</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">全球</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">秒級送達</span></div></div>
         </div>
       </div>
 
       <!-- Section 4 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#7C3AED"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">智慧收件箱代辦流</text>
-            <rect x="226" y="8" width="78" height="20" rx="10" fill="#EDE9FE" stroke="#DDD6FE" stroke-width="1"/>
-            <text x="265" y="22" fill="#6D28D9" font-size="10" font-weight="700" text-anchor="middle">⏰ 稍後代辦</text>
-            <rect x="18" y="48" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="65" r="5" fill="#7C3AED"/>
-            <text x="48" y="69" fill="#0F172A" font-size="11" font-weight="700">專案週報與架構評審</text>
-            <rect x="220" y="55" width="72" height="20" rx="4" fill="#F5F3FF"/>
-            <text x="256" y="69" fill="#7C3AED" font-size="9.5" font-weight="700" text-anchor="middle">⏰ 明天 09:00</text>
-            <rect x="18" y="88" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
-            <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">GitHub 安全警報通知</text>
-            <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
-            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ 重要星標</text>
-            <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
-            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 毫秒級全文即時檢索...</text>
-            <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
-            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">回車檢索</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f5f3ff; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">智慧收件箱代辦流</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ 稍後代辦</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">專案週報與架構評審</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ 明天 09:00</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">GitHub 安全警報通知</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⭐ 重要星標</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔍 毫秒級全文即時檢索...</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">回車檢索</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             📥 進階工作流 · 極簡輕快
           </div>
@@ -533,8 +274,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 5 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fff1f2; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🔀 別名隔離 · 垃圾郵件一鍵熔斷
           </div>
@@ -547,37 +288,8 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ 真實主號隱身</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#E11D48"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">多別名分發與單向熔斷器</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FFE4E6" stroke="#FECDD3" stroke-width="1"/>
-            <text x="270" y="22" fill="#E11D48" font-size="10" font-weight="700" text-anchor="middle">🛡️ 保護主號</text>
-            <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
-            <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
-            <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">主</text>
-            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">主郵箱</text>
-            <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 安全隱身</text>
-            <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 142H130C140 142 140 150 150 150H170" stroke="#E11D48" stroke-width="1.8" stroke-dasharray="3 3"/>
-            <rect x="170" y="48" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="68" fill="#0F172A" font-size="10" font-weight="600">github@alias</text>
-            <rect x="254" y="54" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="68" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● 通暢</text>
-            <rect x="170" y="91" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="111" fill="#0F172A" font-size="10" font-weight="600">steam@alias</text>
-            <rect x="254" y="97" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="111" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● 通暢</text>
-            <rect x="170" y="134" width="132" height="32" rx="6" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1.2"/>
-            <text x="180" y="154" fill="#9F1239" font-size="10" font-weight="600">spam@alias</text>
-            <rect x="254" y="140" width="42" height="20" rx="4" fill="#FFE4E6"/>
-            <text x="275" y="154" fill="#E11D48" font-size="9" font-weight="700" text-anchor="middle">✕ 已熔斷</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">多別名分發與單向熔斷器</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🛡️ 保護主號</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">主</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">主郵箱</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔒 安全隱身</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">github@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● 通暢</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">steam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● 通暢</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">spam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">✕ 已熔斷</span></div></div>
         </div>
       </div>
 
@@ -585,7 +297,7 @@ export const WELCOME_TEMPLATES = {
 
     <!-- Full-Width Interactive Call-To-Action (CTA) Buttons -->
     <div style="text-align: center; margin: 32px 0 24px;">
-      <a href="/inbox" style="display: inline-block; background: linear-gradient(135deg, #0078D4 0%, #2563eb 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
+      <a href="/inbox" style="display: inline-block; background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #1d4ed8 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
         🚀 開啟我的收件箱
       </a>
       <a href="/settings/profile" style="display: inline-block; background: #ffffff; color: #0078D4; text-decoration: none; font-weight: 600; font-size: 14.5px; padding: 12px 28px; border-radius: 9999px; border: 1.5px solid #bfdbfe; margin: 0 10px 10px;">
@@ -596,9 +308,7 @@ export const WELCOME_TEMPLATES = {
     <!-- 3-Step Quick Start Guide -->
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px 26px; margin: 24px 0;">
       <div style="font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#0078D4"/>
-        </svg>
+        <span aria-hidden="true" style="color: #1854a0; font-size: 18px">★</span>
         <span>新手 3 步快速上手指引</span>
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
@@ -608,7 +318,7 @@ export const WELCOME_TEMPLATES = {
       </div>
     </div>
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #52647b; line-height: 1.65;">
       <div>📌 <strong>貼心提示：</strong> 這是一封官方系統引導信件。站長設定了自動清理週期，到期後會自動安全清理，無需手動刪除。</div>
       <div style="margin-top: 10px; font-weight: 600; color: #64748b;">Epocanvas Mail 開發者團隊 · 陪你開啟高效每一天</div>
     </div>
@@ -619,44 +329,20 @@ export const WELCOME_TEMPLATES = {
     lang: 'en',
     name: 'English',
     subject: "🎉 Welcome to Epocanvas Mail · Your Exclusive Custom Domain Mailbox",
-    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
+    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
   <!-- Top Full-Width Banner with Microsoft Azure Gradient & Official EpoMail Brand Logo -->
-  <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
+  <div style="background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #075985 35%, #1d4ed8 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
-      <div style="flex: 1; min-width: 300px;">
+      <div style="flex: 1 1 260px; min-width: 0;">
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 5px 14px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 14px; backdrop-filter: blur(8px);">
           <span>✨ Your Custom Domain Mailbox is Ready</span>
         </div>
         <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">Hi {{user_name}}, Great to Meet You!</h1>
         <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.95); font-size: 14.5px; line-height: 1.55;">Zero Configuration · Ad-Free · Blazing Fast · Exclusive Geek Identity</p>
       </div>
-      <!-- Official EpoMail Cloud Logo SVG Artwork -->
+      <!-- Official EpoMail brand mark -->
       <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 92px; height: 92px; background: rgba(255, 255, 255, 0.18); border-radius: 22px; border: 1.5px solid rgba(255, 255, 255, 0.38); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18); backdrop-filter: blur(10px);">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="76" height="76" style="display:block; flex-shrink:0;">
-          <defs>
-            <linearGradient id="epomailLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#00F5D4" />
-              <stop offset="40%" stop-color="#0072FF" />
-              <stop offset="100%" stop-color="#5B24FF" />
-            </linearGradient>
-            <mask id="epomailCutout">
-              <rect width="100%" height="100%" fill="white" />
-              <path d="M 15 210 L 200 270 L 385 210" fill="none" stroke="black" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
-              <line x1="60" y1="320" x2="140" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <line x1="340" y1="320" x2="260" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <circle cx="200" cy="270" r="26" fill="white" />
-              <circle cx="200" cy="270" r="26" fill="none" stroke="black" stroke-width="10" />
-              <circle cx="200" cy="270" r="4.5" fill="black" />
-              <line x1="200" y1="270" x2="188" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-              <line x1="200" y1="270" x2="215" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-            </mask>
-          </defs>
-          <path d="M 60 110 Q 70 110 70 100 Q 70 110 80 110 Q 70 110 70 120 Q 70 110 60 110 Z" fill="#00F5D4" opacity="0.85" />
-          <path d="M 330 90 Q 335 90 335 85 Q 335 90 340 90 Q 335 90 335 95 Q 335 90 330 90 Z" fill="#FF369B" opacity="0.9" />
-          <circle cx="85" cy="180" r="2.5" fill="#5B24FF" opacity="0.6" />
-          <circle cx="320" cy="180" r="3" fill="#0072FF" opacity="0.7" />
-          <path d="M 40 220 A 60 60 0 0 1 120 155 A 85 85 0 0 1 280 155 A 60 60 0 0 1 360 220 L 360 260 C 360 325 290 335 200 335 C 110 335 40 325 40 260 Z" fill="url(#epomailLogoGrad)" mask="url(#epomailCutout)" />
-        </svg>
+        <span style="display: block; margin: auto; text-align: center; color: #fff; line-height: 1.2"><span aria-hidden="true" style="display: block; font-size: 32px">✉</span><strong style="display: block; font-size: 15px">EpoMail</strong></span>
       </div>
     </div>
   </div>
@@ -671,8 +357,8 @@ export const WELCOME_TEMPLATES = {
     <div style="margin: 28px 0; display: flex; flex-direction: column; gap: 20px;">
       
       <!-- Section 1 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f0f7ff; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 120, 212, 0.1); border: 1px solid rgba(0, 120, 212, 0.25); padding: 4px 12px; border-radius: 9999px; color: #0078D4; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🌐 Exclusive Geek Identity · Zero Domain Hassle
           </div>
@@ -685,62 +371,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🏷️ Multiple Domains</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#EF4444"/>
-            <circle cx="28" cy="18" r="4" fill="#F59E0B"/>
-            <circle cx="40" cy="18" r="4" fill="#10B981"/>
-            <rect x="56" y="8" width="248" height="20" rx="6" fill="#F1F5F9"/>
-            <circle cx="68" cy="18" r="3" fill="#10B981"/>
-            <text x="78" y="22" fill="#0284C7" font-size="10" font-weight="600" font-family="monospace">https://epomail.bond/@me</text>
-            <rect x="20" y="52" width="280" height="110" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2" filter="drop-shadow(0 4px 12px rgba(0,0,0,0.04))"/>
-            <circle cx="50" cy="86" r="18" fill="#0078D4"/>
-            <text x="50" y="92" fill="#FFFFFF" font-size="13" font-weight="800" text-anchor="middle">@</text>
-            <text x="80" y="80" fill="#0F172A" font-size="13" font-weight="700">Custom Geek Business Card</text>
-            <text x="80" y="96" fill="#64748B" font-size="11" font-weight="500" font-family="monospace">user@epomail.bond</text>
-            <rect x="220" y="70" width="64" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="252" y="84" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">● DNS Active</text>
-            <line x1="32" y1="120" x2="288" y2="120" stroke="#F1F5F9" stroke-width="1"/>
-            <rect x="32" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="70" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">SPF Verified</text>
-            <rect x="116" y="130" width="80" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="156" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DKIM Signed</text>
-            <rect x="204" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="242" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DMARC 100%</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Custom Geek Business Card</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">https://epomail.bond/@me</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">user@epomail.bond</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● DNS Active</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">SPF Verified</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DKIM Signed</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DMARC 100%</span></div></div>
         </div>
       </div>
 
       <!-- Section 2 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#10B981"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Privacy & Security Console</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="270" y="22" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">100% Private</text>
-            <rect x="18" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="30" y="70" fill="#64748B" font-size="10" font-weight="600">Ad Scanning</text>
-            <text x="30" y="90" fill="#059669" font-size="14" font-weight="800">0 Tracking / 0 Ads</text>
-            <rect x="166" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="178" y="70" fill="#64748B" font-size="10" font-weight="600">Encryption Standard</text>
-            <text x="178" y="90" fill="#0078D4" font-size="14" font-weight="800">TLS 1.3 / AES</text>
-            <rect x="18" y="112" width="284" height="50" rx="8" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1.2"/>
-            <circle cx="38" cy="137" r="10" fill="#059669"/>
-            <path d="M34 137L37 140L42 134" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <text x="56" y="134" fill="#065F46" font-size="11.5" font-weight="700">Never selling user data or profiles to third parties</text>
-            <text x="56" y="149" fill="#047857" font-size="10" font-weight="500">Zero ads · Zero popups · True communication focus</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #ecfdf5; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Privacy &amp; Security Console</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">100% Private</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Ad Scanning</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">0 Tracking / 0 Ads</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Encryption Standard</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">TLS 1.3 / AES</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Never selling user data or profiles to third parties</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Zero ads · Zero popups · True communication focus</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 12px; border-radius: 9999px; color: #059669; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🛡️ Pure & Private · 100% Ad-Free
           </div>
@@ -756,8 +397,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 3 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fffbeb; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); padding: 4px 12px; border-radius: 9999px; color: #d97706; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             ⚡ Global Edge Network · Blazing Fast
           </div>
@@ -770,62 +411,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🌍 Global Edge CDN</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#F59E0B"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Global Edge CDN Direct Link</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1"/>
-            <text x="270" y="22" fill="#D97706" font-size="10" font-weight="700" text-anchor="middle">⚡ &lt; 20ms</text>
-            <rect x="18" y="50" width="284" height="112" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <line x1="60" y1="106" x2="160" y2="106" stroke="#0078D4" stroke-width="2" stroke-dasharray="4 3"/>
-            <line x1="160" y1="106" x2="260" y2="106" stroke="#10B981" stroke-width="2"/>
-            <circle cx="60" cy="106" r="16" fill="#EFF6FF" stroke="#0078D4" stroke-width="1.5"/>
-            <text x="60" y="110" fill="#0078D4" font-size="11" font-weight="800" text-anchor="middle">User</text>
-            <text x="60" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">Direct Link</text>
-            <circle cx="160" cy="106" r="20" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.8"/>
-            <text x="160" y="109" fill="#D97706" font-size="10" font-weight="800" text-anchor="middle">EDGE</text>
-            <text x="160" y="120" fill="#B45309" font-size="8" font-weight="700" text-anchor="middle">CDN</text>
-            <text x="160" y="144" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">300+ Nodes</text>
-            <circle cx="260" cy="106" r="16" fill="#ECFDF5" stroke="#10B981" stroke-width="1.5"/>
-            <text x="260" y="110" fill="#059669" font-size="11" font-weight="800" text-anchor="middle">Global</text>
-            <text x="260" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">Fast Delivery</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Global Edge CDN Direct Link</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⚡ &lt; 20ms</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">User</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Direct Link</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">EDGE</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">CDN</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">300+ Nodes</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Global</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Fast Delivery</span></div></div>
         </div>
       </div>
 
       <!-- Section 4 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#7C3AED"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Smart Inbox Action Stream</text>
-            <rect x="226" y="8" width="78" height="20" rx="10" fill="#EDE9FE" stroke="#DDD6FE" stroke-width="1"/>
-            <text x="265" y="22" fill="#6D28D9" font-size="10" font-weight="700" text-anchor="middle">⏰ Snoozed</text>
-            <rect x="18" y="48" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="65" r="5" fill="#7C3AED"/>
-            <text x="48" y="69" fill="#0F172A" font-size="11" font-weight="700">Weekly Report & Architecture Review</text>
-            <rect x="220" y="55" width="72" height="20" rx="4" fill="#F5F3FF"/>
-            <text x="256" y="69" fill="#7C3AED" font-size="9.5" font-weight="700" text-anchor="middle">⏰ Tomorrow 09:00</text>
-            <rect x="18" y="88" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
-            <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">GitHub Security Alert</text>
-            <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
-            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ Starred</text>
-            <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
-            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 Millisecond full-text search...</text>
-            <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
-            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">Press Enter</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f5f3ff; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Smart Inbox Action Stream</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ Snoozed</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Weekly Report &amp; Architecture Review</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ Tomorrow 09:00</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">GitHub Security Alert</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⭐ Starred</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔍 Millisecond full-text search...</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Press Enter</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             📥 Advanced Workflow · Light & Fast
           </div>
@@ -841,8 +437,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 5 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fff1f2; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🔀 Alias Isolation · One-Click Spam Shield
           </div>
@@ -855,37 +451,8 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ True Identity Hidden</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#E11D48"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Multi-Alias Routing & Fuse</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FFE4E6" stroke="#FECDD3" stroke-width="1"/>
-            <text x="270" y="22" fill="#E11D48" font-size="10" font-weight="700" text-anchor="middle">🛡️ Protect Primary</text>
-            <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
-            <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
-            <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">Main</text>
-            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Primary</text>
-            <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 Safe & Hidden</text>
-            <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 142H130C140 142 140 150 150 150H170" stroke="#E11D48" stroke-width="1.8" stroke-dasharray="3 3"/>
-            <rect x="170" y="48" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="68" fill="#0F172A" font-size="10" font-weight="600">github@alias</text>
-            <rect x="254" y="54" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="68" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● Active</text>
-            <rect x="170" y="91" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="111" fill="#0F172A" font-size="10" font-weight="600">steam@alias</text>
-            <rect x="254" y="97" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="111" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● Active</text>
-            <rect x="170" y="134" width="132" height="32" rx="6" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1.2"/>
-            <text x="180" y="154" fill="#9F1239" font-size="10" font-weight="600">spam@alias</text>
-            <rect x="254" y="140" width="42" height="20" rx="4" fill="#FFE4E6"/>
-            <text x="275" y="154" fill="#E11D48" font-size="9" font-weight="700" text-anchor="middle">✕ Fused</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Multi-Alias Routing &amp; Fuse</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🛡️ Protect Primary</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Main</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Primary</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔒 Safe &amp; Hidden</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">github@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● Active</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">steam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● Active</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">spam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">✕ Fused</span></div></div>
         </div>
       </div>
 
@@ -893,7 +460,7 @@ export const WELCOME_TEMPLATES = {
 
     <!-- Full-Width Interactive Call-To-Action (CTA) Buttons -->
     <div style="text-align: center; margin: 32px 0 24px;">
-      <a href="/inbox" style="display: inline-block; background: linear-gradient(135deg, #0078D4 0%, #2563eb 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
+      <a href="/inbox" style="display: inline-block; background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #1d4ed8 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
         🚀 Open My Inbox
       </a>
       <a href="/settings/profile" style="display: inline-block; background: #ffffff; color: #0078D4; text-decoration: none; font-weight: 600; font-size: 14.5px; padding: 12px 28px; border-radius: 9999px; border: 1.5px solid #bfdbfe; margin: 0 10px 10px;">
@@ -904,9 +471,7 @@ export const WELCOME_TEMPLATES = {
     <!-- 3-Step Quick Start Guide -->
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px 26px; margin: 24px 0;">
       <div style="font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#0078D4"/>
-        </svg>
+        <span aria-hidden="true" style="color: #1854a0; font-size: 18px">★</span>
         <span>3-Step Quick Start Guide</span>
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
@@ -916,7 +481,7 @@ export const WELCOME_TEMPLATES = {
       </div>
     </div>
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #52647b; line-height: 1.65;">
       <div>📌 <strong>Tip:</strong> This is an official onboarding email. The system has set an auto-cleanup retention period; it will safely expire automatically without requiring manual deletion.</div>
       <div style="margin-top: 10px; font-weight: 600; color: #64748b;">Epocanvas Mail Team · Powering Your Productive Days</div>
     </div>
@@ -927,44 +492,20 @@ export const WELCOME_TEMPLATES = {
     lang: 'fr',
     name: 'Français',
     subject: "🎉 Bienvenue sur Epocanvas Mail · Votre messagerie à domaine exclusif",
-    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
+    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
   <!-- Top Full-Width Banner with Microsoft Azure Gradient & Official EpoMail Brand Logo -->
-  <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
+  <div style="background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #075985 35%, #1d4ed8 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
-      <div style="flex: 1; min-width: 300px;">
+      <div style="flex: 1 1 260px; min-width: 0;">
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 5px 14px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 14px; backdrop-filter: blur(8px);">
           <span>✨ Votre messagerie à domaine exclusif est prête</span>
         </div>
         <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">Bonjour {{user_name}}, ravis de vous rencontrer !</h1>
         <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.95); font-size: 14.5px; line-height: 1.55;">Zéro configuration · Sans publicité · Ultra-rapide · Identité geek exclusive</p>
       </div>
-      <!-- Official EpoMail Cloud Logo SVG Artwork -->
+      <!-- Official EpoMail brand mark -->
       <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 92px; height: 92px; background: rgba(255, 255, 255, 0.18); border-radius: 22px; border: 1.5px solid rgba(255, 255, 255, 0.38); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18); backdrop-filter: blur(10px);">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="76" height="76" style="display:block; flex-shrink:0;">
-          <defs>
-            <linearGradient id="epomailLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#00F5D4" />
-              <stop offset="40%" stop-color="#0072FF" />
-              <stop offset="100%" stop-color="#5B24FF" />
-            </linearGradient>
-            <mask id="epomailCutout">
-              <rect width="100%" height="100%" fill="white" />
-              <path d="M 15 210 L 200 270 L 385 210" fill="none" stroke="black" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
-              <line x1="60" y1="320" x2="140" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <line x1="340" y1="320" x2="260" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <circle cx="200" cy="270" r="26" fill="white" />
-              <circle cx="200" cy="270" r="26" fill="none" stroke="black" stroke-width="10" />
-              <circle cx="200" cy="270" r="4.5" fill="black" />
-              <line x1="200" y1="270" x2="188" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-              <line x1="200" y1="270" x2="215" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-            </mask>
-          </defs>
-          <path d="M 60 110 Q 70 110 70 100 Q 70 110 80 110 Q 70 110 70 120 Q 70 110 60 110 Z" fill="#00F5D4" opacity="0.85" />
-          <path d="M 330 90 Q 335 90 335 85 Q 335 90 340 90 Q 335 90 335 95 Q 335 90 330 90 Z" fill="#FF369B" opacity="0.9" />
-          <circle cx="85" cy="180" r="2.5" fill="#5B24FF" opacity="0.6" />
-          <circle cx="320" cy="180" r="3" fill="#0072FF" opacity="0.7" />
-          <path d="M 40 220 A 60 60 0 0 1 120 155 A 85 85 0 0 1 280 155 A 60 60 0 0 1 360 220 L 360 260 C 360 325 290 335 200 335 C 110 335 40 325 40 260 Z" fill="url(#epomailLogoGrad)" mask="url(#epomailCutout)" />
-        </svg>
+        <span style="display: block; margin: auto; text-align: center; color: #fff; line-height: 1.2"><span aria-hidden="true" style="display: block; font-size: 32px">✉</span><strong style="display: block; font-size: 15px">EpoMail</strong></span>
       </div>
     </div>
   </div>
@@ -979,8 +520,8 @@ export const WELCOME_TEMPLATES = {
     <div style="margin: 28px 0; display: flex; flex-direction: column; gap: 20px;">
       
       <!-- Section 1 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f0f7ff; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 120, 212, 0.1); border: 1px solid rgba(0, 120, 212, 0.25); padding: 4px 12px; border-radius: 9999px; color: #0078D4; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🌐 Identité geek exclusive · Zéro souci de domaine
           </div>
@@ -993,62 +534,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🏷️ Multiples domaines</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#EF4444"/>
-            <circle cx="28" cy="18" r="4" fill="#F59E0B"/>
-            <circle cx="40" cy="18" r="4" fill="#10B981"/>
-            <rect x="56" y="8" width="248" height="20" rx="6" fill="#F1F5F9"/>
-            <circle cx="68" cy="18" r="3" fill="#10B981"/>
-            <text x="78" y="22" fill="#0284C7" font-size="10" font-weight="600" font-family="monospace">https://epomail.bond/@me</text>
-            <rect x="20" y="52" width="280" height="110" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2" filter="drop-shadow(0 4px 12px rgba(0,0,0,0.04))"/>
-            <circle cx="50" cy="86" r="18" fill="#0078D4"/>
-            <text x="50" y="92" fill="#FFFFFF" font-size="13" font-weight="800" text-anchor="middle">@</text>
-            <text x="80" y="80" fill="#0F172A" font-size="13" font-weight="700">Carte de visite geek exclusive</text>
-            <text x="80" y="96" fill="#64748B" font-size="11" font-weight="500" font-family="monospace">user@epomail.bond</text>
-            <rect x="220" y="70" width="64" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="252" y="84" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">● DNS actif</text>
-            <line x1="32" y1="120" x2="288" y2="120" stroke="#F1F5F9" stroke-width="1"/>
-            <rect x="32" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="70" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">SPF vérifié</text>
-            <rect x="116" y="130" width="80" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="156" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DKIM signé</text>
-            <rect x="204" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="242" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DMARC 100%</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Carte de visite geek exclusive</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">https://epomail.bond/@me</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">user@epomail.bond</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● DNS actif</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">SPF vérifié</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DKIM signé</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DMARC 100%</span></div></div>
         </div>
       </div>
 
       <!-- Section 2 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#10B981"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Console de sécurité et confidentialité</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="270" y="22" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">100% privé</text>
-            <rect x="18" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="30" y="70" fill="#64748B" font-size="10" font-weight="600">Analyse publicitaire</text>
-            <text x="30" y="90" fill="#059669" font-size="14" font-weight="800">0 pistage / 0 pub</text>
-            <rect x="166" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="178" y="70" fill="#64748B" font-size="10" font-weight="600">Chiffrement</text>
-            <text x="178" y="90" fill="#0078D4" font-size="14" font-weight="800">TLS 1.3 / AES</text>
-            <rect x="18" y="112" width="284" height="50" rx="8" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1.2"/>
-            <circle cx="38" cy="137" r="10" fill="#059669"/>
-            <path d="M34 137L37 140L42 134" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <text x="56" y="134" fill="#065F46" font-size="11.5" font-weight="700">Aucune revente de données à des tiers</text>
-            <text x="56" y="149" fill="#047857" font-size="10" font-weight="500">Zéro pub · Zéro popup · Communication pure</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #ecfdf5; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Console de sécurité et confidentialité</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">100% privé</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Analyse publicitaire</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">0 pistage / 0 pub</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Chiffrement</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">TLS 1.3 / AES</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Aucune revente de données à des tiers</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Zéro pub · Zéro popup · Communication pure</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 12px; border-radius: 9999px; color: #059669; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🛡️ Pur et privé · 100% sans publicité
           </div>
@@ -1064,8 +560,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 3 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fffbeb; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); padding: 4px 12px; border-radius: 9999px; color: #d97706; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             ⚡ Réseau Edge mondial · Ultra-rapide
           </div>
@@ -1078,62 +574,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🌍 Réseau CDN mondial</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#F59E0B"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Liaison directe CDN Edge</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1"/>
-            <text x="270" y="22" fill="#D97706" font-size="10" font-weight="700" text-anchor="middle">⚡ &lt; 20ms</text>
-            <rect x="18" y="50" width="284" height="112" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <line x1="60" y1="106" x2="160" y2="106" stroke="#0078D4" stroke-width="2" stroke-dasharray="4 3"/>
-            <line x1="160" y1="106" x2="260" y2="106" stroke="#10B981" stroke-width="2"/>
-            <circle cx="60" cy="106" r="16" fill="#EFF6FF" stroke="#0078D4" stroke-width="1.5"/>
-            <text x="60" y="110" fill="#0078D4" font-size="11" font-weight="800" text-anchor="middle">Utilisateur</text>
-            <text x="60" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">Liaison directe</text>
-            <circle cx="160" cy="106" r="20" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.8"/>
-            <text x="160" y="109" fill="#D97706" font-size="10" font-weight="800" text-anchor="middle">EDGE</text>
-            <text x="160" y="120" fill="#B45309" font-size="8" font-weight="700" text-anchor="middle">CDN</text>
-            <text x="160" y="144" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">300+ nœuds</text>
-            <circle cx="260" cy="106" r="16" fill="#ECFDF5" stroke="#10B981" stroke-width="1.5"/>
-            <text x="260" y="110" fill="#059669" font-size="11" font-weight="800" text-anchor="middle">Mondial</text>
-            <text x="260" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">Envoi rapide</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Liaison directe CDN Edge</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⚡ &lt; 20ms</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Utilisateur</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Liaison directe</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">EDGE</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">CDN</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">300+ nœuds</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Mondial</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Envoi rapide</span></div></div>
         </div>
       </div>
 
       <!-- Section 4 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#7C3AED"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Flux d'actions intelligent</text>
-            <rect x="226" y="8" width="78" height="20" rx="10" fill="#EDE9FE" stroke="#DDD6FE" stroke-width="1"/>
-            <text x="265" y="22" fill="#6D28D9" font-size="10" font-weight="700" text-anchor="middle">⏰ En attente</text>
-            <rect x="18" y="48" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="65" r="5" fill="#7C3AED"/>
-            <text x="48" y="69" fill="#0F172A" font-size="11" font-weight="700">Rapport hebdomadaire et revue</text>
-            <rect x="220" y="55" width="72" height="20" rx="4" fill="#F5F3FF"/>
-            <text x="256" y="69" fill="#7C3AED" font-size="9.5" font-weight="700" text-anchor="middle">⏰ Demain 09:00</text>
-            <rect x="18" y="88" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
-            <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">Alerte sécurité GitHub</text>
-            <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
-            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ Favori</text>
-            <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
-            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 Recherche plein texte instantanée...</text>
-            <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
-            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">Appuyez sur Entrée</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f5f3ff; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Flux d'actions intelligent</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ En attente</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Rapport hebdomadaire et revue</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ Demain 09:00</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Alerte sécurité GitHub</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⭐ Favori</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔍 Recherche plein texte instantanée...</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Appuyez sur Entrée</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             📥 Flux avancé · Simple et rapide
           </div>
@@ -1149,8 +600,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 5 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fff1f2; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🔀 Alias isolés · Bouclier anti-spam en un clic
           </div>
@@ -1163,37 +614,8 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ Identité principale masquée</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#E11D48"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Routage multi-alias et fusible</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FFE4E6" stroke="#FECDD3" stroke-width="1"/>
-            <text x="270" y="22" fill="#E11D48" font-size="10" font-weight="700" text-anchor="middle">🛡️ Protéger l'adresse principale</text>
-            <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
-            <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
-            <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">Principal</text>
-            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Principale</text>
-            <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 En sécurité</text>
-            <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 142H130C140 142 140 150 150 150H170" stroke="#E11D48" stroke-width="1.8" stroke-dasharray="3 3"/>
-            <rect x="170" y="48" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="68" fill="#0F172A" font-size="10" font-weight="600">github@alias</text>
-            <rect x="254" y="54" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="68" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● Actif</text>
-            <rect x="170" y="91" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="111" fill="#0F172A" font-size="10" font-weight="600">steam@alias</text>
-            <rect x="254" y="97" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="111" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● Actif</text>
-            <rect x="170" y="134" width="132" height="32" rx="6" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1.2"/>
-            <text x="180" y="154" fill="#9F1239" font-size="10" font-weight="600">spam@alias</text>
-            <rect x="254" y="140" width="42" height="20" rx="4" fill="#FFE4E6"/>
-            <text x="275" y="154" fill="#E11D48" font-size="9" font-weight="700" text-anchor="middle">✕ Coupé</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Routage multi-alias et fusible</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🛡️ Protéger l'adresse principale</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Principal</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Principale</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔒 En sécurité</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">github@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● Actif</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">steam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● Actif</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">spam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">✕ Coupé</span></div></div>
         </div>
       </div>
 
@@ -1201,7 +623,7 @@ export const WELCOME_TEMPLATES = {
 
     <!-- Full-Width Interactive Call-To-Action (CTA) Buttons -->
     <div style="text-align: center; margin: 32px 0 24px;">
-      <a href="/inbox" style="display: inline-block; background: linear-gradient(135deg, #0078D4 0%, #2563eb 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
+      <a href="/inbox" style="display: inline-block; background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #1d4ed8 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
         🚀 Ouvrir ma boîte de réception
       </a>
       <a href="/settings/profile" style="display: inline-block; background: #ffffff; color: #0078D4; text-decoration: none; font-weight: 600; font-size: 14.5px; padding: 12px 28px; border-radius: 9999px; border: 1.5px solid #bfdbfe; margin: 0 10px 10px;">
@@ -1212,9 +634,7 @@ export const WELCOME_TEMPLATES = {
     <!-- Guide de démarrage en 3 étapes -->
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px 26px; margin: 24px 0;">
       <div style="font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#0078D4"/>
-        </svg>
+        <span aria-hidden="true" style="color: #1854a0; font-size: 18px">★</span>
         <span>Guide de démarrage en 3 étapes</span>
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
@@ -1224,7 +644,7 @@ export const WELCOME_TEMPLATES = {
       </div>
     </div>
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #52647b; line-height: 1.65;">
       <div>📌 <strong>Astuce :</strong> Ceci est un message officiel d'accueil. Une période de rétention automatique est configurée ; il sera nettoyé automatiquement.</div>
       <div style="margin-top: 10px; font-weight: 600; color: #64748b;">L'équipe Epocanvas Mail · Pour vos journées productives</div>
     </div>
@@ -1235,44 +655,20 @@ export const WELCOME_TEMPLATES = {
     lang: 'es',
     name: 'Español',
     subject: "🎉 Bienvenido a Epocanvas Mail · Tu buzón con dominio exclusivo",
-    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
+    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
   <!-- Top Full-Width Banner with Microsoft Azure Gradient & Official EpoMail Brand Logo -->
-  <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
+  <div style="background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #075985 35%, #1d4ed8 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
-      <div style="flex: 1; min-width: 300px;">
+      <div style="flex: 1 1 260px; min-width: 0;">
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 5px 14px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 14px; backdrop-filter: blur(8px);">
           <span>✨ Tu buzón con dominio exclusivo está listo</span>
         </div>
         <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">¡Hola {{user_name}}, un placer conocerte!</h1>
         <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.95); font-size: 14.5px; line-height: 1.55;">Cero configuración · Sin publicidad · Súper rápido · Identidad geek exclusiva</p>
       </div>
-      <!-- Official EpoMail Cloud Logo SVG Artwork -->
+      <!-- Official EpoMail brand mark -->
       <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 92px; height: 92px; background: rgba(255, 255, 255, 0.18); border-radius: 22px; border: 1.5px solid rgba(255, 255, 255, 0.38); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18); backdrop-filter: blur(10px);">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="76" height="76" style="display:block; flex-shrink:0;">
-          <defs>
-            <linearGradient id="epomailLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#00F5D4" />
-              <stop offset="40%" stop-color="#0072FF" />
-              <stop offset="100%" stop-color="#5B24FF" />
-            </linearGradient>
-            <mask id="epomailCutout">
-              <rect width="100%" height="100%" fill="white" />
-              <path d="M 15 210 L 200 270 L 385 210" fill="none" stroke="black" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
-              <line x1="60" y1="320" x2="140" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <line x1="340" y1="320" x2="260" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <circle cx="200" cy="270" r="26" fill="white" />
-              <circle cx="200" cy="270" r="26" fill="none" stroke="black" stroke-width="10" />
-              <circle cx="200" cy="270" r="4.5" fill="black" />
-              <line x1="200" y1="270" x2="188" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-              <line x1="200" y1="270" x2="215" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-            </mask>
-          </defs>
-          <path d="M 60 110 Q 70 110 70 100 Q 70 110 80 110 Q 70 110 70 120 Q 70 110 60 110 Z" fill="#00F5D4" opacity="0.85" />
-          <path d="M 330 90 Q 335 90 335 85 Q 335 90 340 90 Q 335 90 335 95 Q 335 90 330 90 Z" fill="#FF369B" opacity="0.9" />
-          <circle cx="85" cy="180" r="2.5" fill="#5B24FF" opacity="0.6" />
-          <circle cx="320" cy="180" r="3" fill="#0072FF" opacity="0.7" />
-          <path d="M 40 220 A 60 60 0 0 1 120 155 A 85 85 0 0 1 280 155 A 60 60 0 0 1 360 220 L 360 260 C 360 325 290 335 200 335 C 110 335 40 325 40 260 Z" fill="url(#epomailLogoGrad)" mask="url(#epomailCutout)" />
-        </svg>
+        <span style="display: block; margin: auto; text-align: center; color: #fff; line-height: 1.2"><span aria-hidden="true" style="display: block; font-size: 32px">✉</span><strong style="display: block; font-size: 15px">EpoMail</strong></span>
       </div>
     </div>
   </div>
@@ -1287,8 +683,8 @@ export const WELCOME_TEMPLATES = {
     <div style="margin: 28px 0; display: flex; flex-direction: column; gap: 20px;">
       
       <!-- Section 1 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f0f7ff; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 120, 212, 0.1); border: 1px solid rgba(0, 120, 212, 0.25); padding: 4px 12px; border-radius: 9999px; color: #0078D4; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🌐 Identidad geek exclusiva · Cero complicaciones
           </div>
@@ -1301,62 +697,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🏷️ Múltiples dominios</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#EF4444"/>
-            <circle cx="28" cy="18" r="4" fill="#F59E0B"/>
-            <circle cx="40" cy="18" r="4" fill="#10B981"/>
-            <rect x="56" y="8" width="248" height="20" rx="6" fill="#F1F5F9"/>
-            <circle cx="68" cy="18" r="3" fill="#10B981"/>
-            <text x="78" y="22" fill="#0284C7" font-size="10" font-weight="600" font-family="monospace">https://epomail.bond/@me</text>
-            <rect x="20" y="52" width="280" height="110" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2" filter="drop-shadow(0 4px 12px rgba(0,0,0,0.04))"/>
-            <circle cx="50" cy="86" r="18" fill="#0078D4"/>
-            <text x="50" y="92" fill="#FFFFFF" font-size="13" font-weight="800" text-anchor="middle">@</text>
-            <text x="80" y="80" fill="#0F172A" font-size="13" font-weight="700">Tarjeta de presentación geek</text>
-            <text x="80" y="96" fill="#64748B" font-size="11" font-weight="500" font-family="monospace">user@epomail.bond</text>
-            <rect x="220" y="70" width="64" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="252" y="84" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">● DNS activo</text>
-            <line x1="32" y1="120" x2="288" y2="120" stroke="#F1F5F9" stroke-width="1"/>
-            <rect x="32" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="70" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">SPF verificado</text>
-            <rect x="116" y="130" width="80" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="156" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DKIM firmado</text>
-            <rect x="204" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="242" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DMARC 100%</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Tarjeta de presentación geek</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">https://epomail.bond/@me</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">user@epomail.bond</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● DNS activo</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">SPF verificado</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DKIM firmado</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DMARC 100%</span></div></div>
         </div>
       </div>
 
       <!-- Section 2 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#10B981"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Consola de privacidad y seguridad</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="270" y="22" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">100% privado</text>
-            <rect x="18" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="30" y="70" fill="#64748B" font-size="10" font-weight="600">Escaneo de anuncios</text>
-            <text x="30" y="90" fill="#059669" font-size="14" font-weight="800">0 rastreo / 0 publicidad</text>
-            <rect x="166" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="178" y="70" fill="#64748B" font-size="10" font-weight="600">Estándar de cifrado</text>
-            <text x="178" y="90" fill="#0078D4" font-size="14" font-weight="800">TLS 1.3 / AES</text>
-            <rect x="18" y="112" width="284" height="50" rx="8" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1.2"/>
-            <circle cx="38" cy="137" r="10" fill="#059669"/>
-            <path d="M34 137L37 140L42 134" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <text x="56" y="134" fill="#065F46" font-size="11.5" font-weight="700">Nunca vendemos datos de usuarios a terceros</text>
-            <text x="56" y="149" fill="#047857" font-size="10" font-weight="500">Cero publicidad · Cero popups · Comunicación pura</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #ecfdf5; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Consola de privacidad y seguridad</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">100% privado</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Escaneo de anuncios</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">0 rastreo / 0 publicidad</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Estándar de cifrado</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">TLS 1.3 / AES</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Nunca vendemos datos de usuarios a terceros</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Cero publicidad · Cero popups · Comunicación pura</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 12px; border-radius: 9999px; color: #059669; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🛡️ Puro y privado · 100% sin publicidad
           </div>
@@ -1372,8 +723,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 3 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fffbeb; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); padding: 4px 12px; border-radius: 9999px; color: #d97706; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             ⚡ Red Edge global · Súper veloz
           </div>
@@ -1386,62 +737,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🌍 CDN Edge global</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#F59E0B"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Enlace directo CDN Edge</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1"/>
-            <text x="270" y="22" fill="#D97706" font-size="10" font-weight="700" text-anchor="middle">⚡ &lt; 20ms</text>
-            <rect x="18" y="50" width="284" height="112" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <line x1="60" y1="106" x2="160" y2="106" stroke="#0078D4" stroke-width="2" stroke-dasharray="4 3"/>
-            <line x1="160" y1="106" x2="260" y2="106" stroke="#10B981" stroke-width="2"/>
-            <circle cx="60" cy="106" r="16" fill="#EFF6FF" stroke="#0078D4" stroke-width="1.5"/>
-            <text x="60" y="110" fill="#0078D4" font-size="11" font-weight="800" text-anchor="middle">Usuario</text>
-            <text x="60" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">Conexión directa</text>
-            <circle cx="160" cy="106" r="20" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.8"/>
-            <text x="160" y="109" fill="#D97706" font-size="10" font-weight="800" text-anchor="middle">EDGE</text>
-            <text x="160" y="120" fill="#B45309" font-size="8" font-weight="700" text-anchor="middle">CDN</text>
-            <text x="160" y="144" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">300+ nodos</text>
-            <circle cx="260" cy="106" r="16" fill="#ECFDF5" stroke="#10B981" stroke-width="1.5"/>
-            <text x="260" y="110" fill="#059669" font-size="11" font-weight="800" text-anchor="middle">Global</text>
-            <text x="260" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">Entrega rápida</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Enlace directo CDN Edge</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⚡ &lt; 20ms</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Usuario</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Conexión directa</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">EDGE</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">CDN</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">300+ nodos</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Global</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Entrega rápida</span></div></div>
         </div>
       </div>
 
       <!-- Section 4 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#7C3AED"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Flujo de acciones inteligente</text>
-            <rect x="226" y="8" width="78" height="20" rx="10" fill="#EDE9FE" stroke="#DDD6FE" stroke-width="1"/>
-            <text x="265" y="22" fill="#6D28D9" font-size="10" font-weight="700" text-anchor="middle">⏰ Pospuesto</text>
-            <rect x="18" y="48" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="65" r="5" fill="#7C3AED"/>
-            <text x="48" y="69" fill="#0F172A" font-size="11" font-weight="700">Informe semanal y revisión</text>
-            <rect x="220" y="55" width="72" height="20" rx="4" fill="#F5F3FF"/>
-            <text x="256" y="69" fill="#7C3AED" font-size="9.5" font-weight="700" text-anchor="middle">⏰ Mañana 09:00</text>
-            <rect x="18" y="88" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
-            <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">Alerta de seguridad GitHub</text>
-            <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
-            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ Destacado</text>
-            <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
-            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 Búsqueda instantánea de texto completo...</text>
-            <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
-            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">Pulsa Enter</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f5f3ff; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Flujo de acciones inteligente</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ Pospuesto</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Informe semanal y revisión</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ Mañana 09:00</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Alerta de seguridad GitHub</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⭐ Destacado</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔍 Búsqueda instantánea de texto completo...</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Pulsa Enter</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             📥 Flujo avanzado · Ligero y ágil
           </div>
@@ -1457,8 +763,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 5 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fff1f2; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🔀 Aislamiento de alias · Escudo antispam de un clic
           </div>
@@ -1471,37 +777,8 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ Identidad principal oculta</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#E11D48"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Enrutamiento y fusible de alias</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FFE4E6" stroke="#FECDD3" stroke-width="1"/>
-            <text x="270" y="22" fill="#E11D48" font-size="10" font-weight="700" text-anchor="middle">🛡️ Proteger correo principal</text>
-            <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
-            <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
-            <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">Principal</text>
-            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Principal</text>
-            <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 Seguro y oculto</text>
-            <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 142H130C140 142 140 150 150 150H170" stroke="#E11D48" stroke-width="1.8" stroke-dasharray="3 3"/>
-            <rect x="170" y="48" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="68" fill="#0F172A" font-size="10" font-weight="600">github@alias</text>
-            <rect x="254" y="54" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="68" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● Activo</text>
-            <rect x="170" y="91" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="111" fill="#0F172A" font-size="10" font-weight="600">steam@alias</text>
-            <rect x="254" y="97" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="111" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● Activo</text>
-            <rect x="170" y="134" width="132" height="32" rx="6" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1.2"/>
-            <text x="180" y="154" fill="#9F1239" font-size="10" font-weight="600">spam@alias</text>
-            <rect x="254" y="140" width="42" height="20" rx="4" fill="#FFE4E6"/>
-            <text x="275" y="154" fill="#E11D48" font-size="9" font-weight="700" text-anchor="middle">✕ Desconectado</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Enrutamiento y fusible de alias</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🛡️ Proteger correo principal</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Principal</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Principal</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔒 Seguro y oculto</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">github@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● Activo</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">steam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● Activo</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">spam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">✕ Desconectado</span></div></div>
         </div>
       </div>
 
@@ -1509,7 +786,7 @@ export const WELCOME_TEMPLATES = {
 
     <!-- Full-Width Interactive Call-To-Action (CTA) Buttons -->
     <div style="text-align: center; margin: 32px 0 24px;">
-      <a href="/inbox" style="display: inline-block; background: linear-gradient(135deg, #0078D4 0%, #2563eb 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
+      <a href="/inbox" style="display: inline-block; background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #1d4ed8 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
         🚀 Abrir mi bandeja de entrada
       </a>
       <a href="/settings/profile" style="display: inline-block; background: #ffffff; color: #0078D4; text-decoration: none; font-weight: 600; font-size: 14.5px; padding: 12px 28px; border-radius: 9999px; border: 1.5px solid #bfdbfe; margin: 0 10px 10px;">
@@ -1520,9 +797,7 @@ export const WELCOME_TEMPLATES = {
     <!-- Guía rápida de inicio en 3 pasos -->
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px 26px; margin: 24px 0;">
       <div style="font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#0078D4"/>
-        </svg>
+        <span aria-hidden="true" style="color: #1854a0; font-size: 18px">★</span>
         <span>Guía rápida de inicio en 3 pasos</span>
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
@@ -1532,7 +807,7 @@ export const WELCOME_TEMPLATES = {
       </div>
     </div>
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #52647b; line-height: 1.65;">
       <div>📌 <strong>Consejo:</strong> Este es un correo oficial del sistema. Se ha establecido un período de retención automática; caducará de forma segura sin requerir eliminación manual.</div>
       <div style="margin-top: 10px; font-weight: 600; color: #64748b;">El equipo de Epocanvas Mail · Impulsando tus días productivos</div>
     </div>
@@ -1543,44 +818,20 @@ export const WELCOME_TEMPLATES = {
     lang: 'nl',
     name: 'Nederlands',
     subject: "🎉 Welkom bij Epocanvas Mail · Uw exclusieve eigen domein mailbox",
-    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
+    content: `<div style="width: 100%; max-width: 100%; box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.6; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 35px -6px rgba(0, 0, 0, 0.08);">
   <!-- Top Full-Width Banner with Microsoft Azure Gradient & Official EpoMail Brand Logo -->
-  <div style="background: linear-gradient(135deg, #0078D4 0%, #0284c7 35%, #2563eb 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
+  <div style="background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #075985 35%, #1d4ed8 70%, #4338ca 100%); padding: 40px 42px 34px; text-align: left; position: relative;">
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
-      <div style="flex: 1; min-width: 300px;">
+      <div style="flex: 1 1 260px; min-width: 0;">
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 5px 14px; border-radius: 20px; color: #ffffff; font-size: 13px; font-weight: 600; margin-bottom: 14px; backdrop-filter: blur(8px);">
           <span>✨ Uw eigen domein mailbox is gereed</span>
         </div>
         <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.35;">Hallo {{user_name}}, leuk u te ontmoeten!</h1>
         <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.95); font-size: 14.5px; line-height: 1.55;">Nul configuratie · Reclamevrij · Razendsnel · Exclusieve geek-identiteit</p>
       </div>
-      <!-- Official EpoMail Cloud Logo SVG Artwork -->
+      <!-- Official EpoMail brand mark -->
       <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 92px; height: 92px; background: rgba(255, 255, 255, 0.18); border-radius: 22px; border: 1.5px solid rgba(255, 255, 255, 0.38); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18); backdrop-filter: blur(10px);">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="76" height="76" style="display:block; flex-shrink:0;">
-          <defs>
-            <linearGradient id="epomailLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#00F5D4" />
-              <stop offset="40%" stop-color="#0072FF" />
-              <stop offset="100%" stop-color="#5B24FF" />
-            </linearGradient>
-            <mask id="epomailCutout">
-              <rect width="100%" height="100%" fill="white" />
-              <path d="M 15 210 L 200 270 L 385 210" fill="none" stroke="black" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" />
-              <line x1="60" y1="320" x2="140" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <line x1="340" y1="320" x2="260" y2="280" stroke="black" stroke-width="10" stroke-linecap="round" />
-              <circle cx="200" cy="270" r="26" fill="white" />
-              <circle cx="200" cy="270" r="26" fill="none" stroke="black" stroke-width="10" />
-              <circle cx="200" cy="270" r="4.5" fill="black" />
-              <line x1="200" y1="270" x2="188" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-              <line x1="200" y1="270" x2="215" y2="258" stroke="black" stroke-width="7" stroke-linecap="round" />
-            </mask>
-          </defs>
-          <path d="M 60 110 Q 70 110 70 100 Q 70 110 80 110 Q 70 110 70 120 Q 70 110 60 110 Z" fill="#00F5D4" opacity="0.85" />
-          <path d="M 330 90 Q 335 90 335 85 Q 335 90 340 90 Q 335 90 335 95 Q 335 90 330 90 Z" fill="#FF369B" opacity="0.9" />
-          <circle cx="85" cy="180" r="2.5" fill="#5B24FF" opacity="0.6" />
-          <circle cx="320" cy="180" r="3" fill="#0072FF" opacity="0.7" />
-          <path d="M 40 220 A 60 60 0 0 1 120 155 A 85 85 0 0 1 280 155 A 60 60 0 0 1 360 220 L 360 260 C 360 325 290 335 200 335 C 110 335 40 325 40 260 Z" fill="url(#epomailLogoGrad)" mask="url(#epomailCutout)" />
-        </svg>
+        <span style="display: block; margin: auto; text-align: center; color: #fff; line-height: 1.2"><span aria-hidden="true" style="display: block; font-size: 32px">✉</span><strong style="display: block; font-size: 15px">EpoMail</strong></span>
       </div>
     </div>
   </div>
@@ -1595,8 +846,8 @@ export const WELCOME_TEMPLATES = {
     <div style="margin: 28px 0; display: flex; flex-direction: column; gap: 20px;">
       
       <!-- Section 1 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f0f7ff; background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%); border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(0, 120, 212, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 120, 212, 0.1); border: 1px solid rgba(0, 120, 212, 0.25); padding: 4px 12px; border-radius: 9999px; color: #0078D4; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🌐 Exclusieve geek-identiteit · Zonder domeinzorgen
           </div>
@@ -1609,62 +860,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #e2e8f0; color: #334155; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🏷️ Meerdere domeinen</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#EF4444"/>
-            <circle cx="28" cy="18" r="4" fill="#F59E0B"/>
-            <circle cx="40" cy="18" r="4" fill="#10B981"/>
-            <rect x="56" y="8" width="248" height="20" rx="6" fill="#F1F5F9"/>
-            <circle cx="68" cy="18" r="3" fill="#10B981"/>
-            <text x="78" y="22" fill="#0284C7" font-size="10" font-weight="600" font-family="monospace">https://epomail.bond/@me</text>
-            <rect x="20" y="52" width="280" height="110" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2" filter="drop-shadow(0 4px 12px rgba(0,0,0,0.04))"/>
-            <circle cx="50" cy="86" r="18" fill="#0078D4"/>
-            <text x="50" y="92" fill="#FFFFFF" font-size="13" font-weight="800" text-anchor="middle">@</text>
-            <text x="80" y="80" fill="#0F172A" font-size="13" font-weight="700">Geek-visitekaartje</text>
-            <text x="80" y="96" fill="#64748B" font-size="11" font-weight="500" font-family="monospace">user@epomail.bond</text>
-            <rect x="220" y="70" width="64" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="252" y="84" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">● DNS actief</text>
-            <line x1="32" y1="120" x2="288" y2="120" stroke="#F1F5F9" stroke-width="1"/>
-            <rect x="32" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="70" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">SPF geverifieerd</text>
-            <rect x="116" y="130" width="80" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="156" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DKIM ondertekend</text>
-            <rect x="204" y="130" width="76" height="18" rx="4" fill="#EFF6FF"/>
-            <text x="242" y="143" fill="#0078D4" font-size="9.5" font-weight="600" text-anchor="middle">DMARC 100%</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Geek-visitekaartje</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">https://epomail.bond/@me</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">user@epomail.bond</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● DNS actief</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">SPF geverifieerd</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DKIM ondertekend</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">DMARC 100%</span></div></div>
         </div>
       </div>
 
       <!-- Section 2 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#10B981"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Privacy- en beveiligingsconsole</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
-            <text x="270" y="22" fill="#059669" font-size="10" font-weight="700" text-anchor="middle">100% privé</text>
-            <rect x="18" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="30" y="70" fill="#64748B" font-size="10" font-weight="600">Advertentiescan</text>
-            <text x="30" y="90" fill="#059669" font-size="14" font-weight="800">0 tracking / 0 advertenties</text>
-            <rect x="166" y="50" width="136" height="52" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <text x="178" y="70" fill="#64748B" font-size="10" font-weight="600">Encryptiestandaard</text>
-            <text x="178" y="90" fill="#0078D4" font-size="14" font-weight="800">TLS 1.3 / AES</text>
-            <rect x="18" y="112" width="284" height="50" rx="8" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1.2"/>
-            <circle cx="38" cy="137" r="10" fill="#059669"/>
-            <path d="M34 137L37 140L42 134" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <text x="56" y="134" fill="#065F46" font-size="11.5" font-weight="700">Geen verkoop van gebruikersgegevens aan derden</text>
-            <text x="56" y="149" fill="#047857" font-size="10" font-weight="500">Geen reclame · Geen pop-ups · Focus op communicatie</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #ecfdf5; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); border: 1px solid #a7f3d0; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(16, 185, 129, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Privacy- en beveiligingsconsole</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">100% privé</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Advertentiescan</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">0 tracking / 0 advertenties</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Encryptiestandaard</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">TLS 1.3 / AES</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Geen verkoop van gebruikersgegevens aan derden</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Geen reclame · Geen pop-ups · Focus op communicatie</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 12px; border-radius: 9999px; color: #059669; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🛡️ Puur & privé · 100% reclamevrij
           </div>
@@ -1680,8 +886,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 3 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fffbeb; background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%); border: 1px solid #fde68a; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(245, 158, 11, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); padding: 4px 12px; border-radius: 9999px; color: #d97706; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             ⚡ Wereldwijd Edge-netwerk · Razendsnel
           </div>
@@ -1694,62 +900,17 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🌍 Wereldwijd Edge CDN</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#F59E0B"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Directe Edge CDN-verbinding</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FEF3C7" stroke="#FDE68A" stroke-width="1"/>
-            <text x="270" y="22" fill="#D97706" font-size="10" font-weight="700" text-anchor="middle">⚡ &lt; 20ms</text>
-            <rect x="18" y="50" width="284" height="112" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <line x1="60" y1="106" x2="160" y2="106" stroke="#0078D4" stroke-width="2" stroke-dasharray="4 3"/>
-            <line x1="160" y1="106" x2="260" y2="106" stroke="#10B981" stroke-width="2"/>
-            <circle cx="60" cy="106" r="16" fill="#EFF6FF" stroke="#0078D4" stroke-width="1.5"/>
-            <text x="60" y="110" fill="#0078D4" font-size="11" font-weight="800" text-anchor="middle">Gebruiker</text>
-            <text x="60" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">Directe verbinding</text>
-            <circle cx="160" cy="106" r="20" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.8"/>
-            <text x="160" y="109" fill="#D97706" font-size="10" font-weight="800" text-anchor="middle">EDGE</text>
-            <text x="160" y="120" fill="#B45309" font-size="8" font-weight="700" text-anchor="middle">CDN</text>
-            <text x="160" y="144" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">300+ knooppunten</text>
-            <circle cx="260" cy="106" r="16" fill="#ECFDF5" stroke="#10B981" stroke-width="1.5"/>
-            <text x="260" y="110" fill="#059669" font-size="11" font-weight="800" text-anchor="middle">Wereldwijd</text>
-            <text x="260" y="138" fill="#64748B" font-size="9.5" font-weight="600" text-anchor="middle">Snelle bezorging</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Directe Edge CDN-verbinding</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⚡ &lt; 20ms</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Gebruiker</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Directe verbinding</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">EDGE</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">CDN</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">300+ knooppunten</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Wereldwijd</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Snelle bezorging</span></div></div>
         </div>
       </div>
 
       <!-- Section 4 (Zigzag: Illustration Left, Text Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#7C3AED"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Slimme inbox-actiestroom</text>
-            <rect x="226" y="8" width="78" height="20" rx="10" fill="#EDE9FE" stroke="#DDD6FE" stroke-width="1"/>
-            <text x="265" y="22" fill="#6D28D9" font-size="10" font-weight="700" text-anchor="middle">⏰ Uitgesteld</text>
-            <rect x="18" y="48" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="65" r="5" fill="#7C3AED"/>
-            <text x="48" y="69" fill="#0F172A" font-size="11" font-weight="700">Wekelijks rapport en architectuurbeoordeling</text>
-            <rect x="220" y="55" width="72" height="20" rx="4" fill="#F5F3FF"/>
-            <text x="256" y="69" fill="#7C3AED" font-size="9.5" font-weight="700" text-anchor="middle">⏰ Morgen 09:00</text>
-            <rect x="18" y="88" width="284" height="34" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2"/>
-            <circle cx="34" cy="105" r="5" fill="#F59E0B"/>
-            <text x="48" y="109" fill="#0F172A" font-size="11" font-weight="700">GitHub-beveiligingsmelding</text>
-            <rect x="220" y="95" width="72" height="20" rx="4" fill="#FEF3C7"/>
-            <text x="256" y="109" fill="#D97706" font-size="9.5" font-weight="700" text-anchor="middle">⭐ Ster</text>
-            <rect x="18" y="128" width="284" height="36" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
-            <text x="32" y="151" fill="#64748B" font-size="11" font-family="monospace">🔍 Zoeken in volledige tekst...</text>
-            <rect x="238" y="134" width="54" height="24" rx="4" fill="#0078D4"/>
-            <text x="265" y="150" fill="#FFFFFF" font-size="10" font-weight="700" text-anchor="middle">Druk op Enter</text>
-          </svg>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #f5f3ff; background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); border: 1px solid #ddd6fe; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(124, 58, 237, 0.05); flex-wrap: wrap;">
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Slimme inbox-actiestroom</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ Uitgesteld</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Wekelijks rapport en architectuurbeoordeling</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⏰ Morgen 09:00</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">GitHub-beveiligingsmelding</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">⭐ Ster</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔍 Zoeken in volledige tekst...</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Druk op Enter</span></div></div>
         </div>
-        <div style="flex: 1; min-width: 280px;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(124, 58, 237, 0.1); border: 1px solid rgba(124, 58, 237, 0.25); padding: 4px 12px; border-radius: 9999px; color: #7c3aed; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             📥 Geavanceerde workflow · Licht & snel
           </div>
@@ -1765,8 +926,8 @@ export const WELCOME_TEMPLATES = {
       </div>
 
       <!-- Section 5 (Zigzag: Text Left, Illustration Right) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 280px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 32px; background-color: #fff1f2; background: linear-gradient(135deg, #fff1f2 0%, #ffffff 100%); border: 1px solid #fecdd3; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.05); flex-wrap: wrap;">
+        <div style="flex: 1 1 240px; min-width: 0;">
           <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.25); padding: 4px 12px; border-radius: 9999px; color: #e11d48; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
             🔀 Alias-isolatie · Antispam met één klik
           </div>
@@ -1779,37 +940,8 @@ export const WELCOME_TEMPLATES = {
             <span style="background: #ffe4e6; color: #9f1239; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">🛡️ Echte identiteit verborgen</span>
           </div>
         </div>
-        <div style="width: 300px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-          <svg width="100%" height="150" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width: 300px; display: block; margin: 0 auto;">
-            <rect width="320" height="180" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
-            <rect x="0" y="0" width="320" height="36" rx="12" fill="#FFFFFF"/>
-            <rect x="0" y="24" width="320" height="12" fill="#FFFFFF"/>
-            <line x1="0" y1="36" x2="320" y2="36" stroke="#E2E8F0" stroke-width="1"/>
-            <circle cx="16" cy="18" r="4" fill="#E11D48"/>
-            <text x="28" y="22" fill="#0F172A" font-size="11" font-weight="700">Multi-alias routering en zekering</text>
-            <rect x="236" y="8" width="68" height="20" rx="10" fill="#FFE4E6" stroke="#FECDD3" stroke-width="1"/>
-            <text x="270" y="22" fill="#E11D48" font-size="10" font-weight="700" text-anchor="middle">🛡️ Bescherm hoofdaccount</text>
-            <rect x="18" y="52" width="76" height="110" rx="8" fill="#0078D4" filter="drop-shadow(0 4px 10px rgba(0,120,212,0.25))"/>
-            <circle cx="56" cy="85" r="14" fill="#FFFFFF" fill-opacity="0.2"/>
-            <text x="56" y="90" fill="#FFFFFF" font-size="14" font-weight="800" text-anchor="middle">Hoofd</text>
-            <text x="56" y="118" fill="#FFFFFF" font-size="11" font-weight="700" text-anchor="middle">Primair</text>
-            <text x="56" y="134" fill="#BFDBFE" font-size="9" font-weight="600" text-anchor="middle">🔒 Veilig en verborgen</text>
-            <path d="M94 72H130C140 72 140 64 150 64H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 107H170" stroke="#10B981" stroke-width="1.8"/>
-            <path d="M94 142H130C140 142 140 150 150 150H170" stroke="#E11D48" stroke-width="1.8" stroke-dasharray="3 3"/>
-            <rect x="170" y="48" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="68" fill="#0F172A" font-size="10" font-weight="600">github@alias</text>
-            <rect x="254" y="54" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="68" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● Actief</text>
-            <rect x="170" y="91" width="132" height="32" rx="6" fill="#FFFFFF" stroke="#A7F3D0" stroke-width="1.2"/>
-            <text x="180" y="111" fill="#0F172A" font-size="10" font-weight="600">steam@alias</text>
-            <rect x="254" y="97" width="42" height="20" rx="4" fill="#ECFDF5"/>
-            <text x="275" y="111" fill="#059669" font-size="9" font-weight="700" text-anchor="middle">● Actief</text>
-            <rect x="170" y="134" width="132" height="32" rx="6" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1.2"/>
-            <text x="180" y="154" fill="#9F1239" font-size="10" font-weight="600">spam@alias</text>
-            <rect x="254" y="140" width="42" height="20" rx="4" fill="#FFE4E6"/>
-            <text x="275" y="154" fill="#E11D48" font-size="9" font-weight="700" text-anchor="middle">✕ Uitgeschakeld</text>
-          </svg>
+        <div style="width: 300px; max-width: 100%; box-sizing: border-box; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background-color: #fff"><strong style="display: block; margin-bottom: 5px; color: #1e3a5f; font-size: 15px">Multi-alias routering en zekering</strong><div><span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🛡️ Bescherm hoofdaccount</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Hoofd</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">Primair</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">🔒 Veilig en verborgen</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">github@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● Actief</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">steam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">● Actief</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">spam@alias</span> <span style="display: inline-block; margin: 3px 4px 3px 0; padding: 3px 7px; border: 1px solid #cbd5e1; border-radius: 6px; color: #334155; font-size: 13px; line-height: 1.5">✕ Uitgeschakeld</span></div></div>
         </div>
       </div>
 
@@ -1817,7 +949,7 @@ export const WELCOME_TEMPLATES = {
 
     <!-- Full-Width Interactive Call-To-Action (CTA) Buttons -->
     <div style="text-align: center; margin: 32px 0 24px;">
-      <a href="/inbox" style="display: inline-block; background: linear-gradient(135deg, #0078D4 0%, #2563eb 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
+      <a href="/inbox" style="display: inline-block; background-color: #1854a0; background: linear-gradient(135deg, #1854a0 0%, #1d4ed8 100%); color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 13px 32px; border-radius: 9999px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35); margin: 0 10px 10px;">
         🚀 Open mijn inbox
       </a>
       <a href="/settings/profile" style="display: inline-block; background: #ffffff; color: #0078D4; text-decoration: none; font-weight: 600; font-size: 14.5px; padding: 12px 28px; border-radius: 9999px; border: 1.5px solid #bfdbfe; margin: 0 10px 10px;">
@@ -1828,9 +960,7 @@ export const WELCOME_TEMPLATES = {
     <!-- Snelstartgids in 3 stappen -->
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px 26px; margin: 24px 0;">
       <div style="font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#0078D4"/>
-        </svg>
+        <span aria-hidden="true" style="color: #1854a0; font-size: 18px">★</span>
         <span>Snelstartgids in 3 stappen</span>
       </div>
       <div style="font-size: 13.5px; color: #475569; line-height: 1.9;">
@@ -1840,7 +970,7 @@ export const WELCOME_TEMPLATES = {
       </div>
     </div>
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #94a3b8; line-height: 1.65;">
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed #cbd5e1; font-size: 12.5px; color: #52647b; line-height: 1.65;">
       <div>📌 <strong>Tip:</strong> Dit is een officiële welkomstmail van het systeem. Er is een automatische bewaartermijn ingesteld; het bericht verloopt veilig automatisch.</div>
       <div style="margin-top: 10px; font-weight: 600; color: #64748b;">Het Epocanvas Mail-team · Voor uw productieve dagen</div>
     </div>
@@ -1947,15 +1077,15 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
   zh: {
     lang: 'zh',
     subject: '📢 Epocanvas Mail 全域公告：系统服务更新通知',
-    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, sans-serif; color: #1e293b; line-height: 1.7; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
   <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">系统全域通知</h2>
   <p style="color: #475569; font-size: 15px;">尊敬的 {{user_name}}：</p>
   <p style="color: #475569; font-size: 14.5px;">我们在此向您推送最新的全域服务公告，致力于为您提供更高效、纯净且智能的邮箱服务。</p>
-  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+  <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
     <strong style="color: #1e293b;">公告要点：</strong>
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. 在此编辑您的公告内容<br>2. 支持多语言模板，按收件人语言自动分发<br>3. 支持 {{current_date}} 等动态变量占位符</p>
   </div>
-  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+  <p style="color: #52647b; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
     此邮件由系统站长 (announcement@epocanvas.com) 统一发布 · 祝您使用愉快！
   </p>
 </div>`
@@ -1963,15 +1093,15 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
   'zh-Hant': {
     lang: 'zh-Hant',
     subject: '📢 Epocanvas Mail 全域公告：系統服務更新通知',
-    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, sans-serif; color: #1e293b; line-height: 1.7; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
   <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">系統全域通知</h2>
   <p style="color: #475569; font-size: 15px;">尊敬的 {{user_name}}：</p>
   <p style="color: #475569; font-size: 14.5px;">我們在此向您推送最新的全域服務公告，致力於為您提供更高效、純淨且智能的郵箱服務。</p>
-  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+  <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
     <strong style="color: #1e293b;">公告要點：</strong>
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. 在此編輯您的公告內容<br>2. 支援多語言模板，按收件人語言自動分發<br>3. 支援 {{current_date}} 等動態變數佔位符</p>
   </div>
-  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+  <p style="color: #52647b; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
     此郵件由系統站長 (announcement@epocanvas.com) 統一發佈 · 祝您使用愉快！
   </p>
 </div>`
@@ -1979,15 +1109,15 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
   en: {
     lang: 'en',
     subject: '📢 Epocanvas Mail Global Announcement: Service Update Notice',
-    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
   <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">Global System Notice</h2>
   <p style="color: #475569; font-size: 15px;">Dear {{user_name}},</p>
   <p style="color: #475569; font-size: 14.5px;">We are publishing the latest global service announcement, committed to delivering a faster, cleaner and smarter mailbox experience.</p>
-  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+  <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
     <strong style="color: #1e293b;">Highlights:</strong>
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Edit your announcement content here<br>2. Multilingual templates are delivered per recipient language<br>3. Dynamic placeholders such as {{current_date}} are supported</p>
   </div>
-  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+  <p style="color: #52647b; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
     Published by the site administrator (announcement@epocanvas.com) · Enjoy your stay!
   </p>
 </div>`
@@ -1995,15 +1125,15 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
   fr: {
     lang: 'fr',
     subject: '📢 Epocanvas Mail Annonce globale : avis de mise à jour du service',
-    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
   <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">Avis global du système</h2>
   <p style="color: #475569; font-size: 15px;">Cher(ère) {{user_name}},</p>
   <p style="color: #475569; font-size: 14.5px;">Nous publions la dernière annonce globale de service, engagés à vous offrir une messagerie plus rapide, plus propre et plus intelligente.</p>
-  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+  <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
     <strong style="color: #1e293b;">Points clés :</strong>
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Modifiez le contenu de votre annonce ici<br>2. Les modèles multilingues sont distribués selon la langue du destinataire<br>3. Les variables dynamiques comme {{current_date}} sont prises en charge</p>
   </div>
-  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+  <p style="color: #52647b; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
     Publié par l'administrateur du site (announcement@epocanvas.com) · Bonne continuation !
   </p>
 </div>`
@@ -2011,15 +1141,15 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
   es: {
     lang: 'es',
     subject: '📢 Epocanvas Mail Anuncio global: aviso de actualización del servicio',
-    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
   <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">Aviso global del sistema</h2>
   <p style="color: #475569; font-size: 15px;">Estimado(a) {{user_name}}:</p>
   <p style="color: #475569; font-size: 14.5px;">Publicamos el último anuncio global del servicio, comprometidos a ofrecerte un buzón más rápido, limpio e inteligente.</p>
-  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+  <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
     <strong style="color: #1e293b;">Puntos destacados:</strong>
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Edita aquí el contenido de tu anuncio<br>2. Las plantillas multilingües se entregan según el idioma del destinatario<br>3. Se admiten marcadores dinámicos como {{current_date}}</p>
   </div>
-  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+  <p style="color: #52647b; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
     Publicado por el administrador del sitio (announcement@epocanvas.com) · ¡Que disfrutes el servicio!
   </p>
 </div>`
@@ -2027,15 +1157,15 @@ export const GLOBAL_ANNOUNCEMENT_TEMPLATES = {
   nl: {
     lang: 'nl',
     subject: '📢 Epocanvas Mail Wereldwijde aankondiging: melding servicedienst update',
-    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
+    content: `<div style="max-width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; line-height: 1.7; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 32px;">
   <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; font-weight: 700;">Wereldwijde systeemmelding</h2>
   <p style="color: #475569; font-size: 15px;">Beste {{user_name}},</p>
   <p style="color: #475569; font-size: 14.5px;">Wij publiceren de nieuwste wereldwijde serviceaankondiging, met de inzet om je een snellere, schonere en slimmere mailbox te bieden.</p>
-  <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+  <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
     <strong style="color: #1e293b;">Kernpunten:</strong>
     <p style="margin: 6px 0 0; color: #64748b; font-size: 14px;">1. Bewerk hier de inhoud van je aankondiging<br>2. Meertalige sjablonen worden per ontvangerstaal bezorgd<br>3. Dynamische variabelen zoals {{current_date}} worden ondersteund</p>
   </div>
-  <p style="color: #94a3b8; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
+  <p style="color: #52647b; font-size: 12.5px; margin-top: 28px; border-top: 1px dashed #e2e8f0; padding-top: 16px;">
     Gepubliceerd door de sitebeheerder (announcement@epocanvas.com) · Veel plezier!
   </p>
 </div>`

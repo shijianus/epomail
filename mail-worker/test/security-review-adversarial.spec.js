@@ -12,10 +12,10 @@
  *  - toImageUrlHtml ownership filter for the direct `attachments/` and
  *    `/oss/attachments/` content forms
  *
- * All seeded state is physically removed in afterAll (zero fake data).
+ * All seeded state is physically removed after each test, including failures.
  */
 import { env, SELF } from 'cloudflare:test';
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { buildSignedObjectUrl, signObjectAccess, verifyObjectAccess } from '../src/utils/object-token.js';
 import oauthService from '../src/service/oauth-service.js';
 import settingService from '../src/service/setting-service.js';
@@ -60,16 +60,40 @@ CREATE TABLE IF NOT EXISTS oauth (
 	user_id INTEGER DEFAULT 0 NOT NULL
 )`;
 
+// The real HTTP authentication middleware resolves current account state in D1.
+// Include the additional identity columns used by the existing OAuth bind probe.
+const CREATE_USERS = `CREATE TABLE IF NOT EXISTS user (
+	user_id INTEGER PRIMARY KEY, email TEXT NOT NULL, type INTEGER NOT NULL DEFAULT 2,
+	password TEXT NOT NULL DEFAULT 'unit-password', salt TEXT NOT NULL DEFAULT 'unit-salt',
+	is_del INTEGER NOT NULL DEFAULT 0, status INTEGER NOT NULL DEFAULT 0,
+	create_time TEXT DEFAULT CURRENT_TIMESTAMP, active_time TEXT, create_ip TEXT, active_ip TEXT,
+	os TEXT, browser TEXT, device TEXT, sort INTEGER DEFAULT 0, send_count INTEGER DEFAULT 0,
+	reg_key_id INTEGER NOT NULL DEFAULT 0, custom_labels TEXT NOT NULL DEFAULT '[]',
+	totp_enabled INTEGER NOT NULL DEFAULT 0, totp_secret TEXT NOT NULL DEFAULT '',
+	totp_key_version INTEGER NOT NULL DEFAULT 1, totp_backup_codes TEXT NOT NULL DEFAULT '[]',
+	totp_created_at TEXT NOT NULL DEFAULT '', security_keys TEXT NOT NULL DEFAULT '[]',
+	auth_version INTEGER NOT NULL DEFAULT 0, passkey_history INTEGER NOT NULL DEFAULT 0,
+	storage_quota_mb INTEGER NOT NULL DEFAULT 0, byo_storage_enabled INTEGER NOT NULL DEFAULT 0,
+	byo_storage_config TEXT NOT NULL DEFAULT '{}'
+)`;
+
+async function seedUser(userId, email) {
+	await env.db.prepare(`INSERT OR REPLACE INTO user (user_id, email, type, is_del, status)
+		VALUES (?, ?, 2, 0, 0)`).bind(userId, email).run();
+}
+
 beforeAll(async () => {
+	await env.db.prepare(CREATE_USERS).run();
 	await env.db.prepare(CREATE_ATTACHMENTS).run();
 	await env.db.prepare(CREATE_OAUTH).run();
 	await ensureOtcTable(env.db);
 	await ensureBindClaimTable(env.db);
 });
 
-afterAll(async () => {
+async function cleanup() {
 	await env.db.prepare('DELETE FROM attachments').run();
 	await env.db.prepare('DELETE FROM oauth').run();
+	await env.db.prepare('DELETE FROM user WHERE user_id IN (2, 3, 5)').run();
 	await clearOtc(env.db);
 	await clearBindClaim(env.db);
 	for (const key of [
@@ -81,8 +105,16 @@ afterAll(async () => {
 	]) {
 		await env.kv.delete(key);
 	}
-	await env.db.prepare('DROP TABLE IF EXISTS attachments').run();
-	await env.db.prepare('DROP TABLE IF EXISTS oauth').run();
+}
+
+afterAll(cleanup);
+
+afterEach(async () => {
+	try {
+		await cleanup();
+	} finally {
+		vi.restoreAllMocks();
+	}
 });
 
 function createMockKv() {
@@ -107,9 +139,10 @@ function createMockKv() {
 }
 
 async function seedAuth(userId, email, sessionToken) {
-	const token = await jwtUtils.generateToken({ env }, { userId, token: sessionToken }, 3600);
+	await seedUser(userId, email);
+	const token = await jwtUtils.generateToken({ env }, { userId, token: sessionToken, authVersion: 0 }, 3600);
 	await env.kv.put(`auth-uid:${userId}`, JSON.stringify({
-		user: { userId, email, isDel: 0, status: 0, type: 2 },
+		user: { userId, email, isDel: 0, status: 0, type: 2, authVersion: 0 },
 		tokens: [sessionToken],
 		refreshTime: new Date().toISOString()
 	}), { expirationTtl: 3600 });
@@ -128,7 +161,7 @@ describe('Object capability token boundaries', () => {
 
 	it('binds the signature to the uid parameter; swapping uid invalidates it', async () => {
 		const token = await signObjectAccess(c, 'attachments/a.txt', { ttlSeconds: 60, userId: 7 });
-		const forgedParams = new URLSearchParams({ exp: String(token.exp), uid: '8', sig: token.sig });
+		const forgedParams = new URLSearchParams({ v: String(token.v), exp: String(token.exp), uid: '8', sig: token.sig });
 		const url = new URL(`https://x.test/oss/attachments/a.txt?${forgedParams.toString()}`);
 		const access = await verifyObjectAccess(c, 'attachments/a.txt', url);
 		expect(access).toBeNull();
@@ -137,7 +170,7 @@ describe('Object capability token boundaries', () => {
 	it('rejects an expired capability', async () => {
 		const token = await signObjectAccess(c, 'attachments/a.txt', { ttlSeconds: 1, userId: 7 });
 		const pastExp = token.exp - 120;
-		const forgedParams = new URLSearchParams({ exp: String(pastExp), uid: String(token.uid), sig: token.sig });
+		const forgedParams = new URLSearchParams({ v: String(token.v), exp: String(pastExp), uid: String(token.uid), sig: token.sig });
 		const url = new URL(`https://x.test/oss/attachments/a.txt?${forgedParams.toString()}`);
 		expect(await verifyObjectAccess(c, 'attachments/a.txt', url)).toBeNull();
 	});
@@ -150,8 +183,11 @@ describe('Object capability token boundaries', () => {
 });
 
 describe('Object route adversarial entry points', () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
+	beforeEach(() => {
+		// Explicit settings fixture; keep real BYO lookup, signatures and KV bodies.
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			userByoStorage: 1, r2Domain: '', bucket: '', endpoint: '', s3AccessKey: '', s3SecretKey: ''
+		});
 	});
 
 	it('never leaks session state through encoded traversal on the root /static route', async () => {
@@ -238,10 +274,6 @@ describe('Object route adversarial entry points', () => {
 });
 
 describe('OAuth server-side boundary probes', () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
-
 	it('rejects authorize initiation without a browser client state', async () => {
 		const kv = createMockKv();
 		const c = {
@@ -249,6 +281,7 @@ describe('OAuth server-side boundary probes', () => {
 			req: { url: 'https://mail.example.com/api/oauth/authorize/apple', header: () => null }
 		};
 		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
 			oauthProviders: {
 				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
 			}
@@ -267,6 +300,7 @@ describe('OAuth server-side boundary probes', () => {
 		await env.db.prepare('DELETE FROM oauth').run();
 		await env.db.prepare('INSERT INTO oauth (oauth_user_id, username, name, user_id) VALUES (?, ?, ?, ?)')
 			.bind('apple:adv-bind', 'adv-bind', 'Adv Bind', 0).run();
+		await seedUser(5, 'adv-bound@example.com');
 
 		const kv = createMockKv();
 		const c = {
@@ -279,6 +313,12 @@ describe('OAuth server-side boundary probes', () => {
 			},
 			req: { url: 'https://mail.example.com/api/oauth/bindUser', header: () => null }
 		};
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			oauthLoginEnabled: 1,
+			oauthProviders: {
+				apple: { clientId: 'test-client-id', clientSecret: 'test-client-secret', enabled: 1 }
+			}
+		});
 		vi.spyOn(loginService, 'validateRegistration').mockResolvedValue({});
 		vi.spyOn(loginService, 'register').mockResolvedValue({ userId: 5, reservedRegKey: false });
 		vi.spyOn(loginService, 'login').mockResolvedValue('bound-session-jwt');
@@ -321,10 +361,6 @@ describe('OAuth server-side boundary probes', () => {
 });
 
 describe('toImageUrlHtml direct-prefix ownership forms', () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
-
 	it('filters foreign keys referenced via bare attachments/ and /oss/attachments/ forms', async () => {
 		await env.db.prepare('DELETE FROM attachments').run();
 		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
@@ -333,7 +369,11 @@ describe('toImageUrlHtml direct-prefix ownership forms', () => {
 			.bind(2, 10, 20, 'attachments/adv-own-img.txt', 'adv-own-img.txt', 12, 2).run();
 		await env.kv.put('attachments/adv-foreign-img.txt', 'foreign-image');
 		await env.kv.put('attachments/adv-own-img.txt', 'own-image');
-		vi.spyOn(settingService, 'query').mockResolvedValue({ r2Domain: '' });
+		await seedUser(2, 'user2@example.com');
+		await seedUser(3, 'user3@example.com');
+		vi.spyOn(settingService, 'query').mockResolvedValue({
+			userByoStorage: 1, r2Domain: '', bucket: '', endpoint: '', s3AccessKey: '', s3SecretKey: ''
+		});
 
 		const foreign = await attService.toImageUrlHtml(
 			{ env },

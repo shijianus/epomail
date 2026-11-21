@@ -14,3 +14,8 @@ supportedArchitectures:
   libc:
     - glibc
     - musl
+overrides:
+  'nanoid@<3.3.20': 3.3.20
+  'undici@>=7.0.0 <7.30.1': 7.30.1
+  'source-map-js@<1.2.2': 1.2.2
+  'sharp@<0.35.5': 0.35.5

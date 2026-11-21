@@ -1,23 +1,25 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 
 (async () => {
   console.log('=== Starting E2E UI Test on Cloudflare Deployment ===');
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
 
-  const BASE = 'https://epomail.epocanvas.workers.dev';
+  const BASE = legacyOrigin;
 
   try {
     // Step 1: Login
-    console.log('Logging into https://epomail.epocanvas.workers.dev ...');
+    console.log('Logging into <本地测试地址> ...');
     const loginRes = await page.request.post(BASE + '/api/login', {
-      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginData = await loginRes.json();
     if (loginData.code !== 200) {
-      throw new Error('Login failed: ' + JSON.stringify(loginData));
+      throw new Error('Login failed: ' + Number(loginData?.code));
     }
     const token = loginData.data?.token;
     console.log('Login success, token acquired.');

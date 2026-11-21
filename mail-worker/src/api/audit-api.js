@@ -6,6 +6,7 @@ import BizError from '../error/biz-error';
 import { t } from '../i18n/i18n';
 import { isAdminUser } from '../utils/admin-utils';
 import permService from '../service/perm-service';
+import { readJsonObject } from '../utils/request-body.js';
 
 const ensureAuthUser = (c) => {
 	const user = c.get('user');
@@ -57,14 +58,14 @@ app.post('/audit/list', handleAuditList);
 
 app.post('/audit/action', async (c) => {
 	await ensureAdminUser(c);
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const data = await auditService.takeAction(c, body);
 	return c.json(result.ok(data));
 });
 
 app.post('/audit/adjudicate', async (c) => {
 	await ensureAdminUser(c);
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const data = await auditService.adjudicate(c, body);
 	return c.json(result.ok(data));
 });
@@ -83,7 +84,7 @@ app.get('/audit/circuit-breaker', async (c) => {
 
 app.post('/audit/circuit-breaker', async (c) => {
 	await ensureAdminUser(c);
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const data = await auditService.setCircuitBreaker(c, body);
 	return c.json(result.ok(data));
 });
@@ -98,7 +99,7 @@ app.get('/audit/outbox/list', async (c) => {
 
 app.post('/audit/outbox/retry', async (c) => {
 	await ensureAdminUser(c);
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const data = await decisionNoticeService.retryOutboxTask(c, body.taskId || body.task_id);
 	return c.json(result.ok(data));
 });

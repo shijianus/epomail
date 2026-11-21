@@ -1,0 +1,6 @@
+# SHA-256 digests used solely to identify retired OAuth sample credentials.
+# The archived code compares SHA-256(client_secret) against these constants.
+de5d15077972c7c70778aea66777a6cd7a766857:mail-worker/src/service/oauth-app-service.js:generic-api-key:44
+de5d15077972c7c70778aea66777a6cd7a766857:mail-worker/src/service/oauth-app-service.js:generic-api-key:45
+# Single-segment UI example. This revision issues and verifies signed three-part JWTs.
+9fd02b75dcaa31e1c12c2424b3b9c52b19eab203:mail-vue/src/views/oauth-app/index.vue:curl-auth-header:619

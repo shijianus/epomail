@@ -138,13 +138,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { Icon } from '@iconify/vue';
 import DOMPurify from 'dompurify';
+import { prepareMailContent } from '@/utils/mail-content-privacy.js';
 
 const route = useRoute();
+const router = useRouter();
 const { t } = useI18n();
 
 const loading = ref(true);
@@ -153,9 +155,12 @@ const noticeData = ref(null);
 const safeNoticeHtml = computed(() => {
   const html = noticeData.value?.htmlContent;
   if (!html) return '';
-  return DOMPurify.sanitize(html, {
-    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
-    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus']
+  // Historical case documents may contain markup in the operator's notes.
+  // Render the wording and structure on this page's own accessible surface.
+  return DOMPurify.sanitize(prepareMailContent(html).html, {
+    ALLOWED_TAGS: ['div', 'p', 'span', 'strong', 'b', 'em', 'i', 'h1', 'h2', 'h3', 'h4',
+      'br', 'hr', 'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'pre', 'code', 'blockquote'],
+    ALLOWED_ATTR: [], ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: false
   });
 });
 const appealText = ref('');
@@ -256,7 +261,7 @@ const handleSubmitAppeal = async () => {
       }
       appealText.value = '';
     } else {
-      ElMessage.error(body.message || '申诉提交失败');
+      ElMessage.error(body.message || t('auditAppealSubmitFailed'));
     }
   } catch (err) {
     ElMessage.error(t('auditRestrictedNetworkError'));
@@ -292,6 +297,8 @@ onMounted(() => {
 .notice-shell {
   width: 100%;
   max-width: 720px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -299,6 +306,8 @@ onMounted(() => {
 
 .notice-header {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
@@ -354,6 +363,8 @@ onMounted(() => {
 .decision-summary-card {
   .summary-top-row {
     display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
@@ -361,6 +372,8 @@ onMounted(() => {
     .case-meta {
       display: flex;
       align-items: center;
+      min-width: 0;
+      flex-wrap: wrap;
       gap: 8px;
 
       .case-number {
@@ -410,7 +423,7 @@ onMounted(() => {
       .matrix-label {
         display: flex;
         align-items: center;
-        white-space: nowrap;
+        white-space: normal;
       }
     }
   }
@@ -427,16 +440,21 @@ onMounted(() => {
 }
 
 .notice-html-wrapper {
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--el-text-color-primary, #1e293b);
   border-radius: 6px;
-  overflow: hidden;
+  :deep(h1), :deep(h2), :deep(h3) { margin: 0 0 12px; font-size: 1.15em; line-height: 1.4; }
+  :deep(p) { margin: 0 0 10px; }
+  :deep(pre) { white-space: pre-wrap; }
+  :deep(table) { width: 100%; table-layout: fixed; }
+  :deep(span + span) { margin-inline-start: .35em; }
 }
 
 .notice-text-content .formatted-pre {
   margin: 0;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 16px;
   white-space: pre-wrap;
   color: var(--el-text-color-regular, #334155);
 }
@@ -515,5 +533,11 @@ onMounted(() => {
     max-width: 440px;
     margin: 0 auto;
   }
+}
+
+@media (max-width: 480px) {
+  .restricted-notice-container { padding: 16px 10px 24px; }
+  .dossier-card { padding: 14px; }
+  .capability-matrix .matrix-item { flex-wrap: wrap; }
 }
 </style>

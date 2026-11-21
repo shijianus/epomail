@@ -1,5 +1,4 @@
-import { pbkdf2 as noblePbkdf2 } from '@noble/hashes/pbkdf2.js';
-import { sha256 } from '@noble/hashes/sha256.js';
+import { pbkdf2Sha256Cooperative } from './pbkdf2-cooperative.js';
 
 const encoder = new TextEncoder();
 
@@ -54,8 +53,8 @@ async function dispatchPbkdf2Sha256(passwordBytes, saltBytes, iterations) {
 		);
 		return new Uint8Array(derivedBits);
 	}
-	// workerd WebCrypto 拒绝的高迭代路径：@noble/hashes 1.8.0（纯 JS HMAC-SHA-256，无 WebCrypto 委托）
-	return noblePbkdf2(sha256, passwordBytes, saltBytes, { c: iterations, dkLen: PBKDF2_KEY_LEN / 8 });
+	// Preserve the configured work factor while allowing other Worker I/O to run.
+	return pbkdf2Sha256Cooperative(passwordBytes, saltBytes, iterations);
 }
 
 function uint8ToBase64(bytes) {
@@ -200,4 +199,5 @@ const saltHashUtils = {
 	}
 };
 
+export { timingSafeEqual };
 export default saltHashUtils;

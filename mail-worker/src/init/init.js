@@ -4,6 +4,15 @@ import { emailConst } from "../const/entity-const";
 import { getUserDb, getMailDb } from '../utils/db-accessor';
 import { getDefaultUserLabelsString } from '../const/default-labels';
 import cryptoUtils from '../utils/crypto-utils';
+import { ensureAiBudgetSchema } from '../utils/ai-budget.js';
+import { MAIL_BODY_BYTES_SQL } from '../utils/mail-pipeline.js';
+import { ensureSendQuotaPeriods } from '../utils/send-quota-period.js';
+import { ensureMailReliabilitySchema, backfillWelcomeReceipts } from '../utils/mail-reliability-schema.js';
+import { ensureNoticeDeliverySchema } from '../utils/notice-delivery-schema.js';
+import { ensureAuthSecurityOperationSchema } from '../utils/auth-security-operation.js';
+import { ensureUserSessionTable } from '../utils/session-auth-store.js';
+import { ensureSessionRevocationSchema } from '../utils/session-revocation.js';
+import { ensureStorageProbeHistory } from '../utils/storage-probe-history.js';
 
 function timingSafeEqual(a, b) {
 	if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
@@ -12,8 +21,31 @@ function timingSafeEqual(a, b) {
 	return diff === 0;
 }
 
+async function addMissingColumns(db, table, statements) {
+	const { results } = await db.prepare(`PRAGMA table_info('${table}')`).all();
+	const existing = new Set(results.map(column => column.name));
+	for (const statement of statements) {
+		const [, target, column] = /^ALTER TABLE (\w+) ADD COLUMN (\w+) /.exec(statement);
+		if (target !== table) throw new Error(`Unexpected migration table: ${target}`);
+		if (existing.has(column)) continue;
+		try {
+			await db.prepare(statement).run();
+		} catch (error) {
+			// A concurrent initializer may have added this column after the read.
+			// Propagate all other errors so the upgrade cannot report success.
+			if (!/duplicate column name/i.test(error.message)) throw error;
+			const current = await db.prepare(`SELECT 1 AS present FROM pragma_table_info('${table}') WHERE name=?`)
+				.bind(column).first();
+			if (!current) throw error;
+		}
+	}
+}
+
 const dbInit = {
-	async init(c) {
+	async authorizeRequest(c, { allowUrlParam = false } = {}) {
+		const envName = String(c.env?.ENVIRONMENT || '').toLowerCase();
+		const localLike = Boolean(c.env?.DEV || c.env?.dev) || envName === 'development' || envName === 'test';
+		const productionLike = !localLike || envName === 'production' || envName === 'prod';
 		const authHeader = c.req.header('Authorization') || '';
 		const xInitSecret = c.req.header('X-Init-Secret') || '';
 		let secret = xInitSecret;
@@ -26,22 +58,32 @@ const dbInit = {
 				secret = body.secret || '';
 			} catch (_) {}
 		}
-		if (!secret) {
+		if (!secret && allowUrlParam) {
 			const urlSecret = c.req.param('secret');
 			if (urlSecret) {
-				if (c?.env?.ALLOW_URL_INIT === 'false' || c?.env?.ENVIRONMENT === 'staging') {
-					return c.text('❌ Passing initialization secret via URL is prohibited in this environment. Use POST /api/init with X-Init-Secret header.', 403);
+				if (c.env?.ALLOW_URL_INIT === 'false' || envName === 'staging' || productionLike) {
+					return { ok: false, response: c.text('❌ Passing initialization secret via URL is prohibited in this environment. Use POST /api/init with X-Init-Secret header.', 403) };
 				}
 				secret = urlSecret;
 			}
 		}
 
-		const expected = c.env.init_secret || c.env.jwt_secret;
+		// Production/staging must not reuse the JWT signing key as the init
+		// secret. Local development and tests may keep the compatibility fallback.
+		const expected = c.env.init_secret || (localLike ? c.env.jwt_secret : '');
 		if (!expected || !secret || !timingSafeEqual(secret, expected)) {
-			return c.text('❌ Forbidden', 403);
+			return { ok: false, response: c.text('❌ Forbidden', 403) };
 		}
+		return { ok: true };
+	},
+
+	async init(c) {
+		const auth = await this.authorizeRequest(c, { allowUrlParam: true });
+		if (!auth.ok) return auth.response;
 
 		await this.intDB(c);
+		await this.v3_23DB(c);
+		await this.v3_18DB(c);
 		await this.v1_1DB(c);
 		await this.v1_2DB(c);
 		await this.v1_3DB(c);
@@ -76,17 +118,130 @@ const dbInit = {
 		await this.v3_15DB(c);
 		await this.v3_16DB(c);
 		await this.v3_17DB(c);
-		await this.v3_18DB(c);
 		await this.v3_19DB(c);
 		await this.v3_20DB(c);
 		await this.v3_21DB(c);
 		await this.v3_22DB(c);
+		await this.v3_23DB(c);
+		await this.v3_24DB(c);
+		await this.v3_25DB(c);
+		await this.v3_26DB(c);
+		await this.v3_27DB(c);
+		await this.v3_28DB(c);
+		await this.v3_29DB(c);
+		await this.v3_30DB(c);
+		await this.v3_31DB(c);
+		await this.v3_32DB(c);
 		await settingService.refresh(c);
 		const generatedAdminPassword = c.get('generatedAdminPassword');
 		if (generatedAdminPassword) {
 			return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
 		}
 		return c.text('success');
+	},
+
+	async v3_32DB(c) {
+		const mailDb = getMailDb(c);
+		const userDb = getUserDb(c);
+		await ensureMailReliabilitySchema(c);
+		await backfillWelcomeReceipts(c);
+		await ensureUserSessionTable(userDb);
+		await ensureSessionRevocationSchema(c);
+		await mailDb.batch([
+			mailDb.prepare(`CREATE INDEX IF NOT EXISTS idx_email_user_body_bytes ON email(user_id,${MAIL_BODY_BYTES_SQL})`),
+			mailDb.prepare('CREATE INDEX IF NOT EXISTS idx_attachments_user_size ON attachments(user_id,size)'),
+			mailDb.prepare("CREATE INDEX IF NOT EXISTS idx_outbound_active_user ON mail_outbound_task(user_id,reserved_bytes,reserved_count) WHERE state IN ('PREPARED','SENDING','UNKNOWN')"),
+			mailDb.prepare("CREATE INDEX IF NOT EXISTS idx_receive_active_user ON mail_receive_claim(user_id,lease_until,reserved_bytes,reserved_count) WHERE state IN ('CLAIMED','SAVING','RETRY')"),
+			mailDb.prepare('CREATE INDEX IF NOT EXISTS idx_account_user_order ON account(user_id,is_del,sort DESC,account_id ASC)')
+		]);
+		await userDb.prepare('CREATE INDEX IF NOT EXISTS idx_role_perm_membership ON role_perm(role_id,perm_id)').run();
+	},
+
+	async v3_31DB(c) {
+		await ensureSendQuotaPeriods(getUserDb(c));
+	},
+
+	async v3_30DB(c) {
+		const db = getMailDb(c);
+		await db.batch([
+			db.prepare('CREATE INDEX IF NOT EXISTS idx_email_user_page ON email(user_id, email_id)'),
+			db.prepare('CREATE INDEX IF NOT EXISTS idx_star_user_email ON star(user_id, email_id)'),
+			db.prepare('CREATE INDEX IF NOT EXISTS idx_email_live_notice ON email(user_id, create_time) WHERE is_official=1 AND is_del=0'),
+			db.prepare("CREATE INDEX IF NOT EXISTS idx_email_user_labels ON email(user_id, labels, unread) WHERE is_del=0 AND labels!='[]' AND labels IS NOT NULL")
+		]);
+	},
+
+	async v3_29DB(c) {
+		await ensureStorageProbeHistory(c);
+	},
+
+	async v3_28DB(c) {
+		const db = getMailDb(c);
+		const hasMarker = () => db.prepare("SELECT 1 FROM pragma_table_info('email') WHERE name = 'is_official'").first();
+		if (!await hasMarker()) {
+			try {
+				await db.prepare('ALTER TABLE email ADD COLUMN is_official INTEGER NOT NULL DEFAULT 0').run();
+			} catch (error) {
+				if (!await hasMarker()) throw error;
+			}
+		}
+		// Only a receipt from the internal notice writer establishes provenance for legacy mail.
+		await db.prepare(`UPDATE email SET is_official = 1 WHERE is_official = 0
+			AND email_id IN (SELECT email_id FROM notice_delivery_receipt)
+			AND EXISTS (SELECT 1 FROM notice_delivery_receipt r
+				WHERE r.email_id = email.email_id AND r.user_id = email.user_id AND r.message_id = email.message_id)
+			AND receive_claim_key IS NULL AND outbound_task_id IS NULL`).run();
+	},
+
+	async v3_27DB(c) {
+		await ensureSessionRevocationSchema(c);
+	},
+
+	async v3_26DB(c) {
+		const userDb = getUserDb(c);
+		await ensureUserSessionTable(userDb);
+	},
+
+	async securityMigrate(c) {
+		const auth = await this.authorizeRequest(c, { allowUrlParam: false });
+		if (!auth.ok) return auth.response;
+
+		const { default: oauthAppService } = await import('../service/oauth-app-service.js');
+		const { default: emailKeyMigrationService } = await import('../service/email-key-migration-service.js');
+
+		const oauthApps = await oauthAppService.migratePlaintextSecrets(c, { dryRun: false });
+		const oauthAppState = await oauthAppService.inspectSecretState(c);
+
+		const emailBatches = [];
+		let emailTotalMigrated = 0;
+		for (let round = 0; round < 10; round++) {
+			const step = await emailKeyMigrationService.migrateBatch(c, { limit: 200, dryRun: false, requireDedicatedKey: true });
+			emailBatches.push({
+				round,
+				scanned: step.scanned,
+				migrated: step.migrated,
+				alreadyTarget: step.alreadyTarget,
+				failed: step.failed,
+				errors: step.errors
+			});
+			emailTotalMigrated += Number(step.migrated || 0);
+			if (!step.ok || step.migrated === 0 || step.scanned < 200) break;
+		}
+		const emailVerification = await emailKeyMigrationService.postDeployVerify(c);
+		await settingService.refresh(c);
+
+		const ok = Boolean(oauthApps.ok && emailVerification.ok && oauthAppState.plaintextApps === 0);
+		return c.json({
+			code: ok ? 200 : 500,
+			data: {
+				ok,
+				oauthApps,
+				oauthAppState,
+				emailTotalMigrated,
+				emailBatches,
+				emailVerification
+			}
+		}, ok ? 200 : 500);
 	},
 
 	async v3_13DB(c) {
@@ -120,11 +275,9 @@ const dbInit = {
 			hasRoleSeeded = flag === '1';
 		} catch (_) {}
 
-		// 以 role_code 精准判定标准角色是否已播种：v1_1DB 先行插入的遗留「普通用户」(custom) 不再阻断播种
-		const standardRoleCount = await userDb.prepare(
-			`SELECT count(*) as count FROM role WHERE role_code IN ('visitor','user_base','user_lv0','user_lv1','moderator','master')`
-		).first();
-		const shouldSeedRoles = !hasRoleSeeded && (!standardRoleCount || Number(standardRoleCount.count) === 0);
+		// An absent completion marker includes interrupted seeds. Existing roles
+		// are preserved once the full initial seed has committed successfully.
+		const shouldSeedRoles = !hasRoleSeeded;
 
 		if (shouldSeedRoles) {
 			const standardRoles = [
@@ -133,7 +286,7 @@ const dbInit = {
 					name: '参观者',
 					key: 'visitor',
 					sort: 1,
-					isDefault: 1,
+					isDefault: 0,
 					sendType: 'ban',
 					sendCount: 0,
 					accountCount: 0,
@@ -149,7 +302,7 @@ const dbInit = {
 					name: '普通用户',
 					key: 'user_base',
 					sort: 2,
-					isDefault: 0,
+					isDefault: 1,
 					sendType: 'day',
 					sendCount: 5,
 					accountCount: 1,
@@ -251,17 +404,56 @@ const dbInit = {
 						if (roleId) {
 							await this.assignRolePerms(userDb, roleId, defRole.permKeys);
 						}
+					} else if (!existing.role_code || existing.role_code === 'custom') {
+						// v1_1DB 预插入的遗留「普通用户」行尚无标准 role_code，在此原位对齐为标准角色并赋予权限
+						await userDb.prepare(`
+							UPDATE role SET
+								key = ?, description = ?, sort = ?, is_default = ?,
+								send_count = ?, send_type = ?, account_count = ?,
+								storage_quota_mb = ?, allow_attachment = ?, role_code = ?,
+								tag_text = ?, tag_color = ?
+							WHERE role_id = ?
+						`).bind(
+							defRole.key, defRole.description, defRole.sort, defRole.isDefault,
+							defRole.sendCount, defRole.sendType, defRole.accountCount,
+							defRole.storageQuotaMb, defRole.allowAttachment, defRole.roleCode,
+							defRole.tagText, defRole.tagColor, existing.role_id
+						).run();
+						await this.assignRolePerms(userDb, existing.role_id, defRole.permKeys);
+					} else {
+						await this.assignRolePerms(userDb, existing.role_id, defRole.permKeys);
 					}
 				} catch (e) {
-					console.warn(`初始化默认身份分组 ${defRole.name} 提示：`, e.message);
+					throw new Error(`Standard role bootstrap failed (${defRole.roleCode})`, { cause: e });
 				}
 			}
 
-			try {
-				if (c?.env?.kv) {
-					await c.env.kv.put('roles_seeded_v2', '1');
-				}
-			} catch (_) {}
+			const seeded = await userDb.prepare(`
+				SELECT COUNT(DISTINCT role_code) AS count FROM role
+				WHERE role_code IN ('visitor','user_base','user_lv0','user_lv1','moderator','master')
+			`).first();
+			if (Number(seeded?.count) !== 6) throw new Error('Standard role bootstrap is incomplete');
+			if (c?.env?.kv) await c.env.kv.put('roles_seeded_v2', '1');
+		}
+
+		// Repair legacy databases that accumulated more than one default role.
+		// Registration must resolve to one deterministic role after every init,
+		// including installs that already carry the completion marker.
+		const defaultRoles = (await userDb.prepare(`
+			SELECT role_id, role_code, sort FROM role WHERE is_default = 1
+			ORDER BY CASE WHEN role_code = 'user_base' THEN 0 ELSE 1 END, sort ASC, role_id ASC
+		`).all()).results || [];
+		let keeper = defaultRoles[0];
+		if (!keeper) {
+			keeper = await userDb.prepare(`
+				SELECT role_id FROM role
+				WHERE role_code = 'user_base' OR key = 'user_base' OR name = '普通用户'
+				ORDER BY role_id ASC LIMIT 1
+			`).first();
+		}
+		if (keeper?.role_id) {
+			await userDb.prepare(`UPDATE role SET is_default = 0 WHERE is_default = 1`).run();
+			await userDb.prepare(`UPDATE role SET is_default = 1 WHERE role_id = ?`).bind(keeper.role_id).run();
 		}
 
 		if (c.env.admin) {
@@ -285,9 +477,87 @@ const dbInit = {
 		} catch (e) {
 			console.warn('visitor user:query cleanup warning:', e.message);
 		}
-	},
+		},
 
-	// v3_22DB: 对象存储删除状态机与附件/去重索引。
+		async v3_25DB(c) {
+			const userDb = getUserDb(c);
+			for (const [name, definition] of [
+				['initial_password_hash', "TEXT NOT NULL DEFAULT ''"],
+				['telegram_share_version', 'INTEGER NOT NULL DEFAULT 0'],
+				['deletion_requested_at', "TEXT NOT NULL DEFAULT ''"],
+				['deletion_status', "TEXT NOT NULL DEFAULT ''"]
+			]) {
+				const exists = await userDb.prepare(
+					`SELECT 1 AS present FROM pragma_table_info('user') WHERE name = ? LIMIT 1`
+				).bind(name).first();
+				if (!exists) await userDb.prepare(`ALTER TABLE user ADD COLUMN ${name} ${definition}`).run();
+			}
+			await userDb.prepare(`
+				CREATE TABLE IF NOT EXISTS legal_acceptance (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER NOT NULL,
+					terms_version TEXT NOT NULL,
+					accepted_at TEXT NOT NULL,
+					locale TEXT NOT NULL,
+					source_url TEXT NOT NULL
+				)
+			`).run();
+			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_legal_acceptance_user ON legal_acceptance(user_id)`).run();
+		},
+
+		async v3_24DB(c) {
+			const mailDb = getMailDb(c);
+			const columns = [
+				{ name: 'trashed_at', sql: 'ALTER TABLE email ADD COLUMN trashed_at TEXT;' },
+				{ name: 'spam_at', sql: 'ALTER TABLE email ADD COLUMN spam_at TEXT;' },
+				{ name: 'receive_claim_key', sql: 'ALTER TABLE email ADD COLUMN receive_claim_key TEXT;' },
+				{ name: 'outbound_task_id', sql: 'ALTER TABLE email ADD COLUMN outbound_task_id TEXT;' }
+			];
+			for (const column of columns) {
+				const exists = await mailDb.prepare(
+					`SELECT 1 AS present FROM pragma_table_info('email') WHERE name = ? LIMIT 1`
+				).bind(column.name).first();
+				if (!exists) await mailDb.prepare(column.sql).run();
+			}
+			// Legacy rows have no deletion timestamp. Grant a fresh minimum
+			// retention window instead of treating message age as deletion age.
+			await mailDb.prepare(`UPDATE email SET trashed_at = CURRENT_TIMESTAMP WHERE is_del = 1 AND trashed_at IS NULL`).run();
+			await mailDb.prepare(`UPDATE email SET spam_at = CURRENT_TIMESTAMP WHERE is_spam = 1 AND spam_at IS NULL`).run();
+			await mailDb.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_receive_claim ON email(receive_claim_key) WHERE receive_claim_key IS NOT NULL`).run();
+			await mailDb.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_outbound_task ON email(outbound_task_id) WHERE outbound_task_id IS NOT NULL`).run();
+			await mailDb.prepare(`CREATE INDEX IF NOT EXISTS idx_email_trash_expiry ON email(is_del, trashed_at)`).run();
+			await ensureMailReliabilitySchema(c);
+			await ensureNoticeDeliverySchema(c);
+		},
+
+		// v3_23DB: account security version and durable passkey history.
+		// auth_version invalidates sessions, pending MFA and step-up proofs after
+		// a password/factor change; passkey_history prevents an emptied list from
+		// being mistaken for a brand-new account.
+		async v3_23DB(c) {
+			const userDb = getUserDb(c);
+			const columns = [
+				{ name: 'auth_version', sql: 'ALTER TABLE user ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0;' },
+				{ name: 'passkey_history', sql: 'ALTER TABLE user ADD COLUMN passkey_history INTEGER NOT NULL DEFAULT 0;' }
+			];
+			for (const column of columns) {
+				const exists = await userDb.prepare(
+					`SELECT 1 AS present FROM pragma_table_info('user') WHERE name = ? LIMIT 1`
+				).bind(column.name).first();
+				if (!exists) await userDb.prepare(column.sql).run();
+			}
+			const hasKeys = await userDb.prepare(
+				`SELECT 1 AS present FROM pragma_table_info('user') WHERE name = 'security_keys'`
+			).first();
+			if (hasKeys) await userDb.prepare(`
+				UPDATE user SET passkey_history = 1
+				WHERE passkey_history = 0 AND security_keys IS NOT NULL AND security_keys NOT IN ('', '[]')
+			`).run();
+			await ensureAiBudgetSchema(c);
+			await ensureAuthSecurityOperationSchema(c);
+		},
+
+		// v3_22DB: 对象存储删除状态机与附件/去重索引。
 	// 背景：D1 元数据删除与对象存储删除无法构成跨系统事务，旧实现先删元数据
 	// 再删对象；对象删除失败后 key 永久丢失，形成无法回收的孤儿对象。
 	// 本迁移建立持久化删除队列（与元数据删除同批提交），由定时任务重放；
@@ -439,28 +709,43 @@ const dbInit = {
 		}
 	},
 
-	// v3_18DB: 系统设置操作报告与IP风控持久化配置迁移
+	// v3_18DB: 系统设置操作报告与IP风控持久化配置迁移（使用独立 setting_ext 键值表，避免超过 Cloudflare D1 单表 100 列上限）
 	async v3_18DB(c) {
 		const userDb = getUserDb(c);
-		const settingCols = [
-			{ name: 'audit_log_enabled', sql: `ALTER TABLE setting ADD COLUMN audit_log_enabled INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'audit_max_ip_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_ip_per_account INTEGER NOT NULL DEFAULT 3;` },
-			{ name: 'audit_max_device_per_account', sql: `ALTER TABLE setting ADD COLUMN audit_max_device_per_account INTEGER NOT NULL DEFAULT 3;` },
-			{ name: 'audit_auto_clean_oldest', sql: `ALTER TABLE setting ADD COLUMN audit_auto_clean_oldest INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'audit_prioritize_non_critical_clean', sql: `ALTER TABLE setting ADD COLUMN audit_prioritize_non_critical_clean INTEGER NOT NULL DEFAULT 1;` },
-			{ name: 'audit_critical_quota', sql: `ALTER TABLE setting ADD COLUMN audit_critical_quota INTEGER NOT NULL DEFAULT 3;` }
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS setting_ext (
+				key TEXT PRIMARY KEY,
+				value TEXT NOT NULL
+			)
+		`).run();
+
+		const legacyColMap = [
+			{ col: 'audit_log_enabled', key: 'auditLogEnabled', def: '1' },
+			{ col: 'audit_max_ip_per_account', key: 'auditMaxIpPerAccount', def: '3' },
+			{ col: 'audit_max_device_per_account', key: 'auditMaxDevicePerAccount', def: '3' },
+			{ col: 'audit_auto_clean_oldest', key: 'auditAutoCleanOldest', def: '1' },
+			{ col: 'audit_prioritize_non_critical_clean', key: 'auditPrioritizeNonCriticalClean', def: '1' },
+			{ col: 'audit_critical_quota', key: 'auditCriticalQuota', def: '3' }
 		];
 
-		const tableInfo = await userDb.prepare(`PRAGMA table_info('setting')`).all().catch(() => ({ results: [] }));
+		const tableInfo = await userDb.prepare(`PRAGMA table_info('setting')`).all();
 		const existingCols = new Set((tableInfo?.results || []).map(r => r.name));
-		for (const col of settingCols) {
-			if (!existingCols.has(col.name)) {
-				try {
-					await userDb.prepare(col.sql).run();
-				} catch (err) {
-					console.warn(`v3_18DB 跳过 setting 列 ${col.name}:`, err.message);
-				}
-			}
+		const presentLegacy = legacyColMap.filter(item => existingCols.has(item.col));
+
+		for (const item of presentLegacy) {
+			// Keep the legacy columns during the rollback window. Existing
+			// setting_ext values remain authoritative on retries.
+			await userDb.prepare(`
+				INSERT OR IGNORE INTO setting_ext (key, value)
+				SELECT ?, CAST(${item.col} AS TEXT) FROM setting
+				WHERE ${item.col} IS NOT NULL LIMIT 1
+			`).bind(item.key).run();
+		}
+
+		for (const item of legacyColMap) {
+			await userDb.prepare(
+				`INSERT OR IGNORE INTO setting_ext (key, value) VALUES (?, ?)`
+			).bind(item.key, item.def).run();
 		}
 	},
 
@@ -765,24 +1050,30 @@ const dbInit = {
 	async v3_14DB(c) {
 		const userDb = getUserDb(c);
 		const mailDb = getMailDb(c);
+		const demoEnabled = String(c.env?.DEMO_VISITOR_ENABLED || '').toLowerCase() === 'true';
+		const demoEmail = String(c.env?.DEMO_VISITOR_EMAIL || '').trim().toLowerCase();
+		const demoPassword = String(c.env?.DEMO_VISITOR_PASSWORD || '').trim();
+		if (demoEnabled) {
+			const weakPasswords = new Set(['123456', '12345678', '123456789', '1234567890', 'password', 'admin123']);
+			if (!demoEmail || !demoPassword || demoPassword.length < 12 || weakPasswords.has(demoPassword.toLowerCase())) {
+				throw new Error('DEMO_VISITOR_EMAIL and strong DEMO_VISITOR_PASSWORD (min 12 chars) are required when DEMO_VISITOR_ENABLED=true');
+			}
+			if (c.env.admin && demoEmail === String(c.env.admin).trim().toLowerCase()) {
+				throw new Error('DEMO_VISITOR_EMAIL must not match site owner admin email');
+			}
+		}
 
 		// v3_15 兼容迁移：为存量库补齐 entity 已声明但历史 DDL 遗漏的列（全新库由 CREATE TABLE 直接建立，此处幂等跳过）
 		const userLabelsDefault = getDefaultUserLabelsString().replace(/'/g, "''");
-		const legacyMissingCols = [
-			{ db: userDb, table: 'user', name: 'update_time', sql: `ALTER TABLE user ADD COLUMN update_time DATETIME DEFAULT CURRENT_TIMESTAMP;` },
-			{ db: userDb, table: 'user', name: 'custom_labels', sql: `ALTER TABLE user ADD COLUMN custom_labels TEXT NOT NULL DEFAULT '${userLabelsDefault}';` },
-			{ db: mailDb, table: 'email', name: 'labels', sql: `ALTER TABLE email ADD COLUMN labels TEXT NOT NULL DEFAULT '[]';` }
-		];
-		for (const col of legacyMissingCols) {
-			try {
-				const colInfo = await col.db.prepare(`SELECT * FROM pragma_table_info('${col.table}') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await col.db.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`跳过 ${col.table} 字段 ${col.name}：${e.message}`);
-			}
-		}
+		await addMissingColumns(userDb, 'user', [
+			`ALTER TABLE user ADD COLUMN update_time DATETIME;`,
+			`ALTER TABLE user ADD COLUMN custom_labels TEXT NOT NULL DEFAULT '${userLabelsDefault}';`
+		]);
+		// SQLite forbids non-constant defaults on ALTER TABLE ADD COLUMN; backfill NULL legacy rows once added.
+		await userDb.prepare(`UPDATE user SET update_time = COALESCE(create_time, datetime('now')) WHERE update_time IS NULL`).run();
+		await addMissingColumns(mailDb, 'email', [
+			`ALTER TABLE email ADD COLUMN labels TEXT NOT NULL DEFAULT '[]';`
+		]);
 
 		const aiSettingCols = [
 			{ name: 'ai_api_key', sql: `ALTER TABLE setting ADD COLUMN ai_api_key TEXT NOT NULL DEFAULT '';` },
@@ -810,93 +1101,84 @@ const dbInit = {
 			}
 		}
 
-		// 确保管理员在所有已配置域名下均具备默认 account 邮箱
-		// 确保演示参观者账号 admin@epomail.cyou 独立存在且归属参观者角色 (type: 2)，绝不越权晋升站长
-		try {
-			const visitorRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'visitor' OR key = 'visitor' LIMIT 1`).first();
-			const visitorRoleId = visitorRole ? visitorRole.role_id : 2;
-			const visitorEmail = 'admin@epomail.cyou';
-			
-			let visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(visitorEmail).first();
-			if (!visitorUser) {
-				// 预设安全 PBKDF2 哈希密码 123456
-				const defHash = 'pbkdf2:100000:wYbOCP3rv6muivmiYwmd/oXXroIcxp7/VcB02M+Ac5w=';
-				const defSalt = 'ZmUlWbNgsFel3E0oxnPHcA==';
-				await userDb.prepare(`
-					INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time)
-					VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'))
-				`).bind(visitorEmail, defHash, defSalt, visitorRoleId).run();
-				visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(visitorEmail).first();
-			} else if (visitorUser.type !== visitorRoleId) {
-				await userDb.prepare(`UPDATE user SET type = ?, is_del = 0 WHERE user_id = ?`).bind(visitorRoleId, visitorUser.user_id).run();
-			}
+		// 1. 主站长账号优先初始化：确保冷启动时 c.env.admin 首个落库，且缺失 admin_initial_password 时在生产环境安全失败（禁止吞掉异常）
+		if (c.env.admin) {
+			let adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
+			if (!adminUser) {
+				// 全新部署引导：主站长账号不存在时直接创建（注册端 adminReserved 拦截站长邮箱，无法走注册路径）
+				// 禁止使用固定默认密码。生产环境必须显式提供 admin_initial_password Secret；
+				// 本地开发在缺失时生成一次性随机密码，并仅在初始化响应中回显一次。
+				const masterRoleRow = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
+				const masterRoleId = masterRoleRow ? masterRoleRow.role_id : 1;
 
-			if (visitorUser) {
-				// 确保 account 表中 admin@epomail.cyou 指向该独立的参观者用户，绝不挂在站长名下
-				const existingAcc = await userDb.prepare(`SELECT account_id, user_id FROM account WHERE email = ?`).bind(visitorEmail).first();
-				if (!existingAcc) {
-					await userDb.prepare(`
-						INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort)
-						VALUES (?, 0, ?, 0, ?, 1, 0)
-					`).bind(visitorEmail, visitorUser.user_id, visitorEmail).run();
-				} else {
-					await userDb.prepare(`UPDATE account SET user_id = ?, name = ?, is_del = 0 WHERE account_id = ?`).bind(visitorUser.user_id, visitorEmail, existingAcc.account_id).run();
-				}
-
-				// 清除参观者账号的 HAS_WELCOME KV 脏缓存，确保下次登录时能触发欢迎邮件投递
-				// 修复账号被恢复/迁移后 KV 残留导致欢迎邮件被永久阻塞的问题
-				try {
-					await c.env.kv.delete('HAS_WELCOME_' + visitorUser.user_id);
-				} catch (_) {}
-			}
-
-			// 确保超级管理员 (User 1) 仅绑定自身主邮箱 c.env.admin (admin@epomail.bond)，绝不越权关联其他域名信箱
-			if (c.env.admin) {
-				let adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
-				if (!adminUser) {
-					// 全新部署引导：主站长账号不存在时直接创建（注册端 adminReserved 拦截站长邮箱，无法走注册路径）
-					// 禁止使用固定默认密码。生产环境必须显式提供 admin_initial_password Secret；
-					// 本地开发在缺失时生成一次性随机密码，并仅在初始化响应中回显一次。
-					const masterRoleRow = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
-					const masterRoleId = masterRoleRow ? masterRoleRow.role_id : 1;
-
-					let initialPassword = (c.env.admin_initial_password || '').trim();
-					let generatedPassword = null;
-					if (!initialPassword || initialPassword.length < 8) {
-						if (c.env.dev || c.env.DEV) {
-							initialPassword = cryptoUtils.genRandomPwd(20);
-							generatedPassword = initialPassword;
-							c.set('generatedAdminPassword', generatedPassword);
-						} else {
-							throw new Error('admin_initial_password Secret is required (min 8 chars) before creating the site owner account');
-						}
+				let initialPassword = (c.env.admin_initial_password || '').trim();
+				let generatedPassword = null;
+				if (!initialPassword || initialPassword.length < 8) {
+					if (c.env.dev || c.env.DEV) {
+						initialPassword = cryptoUtils.genRandomPwd(20);
+						generatedPassword = initialPassword;
+						c.set('generatedAdminPassword', generatedPassword);
+					} else {
+						throw new Error('admin_initial_password Secret is required (min 8 chars) before creating the site owner account');
 					}
-
-					const { salt, hash } = await cryptoUtils.hashPassword(initialPassword);
-					await userDb.prepare(`
-						INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time, custom_labels)
-						VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'), ?)
-					`).bind(c.env.admin, hash, salt, masterRoleId, getDefaultUserLabelsString()).run();
-					adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
-					console.log(`[init] 已创建主站长账号 ${c.env.admin} (user_id=${adminUser?.user_id})，初始凭据已按安全策略生成/注入`);
 				}
-				if (adminUser) {
+
+				const { salt, hash } = await cryptoUtils.hashPassword(initialPassword, c.env);
+				await userDb.prepare(`
+					INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time, custom_labels)
+					VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'), ?)
+				`).bind(c.env.admin, hash, salt, masterRoleId, getDefaultUserLabelsString()).run();
+				adminUser = await userDb.prepare(`SELECT user_id FROM user WHERE email = ?`).bind(c.env.admin).first();
+				console.log(`[init] 已创建主站长账号 ${c.env.admin} (user_id=${adminUser?.user_id})，初始凭据已按安全策略生成/注入`);
+			}
+			if (adminUser) {
+				try {
 					// 若站长账号尚未晋升 master（历史遗留普通账号），此处兜底晋升
 					const masterRoleRow = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
 					if (masterRoleRow) {
 						await userDb.prepare(`UPDATE user SET type = ? WHERE user_id = ? AND type != ?`).bind(masterRoleRow.role_id, adminUser.user_id, masterRoleRow.role_id).run();
 					}
-					const adminAcc = await userDb.prepare(`SELECT account_id FROM account WHERE email = ? AND user_id = ?`).bind(c.env.admin, adminUser.user_id).first();
+					const adminAcc = await mailDb.prepare(`SELECT account_id FROM account WHERE email = ? AND user_id = ?`).bind(c.env.admin, adminUser.user_id).first();
 					if (!adminAcc) {
-						await userDb.prepare(`
+						await mailDb.prepare(`
 							INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort)
 							VALUES (?, 0, ?, 0, ?, 1, 0)
 						`).bind(c.env.admin, adminUser.user_id, emailUtils.getName(c.env.admin)).run();
 					}
+				} catch (e) {
+					console.error('[init] admin account synchronization failed', e?.name || 'Error');
+					throw new Error('Admin mailbox account synchronization failed', { cause: e });
 				}
 			}
-		} catch (e) {
-			console.warn('visitor and admin accounts sync warning:', e.message);
+		}
+
+		// 2. 演示参观者账号默认关闭：严禁在生产环境自动注入固定可猜测密码或复活已停用账号。
+		// 仅当显式开启 DEMO_VISITOR_ENABLED=true 且提供高强度 DEMO_VISITOR_PASSWORD 时按需播种；存量库既有账号保持原状，由独立运维脚本处置。
+		if (demoEnabled) {
+			try {
+				const visitorRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'visitor' OR key = 'visitor' LIMIT 1`).first();
+				const visitorRoleId = visitorRole ? visitorRole.role_id : 2;
+				let visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(demoEmail).first();
+				if (!visitorUser) {
+					const { salt, hash } = await cryptoUtils.hashPassword(demoPassword, c.env);
+					await userDb.prepare(`
+						INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time)
+						VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'))
+					`).bind(demoEmail, hash, salt, visitorRoleId).run();
+					visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(demoEmail).first();
+				}
+				if (visitorUser) {
+					const existingAcc = await mailDb.prepare(`SELECT account_id FROM account WHERE email = ?`).bind(demoEmail).first();
+					if (!existingAcc) {
+						await mailDb.prepare(`
+							INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort)
+							VALUES (?, 0, ?, 0, ?, 1, 0)
+						`).bind(demoEmail, visitorUser.user_id, demoEmail).run();
+					}
+				}
+			} catch (e) {
+				console.warn('demo visitor sync warning:', e.message);
+			}
 		}
 	},
 
@@ -918,7 +1200,7 @@ const dbInit = {
 				SELECT DISTINCT ?, pid FROM perm WHERE perm_key IN (${placeholders}) AND pid > 0
 			`).bind(roleId, ...permKeys, roleId, ...permKeys).run();
 		} catch (e) {
-			console.warn('assignRolePerms warning:', e.message);
+			throw new Error('Standard role permission bootstrap failed', { cause: e });
 		}
 	},
 
@@ -1360,14 +1642,38 @@ const dbInit = {
 		} catch (e) { console.warn(e.message); }
 
 		try {
-			await mailDb.prepare(`DROP INDEX IF EXISTS idx_account_email`).run();
-			await mailDb.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_account_email_nocase ON account (email COLLATE NOCASE)`).run();
-		} catch (e) { console.warn(e.message); }
+			await this.ensureEmailUniqueIndex(mailDb, 'account', 'idx_account_email', 'idx_account_email_nocase');
+		} catch (e) { console.warn(`account email unique index migration: ${e.message}`); }
 
 		try {
-			await userDb.prepare(`DROP INDEX IF EXISTS idx_user_email`).run();
-			await userDb.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_email_nocase ON user (email COLLATE NOCASE)`).run();
-		} catch (e) { console.warn(e.message); }
+			await this.ensureEmailUniqueIndex(userDb, 'user', 'idx_user_email', 'idx_user_email_nocase');
+		} catch (e) { console.warn(`user email unique index migration: ${e.message}`); }
+	},
+
+	/**
+	 * Create the NOCASE unique index BEFORE dropping the legacy index. If the
+	 * historical table contains case-insensitive duplicates, keep the old
+	 * protection and report the unresolved data instead of leaving the table
+	 * with no unique constraint at all.
+	 */
+	async ensureEmailUniqueIndex(db, table, oldIndex, newIndex) {
+		const duplicate = await db.prepare(`
+			SELECT email FROM ${table}
+			WHERE email IS NOT NULL AND TRIM(email) <> ''
+			GROUP BY email COLLATE NOCASE
+			HAVING COUNT(*) > 1
+			LIMIT 1
+		`).first();
+		if (duplicate) {
+			console.warn(`[init] ${table}.email has case-insensitive duplicates; keeping ${oldIndex} and skipping ${newIndex}`);
+			return { ok: false, reason: 'duplicate_emails' };
+		}
+
+		await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS ${newIndex} ON ${table} (email COLLATE NOCASE)`).run();
+		const created = await db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name=?`).bind(newIndex).first();
+		if (!created) throw new Error(`Failed to create ${newIndex}`);
+		await db.prepare(`DROP INDEX IF EXISTS ${oldIndex}`).run();
+		return { ok: true };
 	},
 
 	async v1_5DB(c) {
@@ -1447,22 +1753,17 @@ const dbInit = {
 			`ALTER TABLE setting ADD COLUMN rule_type INTEGER NOT NULL DEFAULT 0;`
 		];
 
-		await Promise.all(settingColumns.map(async sql => {
-			try { await userDb.prepare(sql).run(); } catch (e) { console.warn(`跳过字段添加：${e.message}`); }
-		}));
-
-		try {
-			const nameColumn = await mailDb.prepare(`SELECT * FROM pragma_table_info('email') WHERE name = 'to_email' limit 1`).first();
-			if (!nameColumn) {
-				await mailDb.batch([
-					mailDb.prepare(`ALTER TABLE email ADD COLUMN to_email TEXT NOT NULL DEFAULT ''`),
-					mailDb.prepare(`ALTER TABLE email ADD COLUMN to_name TEXT NOT NULL DEFAULT ''`),
-					mailDb.prepare(`UPDATE email SET to_email = json_extract(recipient, '$[0].address'), to_name = json_extract(recipient, '$[0].name')`)
-				]);
-			}
-		} catch (e) {
-			console.warn(`跳过 email 字段添加：${e.message}`);
-		}
+		await addMissingColumns(userDb, 'setting', settingColumns);
+		await addMissingColumns(mailDb, 'email', [
+			"ALTER TABLE email ADD COLUMN to_email TEXT NOT NULL DEFAULT ''",
+			"ALTER TABLE email ADD COLUMN to_name TEXT NOT NULL DEFAULT ''"
+		]);
+		await mailDb.prepare(`UPDATE email SET
+			to_email = CASE WHEN to_email = '' THEN COALESCE(json_extract(recipient, '$[0].address'), '') ELSE to_email END,
+			to_name = CASE WHEN to_name = '' THEN COALESCE(json_extract(recipient, '$[0].name'), '') ELSE to_name END
+			WHERE CASE WHEN json_valid(recipient) THEN json_type(recipient, '$[0]') = 'object' ELSE 0 END
+				AND ((to_email = '' AND COALESCE(json_extract(CASE WHEN json_valid(recipient) THEN recipient END, '$[0].address'), '') != '')
+					OR (to_name = '' AND COALESCE(json_extract(CASE WHEN json_valid(recipient) THEN recipient END, '$[0].name'), '') != ''))`).run();
 	},
 
 	async v1_2DB(c) {
@@ -1478,9 +1779,7 @@ const dbInit = {
 			`ALTER TABLE email ADD COLUMN relation TEXT NOT NULL DEFAULT '';`
 		];
 
-		await Promise.all(emailCols.map(async sql => {
-			try { await mailDb.prepare(sql).run(); } catch (e) { console.warn(`跳过字段添加：${e.message}`); }
-		}));
+		await addMissingColumns(mailDb, 'email', emailCols);
 
 		await this.receiveEmailToRecipient(c);
 		await this.initAccountName(c);
@@ -1500,23 +1799,29 @@ const dbInit = {
 		const mailDb = getMailDb(c);
 		const userDb = getUserDb(c);
 
-		const mailCols = [
+		await addMissingColumns(mailDb, 'email', [
 			`ALTER TABLE email ADD COLUMN type INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE email ADD COLUMN status INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE email ADD COLUMN resend_email_id TEXT;`,
-			`ALTER TABLE email ADD COLUMN message TEXT;`,
+			`ALTER TABLE email ADD COLUMN message TEXT;`
+		]);
+
+		await addMissingColumns(mailDb, 'attachments', [
 			`ALTER TABLE attachments ADD COLUMN status INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE attachments ADD COLUMN type INTEGER NOT NULL DEFAULT 0;`
-		];
+		]);
 
-		const userCols = [
+		await addMissingColumns(userDb, 'setting', [
 			`ALTER TABLE setting ADD COLUMN resend_tokens TEXT NOT NULL DEFAULT '{}';`,
 			`ALTER TABLE setting ADD COLUMN send INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE setting ADD COLUMN r2_domain TEXT;`,
 			`ALTER TABLE setting ADD COLUMN site_key TEXT;`,
 			`ALTER TABLE setting ADD COLUMN secret_key TEXT;`,
 			`ALTER TABLE setting ADD COLUMN background TEXT;`,
-			`ALTER TABLE setting ADD COLUMN login_opacity INTEGER NOT NULL DEFAULT 0.90;`,
+			`ALTER TABLE setting ADD COLUMN login_opacity INTEGER NOT NULL DEFAULT 0.90;`
+		]);
+
+		await addMissingColumns(userDb, 'user', [
 			`ALTER TABLE user ADD COLUMN create_ip TEXT;`,
 			`ALTER TABLE user ADD COLUMN active_ip TEXT;`,
 			`ALTER TABLE user ADD COLUMN os TEXT;`,
@@ -1524,15 +1829,7 @@ const dbInit = {
 			`ALTER TABLE user ADD COLUMN device TEXT;`,
 			`ALTER TABLE user ADD COLUMN sort INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE user ADD COLUMN send_count INTEGER NOT NULL DEFAULT 0;`
-		];
-
-		await Promise.all(mailCols.map(async sql => {
-			try { await mailDb.prepare(sql).run(); } catch (e) { console.warn(`跳过字段添加：${e.message}`); }
-		}));
-
-		await Promise.all(userCols.map(async sql => {
-			try { await userDb.prepare(sql).run(); } catch (e) { console.warn(`跳过字段添加：${e.message}`); }
-		}));
+		]);
 
 		// 创建 perm 表并初始化
 		try {
@@ -1673,6 +1970,11 @@ const dbInit = {
 				text TEXT,
 				labels TEXT NOT NULL DEFAULT '[]',
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+				trashed_at TEXT,
+				spam_at TEXT,
+				receive_claim_key TEXT,
+				outbound_task_id TEXT,
+				is_official INTEGER NOT NULL DEFAULT 0,
 				is_del INTEGER DEFAULT 0 NOT NULL
 			)
 		`).run();
@@ -1738,6 +2040,9 @@ const dbInit = {
 				latest_email_time DATETIME,
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 				user_id INTEGER NOT NULL,
+				name TEXT NOT NULL DEFAULT '',
+				all_receive INTEGER NOT NULL DEFAULT 0,
+				sort INTEGER NOT NULL DEFAULT 0,
 				is_del INTEGER DEFAULT 0 NOT NULL
 			)
 		`).run();
@@ -1750,14 +2055,34 @@ const dbInit = {
 				type INTEGER DEFAULT 1 NOT NULL,
 				password TEXT NOT NULL,
 				salt TEXT NOT NULL,
+				initial_password_hash TEXT NOT NULL DEFAULT '',
 				status INTEGER DEFAULT 0 NOT NULL,
 				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 				update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 				active_time DATETIME,
 				is_del INTEGER DEFAULT 0 NOT NULL,
+				auth_version INTEGER NOT NULL DEFAULT 0,
+				passkey_history INTEGER NOT NULL DEFAULT 0,
+				send_quota_period INTEGER NOT NULL DEFAULT 0,
+				send_quota_generation INTEGER NOT NULL DEFAULT 0,
+				telegram_share_version INTEGER NOT NULL DEFAULT 0,
+				deletion_requested_at TEXT NOT NULL DEFAULT '',
+				deletion_status TEXT NOT NULL DEFAULT '',
 				custom_labels TEXT NOT NULL DEFAULT '${getDefaultUserLabelsString().replace(/'/g, "''")}'
 			)
 		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS legal_acceptance (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				terms_version TEXT NOT NULL,
+				accepted_at TEXT NOT NULL,
+				locale TEXT NOT NULL,
+				source_url TEXT NOT NULL
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_legal_acceptance_user ON legal_acceptance(user_id)`).run();
 
 		await userDb.prepare(`
 			CREATE TABLE IF NOT EXISTS setting (
@@ -1768,13 +2093,14 @@ const dbInit = {
 				title TEXT NOT NULL,
 				auto_refresh INTEGER NOT NULL,
 				register_verify INTEGER NOT NULL,
-				add_email_verify INTEGER NOT NULL,
-				audit_log_enabled INTEGER DEFAULT 1,
-				audit_max_ip_per_account INTEGER DEFAULT 3,
-				audit_max_device_per_account INTEGER DEFAULT 3,
-				audit_auto_clean_oldest INTEGER DEFAULT 1,
-				audit_prioritize_non_critical_clean INTEGER DEFAULT 1,
-				audit_critical_quota INTEGER DEFAULT 3
+				add_email_verify INTEGER NOT NULL
+			)
+		`).run();
+
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS setting_ext (
+				key TEXT PRIMARY KEY,
+				value TEXT NOT NULL
 			)
 		`).run();
 
@@ -1990,60 +2316,40 @@ const dbInit = {
 				END;
 			END;
 		`).run();
+		await ensureAiBudgetSchema(c);
+		await ensureMailReliabilitySchema(c);
+		await ensureNoticeDeliverySchema(c);
+		await ensureAuthSecurityOperationSchema(c);
+		await ensureUserSessionTable(userDb);
+		await ensureSessionRevocationSchema(c);
+		await ensureStorageProbeHistory(c);
 	},
 
 	async receiveEmailToRecipient(c) {
 		const mailDb = getMailDb(c);
-		try {
-			const receiveEmailColumn = await mailDb.prepare(`SELECT * FROM pragma_table_info('email') WHERE name = 'receive_email' limit 1`).first();
-
-			if (!receiveEmailColumn) {
-				return;
-			}
-
-			const queryList = [];
-			const { results } = await mailDb.prepare('SELECT receive_email,email_id FROM email').all();
-			results.forEach(emailRow => {
-				const recipient = {};
-				recipient.address = emailRow.receive_email;
-				recipient.name = '';
-				const recipientStr = JSON.stringify([recipient]);
-				const sql = mailDb.prepare('UPDATE email SET recipient = ? WHERE email_id = ?').bind(recipientStr, emailRow.email_id);
-				queryList.push(sql);
-			});
-
-			queryList.push(mailDb.prepare("ALTER TABLE email DROP COLUMN receive_email"));
-
-			await mailDb.batch(queryList);
-		} catch (e) {
-			console.warn(`receiveEmailToRecipient 跳过：${e.message}`);
+		const legacy = await mailDb.prepare(`SELECT "notnull" AS required, dflt_value AS default_value FROM pragma_table_info('email') WHERE name='receive_email'`).first();
+		if (!legacy) return;
+		if (legacy.required && (legacy.default_value === null || /^\(?null\)?$/i.test(legacy.default_value))) {
+			throw new Error('Legacy email.receive_email requires a compatible default before upgrade');
 		}
+
+		await mailDb.prepare(`UPDATE email SET recipient = json_array(json_object('address', receive_email, 'name', ''))
+			WHERE (recipient IS NULL OR trim(recipient) IN ('', '[]'))
+				AND receive_email IS NOT NULL AND trim(receive_email) != ''`).run();
 	},
 
 	async initAccountName(c) {
 		const mailDb = getMailDb(c);
-		try {
-			const nameColumn = await mailDb.prepare(`SELECT * FROM pragma_table_info('account') WHERE name = 'name' limit 1`).first();
+		const nameColumn = await mailDb.prepare("SELECT 1 AS present FROM pragma_table_info('account') WHERE name='name'").first();
+		if (nameColumn) return;
 
-			if (nameColumn) {
-				return;
-			}
-
-			const queryList = [];
-			queryList.push(mailDb.prepare(`ALTER TABLE account ADD COLUMN name TEXT NOT NULL DEFAULT ''`));
-
-			const { results } = await mailDb.prepare(`SELECT account_id, email FROM account`).all();
-
-			results.forEach(accountRow => {
-				const name = emailUtils.getName(accountRow.email);
-				const sql = mailDb.prepare('UPDATE account SET name = ? WHERE account_id = ?').bind(name, accountRow.account_id);
-				queryList.push(sql);
-			});
-
-			await mailDb.batch(queryList);
-		} catch (e) {
-			console.warn(`initAccountName 跳过：${e.message}`);
-		}
+		await mailDb.batch([
+			mailDb.prepare("ALTER TABLE account ADD COLUMN name TEXT NOT NULL DEFAULT ''"),
+			mailDb.prepare(`UPDATE account SET name = CASE
+				WHEN instr(trim(email), '@') > 0 AND instr(substr(trim(email), instr(trim(email), '@') + 1), '@') = 0
+				THEN substr(trim(email), 1, instr(trim(email), '@') - 1)
+				ELSE '' END`)
+		]);
 	}
 };
 

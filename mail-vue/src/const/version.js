@@ -1,2 +1,4 @@
-export const APP_VERSION = 'v1.1.0';
-export const APP_VERSION_TAG = 'EpoMail v1.1.0 · Cloudflare Workers';
+import { version } from '../../package.json';
+
+export const APP_VERSION = `v${version}`;
+export const APP_VERSION_TAG = `EpoMail ${APP_VERSION} · Cloudflare Workers`;

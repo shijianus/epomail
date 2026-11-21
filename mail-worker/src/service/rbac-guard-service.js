@@ -17,7 +17,10 @@ export const PRIVILEGED_PERMS = new Set([
 	'role:set',
 	'role:delete',
 	'setting:set',
-	'all-email:delete'
+	'all-email:delete',
+	// 裁决权可封禁任意账号（含管理员目标），必须与站长绑定，禁止向下转授
+	'audit:adjudicate',
+	'audit:*'
 ]);
 
 async function loadCaller(c, callerUserId) {

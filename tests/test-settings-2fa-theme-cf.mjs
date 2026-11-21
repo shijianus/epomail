@@ -35,7 +35,7 @@ async function runE2ETests() {
       headers: { 'Content-Type': 'application/json' }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, `Login failed: ${JSON.stringify(loginData)}`);
+    assert.strictEqual(loginData.code, 200, `Login failed: ${Number(loginData?.code)}`);
     const token = loginData.data?.token;
     assert(token, 'Token must exist');
     console.log('  ✅ Logged in successfully, token retrieved');

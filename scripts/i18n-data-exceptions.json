@@ -1,0 +1,224 @@
+[
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "const HK_ZH_MAP = {\n  'Central and Western District': '中西区',\n  'Wan Chai': '湾仔区',\n  'Eastern': '东区',\n  'Southern': '南区',\n  'Yau Tsim Mong': '油尖旺区',\n  'Sham Shui Po': '深水埗区',\n  'Kowloon City': '九龙城区',\n  'Wong Tai Sin': '黄大仙区',\n  'Kwun Tong': '观塘区',\n  'Kwai Tsing': '葵青区',\n  'Tsuen Wan District': '荃湾区',\n  'Tuen Mun': '屯门区',\n  'Yuen Long District': '元朗区',\n  'North': '北区',\n  'Tai Po': '大埔区',\n  'Sha Tin': '沙田区',\n  'Sai Kung District': '西贡区',\n  'Islands District': '离岛区'\n};",
+    "occurrences": 1,
+    "reason": "香港行政区专名对照数据；HK_SUBDIVISIONS 生成持久化 value、labelZh/labelEn，getSubdivisionsByCountry 返回，profile-info 按语言选标签。不是通用 UI 文案，修改会破坏已有地址匹配。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "const CN_ZH_MAP = {\n  'Beijing': '北京市', 'Shanghai': '上海市', 'Tianjin': '天津市', 'Chongqing': '重庆市',\n  'Guangdong': '广东省', 'Zhejiang': '浙江省', 'Jiangsu': '江苏省', 'Shandong': '山东省',\n  'Fujian': '福建省', 'Sichuan': '四川省', 'Hubei': '湖北省', 'Hunan': '湖南省',\n  'Henan': '河南省', 'Hebei': '河北省', 'Shaanxi': '陕西省', 'Anhui': '安徽省',\n  'Jiangxi': '江西省', 'Liaoning': '辽宁省', 'Jilin': '吉林省', 'Heilongjiang': '黑龙江省',\n  'Guangxi': '广西壮族自治区', 'Hainan': '海南省', 'Guizhou': '贵州省', 'Yunnan': '云南省',\n  'Shanxi': '山西省', 'Inner Mongolia': '内蒙古自治区', 'Gansu': '甘肃省', 'Qinghai': '青海省',\n  'Ningxia': '宁夏回族自治区', 'Xinjiang': '新疆维吾尔自治区', 'Tibet': '西藏自治区'\n};",
+    "occurrences": 1,
+    "reason": "省级行政区专名对照数据；CN_SUBDIVISIONS 生成 value、labelZh/labelEn，profile-info 选择显示字段并用这些值匹配已有地址。仅此固定数据表，不豁免地址 UI。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "const TW_ZH_MAP = {\n  'Taipei': '台北市', 'New Taipei': '新北市', 'Taoyuan': '桃园市', 'Taichung': '台中市',\n  'Tainan': '台南市', 'Kaohsiung': '高雄市', 'Keelung': '基隆市', 'Hsinchu': '新竹市',\n  'Chiayi': '嘉义市', 'Yilan': '宜兰县', 'Hualien': '花莲县', 'Taitung': '台东县',\n  'Penghu': '澎湖县', 'Kinmen': '金门县', 'Lienchiang': '连江县', 'Miaoli': '苗栗县',\n  'Changhua': '彰化县', 'Nantou': '南投县', 'Yunlin': '云林县', 'Pingtung': '屏东县'\n};",
+    "occurrences": 1,
+    "reason": "台湾县市专名对照数据；TW_SUBDIVISIONS 派生标签和持久化地址值，非提示/按钮文案。只登记此已核验地名表，新增字段或文字须重新审核。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "const MO_PARISHES = [\n  { value: '花地玛堂区', labelZh: '花地玛堂区 (北区)', labelEn: 'Nossa Senhora de Fátima' },\n  { value: '圣安多尼堂区', labelZh: '圣安多尼堂区 (白鸽巢)', labelEn: 'Santo António' },\n  { value: '大堂区', labelZh: '大堂区 (中区/新口岸)', labelEn: 'Sé' },\n  { value: '望德堂区', labelZh: '望德堂区 (荷兰园)', labelEn: 'São Lázaro' },\n  { value: '风顺堂区', labelZh: '风顺堂区 (下环)', labelEn: 'São Lourenço' },\n  { value: '嘉模堂区', labelZh: '嘉模堂区 (氹仔)', labelEn: 'Nossa Senhora do Carmo (Taipa)' },\n  { value: '圣方济各堂区', labelZh: '圣方济各堂区 (路环)', labelEn: 'São Francisco Xavier (Coloane)' },\n  { value: '路氹城', labelZh: '路氹城', labelEn: 'Cotai' }\n];",
+    "occurrences": 1,
+    "reason": "澳门堂区中/葡专名数据，getSubdivisionsByCountry('MO') 返回；profile-info 读取 labelZh/labelEn 并持久化 value。只豁免专用地名数据，不声明其余 UI 已六语言齐备。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "labelZhHant: zh.replace('中西区', '中西區').replace('湾仔区', '灣仔區').replace('东区', '東區').replace('南区', '南區').replace('油尖旺区', '油尖旺區').replace('深水埗区', '深水埗區').replace('九龙城区', '九龍城區').replace('黄大仙区', '黃大仙區').replace('观塘区', '觀塘區').replace('葵青区', '葵青區').replace('荃湾区', '荃灣區').replace('屯门区', '屯門區').replace('元朗区', '元朗區').replace('北区', '北區').replace('大埔区', '大埔區').replace('沙田区', '沙田區').replace('西贡区', '西貢區').replace('离岛区', '離島區'),",
+    "occurrences": 1,
+    "reason": "HK_SUBDIVISIONS 的简繁专名转换表，输入与输出均为 locale 数据，非硬编码界面提示。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "labelZhHant: zh.replace('省', '省').replace('市', '市').replace('自治区', '自治區').replace('广东', '廣東').replace('浙江', '浙江').replace('江苏', '江蘇').replace('山东', '山東').replace('四川', '四川').replace('辽宁', '遼寧').replace('吉林', '吉林').replace('黑龙江', '黑龍江').replace('广西', '廣西').replace('贵州', '貴州').replace('云南', '雲南').replace('陕西', '陝西').replace('内蒙古', '內蒙古').replace('宁夏', '寧夏').replace('新疆维吾尔', '新疆維吾爾'),",
+    "occurrences": 1,
+    "reason": "CN_SUBDIVISIONS 的简繁专名转换规则，仅生成 labelZhHant；不豁免该文件其他字符串。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "labelZhHant: zh.replace('台北市', '臺北市').replace('新北市', '新北市').replace('桃园市', '桃園市').replace('台中市', '臺中市').replace('台南市', '臺南市').replace('高雄市', '高雄市').replace('基隆市', '基隆市').replace('新竹市', '新竹市').replace('嘉义市', '嘉義市').replace('宜兰县', '宜蘭縣').replace('花莲县', '花蓮縣').replace('台东县', '臺東縣').replace('澎湖县', '澎湖縣').replace('金门县', '金門縣').replace('连江县', '連江縣').replace('苗栗县', '苗栗縣').replace('彰化县', '彰化縣').replace('南投县', '南投縣').replace('云林县', '雲林縣').replace('屏东县', '屏東縣'),",
+    "occurrences": 1,
+    "reason": "TW_SUBDIVISIONS 的简繁地名转换规则，输出 labelZhHant 专用数据，不是统一显示文案。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "nameZh = '阿森松岛';",
+    "occurrences": 2,
+    "reason": "buildIsoCountries 内为保留 ISO 代码 AC 补充中文专名，两处已核验；与 nameEn/nameZhHant 并存，getCountryDisplayName 按语言选择。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "nameZh = '特里斯坦-达库尼亚';",
+    "occurrences": 2,
+    "reason": "buildIsoCountries 为保留代码 TA 补充中文地名，两处同值是已核验数据，不是 UI 缺失翻译。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "nameZhHant = '阿森松島';",
+    "occurrences": 1,
+    "reason": "AC 的正体地名数据，与 nameZh/nameEn 并存，由当前语言选择器读取。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "nameZhHant = '特里斯坦-達庫尼亞';",
+    "occurrences": 1,
+    "reason": "TA 的正体专名补充，只作为 nameZhHant locale 数据使用。"
+  },
+  {
+    "file": "utils/geo-data.js",
+    "snippet": "nameZh = nameZh\n      .replace(/中国台湾省?|台湾省/g, '台湾')\n      .replace(/^中国香港$/, '香港')\n      .replace(/^中国澳门$/, '澳门')\n      .replace(/^韩国$/, '南韩')\n      .replace(/^朝鲜$/, '北韩')\n      .replace(/^圣赫勒拿、阿森松和特里斯坦-达库尼亚$/, '圣赫勒拿');",
+    "occurrences": 1,
+    "reason": "buildIsoCountries 对 ISO 中文地名字段的专名规范化，不作用于通用 UI 提示。英文及其他语言字段分开构造。"
+  },
+  {
+    "file": "utils/phone-validator.js",
+    "snippet": "nameZh = '阿森松岛';",
+    "occurrences": 1,
+    "reason": "buildCountryOptions 为 AC 补充中文地名，与 nameEn 分字段存储，属于电话区号选项的专名数据。"
+  },
+  {
+    "file": "utils/phone-validator.js",
+    "snippet": "nameZh = '特里斯坦-达库尼亚';",
+    "occurrences": 1,
+    "reason": "buildCountryOptions 为 TA 补充中文专名；仅登记该数据赋值，不排除校验提示或其他 UI。"
+  },
+  {
+    "file": "utils/phone-validator.js",
+    "snippet": "nameZh = nameZh\n      .replace(/中国台湾省?|台湾省/g, '台湾')\n      .replace(/^中国香港$/, '香港')\n      .replace(/^中国澳门$/, '澳门')\n      .replace(/^韩国$/, '南韩')\n      .replace(/^朝鲜$/, '北韩')\n      .replace(/^圣赫勒拿、阿森松和特里斯坦-达库尼亚$/, '圣赫勒拿');",
+    "occurrences": 1,
+    "reason": "电话区号选项的 ISO 中文专名规范化，与英文专名独立处理，非校验失败 UI 提示。"
+  },
+  {
+    "file": "utils/phone-validator.js",
+    "snippet": "msgZh: '请输入电话号码',",
+    "occurrences": 1,
+    "reason": "validatePhoneNumber 保留旧接口字段；已核验 mail-vue 无 msgZh/msgEn 读取，profile-info 两处错误展示均走 getPhoneValidationMessage(errorCode -> t)。"
+  },
+  {
+    "file": "utils/phone-validator.js",
+    "snippet": "msgZh: '号码中必须包含有效数字',",
+    "occurrences": 1,
+    "reason": "NO_DIGITS 的旧接口兼容字段；实际 UI 使用 errorCode/params 选六语言词条，不展示 msgZh。"
+  },
+  {
+    "file": "utils/phone-validator.js",
+    "snippet": "const lenMsgsZh = {\n      TOO_SHORT: `电话号码长度不足（当前为 ${digitsOnly.length} 位）`,\n      TOO_LONG: `电话号码长度超出限制（当前为 ${digitsOnly.length} 位）`,\n      INVALID_LENGTH: `电话号码长度不符合该国家/地区规范（当前为 ${digitsOnly.length} 位）`,\n      INVALID_COUNTRY: '国家/地区代码无效'\n    };",
+    "occurrences": 1,
+    "reason": "长度校验的旧 msgZh 兼容数据及 errorCode 枚举判断；profile-info getPhoneValidationMessage 使用 errorCode/params+t，已无 UI 消费此中文表。"
+  },
+  {
+    "file": "utils/phone-validator.js",
+    "snippet": "msgZh: lenMsgsZh[lenError] || `${country.nameZh}电话号码长度不正确`,",
+    "occurrences": 1,
+    "reason": "旧返回协议的 msgZh 后备字段；界面仅消费 errorCode 与 params，经六语言字典生成提示。"
+  },
+  {
+    "file": "utils/phone-validator.js",
+    "snippet": "msgZh: `${country.nameZh}电话号码格式不正确`,",
+    "occurrences": 1,
+    "reason": "INVALID_FORMAT 的旧兼容字段，profile-info 校验提示已改为 errorCode -> t；不豁免新增 UI 文案。"
+  },
+  {
+    "file": "utils/phone-validator.js",
+    "snippet": "msgZh: '无效的电话号码或号段未分配',",
+    "occurrences": 1,
+    "reason": "INVALID_NUMBER 的旧接口兼容字段；mail-vue 展示调用链已不读 msgZh/msgEn，而读取六语言词条。"
+  },
+  {
+    "file": "store/ui.js",
+    "snippet": "name: '社群', icon: 'ic:outline-people-alt'",
+    "occurrences": 2,
+    "reason": "BUILTIN_LABELS 和初始 allLabels 中相同持久化标签标识，规则按 name 匹配；aside/label-setting/content 显示均走 getLabelDisplayName -> labelSocial。"
+  },
+  {
+    "file": "store/ui.js",
+    "snippet": "name: '订阅', icon: 'ic:outline-subscriptions'",
+    "occurrences": 2,
+    "reason": "两份内置标签初始数据的稳定存储名；展示通过 getLabelDisplayName -> labelSubscriptions，不能翻译持久化协议值。"
+  },
+  {
+    "file": "store/ui.js",
+    "snippet": "name: '推销', icon: 'ic:outline-local-offer'",
+    "occurrences": 2,
+    "reason": "两份内置标签持久化值，既有规则依此匹配；展示通过 getLabelDisplayName -> labelPromotions。"
+  },
+  {
+    "file": "store/ui.js",
+    "snippet": "name: '工作', icon: 'ic:outline-work-outline'",
+    "occurrences": 2,
+    "reason": "BUILTIN_LABELS/allLabels 的稳定存储名称；getLabelDisplayName -> labelWork 提供当前语言显示，不是裸 UI 字符串。"
+  },
+  {
+    "file": "layout/header/index.vue",
+    "snippet": "keywords: ['app', 'oauth', '应用', '第三方', '授权', '单点登录', 'sso', 'shijianus-blog', 'epocanvasimage', 'client']",
+    "occurrences": 1,
+    "reason": "settingsMap 的搜索别名，仅 item.keywords.some/includes 用于匹配输入；结果文字来自 item.text=t('thirdPartyAppsTitle')，不渲染关键词数组。"
+  },
+  {
+    "file": "utils/mail-translation-helper.js",
+    "snippet": "const candidateNames = [\n    toName,\n    toEmail ? toEmail.split('@')[0] : '',\n    'Epocanvas 用户',\n    'Epocanvas 用戶',\n    'User',\n    'Epocanvas User'\n  ].filter(Boolean);",
+    "occurrences": 1,
+    "reason": "旧欢迎邮件收件人名称匹配输入，用于生成 expectedHtml/expectedSubject 比对原邮件；实际输出来自 targetTpl 与真实 toName，不展示候选值。"
+  },
+  {
+    "file": "views/category-setting/index.vue",
+    "snippet": "return ['免費', '促銷', '中獎', '大獎', 'casino', 'viagra', 'lottery', 'winner', 'urgent']",
+    "occurrences": 1,
+    "reason": "getSubjectTemplates 的正体垃圾邮件匹配词，写入 blackSubject 过滤规则；其字面内容就是匹配目标，不是应随界面语言翻译的提示。"
+  },
+  {
+    "file": "views/category-setting/index.vue",
+    "snippet": "return ['免费', '促销', '中奖', '大奖', 'casino', 'viagra', 'lottery', 'winner', 'urgent']",
+    "occurrences": 1,
+    "reason": "getSubjectTemplates 的简体垃圾匹配词，持久化为 blackSubject 的实际过滤输入；只登记这组已核验数据。"
+  },
+  {
+    "file": "views/category-setting/index.vue",
+    "snippet": "return ['發票', '中獎', '貸款', '賭場', '博彩', '免費領取', '代開', '退款通知', '急聘', 'pharmacy', 'crypto', 'bitcoin', 'giveaway', 'loan']",
+    "occurrences": 1,
+    "reason": "getContentTemplates 的正体正文过滤规则词，写入 blackContent；按原文匹配邮件，翻译这些值会改变过滤行为。"
+  },
+  {
+    "file": "views/category-setting/index.vue",
+    "snippet": "return ['发票', '中奖', '贷款', '赌场', '博彩', '免费领取', '代开', '退款通知', '急聘', 'pharmacy', 'crypto', 'bitcoin', 'giveaway', 'loan']",
+    "occurrences": 1,
+    "reason": "getContentTemplates 的简体正文过滤数据，由规则编辑器保存为 blackContent，而非通用 UI 文案。"
+  },
+  {
+    "file": "views/content/index.vue",
+    "snippet": "name: '黑名单',",
+    "occurrences": 2,
+    "reason": "屏蔽发件人/新建过滤器两条路径写入同一持久化标签名；用户标签展示已统一 getLabelDisplayName，BUILTIN_LABEL_MAP 将其映射到 blacklist。"
+  },
+  {
+    "file": "views/content/index.vue",
+    "snippet": "name: '自动删除',",
+    "occurrences": 1,
+    "reason": "过滤器持久化标签标识，查询也按此原值匹配；展示通过 getLabelDisplayName -> labelAutoDelete，不可随 locale 改变存储值。"
+  },
+  {
+    "file": "views/content/index.vue",
+    "snippet": "list.push('已静音');",
+    "occurrences": 1,
+    "reason": "handleMute 写入 email.labels 的稳定状态值；getLabelDisplayName -> labelMuted 已覆盖显示，原值还用于 includes 判断。"
+  },
+  {
+    "file": "views/content/index.vue",
+    "snippet": "list.push('已归档');",
+    "occurrences": 1,
+    "reason": "handleArchive 写入 email.labels 的状态值；收件箱移动与既有邮件按此值处理，显示经 getLabelDisplayName -> archiveSuccess。"
+  },
+  {
+    "file": "views/content/index.vue",
+    "snippet": "list.push('任务待办');",
+    "occurrences": 1,
+    "reason": "handleAddToTasks 写入 email.labels 的协议标签；展示已映射为 todoTag，不能把持久化值替换为当前语言文案。"
+  },
+  {
+    "file": "views/content/index.vue",
+    "snippet": "const blockedLabels = ['推销', '订阅', 'Promotions', 'Subscriptions', 'Newsletter', '垃圾邮件', 'Spam'];",
+    "occurrences": 1,
+    "reason": "canSendReaction 中只用于 labels.some(l => blockedLabels.includes(l)) 的跨历史标签比较表，不渲染到界面。"
+  }
+]

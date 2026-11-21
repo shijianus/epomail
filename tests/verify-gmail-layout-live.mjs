@@ -1,22 +1,11 @@
+import { legacyOrigin, legacyUserEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert';
 
-const PRIMARY_BASE = 'https://mail.epocanvas.com';
-const FALLBACK_BASE = 'https://epomail.epocanvas.workers.dev';
-const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
+const USER_EMAIL = legacyUserEmail;
 const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
-async function getAvailableBase() {
-  try {
-    const res = await fetch(`${PRIMARY_BASE}/api/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: USER_EMAIL, password: USER_PWD })
-    });
-    if (res.ok) return PRIMARY_BASE;
-  } catch (e) {}
-  return FALLBACK_BASE;
-}
 
 async function run() {
   console.log('================================================================');
@@ -26,7 +15,7 @@ async function run() {
   let browser;
   let createdEmailId = null;
   let token = null;
-  const BASE = await getAvailableBase();
+  const BASE = legacyOrigin;
   console.log(`[目标环境] 使用核验基地址: ${BASE}`);
 
   try {
@@ -38,7 +27,7 @@ async function run() {
       body: JSON.stringify({ email: USER_EMAIL, password: USER_PWD })
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, `登录必须成功: ${JSON.stringify(loginData)}`);
+    assert.strictEqual(loginData.code, 200, `登录必须成功: ${Number(loginData?.code)}`);
     token = loginData.data?.token;
     assert.ok(token, '返回数据必须包含 JWT Token');
     console.log('  ✓ 登录成功，Token 获取就绪');
@@ -80,7 +69,7 @@ async function run() {
 
     // 3. 启动 Playwright 桌面端 (1440x900)
     console.log('\n[步骤 3] 启动 Playwright 桌面端 (1440x900) 真实浏览器核验...');
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'

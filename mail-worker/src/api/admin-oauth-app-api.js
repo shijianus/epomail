@@ -1,6 +1,7 @@
 import app from '../hono/hono';
 import result from '../model/result';
 import oauthAppService from '../service/oauth-app-service';
+import { readJsonObject } from '../utils/request-body.js';
 
 app.get('/admin/oauthApp/list', async (c) => {
 	const list = await oauthAppService.list(c);
@@ -8,31 +9,31 @@ app.get('/admin/oauthApp/list', async (c) => {
 });
 
 app.post('/admin/oauthApp/add', async (c) => {
-	const params = await c.req.json();
+	const params = await readJsonObject(c);
 	const created = await oauthAppService.add(c, params);
 	return c.json(result.ok(created));
 });
 
 app.put('/admin/oauthApp/update', async (c) => {
-	const params = await c.req.json();
+	const params = await readJsonObject(c);
 	const updated = await oauthAppService.update(c, params);
 	return c.json(result.ok(updated));
 });
 
 app.post('/admin/oauthApp/resetSecret', async (c) => {
-	const { id } = await c.req.json();
+	const { id } = await readJsonObject(c);
 	const resetRes = await oauthAppService.resetSecret(c, id);
 	return c.json(result.ok(resetRes));
 });
 
 app.put('/admin/oauthApp/status', async (c) => {
-	const { id, status } = await c.req.json();
+	const { id, status } = await readJsonObject(c);
 	const res = await oauthAppService.setStatus(c, id, status);
 	return c.json(result.ok(res));
 });
 
 app.delete('/admin/oauthApp/delete', async (c) => {
-	const { id } = await c.req.json();
+	const { id } = await readJsonObject(c);
 	const res = await oauthAppService.delete(c, id);
 	return c.json(result.ok(res));
 });

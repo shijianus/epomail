@@ -6,19 +6,32 @@ import { detectProvider } from '../utils/s3-signer';
 import { normalizeObjectKey } from '../utils/object-key-utils.js';
 import { buildSignedObjectUrl } from '../utils/object-token.js';
 import { safeObjectHeaders } from '../utils/object-response.js';
+import safeLogger from '../utils/safe-logger.js';
+import { decryptByoStorageConfig } from '../utils/storage-credential-crypto.js';
+import byoStorageMigrationService from './byo-storage-migration-service.js';
+
+function requireInboundRawObjectKey(key) {
+	if (typeof key !== 'string' || key !== key.trim() || !/^(?:attachments\/mail-raw-|mail-raw\/inbound\/)[a-f0-9]{64}\.enc$/.test(key)) {
+		throw new Error('Invalid inbound raw MIME object key');
+	}
+	return key;
+}
 
 const r2Service = {
 
 	/**
 	 * Resolve storage engine and config based on user BYO settings and system defaults
 	 */
-	async resolveStorage(c, userId = null) {
+	async resolveStorage(c, userId = null, { forDeletion = false, forWrite = false } = {}) {
 		// 1. Check User-Level BYO Storage
 		if (userId) {
 			try {
 				const userDb = getUserDb(c);
-				const setting = await settingService.query(c);
-				const allowUserByo = setting.userByoStorage !== 0;
+				const setting = forDeletion ? {} : await settingService.query(c);
+				// Disabling BYO must stop new writes but must never make existing
+				// objects unreadable. Reads/deletes keep resolving the historical
+				// user locator; only new writes fall back to system storage.
+				const allowUserByo = forDeletion || !forWrite || setting.userByoStorage !== 0;
 
 				if (allowUserByo) {
 					const userRow = await userDb.prepare(`
@@ -27,21 +40,27 @@ const r2Service = {
 						WHERE user_id = ?
 					`).bind(userId).first();
 
-					if (userRow && userRow.byo_storage_enabled === 1 && userRow.byo_storage_config) {
-						let cfg = userRow.byo_storage_config;
-						if (typeof cfg === 'string') {
-							try { cfg = JSON.parse(cfg); } catch (e) { cfg = null; }
-						}
-						if (cfg && cfg.bucket && cfg.endpoint && cfg.s3AccessKey && cfg.s3SecretKey) {
+					if (forDeletion && !userRow) throw new Error('Original object storage owner is unavailable');
+					if (userRow && Number(userRow.byo_storage_enabled) === 1) {
+						const decrypted = await decryptByoStorageConfig(userRow.byo_storage_config, c.env, userId);
+						if (decrypted.ok && decrypted.state !== 'empty' && decrypted.config.bucket && decrypted.config.endpoint && decrypted.config.s3AccessKey && decrypted.config.s3SecretKey) {
+							// Lazy re-encrypt plaintext or older key-domain configs on non-deletion traffic
+							if (!forDeletion && decrypted.needsMigration) {
+								await byoStorageMigrationService.lazyMigrateRow(c, {
+									user_id: userId,
+									byo_storage_config: userRow.byo_storage_config
+								}).catch(() => {});
+							}
 							return {
 								type: 'USER_S3',
-								config: cfg
+								config: decrypted.config
 							};
 						}
+						throw new Error('Original BYO storage configuration is unavailable');
 					}
 				}
 			} catch (err) {
-				console.warn('Resolve user storage error:', err.message);
+				throw err;
 			}
 		}
 
@@ -51,7 +70,8 @@ const r2Service = {
 		let setting = {};
 		try {
 			setting = await settingService.query(c);
-		} catch (_) {
+		} catch (error) {
+			if (forDeletion) throw error;
 			setting = {};
 		}
 		const { bucket, endpoint, s3AccessKey, s3SecretKey, region, forcePathStyle, customDomain } = setting;
@@ -101,7 +121,7 @@ const r2Service = {
 		if (!safeKey) {
 			throw new Error('Invalid storage object key');
 		}
-		const resolved = await this.resolveStorage(c, userId);
+		const resolved = await this.resolveStorage(c, userId, { forWrite: true });
 
 		if (resolved.type === 'KV') {
 			await kvObjService.putObj(c, safeKey, content, metadata);
@@ -130,7 +150,45 @@ const r2Service = {
 		}
 	},
 
-	async toObjResponse(c, key, userId = null) {
+	// Recovery objects are internal and must never enter the public OSS key policy.
+	async putInboundRawObj(c, key, content, metadata = {}, userId = null) {
+		const safeKey = requireInboundRawObjectKey(key);
+		const resolved = await this.resolveStorage(c, userId);
+		if (resolved.type === 'KV') {
+			await c.env.kv.put(safeKey, content, { metadata });
+		} else if (resolved.type === 'R2') {
+			await c.env.r2.put(safeKey, content, { httpMetadata: { ...metadata } });
+		} else if (resolved.type === 'S3' || resolved.type === 'USER_S3') {
+			await s3Service.putObj(c, safeKey, content, metadata, resolved.config);
+		}
+	},
+
+	async getInboundRawObj(c, key, userId = null) {
+		const safeKey = requireInboundRawObjectKey(key);
+		const resolved = await this.resolveStorage(c, userId);
+		if (resolved.type === 'KV') {
+			const value = await c.env.kv.get(safeKey, { type: 'arrayBuffer' });
+			return value === null ? null : new Response(value);
+		} else if (resolved.type === 'R2') {
+			return await c.env.r2.get(safeKey);
+		} else if (resolved.type === 'S3' || resolved.type === 'USER_S3') {
+			return await s3Service.getObj(c, safeKey, resolved.config);
+		}
+	},
+
+	async deleteInboundRawObj(c, key, userId = null) {
+		const safeKey = requireInboundRawObjectKey(key);
+		const resolved = await this.resolveStorage(c, userId, { forDeletion: true });
+		if (resolved.type === 'KV') {
+			await c.env.kv.delete(safeKey);
+		} else if (resolved.type === 'R2') {
+			await c.env.r2.delete(safeKey);
+		} else if (resolved.type === 'S3' || resolved.type === 'USER_S3') {
+			await s3Service.deleteObj(c, safeKey, resolved.config);
+		}
+	},
+
+	async toObjResponse(c, key, userId = null, filename = null) {
 		const obj = await this.getObj(c, key, userId);
 		if (!obj) {
 			return null;
@@ -146,7 +204,8 @@ const r2Service = {
 					contentType: obj.headers.get('Content-Type'),
 					contentDisposition: obj.headers.get('Content-Disposition'),
 					cacheControl: obj.headers.get('Cache-Control'),
-					isPublic
+					isPublic,
+					filename
 				})
 			});
 		}
@@ -156,7 +215,8 @@ const r2Service = {
 				contentType: obj.httpMetadata?.contentType,
 				contentDisposition: obj.httpMetadata?.contentDisposition,
 				cacheControl: obj.httpMetadata?.cacheControl,
-				isPublic
+				isPublic,
+				filename
 			})
 		});
 	},
@@ -182,7 +242,7 @@ const r2Service = {
 				const directUrl = await s3Service.getPresignedDownloadUrl(c, safeKey, resolved.config, filename, 3600);
 				if (directUrl) return directUrl;
 			} catch (e) {
-				console.warn('Presigned download URL generation failed:', e.message);
+				safeLogger.warn('r2_presigned_download_url_failed', { error: e });
 			}
 		}
 
@@ -195,7 +255,7 @@ const r2Service = {
 		const keys = [...new Set(list.map(normalizeObjectKey).filter(Boolean))];
 		if (keys.length === 0) return;
 
-		const resolved = await this.resolveStorage(c, userId);
+		const resolved = await this.resolveStorage(c, userId, { forDeletion: true });
 
 		// Every backend accepts a batch; the callers rely on this to delete the
 		// object behind an attachment row. Passing an array to the old

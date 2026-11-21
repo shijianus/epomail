@@ -1,3 +1,5 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
@@ -6,13 +8,13 @@ import assert from "assert";
   console.log("=== 开始测试：邮件 AI 翻译全链路端到端审计 (503/超时/提示词/Toast/ARIA) ===");
   console.log("==========================================================================");
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 960 },
     locale: "zh-CN"
   });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   const consoleErrors = [];
   const ariaWarnings = [];
@@ -33,11 +35,11 @@ import assert from "assert";
     // 1. 登录 Admin 账号获取鉴权 Token
     console.log("\n[步骤 1] 登录 Admin 账号获取鉴权 Token...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "Admin 登录失败: " + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, "Admin 登录失败: " + Number(loginData?.code));
     const token = typeof loginData.data === "string" ? loginData.data : loginData.data?.token;
     assert.ok(token, "必须获取到有效 Token");
     console.log("  ✓ Admin 登录成功，Token 获取正常");
@@ -107,7 +109,7 @@ import assert from "assert";
     console.log("\n[步骤 3] 浏览器访问收件箱 /inbox，审计 WAI-ARIA 规范与控制台警告...");
     await context.addInitScript((t) => {
       localStorage.setItem("token", t);
-      localStorage.setItem("loginEmail", "admin@epomail.bond");
+      localStorage.setItem("loginEmail", legacyAdminEmail);
     }, token);
 
     const testPage = await context.newPage();

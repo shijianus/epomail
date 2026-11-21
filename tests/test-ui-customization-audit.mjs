@@ -1,12 +1,14 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = 'https://epomail.epocanvas.workers.dev';
+const BASE = legacyOrigin;
 
 async function runAudit() {
   console.log('🚀 Launching Playwright Audit for UI Enhancements on:', BASE);
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: 'zh-CN'
@@ -17,11 +19,11 @@ async function runAudit() {
     // 1. Login
     console.log('▶ Step 1: Logging in as admin...');
     const loginRes = await page.request.post(`${BASE}/api/login`, {
-      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, `Login failed: ${JSON.stringify(loginData)}`);
+    assert.strictEqual(loginData.code, 200, `Login failed: ${Number(loginData?.code)}`);
     const token = loginData.data?.token;
     assert(token, 'Token must exist');
 

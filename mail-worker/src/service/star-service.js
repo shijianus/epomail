@@ -1,23 +1,21 @@
 import { mailOrm as orm } from '../entity/orm';
 import { star } from '../entity/star';
-import emailService from './email-service';
+import emailService, { isOfficialEmailRow } from './email-service';
 import BizError from '../error/biz-error';
 import { and, desc, eq, lt, sql, inArray, or } from 'drizzle-orm';
 import email from '../entity/email';
 import { isDel } from '../const/entity-const';
 import attService from "./att-service";
 import settingService from './setting-service';
+import emailCryptoUtils from '../utils/email-crypto-utils';
 import { t } from '../i18n/i18n';
 
 const starService = {
 
 	async add(c, params, userId) {
 		const { emailId } = params;
-		const email = await emailService.selectById(c, emailId);
-		if (!email) {
-			throw new BizError(t('starNotExistEmail'));
-		}
-		if (email.userId !== userId) {
+		const emailRow = await emailService.selectById(c, emailId, userId);
+		if (!emailRow || emailRow.userId !== userId) {
 			throw new BizError(t('starNotExistEmail'));
 		}
 		const exist = await orm(c).select().from(star).where(
@@ -46,6 +44,9 @@ const starService = {
 		let { emailId, size, keyword } = params;
 		emailId = Number(emailId);
 		size = Number(size);
+		// SQLite treats LIMIT -1 as no limit. Clamp like every other list path.
+		if (!Number.isInteger(size) || size < 1) size = 20;
+		if (size > 50) size = 50;
 
 		if (!emailId) {
 			emailId = 9999999999;
@@ -53,6 +54,7 @@ const starService = {
 
 		const conditions = [
 			eq(star.userId, userId),
+			eq(email.userId, userId),
 			eq(email.isDel, isDel.NORMAL),
 			lt(star.emailId, emailId)
 		];
@@ -69,7 +71,7 @@ const starService = {
 			);
 		}
 
-		const list = await orm(c).select({
+		let list = await orm(c).select({
 			isStar: sql`1`.as('isStar'),
 			starId: star.starId
 			, ...email
@@ -80,15 +82,20 @@ const starService = {
 			.limit(size)
 			.all();
 
-		const emailIds = list.map(item => item.emailId);
+		if (userId && list.length > 0) {
+			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+			list = await emailCryptoUtils.decryptEmailList(list, cryptoKey);
+		}
 
-		const attsList = await attService.selectByEmailIds(c, emailIds);
+		const emailIds = list.map(item => item.emailId).filter(Boolean);
+
+		const attsList = emailIds.length > 0 ? await attService.selectByEmailIds(c, emailIds) : [];
 
 		const settingData = await settingService.query(c);
 		list.forEach(emailRow => {
 			const atts = attsList.filter(attsRow => attsRow.emailId === emailRow.emailId);
 			emailRow.attList = atts;
-			const isOfficial = emailRow.sendEmail === 'announcement@epocanvas.com' || emailRow.sendEmail === 'admin@epocanvas.com' || (emailRow.labels && emailRow.labels.includes('官方'));
+			const isOfficial = isOfficialEmailRow(emailRow);
 			if (isOfficial) {
 				emailRow.isOfficial = 1;
 				if (!emailRow.content && settingData.welcomeContent) {

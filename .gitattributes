@@ -1,0 +1,2 @@
+# Unified diff files preserve upstream tab-indented context by design.
+mail-worker/patches/*.patch whitespace=-space-before-tab,-blank-at-eol

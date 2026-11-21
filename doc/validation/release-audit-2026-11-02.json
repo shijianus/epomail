@@ -1,0 +1,149 @@
+{
+  "auditDate": "2026-11-02",
+  "scope": "Release-convergence audit; static review and isolated local checks only",
+  "baseline": {
+    "branch": "release/2026-10-31",
+    "commit": "49f8b30eaeacaab93dc00e29857fcad52c83deb4",
+    "shortCommit": "49f8b30",
+    "initialStatus": "Only the pre-existing untracked .zcode directory was reported at audit start",
+    "concurrentChangesObserved": true,
+    "qualification": "Other work changed language dictionaries, Wrangler configuration and local test helpers during the audit. Check results describe their recorded execution snapshot, not a subsequently modified working tree or a clean final release candidate. The TOML failure below was parsed directly from the frozen Git object."
+  },
+  "runtime": {
+    "os": "Windows",
+    "shell": "Git Bash",
+    "node": "v24.14.0",
+    "pnpm": "10.34.5",
+    "python": "3.14.3",
+    "wrangler": "4.90.0"
+  },
+  "checks": [
+    {
+      "command": "node scripts/i18n-symmetry.mjs",
+      "exitCode": 0,
+      "result": "Six locales symmetric in both dictionary families",
+      "vueKeysPerLocale": 3250,
+      "workerKeysPerLocale": 1950
+    },
+    {
+      "command": "node scripts/i18n-audit.mjs",
+      "exitCode": 0,
+      "duplicateKeys": 0,
+      "dictionaryDifferences": 0,
+      "missingLiteralReferences": 0,
+      "literalKeysUsed": 2280,
+      "dynamicReferencesForReview": 1
+    },
+    {
+      "command": "node scripts/i18n-hardcoded.mjs",
+      "exitCode": 0,
+      "suspiciousLines": 0,
+      "resourceFailures": 0,
+      "exceptionFailures": 0,
+      "qualification": "The script checks its defined CJK/resource scope; this is not proof of complete translation quality or every possible hardcoded string."
+    },
+    {
+      "command": "node scripts/i18n-auth-locale.mjs",
+      "exitCode": 0,
+      "keysPerLocale": 158,
+      "literalCallSites": 199,
+      "indirectReferences": 40,
+      "unusedKeyWarnings": 11,
+      "qualification": "Unused-key warnings are not confirmed missing functionality; some references are dynamic."
+    },
+    {
+      "command": "node --test tests/test-i18n-gates.mjs",
+      "exitCode": 0,
+      "tests": 33,
+      "passed": 33,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 15540.3087,
+      "isolation": "Disposable synthetic file fixtures with finally cleanup; no application database, KV or network"
+    },
+    {
+      "command": "pnpm --dir temp_login_ui run typecheck",
+      "exitCode": 0,
+      "result": "tsc --noEmit completed"
+    },
+    {
+      "command": "node scripts/secret-scan.mjs",
+      "exitCode": 0,
+      "trackedFilesReported": 1249,
+      "findings": 0,
+      "qualification": "Built-in working-tree rules only; no claim of a complete external scanner, historical credential rotation or a scan of the separate documentation repository"
+    },
+    {
+      "command": "pnpm --dir temp_login_ui exec vite build --outDir <new-audit-temp-directory>/login",
+      "exitCode": 0,
+      "vite": "6.4.5",
+      "durationSeconds": 9.07,
+      "mainJsKB": 467.62,
+      "mainJsGzipKB": 145.10,
+      "warnings": ["Vite reported that the fresh external output directory would not be emptied. Existing project output was not overwritten."]
+    },
+    {
+      "command": "pnpm --dir mail-vue exec vite build --mode release --outDir <new-audit-temp-directory>/web",
+      "exitCode": 0,
+      "vite": "7.3.7",
+      "durationSeconds": 31.87,
+      "largestJsChunkKB": 1443.28,
+      "largestJsChunkGzipKB": 478.60,
+      "qualification": "Direct isolated Vite build using installed dependencies; did not execute the production install/build hook or replace mail-worker/dist"
+    },
+    {
+      "command": "WRANGLER_SEND_METRICS=false pnpm --dir mail-worker exec wrangler deploy --dry-run --config wrangler-dev.toml --assets <new-audit-temp-directory>/web --outdir <new-audit-temp-directory>/worker",
+      "exitCode": 0,
+      "assetsRead": 439,
+      "bundleKiB": 5627.03,
+      "bundleGzipKiB": 1173.73,
+      "deployed": false,
+      "qualification": "Development-config bundle/assets validation only; not validation of production resources, production build hooks, staging or external providers"
+    },
+    {
+      "method": "Python tomllib.loads over git show 49f8b30:<tracked Wrangler TOML path>",
+      "result": "FAIL",
+      "failedFile": "mail-worker/wrangler-vitest.toml",
+      "error": "Expected newline or end of document after a statement (at line 25, column 34)",
+      "otherTrackedConfigsParsed": [
+        "mail-worker/wrangler-action.toml",
+        "mail-worker/wrangler-dev.toml",
+        "mail-worker/wrangler-test.toml",
+        "mail-worker/wrangler.toml"
+      ],
+      "workingTreeCorrectionObserved": "At the first comparison, the concurrently edited wrangler-vitest.toml parsed successfully. It was not committed to the audited baseline and was not treated as release acceptance."
+    },
+    {
+      "command": "git cat-file -e 8e42637b3b9ecf4290e4a2bd7edc2d213e4af3cb^{commit}",
+      "result": "FAIL",
+      "qualification": "The commit referenced at CHECKLIST.log:2 did not resolve in the local object database. This establishes a local traceability gap, not that the recorded tests were fabricated."
+    }
+  ],
+  "notExecuted": [
+    "Full Worker application test suite",
+    "Application full-stack smoke and browser regression",
+    "Security vulnerability reproduction or trigger/exploitability tests",
+    "Capacity or external-provider load tests",
+    "Staging or production deployment",
+    "Real OAuth, external mail, R2/S3/B2 or Telegram integration acceptance",
+    "Cloud backup restore or Worker rollback",
+    "Dependency installation or online dependency audit",
+    "Separate EpomailDocs build or content modifications"
+  ],
+  "historicalClaimsNotRerun": {
+    "source": "Baseline commit message and CHECKLIST.log:10-20",
+    "workerAssertions": 494,
+    "focusedMailAssertions": 172,
+    "fullstackSmoke": "13/13",
+    "browserE2E": "11/11",
+    "qualification": "Historical recorded results only. They are not this audit's newly executed results and require a reproducible, committed candidate before release."
+  },
+  "documentationRepository": {
+    "referenceCommit": "29fb2e8fd9220f879f099225957907d71bbf1c13",
+    "separateRepository": true,
+    "workingTreeDirty": true,
+    "manifestDocumentsWorkingTreeDirty": true,
+    "qualification": "Cross-repository functional/version consistency was inspected; local documentation was not assumed to be deployed."
+  },
+  "releaseAssessment": "NO-GO for public release on the audited baseline; complete the bounded corrective and acceptance work described in the report without removing required functions."
+}

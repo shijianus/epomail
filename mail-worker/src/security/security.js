@@ -1,13 +1,12 @@
 import BizError from '../error/biz-error';
 import constant from '../const/constant';
-import jwtUtils from '../utils/jwt-utils';
-import KvConst from '../const/kv-const';
 import dayjs from 'dayjs';
 import userService from '../service/user-service';
-import permService from '../service/perm-service';
 import { t } from '../i18n/i18n'
 import app from '../hono/hono';
 import { isAdminUser } from '../utils/admin-utils';
+import { authVersionOf } from '../utils/one-time-credential.js';
+import { refreshSessionAuthInfo, readVerifiedBearerSession, revokeAllUserSessions } from '../utils/session-auth-store.js';
 
 const exclude = [
 	'/login',
@@ -31,7 +30,6 @@ const requirePerms = [
 	'/account/list',
 	'/account/delete',
 	'/account/add',
-	'/my/delete',
 	'/analysis/echarts',
 	'/role/add',
 	'/role/list',
@@ -43,6 +41,8 @@ const requirePerms = [
 	'/allEmail/delete',
 	'/allEmail/batchDelete',
 	'/allEmail/latest',
+	'/allEmail/outbound/unknown',
+	'/allEmail/outbound/resolve',
 	'/setting/setBackground',
 	'/setting/deleteBackground',
 	'/setting/set',
@@ -83,12 +83,22 @@ const requirePerms = [
 	'/setting/storage/scan',
 	'/setting/storage/cleanup',
 	'/setting/storage/orphans/cleanup',
+	'/setting/security/encryption-status',
+	'/setting/security/email-key/migrate',
+	'/setting/security/email-key/rollback',
+	'/setting/security/byo-storage/migrate',
+	'/setting/security/byo-storage/rollback',
+	'/setting/security/oauth-apps/migrate',
 	'/oauth/verify',
+	'/my/delete',
 	'/audit/list',
 	'/audit/action',
 	'/audit/adjudicate',
 	'/audit/purge',
-	'/audit/circuit-breaker'
+	'/audit/circuit-breaker',
+	'/audit/outbox/list',
+	'/audit/outbox/retry',
+	'/audit/outbox/process'
 ];
 
 const premKey = {
@@ -109,17 +119,22 @@ const premKey = {
 	'user:set-status': ['/user/setStatus', '/user/restore', '/user/resetTotp'],
 	'user:set-type': ['/user/setType'],
 	'user:delete': ['/user/delete','/user/deleteAccount', '/user/purgeEmails'],
-	'all-email:query': ['/allEmail/list','/allEmail/latest'],
-	'all-email:delete': ['/allEmail/delete','/allEmail/batchDelete'],
-	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig', '/audit/list', '/audit/circuit-breaker'],
+	'all-email:query': ['/allEmail/list','/allEmail/latest','/allEmail/outbound/unknown'],
+	'all-email:delete': ['/allEmail/delete','/allEmail/batchDelete','/allEmail/outbound/resolve'],
+	'setting:query': ['/setting/query', '/admin/oauthApp/list', '/setting/db/status', '/setting/globalEmailConfig', '/setting/security/encryption-status', '/audit/list', '/audit/circuit-breaker', '/audit/outbox/list'],
 	'setting:set': [
 		'/setting/set', '/setting/setBackground','/setting/deleteBackground','/setting/setBlacklist',
 		'/admin/oauthApp/add', '/admin/oauthApp/update', '/admin/oauthApp/resetSecret', '/admin/oauthApp/status', '/admin/oauthApp/delete',
 		'/setting/sendWelcomeEmail', '/setting/sendGlobalEmail', '/setting/globalEmailConfig',
 		'/setting/ai/test', '/setting/ai/models', '/setting/s3/test', '/setting/db/test', '/setting/storage/scan', '/setting/storage/cleanup', '/setting/storage/orphans/cleanup',
+		'/setting/security/email-key/migrate', '/setting/security/email-key/rollback',
+		'/setting/security/byo-storage/migrate', '/setting/security/byo-storage/rollback',
+		'/setting/security/oauth-apps/migrate',
 		'/oauth/verify',
-		'/audit/action', '/audit/adjudicate', '/audit/purge', '/audit/circuit-breaker'
+		'/audit/action', '/audit/adjudicate', '/audit/purge', '/audit/circuit-breaker',
+		'/audit/outbox/list', '/audit/outbox/retry', '/audit/outbox/process'
 	],
+	'audit:Manage': ['/audit/outbox/list', '/audit/outbox/retry', '/audit/outbox/process'],
 	'analysis:query': ['/analysis/echarts'],
 	'reg-key:add': ['/regKey/add'],
 	'reg-key:query': ['/regKey/list','/regKey/history'],
@@ -149,17 +164,17 @@ app.use('*', async (c, next) => {
 
 	if (pathMatches(path, '/public')) {
 
-		const userPublicToken = await c.env.kv.get(KvConst.PUBLIC_KEY);
-		const publicToken = c.req.header(constant.TOKEN_HEADER);
-		if (!userPublicToken || publicToken !== userPublicToken) {
-			throw new BizError(t('publicTokenFail'), 401);
-		}
-		return await next();
+		// The legacy global bearer has no owner/session/version metadata. Disable
+		// the entire legacy API rather than let old tokens survive factor changes.
+		throw new BizError(t('publicTokenFail'), 403, 'legacy_public_api_disabled');
 	}
 
 	const jwt = c.req.header(constant.TOKEN_HEADER) || c.req.header('token');
 
-	const result = await jwtUtils.verifyToken(c, jwt);
+	const permissionKeys = requirePerms.some(prefix => pathMatches(path, prefix))
+		? Object.keys(premKey).filter(key => premKey[key].some(prefix => pathMatches(path, prefix)))
+		: null;
+	const { claims: result, session, currentUser } = await readVerifiedBearerSession(c, jwt, permissionKeys);
 
 	if (!result) {
 		throw new BizError(t('authExpired'), 401);
@@ -174,7 +189,7 @@ app.use('*', async (c, next) => {
 	if (loginEmail) {
 		c.set('loginEmail', loginEmail);
 	}
-	const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+	let authInfo = session;
 
 	if (!authInfo || !authInfo.user || !Array.isArray(authInfo.tokens)) {
 		throw new BizError(t('authExpired'), 401);
@@ -184,38 +199,31 @@ app.use('*', async (c, next) => {
 		throw new BizError(t('authExpired'), 401);
 	}
 
-	// Autonomous Device Trust Horizon: Enforce 60-day absolute session eviction cap
-	if (authInfo.maxSessionEpoch) {
-		const nowSec = Math.floor(Date.now() / 1000);
-		if (nowSec >= authInfo.maxSessionEpoch) {
-			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
-			throw new BizError(t('authExpired'), 401);
-		}
+	if (currentUser?.user_id == null || Number(currentUser.is_del) !== 0) {
+		await revokeAllUserSessions(c, userId, { ignoreKvError: true });
+		throw new BizError(t('authExpired'), 401);
 	}
 
-	if (authInfo.user.isDel === 1) {
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
-		throw new BizError(t('isDelUser'), 403);
+	if (authVersionOf(result) !== authVersionOf(currentUser)) {
+		throw new BizError(t('authExpired'), 401);
 	}
 
-	if (authInfo.user.status === 1) {
+	if (Number(currentUser.status) !== 0) {
+		await revokeAllUserSessions(c, userId, { ignoreKvError: true });
 		throw new BizError(t('isBanUser'), 403);
 	}
 
-	const permIndex = requirePerms.findIndex(item => pathMatches(path, item));
+	const currentIdentity = {
+		userId: currentUser.user_id,
+		email: currentUser.email,
+		type: currentUser.type,
+		isDel: currentUser.is_del,
+		status: currentUser.status,
+		authVersion: currentUser.auth_version
+	};
 
-	if (permIndex > -1) {
-
-		const permKeys = await permService.userPermKeys(c, authInfo.user.userId);
-
-		const userPaths = permKeyToPaths(permKeys);
-
-		const userPermIndex = userPaths.findIndex(item => pathMatches(path, item));
-
-		if (userPermIndex === -1 && !isAdminUser(c, authInfo.user)) {
-			throw new BizError(t('unauthorized'), 403);
-		}
-
+	if (permissionKeys !== null && !currentUser.allowed && !isAdminUser(c, currentIdentity)) {
+		throw new BizError(t('unauthorized'), 403);
 	}
 
 	const refreshTime = dayjs(authInfo.refreshTime).startOf('day');
@@ -223,24 +231,13 @@ app.use('*', async (c, next) => {
 
 	if (!nowTime.isSame(refreshTime)) {
 		authInfo.refreshTime = dayjs().toISOString();
-		await userService.updateUserInfo(c, authInfo.user.userId);
-		await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
+		await userService.updateUserInfo(c, currentIdentity.userId);
+		const refreshed = await refreshSessionAuthInfo(c, userId, authInfo);
+		if (refreshed?.user) authInfo = refreshed;
 	}
 
-	c.set('user', authInfo.user)
+	// A daily refresh may return an older KV replica. D1 owns identity and role.
+	c.set('user', { ...authInfo.user, ...currentIdentity })
 
 	return await next();
 });
-
-function permKeyToPaths(permKeys) {
-
-	const paths = [];
-
-	for (const key of permKeys) {
-		const routeList = premKey[key];
-		if (routeList && Array.isArray(routeList)) {
-			paths.push(...routeList);
-		}
-	}
-	return paths;
-}

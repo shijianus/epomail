@@ -1,0 +1,52 @@
+diff --git a/dist/cjs.js b/dist/cjs.js
+index 7c36cbdd06cc22c92d590be3f87a08a91ca06b40..c6a8ef81e8f586173c9c79d09ee8312c4b172869 100644
+--- a/dist/cjs.js
++++ b/dist/cjs.js
+@@ -69,11 +69,20 @@ function propertyIsOnObject(object, property) {
+ 	}
+ }
+ 
++// These keys can change an object's prototype while being assigned. Reject
++// them by name even when the target uses a null prototype or a placeholder
++// value, because those shapes bypass the original chain-based guard.
++function isUnsafeKey(key) {
++	return key === '__proto__' || key === 'constructor' || key === 'prototype'
++}
++
+ // Protects from prototype poisoning and unexpected merging up the prototype chain.
+ function propertyIsUnsafe(target, key) {
+-	return propertyIsOnObject(target, key) // Properties are safe to merge if they don't exist in the target yet,
++	return isUnsafeKey(key)
++		|| (propertyIsOnObject(target, key) // Properties are safe to merge if they don't exist in the target yet,
+ 		&& !(Object.hasOwnProperty.call(target, key) // unsafe if they exist up the prototype chain,
+ 			&& Object.propertyIsEnumerable.call(target, key)) // and also unsafe if they're nonenumerable.
++		)
+ }
+ 
+ function mergeObject(target, source, options) {
+diff --git a/index.js b/index.js
+index 77968aed5d456cccc294f60912ef381fa1e52a7b..ecab0b90b5c378af2c9ee3345bcc3bc58235f38e 100644
+--- a/index.js
++++ b/index.js
+@@ -44,11 +44,20 @@ function propertyIsOnObject(object, property) {
+ 	}
+ }
+ 
++// These keys can change an object's prototype while being assigned. Reject
++// them by name even when the target uses a null prototype or a placeholder
++// value, because those shapes bypass the original chain-based guard.
++function isUnsafeKey(key) {
++	return key === '__proto__' || key === 'constructor' || key === 'prototype'
++}
++
+ // Protects from prototype poisoning and unexpected merging up the prototype chain.
+ function propertyIsUnsafe(target, key) {
+-	return propertyIsOnObject(target, key) // Properties are safe to merge if they don't exist in the target yet,
++	return isUnsafeKey(key)
++		|| (propertyIsOnObject(target, key) // Properties are safe to merge if they don't exist in the target yet,
+ 		&& !(Object.hasOwnProperty.call(target, key) // unsafe if they exist up the prototype chain,
+ 			&& Object.propertyIsEnumerable.call(target, key)) // and also unsafe if they're nonenumerable.
++		)
+ }
+ 
+ function mergeObject(target, source, options) {

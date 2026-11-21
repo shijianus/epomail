@@ -14,7 +14,15 @@
           <Icon icon="material-symbols-light:close-rounded" width="22" height="22"/>
         </div>
       </div>
-      <div class="container">
+      <div v-if="attemptKey" class="compose-status" role="status">
+        {{ t(attemptState === 'PARTIAL' ? 'composeAttemptPartial' : 'composeAttemptPending') }}
+        <el-button size="small" :disabled="busy" @click="checkAttempt">{{ t('composeAttemptCheck') }}</el-button>
+        <el-button v-if="['PENDING', 'NOT_FOUND'].includes(attemptState)" size="small" :disabled="busy" @click="sendEmail">{{ t('composeAttemptRetry') }}</el-button>
+      </div>
+      <div v-else-if="saveState" class="compose-status" role="status">
+        {{ t(saveState === 'error' ? 'composeDraftSaveFailed' : saveState === 'saving' ? 'composeDraftSaving' : 'composeDraftSaved') }}
+      </div>
+      <div class="container" :inert="!!attemptKey || busy">
         <el-input-tag  @add-tag="addTagChange" tag-type="primary" @input="inputChange" size="default" v-model="form.receiveEmail" >
           <template #prefix>
             <div class="item-title" >{{ $t('recipient') }}</div>
@@ -94,10 +102,10 @@
 </template>
 <script setup>
 import tinyEditor from '@/components/tiny-editor/index.vue'
-import {h, nextTick, onMounted, onUnmounted, reactive, ref, toRaw, computed} from "vue";
+import {h, nextTick, onMounted, onUnmounted, reactive, ref, computed, watch} from "vue";
 import {Icon} from "@iconify/vue";
 import {useUserStore} from "@/store/user.js";
-import {emailSend} from "@/request/email.js";
+import {emailSend, emailSendStatus} from "@/request/email.js";
 import {isEmail} from "@/utils/verify-utils.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
@@ -111,11 +119,10 @@ import {useSettingStore} from "@/store/setting.js";
 import {userDraftStore} from "@/store/draft.js";
 import {useWriterStore} from "@/store/writer.js";
 import db from "@/db/db.js";
-import dayjs from "dayjs";
+import { composePayload, createDraftSession, hasDraftContent } from '@/utils/compose-draft.js';
+import { resolveTabSession, isSameTabIdentity, tabSession } from '@/utils/tab-session.js';
 import {useI18n} from "vue-i18n";
-import router from "@/router/index.js";
 import {ElMessageBox} from "element-plus";
-import {forceLogoutToLogin} from "@/utils/auth.js";
 
 defineExpose({
   open,
@@ -128,6 +135,7 @@ defineExpose({
 
 const {t} = useI18n()
 const writerStore = useWriterStore();
+writerStore.bindIdentity();
 const draftStore = userDraftStore()
 const settingStore = useSettingStore()
 const emailStore = useEmailStore();
@@ -136,19 +144,21 @@ const editor = ref({})
 const userStore = useUserStore();
 const show = ref(false);
 const percent = ref(0)
-let percentMessage = null
-let sending = false
+const busy = ref(false)
+const attemptKey = ref(null)
+const attemptState = ref('')
+const saveState = ref('')
+let session
+let owner
+let generation = 0
+let saveTick = 0
+let openingDraft = false
+let attachmentReads = 0
 const defValue = ref('')
 const contactsTabRef = ref({})
 const showContacts = ref(false)
 const mySelect = ref()
 let selectStatus = false
-const backReply = reactive({
-  receiveEmail: [],
-  subject: '',
-  content: '',
-  sendType: ''
-})
 const form = reactive({
   sendEmail: '',
   receiveEmail: [],
@@ -186,7 +196,7 @@ function deleteContact() {
   }).then(() => {
     const contactList = contactsTabRef.value.getSelectionRows().map(item => item.email);
     form.receiveEmail = form.receiveEmail.filter(item => !contactList.includes(item));
-    writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.filter(item => !contactList.includes(item));
+    writerStore.removeRecipientRecords(contactList);
   })
 }
 
@@ -260,8 +270,13 @@ function clearContent() {
     cancelButtonText: t('cancel'),
     type: 'warning'
   }).then(() => {
-    resetForm()
-  })
+    form.receiveEmail = []
+    form.subject = form.content = form.text = form.sendType = ''
+    form.emailId = 0
+    form.attachments = []
+    defValue.value = ''
+    editor.value.clearEditor()
+  }).catch(() => {})
 
 }
 
@@ -273,23 +288,89 @@ function chooseFile() {
   const doc = document.createElement("input")
   doc.setAttribute("type", "file")
   doc.multiple = true;
-  doc.click()
+  const target = session
   doc.onchange = async (e) => {
 
     const fileList = e.target.files;
 
-    for (const file of fileList) {
-
-      const size = file.size
-      const filename = file.name
-      const contentType = file.type
-
-      const content = await fileToBase64(file)
-      form.attachments.push({content, filename, size, contentType})
-
+    attachmentReads++
+    try {
+      for (const file of fileList) {
+        const content = await fileToBase64(file)
+        if (!isCurrent(target) || !show.value || busy.value || attemptKey.value) return
+        form.attachments.push({ content, filename: file.name, size: file.size, contentType: file.type })
+      }
+    } catch {
+      ElMessage.error(t('composeDraftSaveFailed'))
+    } finally {
+      if (isCurrent(target)) attachmentReads--
     }
-
   }
+  doc.click()
+}
+
+function isCurrent(target) {
+  return target && target === session && target.database === db.value && isSameTabIdentity(owner, resolveTabSession())
+}
+
+async function saveDraft() {
+  const target = session
+  if (!isCurrent(target)) throw new Error('draft_identity_changed')
+  if (attemptKey.value) return
+  const body = composePayload(form)
+  const tick = ++saveTick
+  saveState.value = 'saving'
+  try {
+    await target.persist(body)
+    if (isCurrent(target) && tick === saveTick) saveState.value = hasDraftContent(body) ? 'saved' : ''
+  } catch (error) {
+    if (isCurrent(target)) saveState.value = 'error'
+    throw error
+  }
+}
+
+watch(form, () => {
+  if (show.value && !openingDraft && !busy.value && !attemptKey.value) saveDraft().catch(() => {})
+}, { deep: true })
+
+function completeSend(target, outcome) {
+  if (!isCurrent(target)) return
+  const title = outcome === 'PARTIALLY_BOUNCED' ? t('composeAttemptMixed') :
+    outcome === 'BOUNCED' ? t('bounced') : t('sendSuccessMsg')
+  ElNotification({ title, message: form.subject, type: outcome ? 'warning' : 'success', position: 'bottom-right' })
+  writerStore.addRecipientRecords(form.receiveEmail)
+  emailStore.sendScroll?.refreshList?.()
+  userStore.refreshUserInfo()
+  show.value = false
+  draftStore.refreshList++
+  resetForm()
+}
+
+async function readAttempt(target, key) {
+  const result = await emailSendStatus(form.accountId, key)
+  if (!isCurrent(target)) return
+  if (result?.state === 'ACCEPTED') {
+    await target.finish(key, true)
+    completeSend(target, result.deliveryOutcome)
+  } else if (result?.state === 'FAILED') {
+    await target.finish(key, false)
+    if (!isCurrent(target)) return
+    attemptKey.value = null
+    attemptState.value = ''
+    saveState.value = 'saved'
+    ElMessage.warning(t('sendFailMsg'))
+  } else {
+    attemptState.value = result?.state || 'UNKNOWN'
+  }
+}
+
+async function checkAttempt() {
+  if (busy.value || !attemptKey.value || !isCurrent(session)) return
+  busy.value = true
+  const target = session
+  try { await readAttempt(target, attemptKey.value) }
+  catch { if (isCurrent(target)) ElMessage.warning(t('composeAttemptCheckFailed')) }
+  finally { if (target === session) busy.value = false }
 }
 
 async function sendEmail() {
@@ -334,83 +415,63 @@ async function sendEmail() {
     return
   }
 
-  if (sending) {
-    ElMessage({
-      message: t('sendingErrorMsg'),
-      type: 'error',
-      plain: true,
-    })
-    return
+  if (busy.value || !isCurrent(session)) return
+  if (attachmentReads) { ElMessage.warning(t('composeDraftSaving')); return }
+  const retrying = Boolean(attemptKey.value)
+  if (retrying && !['NOT_FOUND', 'PENDING'].includes(attemptState.value)) return
+  const target = session
+  busy.value = true
+  const progressMessage = ElMessage({ message: () => h(sendPercent, {value: percent.value, desc: t('sending')}),
+    plain: true, duration: 0, customClass: 'message-bottom' })
+  let prepared
+  try {
+    prepared = await target.persist(composePayload(form), true)
+    if (!isCurrent(target)) return
+    attemptKey.value = prepared.key
+    attemptState.value = ''
+    const emails = await emailSend(prepared.body, e => {
+      if (isCurrent(target) && e.total) percent.value = Math.round(e.loaded * 98 / e.total)
+    }, { idempotencyKey: prepared.key })
+    await target.finish(prepared.key, true)
+    completeSend(target, emails?.[0]?.deliveryOutcome)
+  } catch (error) {
+    if (!isCurrent(target)) return
+    if (!prepared) { saveState.value = 'error'; ElMessage.error(t('composeDraftSaveFailed')); return }
+    const failure = error.response?.data || error
+    const messages = { outbound_disabled: 'composeOutboundDisabled', outbound_recipient_blocked: 'composeRecipientNotAllowed' }
+    if (messages[failure.errorCode]) ElMessage.warning(t(messages[failure.errorCode]))
+    // A lost success response must never create another attempt. Only a confirmed
+    // terminal failure or an explicit rejection before a task existed unlocks editing.
+    try {
+      await readAttempt(target, prepared.key)
+      const status = error.response?.status ?? failure.code
+      if (!retrying && isCurrent(target) && attemptState.value === 'NOT_FOUND' && status >= 400 && status < 500 &&
+          status !== 408 && status !== 425 && status !== 409) {
+        await target.finish(prepared.key, false)
+        if (isCurrent(target)) {
+          attemptKey.value = null
+          attemptState.value = ''
+          saveState.value = 'saved'
+          if (!messages[failure.errorCode]) ElMessage.error(failure.message || t('sendFailMsg'))
+        }
+      }
+    } catch { if (isCurrent(target)) ElMessage.warning(t('composeAttemptCheckFailed')) }
+  } finally {
+    progressMessage.close()
+    if (target === session) { busy.value = false; percent.value = 0 }
   }
-
-  percentMessage = ElMessage({
-    message: () => h(sendPercent, {value: percent.value, desc: t('sending')}),
-    plain: true,
-    duration: 0,
-    customClass: 'message-bottom'
-  })
-
-  sending = true
-
-  show.value = false
-
-  emailSend(form, (e) => {
-    percent.value = Math.round((e.loaded * 98) / e.total)
-  }).then(emailList => {
-    const email = emailList[0]
-    emailList.forEach(item => {
-      emailStore.sendScroll?.addItem(item)
-    })
-
-    ElNotification({
-      title: t('sendSuccessMsg'),
-      type: "success",
-      message: h('span', {style: 'color: teal'}, email.subject),
-      position: 'bottom-right'
-    })
-
-    userStore.refreshUserInfo();
-
-    addRecipientRecord();
-
-    if (form.draftId) {
-      form.subject = ''
-      form.content = ''
-      form.receiveEmail = []
-      draftStore.setDraft = {...toRaw(form)}
-    }
-
-    show.value = false
-    resetForm();
-  }).catch((e) => {
-    ElNotification({
-      title: t('sendFailMsg'),
-      type: e.code === 403 ? 'warning' : 'error',
-      message: h('span', {style: 'color: teal'}, e.message),
-      position: 'bottom-right'
-    })
-    if (e.code === 401) {
-      forceLogoutToLogin(e.message);
-    }
-    show.value = true
-    addRecipientRecord();
-  }).finally(() => {
-    percentMessage.close()
-    percent.value = 0
-    sending = false
-  })
-}
-
-function addRecipientRecord() {
-  writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.filter(
-      email => !form.receiveEmail.includes(email)
-  );
-
-  writerStore.sendRecipientRecord.unshift(...form.receiveEmail);
-  writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.slice(0, 500);
 }
 
 function resetForm() {
+  generation++
+  session = null
+  owner = null
+  busy.value = false
+  attemptKey.value = null
+  attemptState.value = saveState.value = ''
+  attachmentReads = 0
+  defValue.value = ''
+  form.text = ''
   form.receiveEmail = []
   form.subject = ''
   form.content = ''
@@ -419,14 +480,11 @@ function resetForm() {
   form.sendType = ''
   form.emailId = 0
   form.draftId = null
-  backReply.content = ''
-  backReply.subject = ''
-  backReply.receiveEmail = []
-  backReply.sendType = ''
-  editor.value.clearEditor()
+  editor.value?.clearEditor?.()
 }
 
 function change(content, text) {
+  if (busy.value || attemptKey.value || !show.value) return
   form.content = content;
   form.text = text
 }
@@ -436,7 +494,9 @@ function focusChange() {
 }
 
 function openForward(email) {
+  if (show.value) return
   resetForm();
+  const frame = generation
 
   email.subject = email.subject || ''
 
@@ -448,24 +508,22 @@ function openForward(email) {
   setTimeout(async () => {
     const forwarded = await formatImageAsync(email.content) ||
       `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`
+    if (generation !== frame || show.value) return
     defValue.value = `
       ${forwarded}
     `
+    form.content = defValue.value
     open()
 
-    nextTick(() => {
-      backReply.content = editor.value.getContent()
-      backReply.subject = form.subject
-      backReply.receiveEmail = form.receiveEmail
-      backReply.sendType = form.sendType
-    })
 
   });
 }
 
 function openReply(email) {
 
+  if (show.value) return
   resetForm();
+  const frame = generation
 
   email.subject = email.subject || ''
 
@@ -483,6 +541,7 @@ function openReply(email) {
   setTimeout(async () => {
     const quoted = await formatImageAsync(email.content) ||
       `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`
+    if (generation !== frame || show.value) return
     defValue.value = `
     <div></div>
     <div>
@@ -494,20 +553,17 @@ function openReply(email) {
           ${quoted}
       </article>
     </blockquote>`
+    form.content = defValue.value
     open()
 
-    nextTick(() => {
-      backReply.content = editor.value.getContent()
-      backReply.subject = form.subject
-      backReply.receiveEmail = form.receiveEmail
-      backReply.sendType = form.sendType
-    })
   })
 
 }
 
 function openReplyAll(email) {
+  if (show.value) return
   resetForm();
+  const frame = generation
 
   email.subject = email.subject || '';
 
@@ -554,6 +610,7 @@ function openReplyAll(email) {
   setTimeout(async () => {
     const quoted = await formatImageAsync(email.content) ||
       `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`
+    if (generation !== frame || show.value) return
     defValue.value = `
     <div></div>
     <div>
@@ -565,14 +622,9 @@ function openReplyAll(email) {
           ${quoted}
       </article>
     </blockquote>`;
+    form.content = defValue.value
     open();
 
-    nextTick(() => {
-      backReply.content = editor.value.getContent();
-      backReply.subject = form.subject;
-      backReply.receiveEmail = form.receiveEmail;
-      backReply.sendType = form.sendType;
-    });
   });
 }
 
@@ -602,6 +654,10 @@ async function formatImageAsync(content) {
 }
 
 function open() {
+  if (show.value) { editor.value.focus(); return }
+  generation++
+  owner = resolveTabSession()
+  session = createDraftSession(db.value)
   const activeAcc = accountStore.currentAccount?.email ? accountStore.currentAccount : userStore.user?.account;
   if (activeAcc && activeAcc.email) {
     form.sendEmail = activeAcc.email;
@@ -617,18 +673,32 @@ function open() {
 }
 
 function openWithRecipient(email) {
+  if (show.value) return
   resetForm();
   form.receiveEmail.push(email);
   open();
 }
 
 function openDraft(draft) {
-  Object.assign(form, {...draft})
-  defValue.value = ''
-  setTimeout(() => defValue.value = form.content)
-  show.value = true;
-  editor.value.focus()
+  if (show.value) return
+  resetForm()
+  owner = resolveTabSession()
+  session = createDraftSession(db.value, draft)
+  openingDraft = true
+  Object.assign(form, composePayload(draft))
+  nextTick(() => { openingDraft = false })
+  form.draftId = draft.draftId
+  attemptKey.value = draft.attemptKey || null
+  defValue.value = form.content
+  show.value = true
+  if (attemptKey.value) checkAttempt()
+  else editor.value.focus()
 }
+
+watch(db, () => {
+  show.value = false
+  resetForm()
+})
 
 const handleKeyDown = (event) => {
   if (event.key === 'Escape') {
@@ -636,73 +706,51 @@ const handleKeyDown = (event) => {
   }
 };
 
+// Rendering a different tab identity must also discard the previous UI snapshot.
+const unsubscribe = tabSession.subscribe(() => {
+  if (owner && !isSameTabIdentity(owner, resolveTabSession())) {
+    show.value = false
+    resetForm()
+  }
+})
+const warnUnsaved = event => {
+  if (show.value && !attemptKey.value && (saveState.value === 'saving' || saveState.value === 'error' || attachmentReads)) {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
 onMounted(() => {
+  window.addEventListener('beforeunload', warnUnsaved)
   window.addEventListener('keydown', handleKeyDown);
 });
 
 onUnmounted(() => {
+  unsubscribe()
+  window.removeEventListener('beforeunload', warnUnsaved)
   window.removeEventListener('keydown', handleKeyDown);
 });
 
-function close() {
-
-  if (selectStatus) openSelect();
-
-  if (!form.content) {
-    form.content = editor.value.getContent();
-  }
-
-  if (form.draftId) {
-    draftStore.setDraft = {...toRaw(form)}
+async function close() {
+  if (!show.value || busy.value) return
+  if (attachmentReads) { ElMessage.warning(t('composeDraftSaving')); return }
+  const target = session
+  if (!isCurrent(target)) {
     show.value = false
     resetForm()
-    return;
+    return
   }
-
-  if (!(form.content || form.subject || form.receiveEmail.length > 0)) {
+  busy.value = true
+  try {
+    if (!attemptKey.value) await saveDraft()
+    if (!isCurrent(target)) return
     show.value = false
-    resetForm()
-    return;
-  }
-
-  if (backReply.sendType === 'reply' || backReply.sendType === 'forward') {
-    let subjectFlag = form.subject === backReply.subject
-    let contentFlag = editor.value.getContent() === backReply.content
-    let receiveFlag = form.receiveEmail.length === 1 && form.receiveEmail[0] === backReply.receiveEmail[0]
-    if (backReply.sendType === 'forward' && form.receiveEmail.length === 0) {
-      receiveFlag = true;
-    }
-    if (subjectFlag && contentFlag && receiveFlag) {
-      resetForm();
-      close()
-      return;
-    }
-  }
-
-  ElMessageBox.confirm(t('saveDraftConfirm'), {
-    confirmButtonText: t('confirm'),
-    cancelButtonText: t('cancel'),
-    type: 'warning',
-    distinguishCancelAndClose: true
-  }).then(async () => {
-    const formData = {...toRaw(form)};
-    delete formData.draftId
-    delete formData.attachments
-    formData.createTime = dayjs().utc().format('YYYY-MM-DD HH:mm:ss');
-    const draftId = await db.value.draft.add({...formData})
-    db.value.att.add({draftId, attachments: toRaw(form.attachments)})
     draftStore.refreshList++
-    show.value = false
-    await nextTick(() => {
-      resetForm()
-    })
-  }).catch((action) => {
-    if (action === 'cancel') {
-      show.value = false
-      resetForm()
-    }
-  })
-
+    resetForm()
+  } catch {
+    ElMessage.error(t('composeDraftSaveFailed'))
+  } finally {
+    if (target === session) busy.value = false
+  }
 }
 
 </script>
@@ -719,6 +767,7 @@ function close() {
 }
 </style>
 <style scoped lang="scss">
+.compose-status { padding: 0.5rem 1rem; font-size: 0.9rem; }
 .send {
   position: fixed;
   top: 0;
@@ -738,7 +787,7 @@ function close() {
     padding: 15px;
     border-radius: 8px;
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto minmax(0, 1fr);
     overflow: hidden;
     @media (max-width: 1024px) {
       width: 100%;
@@ -791,6 +840,8 @@ function close() {
     }
 
     .container {
+      grid-row: 3;
+      min-height: 0;
       height: 100%;
       display: grid;
       grid-template-rows: auto auto 1fr auto;

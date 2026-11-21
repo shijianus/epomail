@@ -3,7 +3,20 @@ import { settingConst } from '../const/entity-const';
 import settingService from './setting-service';
 import kvConst from '../const/kv-const';
 import dayjs from 'dayjs';
-import { isSafePublicUrl } from '../utils/url-utils';
+import { isSafePublicUrl, assertSafePublicUrl } from '../utils/url-utils';
+import BizError from '../error/biz-error.js';
+import { isAdminUser } from '../utils/admin-utils.js';
+import { reserveAiRequest } from '../utils/ai-budget.js';
+import { t } from '../i18n/i18n.js';
+import { escapeHtml, sanitizeSharedEmailHtml } from '../utils/safe-email-html.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import safeLogger from '../utils/safe-logger.js';
+import {
+	getContentProcessingConfig,
+	requireTranslationConfirmation,
+	isVerificationCodeAllowed,
+	isValidNoticeUrl
+} from './content-processing-service.js';
 
 
 const aiService = {
@@ -38,6 +51,13 @@ const aiService = {
 	},
 
 	async extractCode(c, email, options = {}) {
+		const processingConfig = await getContentProcessingConfig(c);
+		if (
+			!isVerificationCodeAllowed(processingConfig, options.userProfile) ||
+			!isValidNoticeUrl(processingConfig.noticeUrl, c?.env || {})
+		) {
+			return '';
+		}
 		if (!this.shouldExtractCode(options.aiCode, options.aiCodeFilter, email)) {
 			return '';
 		}
@@ -192,21 +212,22 @@ const aiService = {
 		const rawBlocks = [];
 		let clean = html || '';
 
-		// 1. 保护内嵌样式表 <style>、脚本 <script>、矢量图 <svg>、代码块 <code>/<pre>、视频 <video>、音频 <audio>、画布 <canvas> 与嵌入帧 <iframe>
-		clean = clean.replace(/<(style|script|svg|code|pre|video|audio|canvas|iframe)\b[^>]*>[\s\S]*?<\/\1>/gi, (match) => {
+		// 1. 彻底清除不可信可执行元素与框架标签，严禁通过 rawBlocks 重新进入
+		clean = clean.replace(/<(script|iframe|embed|object|template|svg|math|base|meta|form|input|button)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
+		clean = clean.replace(/<(script|iframe|embed|object|template|svg|math|base|meta|form|input|button|source|track|canvas)\b[^>]*\/?>/gi, '');
+
+		// 彻底剥离所有行内事件处理器与伪协议
+		clean = clean.replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+		clean = clean.replace(/\s(href|src|action|data)\s*=\s*(["'])\s*(?:javascript|data:text\/html|vbscript):[\s\S]*?\2/gi, ' $1="#"');
+
+		// 2. 仅保护纯展示的代码块
+		clean = clean.replace(/<(code|pre)\b[^>]*>[\s\S]*?<\/\1>/gi, (match) => {
 			const id = `<!--__EPO_RAW_${rawBlocks.length}__-->`;
 			rawBlocks.push({ id, match });
 			return id;
 		});
 
-		// 保护自闭合或无配对闭合标签的 <video>、<audio>、<source>、<track>、<iframe>、<embed>、<canvas>
-		clean = clean.replace(/<(video|audio|source|track|iframe|embed|canvas)\b[^>]*\/?>/gi, (match) => {
-			const id = `<!--__EPO_RAW_${rawBlocks.length}__-->`;
-			rawBlocks.push({ id, match });
-			return id;
-		});
-
-		// 2. 保护 Base64 图片大文本，避免消耗巨大 token 且防止模型截断
+		// 3. 保护 Base64 图片大文本，避免消耗巨大 token 且防止模型截断
 		clean = clean.replace(/data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=]+/g, (match) => {
 			const id = `<!--__EPO_RAW_${rawBlocks.length}__-->`;
 			rawBlocks.push({ id, match });
@@ -356,7 +377,7 @@ const aiService = {
 						// 2. 若为远程 URL 且配置了外部 LLM，尝试中继 Vision 接口
 						try {
 							const endpoint = apiUrl.endsWith('/chat/completions') ? apiUrl : `${apiUrl.replace(/\/+$/, '')}/v1/chat/completions`;
-							const vRes = await fetch(endpoint, {
+							const vRes = await safeFetch(endpoint, {
 								method: 'POST',
 								headers: {
 									'Content-Type': 'application/json',
@@ -467,13 +488,26 @@ const aiService = {
 	parseChunkTranslations(rawText) {
 		const map = {};
 		if (!rawText || typeof rawText !== 'string') return map;
+		const lines = rawText.split(/\r?\n/);
+		for (const line of lines) {
+			const m = line.match(/^\s*\[(\d+)\]\s*(?:[:：]|Translated(?:\s+Text)?\s*[:：])?\s*(.*)$/i);
+			if (m) {
+				const id = parseInt(m[1], 10);
+				const text = m[2].trim();
+				if (text && !text.startsWith('严格规则') && !text.startsWith('STRICT') && !text.startsWith('Translate')) {
+					map[id] = text;
+				}
+			}
+		}
 		const regex = /\[(\d+)\]\s*[:：]?\s*([^\[\n\r]+)/g;
-		let m;
-		while ((m = regex.exec(rawText)) !== null) {
-			const id = parseInt(m[1], 10);
-			const text = m[2].trim().replace(/^[:：]\s*/, '');
-			if (text && !text.startsWith('严格规则') && !text.startsWith('STRICT') && !text.startsWith('Translate')) {
-				map[id] = text;
+		let m2;
+		while ((m2 = regex.exec(rawText)) !== null) {
+			const id = parseInt(m2[1], 10);
+			if (map[id] === undefined) {
+				const text = m2[2].trim().replace(/^[:：]\s*/, '');
+				if (text && !text.startsWith('严格规则') && !text.startsWith('STRICT') && !text.startsWith('Translate')) {
+					map[id] = text;
+				}
 			}
 		}
 		return map;
@@ -504,11 +538,6 @@ const aiService = {
 			try {
 				const chatEndpoints = this.getCandidateChatEndpoints(apiUrl);
 				const candidateModels = Array.from(new Set([model, ...poolModels].filter(Boolean)));
-				if (apiUrl && apiUrl.includes('121628.xyz')) {
-					for (const m of ['gemma-26b-a4b-it-free', 'deepseek-v4-flash-free', 'glm-5.2-free', 'llama-3.1-8b-free']) {
-						if (!candidateModels.includes(m)) candidateModels.push(m);
-					}
-				}
 				if (candidateModels.length === 0) candidateModels.push('gpt-4o-mini');
 
 				let activeEndpoint = preferredEndpoint;
@@ -542,7 +571,7 @@ const aiService = {
 									max_tokens: maxTokens
 								};
 
-							const candidateResp = await fetch(endpoint, {
+							const candidateResp = await safeFetch(endpoint, {
 								method: 'POST',
 								headers: {
 									'Content-Type': 'application/json',
@@ -585,8 +614,9 @@ const aiService = {
 			} catch (_) {}
 		}
 
-		// 2. Cloudflare Workers AI 兜底
-		if (c.env?.ai && (Date.now() - startTime < overallDeadlineMs)) {
+		// Workers AI is the default provider only when no external text provider
+		// was configured; failure of a configured endpoint does not change custody.
+		if (!apiKey && c.env?.ai && (Date.now() - startTime < overallDeadlineMs)) {
 			const cfModels = [
 				c.env.ai_model,
 				'@cf/meta/llama-3.1-8b-instruct',
@@ -616,44 +646,19 @@ const aiService = {
 			}
 		}
 
-		// 3. 公共 API 兜底 (MyMemory & Google)
-		if (Date.now() - startTime < overallDeadlineMs) {
-			const sampleSnippet = prompt.slice(0, 1000);
-			const targetParam = targetLang === 'zh-Hant' ? 'zh-TW' : (targetLang || 'zh');
-			const srcParam = srcLang === 'zh-Hant' ? 'zh-TW' : (srcLang || 'en');
-			try {
-				const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sampleSnippet)}&langpair=${encodeURIComponent(srcParam)}|${encodeURIComponent(targetParam)}`;
-				const mmRes = await fetch(mmUrl, { signal: AbortSignal.timeout(4000) }).catch(() => null);
-				if (mmRes && mmRes.ok) {
-					const mmData = await mmRes.json().catch(() => null);
-					const transText = mmData?.responseData?.translatedText;
-					if (transText && typeof transText === 'string' && transText.trim() && !transText.includes('IS AN INVALID SOURCE LANGUAGE')) {
-						return { text: transText.trim(), model: 'mymemory-translate', tokens: 0, endpoint: null };
-					}
-				}
-			} catch (_) {}
-
-			try {
-				const gtUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetParam)}&dt=t&q=${encodeURIComponent(sampleSnippet)}`;
-				const gtRes = await fetch(gtUrl, { signal: AbortSignal.timeout(4000) }).catch(() => null);
-				if (gtRes && gtRes.ok) {
-					const gtData = await gtRes.json().catch(() => null);
-					if (Array.isArray(gtData) && Array.isArray(gtData[0])) {
-						const transText = gtData[0].map(item => item[0]).filter(Boolean).join('');
-						if (transText) {
-							return { text: transText.trim(), model: 'google-translate', tokens: 0, endpoint: null };
-						}
-					}
-				}
-			} catch (_) {}
-		}
-
-		return { text: prompt, model: 'original', tokens: 0, endpoint: null };
+		// A configured provider failing must not transfer mail to another public
+		// service. Callers preserve the original content and report failure.
+		return { text: '', model: 'unavailable', tokens: 0, endpoint: null };
 	},
 
 	async translate(c, options = {}) {
 		let { text, html, targetLang = 'zh', strategy = 'auto', enableOcr } = options;
-		const shouldOcr = enableOcr !== undefined ? Boolean(enableOcr) : true;
+		const processingConfig = await requireTranslationConfirmation(c, options);
+		const shouldOcr = enableOcr === true && processingConfig.ocrEnabled === true;
+		const inputBytes = new TextEncoder().encode(String(text || '') + String(html || '')).byteLength;
+		if (inputBytes > 256 * 1024) {
+			throw new BizError(t('translateFailed'), 413, 'translation_too_large');
+		}
 		const isHtml = Boolean(html && /<[a-z][\s\S]*>/i.test(html));
 
 		const sampleContent = (text || emailUtils.htmlToText(html || '')).slice(0, 3000);
@@ -666,40 +671,49 @@ const aiService = {
 		}
 
 		// 检查官方未修改系统邮件模板（欢迎邮件/全域公告），若未被修改则直接调用对应语言官方模板，若发生修改则退回 AI 翻译
+		let predefined = null;
 		try {
 			const { getPredefinedTranslation } = await import('../const/welcome-template');
-			const predefined = getPredefinedTranslation({
+			predefined = getPredefinedTranslation({
 				content: html,
 				text,
 				subject: options.subject || '',
 				toEmail: options.toEmail || '',
 				toName: options.toName || ''
 			}, finalTargetLang);
-			if (predefined) {
-				return {
-					translatedText: predefined.translatedText,
-					translatedHtml: predefined.translatedHtml,
-					translatedSubject: predefined.translatedSubject,
-					isHtml: Boolean(predefined.isHtml),
-					model: 'system-template',
-					engine: 'template'
-				};
-			}
 		} catch (e) {
 			console.warn('Predefined template check failed, falling back to AI:', e);
 		}
 
-		const settingRow = await settingService.query(c).catch(() => null);
-		if (settingRow && settingRow.aiEnabled === 0) {
+		const settingRow = await settingService.query(c);
+		const requester = c.get?.('user');
+		if (!settingRow || Number(settingRow.aiEnabled) !== 1) {
+			throw new BizError(t('translateFailed'), 403, 'ai_disabled');
+		}
+		if (!requester?.userId) throw new BizError(t('authExpired'), 401, 'auth_required');
+		if (Number(settingRow.aiAdminOnly) === 1 && !isAdminUser(c, requester)) {
+			throw new BizError(t('unauthorized'), 403, 'ai_admin_only');
+		}
+		if (predefined) {
 			return {
-				translatedText: isHtml ? emailUtils.htmlToText(html) : (text || ''),
-				translatedHtml: isHtml ? html : '',
-				isHtml
+				translatedText: predefined.translatedText,
+				translatedHtml: predefined.translatedHtml,
+				translatedSubject: predefined.translatedSubject,
+				isHtml: Boolean(predefined.isHtml),
+				model: 'system-template',
+				engine: 'template'
 			};
 		}
+		await reserveAiRequest(c, Number(requester.userId), {
+			minuteLimit: settingRow.aiRateLimitRpm ?? 60,
+			dayLimit: settingRow.aiDailyQuota ?? 0
+		});
 
 		const apiKey = (settingRow?.aiApiKey || c.env?.AI_API_KEY || '').trim();
 		const apiUrl = (settingRow?.aiApiUrl || c.env?.AI_API_URL || 'https://api.openai.com/v1').trim();
+		if (apiKey && !isSafePublicUrl(apiUrl)) {
+			throw new BizError(t('translateFailed'), 503, 'ai_endpoint_invalid');
+		}
 		let model = (options.model || settingRow?.aiModel || c.env?.ai_model || 'gpt-4o-mini').trim();
 
 		// 角色权限模型分级校验
@@ -768,13 +782,27 @@ STRICT RULES:
 1. Maintain original paragraph breaks, indentation, and formatting cleanly.
 2. Directly output ONLY the translated text without commentary, thinking steps, conversational preambles, or markdown code fences.`;
 
-			const res = await this.callSingleLlm(c, sourceText.slice(0, 4000), systemPrompt, llmConfig);
+			const parts = [];
+			let tokens = 0;
+			let usedModel = model;
+			for (let start = 0; start < sourceText.length; start += 4000) {
+				if (Date.now() - startTime >= overallDeadlineMs) {
+					throw new BizError(t('translateFailed'), 503, 'translation_incomplete');
+				}
+				const res = await this.callSingleLlm(c, sourceText.slice(start, start + 4000), systemPrompt, llmConfig);
+				if (!res.text || res.model === 'unavailable') {
+					throw new BizError(t('translateFailed'), 503, 'translation_unavailable');
+				}
+				parts.push(res.text);
+				tokens += res.tokens || 0;
+				usedModel = res.model;
+			}
 			return {
-				translatedText: res.text,
+				translatedText: parts.join('\n'),
 				translatedHtml: '',
 				isHtml: false,
-				model: res.model,
-				tokens: res.tokens
+				model: usedModel,
+				tokens
 			};
 		}
 
@@ -794,11 +822,6 @@ STRICT RULES:
 			if (model) candidateModels.push(model);
 			for (const m of poolModels) {
 				if (!candidateModels.includes(m)) candidateModels.push(m);
-			}
-			if (apiUrl && apiUrl.includes('121628.xyz')) {
-				for (const m of ['gemma-26b-a4b-it-free', 'deepseek-v4-flash-free', 'glm-5.2-free', 'llama-3.1-8b-free']) {
-					if (!candidateModels.includes(m)) candidateModels.push(m);
-				}
 			}
 			if (candidateModels.length === 0) candidateModels.push('gpt-4o-mini');
 
@@ -868,57 +891,32 @@ STRICT RULES:
 			const workers = Array.from({ length: concurrency }, () => worker());
 			await Promise.all(workers);
 
-			// =========================================================================
-			// 零截断全链路终极保障 (Zero-Truncation Global Batch Compensation)
-			// 检查全邮件所有分片，若有任何条目未翻译（因模型漏行、超时中断或提前退出），立即并发极速补偿，彻底杜绝后半部分未翻译痛点！
-			// =========================================================================
 			const missingSegments = segments.filter(item => !translatedMap[item.id]);
 			if (missingSegments.length > 0) {
-				const targetParam = finalTargetLang === 'zh-Hant' ? 'zh-TW' : (finalTargetLang || 'zh');
-				const srcParam = (detectedSrcLang === 'zh-Hant' ? 'zh-TW' : detectedSrcLang) || 'en';
-				await Promise.allSettled(missingSegments.map(async (item) => {
-					try {
-						const mmUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(item.text.slice(0, 500))}&langpair=${encodeURIComponent(srcParam)}|${encodeURIComponent(targetParam)}`;
-						const mmRes = await fetch(mmUrl, { signal: AbortSignal.timeout(3500) }).catch(() => null);
-						if (mmRes && mmRes.ok) {
-							const mmData = await mmRes.json().catch(() => null);
-							const transText = mmData?.responseData?.translatedText;
-							if (transText && typeof transText === 'string' && transText.trim() && !transText.includes('IS AN INVALID SOURCE LANGUAGE')) {
-								translatedMap[item.id] = transText.trim();
-								return;
-							}
-						}
-					} catch (_) {}
-
-					if (c.env?.ai && !translatedMap[item.id]) {
-						try {
-							const cfRes = await c.env.ai.run('@cf/meta/llama-3.1-8b-instruct', {
-								messages: [
-									{ role: 'system', content: `Translate into ${targetLangName}. Output ONLY the translated text:` },
-									{ role: 'user', content: item.text.slice(0, 500) }
-								],
-								max_tokens: 250
-							}).catch(() => null);
-							const raw = cfRes?.response || '';
-							if (raw && raw.trim()) {
-								translatedMap[item.id] = raw.trim();
-							}
-						} catch (_) {}
-					}
-				}));
+				throw new BizError(t('translateFailed'), 503, 'translation_incomplete');
 			}
 
-			// 回填译文并还原所有原始样式与代码块
+			// 回填译文并强制 HTML 实体转义与伪协议拦截，防止 LLM 返回的恶意标签或伪协议破坏 DOM
+			const sanitizeTransText = (txt) => {
+				if (!txt) return '';
+				return String(txt)
+					.replace(/(?:javascript|vbscript|data\s*:\s*text\/html)\s*:/gi, 'blocked:')
+					.replace(/shadowrootmode/gi, 'blocked-shadow');
+			};
+
 			let restoredHtml = skeleton;
 			for (const [id, transText] of Object.entries(translatedMap)) {
-				restoredHtml = restoredHtml.replaceAll(`__EPO_SEG_${id}__`, transText);
+				restoredHtml = restoredHtml.replaceAll(`__EPO_SEG_${id}__`, escapeHtml(sanitizeTransText(transText)));
 			}
 			for (const seg of segments) {
-				restoredHtml = restoredHtml.replaceAll(`__EPO_SEG_${seg.id}__`, seg.text);
+				restoredHtml = restoredHtml.replaceAll(`__EPO_SEG_${seg.id}__`, escapeHtml(sanitizeTransText(seg.text)));
 			}
 			for (const raw of rawBlocks) {
 				restoredHtml = restoredHtml.replaceAll(raw.id, raw.match);
 			}
+
+			// 严格服务端白名单清理，杜绝任何残余 XSS
+			restoredHtml = sanitizeSharedEmailHtml(restoredHtml);
 
 			// 包装在自适应无侵入根容器中，避免纯黑字体，自适应暗黑模式
 			const finalHtml = `<div class="translated-mail-root" style="color: inherit; font-family: inherit;">${restoredHtml}</div>`;
@@ -933,31 +931,11 @@ STRICT RULES:
 			};
 		}
 
-		// 方案二 (备案/备用方案): 若无可用文本节点或 direct 策略要求，执行整包格式直译
-		const directSystemPrompt = `You are an automated HTML email translation engine.
-Translate all human-readable visible text inside the HTML document into ${targetLangName}.
-STRICT RULES:
-1. Directly output ONLY the resulting translated HTML.
-2. All HTML tags, attributes, inline styles, CSS, links, tables, and colors must remain 100% identical. Only the human-readable text between tags should be translated.
-3. Do NOT wrap output in markdown code fences (no \`\`\`html or \`\`\`).`;
-
-		const directRes = await this.callSingleLlm(c, html.slice(0, 4000), directSystemPrompt, llmConfig);
-		let cleanDirectHtml = directRes.text.replace(/```(?:html|xml)?\s*\n?([\s\S]*?)\n?```/i, '$1').trim();
-		const hasValidStructure = cleanDirectHtml && /<[a-z][\s\S]*>/i.test(cleanDirectHtml);
-
-		if (hasValidStructure) {
-			return {
-				translatedText: emailUtils.htmlToText(cleanDirectHtml),
-				translatedHtml: cleanDirectHtml,
-				isHtml: true,
-				model: directRes.model,
-				tokens: directRes.tokens
-			};
-		}
-
+		// 若无可用文本节点，安全降级为原文安全过滤展示，严禁让模型输出未经校验的完整 HTML
+		const safeOriginalHtml = sanitizeSharedEmailHtml(html);
 		return {
 			translatedText: emailUtils.htmlToText(html),
-			translatedHtml: html,
+			translatedHtml: safeOriginalHtml,
 			isHtml: true,
 			model: 'original',
 			tokens: 0
@@ -1049,7 +1027,7 @@ STRICT RULES:
 		const apiKey = (aiApiKey || '').trim();
 		const startTime = Date.now();
 
-		if (aiApiUrl && !isSafePublicUrl(aiApiUrl)) {
+		if (aiApiUrl && !(await assertSafePublicUrl(aiApiUrl))) {
 			return {
 				success: false,
 				models: [],
@@ -1090,7 +1068,7 @@ STRICT RULES:
 				const controller = new AbortController();
 				const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-				const resp = await fetch(endpoint, {
+				const resp = await safeFetch(endpoint, {
 					method: 'GET',
 					headers: {
 						'Authorization': `Bearer ${apiKey}`,
@@ -1117,7 +1095,7 @@ STRICT RULES:
 					}
 				}
 			} catch (e) {
-				console.warn(`探测端点 ${endpoint} 异常:`, e.message);
+				safeLogger.warn('ai_probe_endpoint_failed', { error: e });
 			}
 		}
 
@@ -1202,7 +1180,7 @@ STRICT RULES:
 			try {
 				const controller = new AbortController();
 				const timeoutId = setTimeout(() => controller.abort(), 3500);
-				const resp = await fetch(endpoint, {
+				const resp = await safeFetch(endpoint, {
 					method: 'GET',
 					headers,
 					signal: controller.signal
@@ -1261,7 +1239,7 @@ STRICT RULES:
 						messages: [{ role: 'user', content: '1' }]
 					};
 
-				const resp = await fetch(endpoint, {
+				const resp = await safeFetch(endpoint, {
 					method: 'POST',
 					headers,
 					body: JSON.stringify(body),
@@ -1280,8 +1258,9 @@ STRICT RULES:
 						endpoint
 					};
 				} else {
-					const errText = await resp.text().catch(() => '');
-					lastError = new Error(`HTTP ${resp.status}: ${errText.slice(0, 160)}`);
+					await resp.text().catch(() => '');
+					safeLogger.warn('ai_ping_failed', { status: resp.status });
+					lastError = new Error(`HTTP ${resp.status}`);
 				}
 			} catch (e) {
 				lastError = e;
@@ -1307,6 +1286,9 @@ STRICT RULES:
 			return {
 				success: false,
 				model: cfModel,
+				latencyMs: 0,
+				tokens: 0,
+				reason: 'binding_missing',
 				error: 'Cloudflare Workers AI 绑定不可用'
 			};
 		}
@@ -1320,18 +1302,28 @@ STRICT RULES:
 				success: true,
 				model: cfModel,
 				latencyMs,
-				tokens: 0,
+				tokens: 1,
 				method: 'workers-ai'
 			};
 		} catch (e) {
 			console.warn(`Workers AI run for ${cfModel}:`, e.message);
 			const latencyMs = Math.max(12, Date.now() - startTime);
+			const errLower = (e?.message || '').toLowerCase();
+			let reason = 'inference_failed';
+			if (errLower.includes('not found') || errLower.includes('unknown model') || errLower.includes('invalid model')) {
+				reason = 'model_not_found';
+			} else if (errLower.includes('rate limit') || errLower.includes('quota') || errLower.includes('429')) {
+				reason = 'quota_exceeded';
+			} else if (errLower.includes('timeout') || errLower.includes('timed out')) {
+				reason = 'timeout';
+			}
 			return {
-				success: true,
+				success: false,
 				model: cfModel,
 				latencyMs,
 				tokens: 0,
-				method: 'workers-ai-binding'
+				reason,
+				error: e?.message || 'Workers AI 推理执行失败'
 			};
 		}
 	},
@@ -1343,7 +1335,7 @@ STRICT RULES:
 		const apiKey = (aiApiKey || '').trim();
 		const apiUrl = (aiApiUrl || '').trim();
 
-		if (apiUrl && !isSafePublicUrl(apiUrl)) {
+		if (apiUrl && !(await assertSafePublicUrl(apiUrl))) {
 			return {
 				success: false,
 				avgLatency: 0,

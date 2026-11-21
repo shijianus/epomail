@@ -1,3 +1,5 @@
+import { registrationErrorKey, type TermsAcceptancePayload } from './registration-legal.ts';
+
 export interface OAuthBindContext {
   bindToken: string;
   oauthUserId: string;
@@ -222,6 +224,8 @@ export function classifyBindPolicyError(
   message: unknown,
   errorCode?: unknown
 ): BindErrorClassification | null {
+  const legalKey = registrationErrorKey(errorCode);
+  if (legalKey) return { field: 'form', key: legalKey };
   if (typeof errorCode === 'string' && errorCode) {
     const byCode = POLICY_ERROR_CODES[errorCode.trim()];
     if (byCode) return byCode;
@@ -240,12 +244,19 @@ export function classifyBindPolicyError(
 
 export function buildOAuthBindPayload(
   context: OAuthBindContext,
-  input: { email: string; code?: string }
+  input: { email: string; code?: string },
+  acceptance?: TermsAcceptancePayload
 ) {
   const code = (input.code || '').trim();
   return {
     email: input.email.trim(),
     ...(code ? { code } : {}),
+    ...(acceptance ? {
+      acceptedTerms: acceptance.acceptedTerms,
+      termsVersion: acceptance.termsVersion,
+      locale: acceptance.locale,
+      sourceUrl: acceptance.sourceUrl
+    } : {}),
     oauthUserId: context.oauthUserId,
     provider: context.provider,
     bindToken: context.bindToken
@@ -295,7 +306,7 @@ function withErrorCode(outcome: BindFailure, errorCode: string | undefined): Bin
 }
 
 export function classifyBindResponse(body: unknown): OAuthBindOutcome {
-  const envelope = body as { code?: number; data?: OAuthBindPayload; errorCode?: string } | null;
+  const envelope = body as { code?: number; data?: OAuthBindPayload; errorCode?: string; proofConsumed?: unknown } | null;
   const errorCode =
     envelope && typeof envelope.errorCode === 'string' && envelope.errorCode
       ? envelope.errorCode
@@ -303,6 +314,11 @@ export function classifyBindResponse(body: unknown): OAuthBindOutcome {
 
   if (!envelope || envelope.code !== 200 || !envelope.data) {
     const code = Number(envelope?.code);
+    // Legal preflight may use 409/503 without spending the proof. Trust only
+    // the explicit server discriminator, never the translated human message.
+    if (envelope?.proofConsumed === false && registrationErrorKey(errorCode)) {
+      return withErrorCode({ kind: 'retry', reason: 'policy' }, errorCode);
+    }
     if (code === 409) return withErrorCode({ kind: 'restart', reason: 'spent_proof' }, errorCode);
     if (code === 410) return withErrorCode({ kind: 'restart', reason: 'invalid_proof' }, errorCode);
     if (code === 425) return withErrorCode({ kind: 'retry', reason: 'in_progress' }, errorCode);

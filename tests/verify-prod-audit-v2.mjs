@@ -1,7 +1,9 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = 'https://mail.epocanvas.com';
+const BASE = legacyOrigin;
 let pass = 0, fail = 0;
 const failures = [];
 
@@ -18,7 +20,7 @@ function ok(cond, label) {
 
 async function run() {
   console.log('================================================================');
-  console.log('=== 公网生产环境全真核验：https://mail.epocanvas.com 安全审计控制台 ===');
+  console.log('=== 本地隔离环境全真核验：<本地测试地址> 安全审计控制台 ===');
   console.log('================================================================');
 
   let browser;
@@ -28,7 +30,7 @@ async function run() {
     const loginRes = await fetch(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@epomail.cyou', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
+      body: JSON.stringify({ email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
     });
     const loginJson = await loginRes.json();
     assert.strictEqual(loginJson.code, 200, '生产环境登录成功');
@@ -46,7 +48,7 @@ async function run() {
 
     // 启动 Chromium 打开生产网页
     console.log('\n[步骤 3] 启动浏览器加载公网真实页面...');
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'
@@ -54,7 +56,7 @@ async function run() {
 
     await context.addInitScript(({ t }) => {
       localStorage.setItem('token', t);
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'admin@epomail.cyou' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyAdminEmail }]));
     }, { t: token });
 
     const page = await context.newPage();
@@ -68,7 +70,7 @@ async function run() {
           code: 200,
           data: {
             userId: 9,
-            email: 'admin@epomail.cyou',
+            email: legacyAdminEmail,
             name: '站长',
             permKeys: ['*'],
             role: { roleId: 6, roleCode: 'master', name: '站长' }
@@ -77,7 +79,7 @@ async function run() {
       });
     });
 
-    console.log('  导航至公网生产: https://mail.epocanvas.com/mail/u/0/#manage/admin/audit ...');
+    console.log('  导航至本地隔离: <本地测试地址>/mail/u/0/#manage/admin/audit ...');
     await page.goto(`${BASE}/mail/u/0/#manage/admin/audit`, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(3000);
 

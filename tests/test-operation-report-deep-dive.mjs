@@ -1,3 +1,4 @@
+import { assertLoopbackBase } from './helpers/load-runner.mjs';
 /**
  * 操作报告板块深度专项端到端测试 (Operation Report Deep Dive E2E)
  * ============================================================
@@ -17,7 +18,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const BASE = process.env.E2E_BASE || 'http://127.0.0.1:8787';
+const BASE = assertLoopbackBase(process.env.E2E_BASE || 'http://127.0.0.1:8787');
 const API = BASE + '/api';
 const ADMIN_EMAIL = 'admin@example.com';
 const ADMIN_PWD = process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '';

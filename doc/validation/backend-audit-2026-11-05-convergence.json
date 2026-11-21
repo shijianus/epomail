@@ -1,0 +1,65 @@
+{
+  "audit": "backend-logic-permissions-release-gate-convergence",
+  "date": "2026-11-05",
+  "branch": "release/2026-10-31",
+  "previousCodeCommit": "c003fc8efd74d12b4b4c941d980069347c4d723d",
+  "codeCommit": "b795f01ff11c850b1b2258ba1514b4bb3e67122e",
+  "environment": {
+    "deployment": "local workerd/D1/KV only",
+    "productionOrStagingAccessed": false,
+    "realProvidersCalled": false
+  },
+  "checks": {
+    "workerTests": "37 files / 520 tests passed (exit 0)",
+    "workerTargeted": [
+      "7 files / 109 tests passed",
+      "4 files / 65 tests passed",
+      "4 files / 49 tests passed",
+      "2 files / 32 tests passed",
+      "security-review-round2 14/14 passed"
+    ],
+    "vueBuild": "pass (34.05s)",
+    "loginTypecheck": "pass",
+    "loginTests": "29/29 passed",
+    "i18nSymmetry": "pass (mail-vue 3260 keys, mail-worker 1950 keys)",
+    "i18nAudit": "pass (2290 literal keys, 0 missing, 0 duplicate)",
+    "i18nHardcoded": "pass (0 suspicious lines)",
+    "i18nAuthLocale": "pass (6 languages x 159 keys, 200 literal + 40 indirect references)",
+    "secretScan": "pass (1258 tracked files, 0 findings)",
+    "wranglerDryRun": "pass (438 files, gzip 1190.90 KiB)",
+    "gitDiffCheck": "pass"
+  },
+  "closed": [
+    "B5 inbound forwarding durable per-target tasks with attachment/CID preservation",
+    "B7 bounded decrypted search in encrypted mail modes",
+    "B8 last recovery code auto-regeneration and login UI display",
+    "B11 administrator user-creation compensation",
+    "U1 OAuth authorize page login/MFA two-step contract",
+    "U6 transient network failure no longer clears the session",
+    "P2-2 profile field length and image URL limits",
+    "P2-3 report-spam deduplication",
+    "P2-4 non-admin Telegram test bound to saved personal configuration",
+    "P2-5 PAT hash-only storage with legacy migration",
+    "P2-7 Apple direct id_token requires server-issued state/nonce",
+    "P2-10 production/staging init_secret no longer falls back to jwt_secret",
+    "P2-13 attachment download original filename",
+    "P2-16 BYO disable read/write split",
+    "P2-17 UNKNOWN reconciliation wall-clock budget",
+    "P2-18 invite redemption fail-closed on role lookup",
+    "P2-19 OIDC auth_time from session iat",
+    "P2-20 forwarding schema included in account deletion"
+  ],
+  "remainingP2": [
+    "SSRF DNS-resolution/rebinding validation",
+    "internal sender Authentication-Results trust boundary",
+    "UNKNOWN reconciliation limited to Resend provider ids",
+    "OIDC inline Passkey/second-factor step-up",
+    "storage locator changes remain hard-blocked without migration",
+    "Telegram first-use before saving personal configuration",
+    "rate-limit KV fallback before migration",
+    "public profile owner email masking",
+    "no admin UI for failed forward tasks",
+    "broad encrypted search returns search_too_broad"
+  ],
+  "verdict": "backend P0/P1 security and consistency findings closed; conditional GO for controlled public beta; unconditional GA waits for staging/restore drills and acceptance of remaining P2"
+}

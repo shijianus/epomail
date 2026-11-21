@@ -1,5 +1,6 @@
 import resendService from '../service/resend-service';
 import app from '../hono/hono';
+import safeLogger from '../utils/safe-logger.js';
 
 app.post('/webhooks', async (c) => {
 	try {
@@ -18,8 +19,9 @@ app.post('/webhooks', async (c) => {
 		const result = await resendService.webhooks(c, body, svixId);
 		return c.json(result, 200);
 	} catch (e) {
-		console.error('Resend webhook rejected:', e?.message || e);
 		const status = Number(e?.code);
-		return c.text('webhook_rejected', status >= 400 && status < 600 ? status : 500);
+		const safeStatus = status >= 400 && status < 600 ? status : 500;
+		safeLogger.warn('resend_webhook_rejected', { status: safeStatus, error: e });
+		return c.text('webhook_rejected', safeStatus);
 	}
 });

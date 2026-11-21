@@ -1,3 +1,5 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
@@ -6,13 +8,13 @@ import assert from "assert";
   console.log("=== 开始测试：Gmail UI 收件优化、to me下拉详情卡片、操作按钮组与 AI 翻译 ===");
   console.log("==========================================================================");
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: "zh-CN"
   });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   let adminToken = null;
   let createdEmailId = null;
@@ -21,11 +23,11 @@ import assert from "assert";
     // 1. 登录 Admin 账号
     console.log("\n[步骤 1] 登录 Admin 账号获取鉴权 Token...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "Admin 登录失败: " + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, "Admin 登录失败: " + Number(loginData?.code));
     adminToken = typeof loginData.data === "string" ? loginData.data : loginData.data?.token;
     console.log("  ✓ Admin 登录成功");
 
@@ -46,7 +48,7 @@ import assert from "assert";
       console.log("  邮件列表为空，发送自测邮件...");
       const sendRes = await page.request.post(BASE + "/api/email/send", {
         data: {
-          toEmail: "admin@epomail.bond",
+          toEmail: legacyAdminEmail,
           subject: "Hello Gmail UI and AI Test",
           text: "This is an important test email for Gmail-style UI optimization and AI translation.",
           html: "<p>This is an important test email for Gmail-style UI optimization and AI translation.</p>"

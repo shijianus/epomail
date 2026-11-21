@@ -1,27 +1,29 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
 (async () => {
   console.log('=== 开始全员系统欢迎邮件大弹窗、全屏模式与真实收件箱全链路 Playwright 验证 ===');
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ 
     viewport: { width: 1440, height: 900 },
     locale: 'zh-CN'
   });
   const page = await context.newPage();
 
-  const BASE = 'https://epomail.epocanvas.workers.dev';
+  const BASE = legacyOrigin;
 
   try {
     // Step 1: 登录
-    console.log('1. 正在登录 Cloudflare 生产环境...');
+    console.log('1. 正在登录 本地隔离环境...');
     const loginRes = await page.request.post(BASE + '/api/login', {
-      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginData = await loginRes.json();
     if (loginData.code !== 200) {
-      throw new Error('登录失败: ' + JSON.stringify(loginData));
+      throw new Error('登录失败: ' + Number(loginData?.code));
     }
     const token = loginData.data?.token;
     console.log('✓ 登录成功，获取 Token');
@@ -64,7 +66,7 @@ import assert from 'assert';
 
     // 验证顶栏去冗余：无 sender 字符串
     const headerText = await page.locator('.welcome-dialog-canvas .el-dialog__header').innerText();
-    assert.ok(!headerText.includes('admin@epocanvas.com'), '顶栏必须剔除冗余的发件人字符串');
+    assert.ok(!headerText.includes(legacyAdminEmail), '顶栏必须剔除冗余的发件人字符串');
     console.log('✓ 顶栏去冗余校验通过');
 
     // 验证发送对象单行条，无不可编辑的邮件属性卡片

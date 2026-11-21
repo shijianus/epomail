@@ -25,6 +25,8 @@ export function isAllowedObjectKey(key) {
 	if (value.includes(':') || value.includes('\0')) return false;
 	if (!SAFE_KEY_PATTERN.test(value)) return false;
 	if (hasTraversal(value)) return false;
+	// Raw MIME recovery objects are private even when stored under attachments/.
+	if (value.startsWith('attachments/mail-raw-')) return false;
 
 	return ALLOWED_PREFIXES.some(prefix => value.length > prefix.length && value.startsWith(prefix));
 }
