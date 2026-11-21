@@ -443,7 +443,7 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 		mobile.waitForResponse(res => new URL(res.url()).pathname === '/api/email/list', { timeout: 90000 }),
 		mobile.locator('button[type="submit"]').click()
 	]);
-	await mobile.waitForURL(/\/mail\/u\/0\/#inbox/, { timeout: 90000 });
+	await mobile.waitForURL(/\/mail\/u\/0\/#inbox/, { timeout: 90000, waitUntil: 'domcontentloaded' });
 	const mobileBody = await mobileList.json();
 	check('mobile login opens the authenticated inbox at 375px', () => {
 		assert.equal(mobileList.status(), 200);
@@ -492,16 +492,43 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 		return route.abort();
 	});
 	await checkMailReadability(mobile, ordinaryMail.subject, 'ordinary mail');
+	if (process.env.EPOMAIL_SCREENSHOT_DIR) {
+		const fs = await import('node:fs/promises');
+		const path = await import('node:path');
+		await fs.mkdir(process.env.EPOMAIL_SCREENSHOT_DIR, { recursive: true });
+		await mobile.setViewportSize({ width: 390, height: 844 });
+		await mobile.screenshot({ path: path.join(process.env.EPOMAIL_SCREENSHOT_DIR, 'ordinary-light-390.png') });
+	}
 	await checkOrdinaryMailLayout(mobile);
 	const untrustedSvg = await mobile.locator('.shadow-content svg').count();
 	check('reading ordinary mail preserves remote image privacy and strips embedded SVG', () => {
 		assert.equal(trackerRequests, 0);
 		assert.equal(untrustedSvg, 0);
 	});
+	await Promise.all([
+		mobile.waitForRequest('https://tracker.invalid/**'),
+		mobile.locator('.remote-images-button').click()
+	]);
+	await mobile.waitForFunction(() => document.querySelector('.remote-images-button') === null);
+	check('authorizing remote images loads the image for that message only', () => {
+		assert.equal(trackerRequests, 1);
+	});
+	if (process.env.EPOMAIL_SCREENSHOT_DIR) {
+		const path = await import('node:path');
+		await mobile.setViewportSize({ width: 1440, height: 900 });
+		await mobile.screenshot({ path: path.join(process.env.EPOMAIL_SCREENSHOT_DIR, 'ordinary-light-1440.png') });
+	}
 	await mobile.goto(`${base}/mail/u/0/#inbox`, { waitUntil: 'domcontentloaded' });
 	await checkMailReadability(mobile, welcome.subject, 'system welcome');
 	await checkWelcomeEmblem(mobile, 'system welcome');
 	await checkWelcomeFeatures(mobile);
+	if (process.env.EPOMAIL_SCREENSHOT_DIR) {
+		const path = await import('node:path');
+		await mobile.setViewportSize({ width: 320, height: 812 });
+		await mobile.screenshot({ path: path.join(process.env.EPOMAIL_SCREENSHOT_DIR, 'welcome-light-320.png') });
+		await mobile.setViewportSize({ width: 1440, height: 900 });
+		await mobile.screenshot({ path: path.join(process.env.EPOMAIL_SCREENSHOT_DIR, 'welcome-light-1440.png') });
+	}
 	await mobile.goto(`${base}/mail/u/0/#inbox`, { waitUntil: 'domcontentloaded' });
 	await checkMailReadability(mobile, legacyNotice.subject, 'stored official notice');
 	await checkWelcomeEmblem(mobile, 'stored official notice');

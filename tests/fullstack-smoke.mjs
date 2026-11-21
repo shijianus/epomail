@@ -223,6 +223,35 @@ await withLocalStack(async ({ base, jwtSecret }) => {
 		assert.equal(replay[0].emailId, firstSend[0].emailId);
 	});
 
+	const echartsBefore = ok(await request('/api/analysis/echarts?timeZone=UTC', auth), 'echarts before 8 concurrent sends');
+	const batchTag = randomUUID().slice(0, 8);
+	const batchPayloads = Array.from({ length: 8 }, (_, idx) => ({
+		accountId: accountRows[0].accountId,
+		receiveEmail: [recipient],
+		subject: `Batch-${batchTag}-${idx}`,
+		content: `<p>batch ${idx}</p>`,
+		text: `batch ${idx}`,
+		sendType: 0,
+		attachments: [],
+		idempotencyKey: `batch-${batchTag}-${idx}`
+	}));
+	const batchResults = await Promise.all(batchPayloads.map(payload => request('/api/email/send', auth, 'POST', payload)));
+	const batchIds = batchResults.map((res, idx) => ok(res, `concurrent send ${idx}`)[0].emailId);
+	const echartsAfter = ok(await request('/api/analysis/echarts?timeZone=UTC', auth), 'echarts after 8 concurrent sends');
+	const replayResults = await Promise.all(batchPayloads.map(payload => request('/api/email/send', auth, 'POST', payload)));
+	const replayIds = replayResults.map((res, idx) => ok(res, `concurrent replay ${idx}`)[0].emailId);
+	const echartsReplay = ok(await request('/api/analysis/echarts?timeZone=UTC', auth), 'echarts after 8 replays');
+	const batchDelivered = ok(await inbox(), 'ordinary inbox after batch').list.filter(row => row.subject.startsWith(`Batch-${batchTag}-`));
+	check('8 concurrent sends increment dashboard counts by 8 and idempotent replays do not duplicate', () => {
+		assert.equal(new Set(batchIds).size, 8);
+		assert.deepEqual(replayIds, batchIds);
+		assert.equal(batchDelivered.length, 8);
+		assert.equal(echartsAfter.daySendTotal - echartsBefore.daySendTotal, 8);
+		assert.equal(echartsAfter.numberCount.sendTotal - echartsBefore.numberCount.sendTotal, 8);
+		assert.equal(echartsReplay.daySendTotal, echartsAfter.daySendTotal);
+		assert.equal(echartsReplay.numberCount.sendTotal, echartsAfter.numberCount.sendTotal);
+	});
+
 	const mailId = delivery[0].emailId;
 	const detailPath = `/api/email/get?emailId=${mailId}`;
 	const detail = await request(detailPath, ordinaryAuth);

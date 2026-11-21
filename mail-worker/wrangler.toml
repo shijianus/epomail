@@ -143,10 +143,10 @@ directory = "./dist"
 not_found_handling = "single-page-application"
 run_worker_first = true
 
-# 定时调度 (夜间清理 + 每 5 分钟 Outbox 调度与租约检查)
-# Staging 环境显式置空 crons，覆盖顶层继承，避免触碰 Cloudflare 账户 5 个 Cron 的上限
+# 定时调度 (每 5 分钟 Outbox 调度、对账、转发重试与租约清理)
+# Cloudflare 账户免费额度最多 5 个 Cron（当前生产 2 + vitals 2），Staging 使用第 5 个配额运行 5 分钟真实 Cron；夜间 0 16 * * * 通过受保护 /api/scheduled 演练
 [env.staging.triggers]
-crons = []
+crons = ["*/5 * * * *"]
 
 # Staging 环境变量隔离配置
 [env.staging.vars]
@@ -156,9 +156,10 @@ ALLOW_URL_INIT = "false"
 # 预发布域名与管理员配置
 domain = ["epomail-staging.epocanvas.workers.dev"]
 admin = "admin@epomail-staging.epocanvas.workers.dev"
-# 邮件外发总开关 (第一阶段默认关闭，严防任意真实外发)
-EMAIL_OUTBOUND_ENABLED = "false"
+# 邮件外发沙箱策略（显式启用外发并强制限制为白名单测试地址）
+EMAIL_OUTBOUND_ENABLED = "true"
+OUTBOUND_WHITELIST_ENFORCE = "true"
 PERSONAL_FORWARDING_ENABLED = "false"
-# 官方测试白名单 (第二阶段启用)
+# 官方测试白名单
 OUTBOUND_WHITELIST = "delivered@resend.dev,bounced@resend.dev,complained@resend.dev"
 

@@ -112,8 +112,9 @@ test('Staging preflight requires explicit sandbox scope and an enforced recipien
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const configPath = join(dir, 'wrangler.toml');
   const source = readFileSync(new URL('../mail-worker/wrangler.toml', import.meta.url), 'utf8');
-  const enabled = source.replace(/(\[env\.staging\.vars\][\s\S]*?)EMAIL_OUTBOUND_ENABLED = "false"/,
-    '$1EMAIL_OUTBOUND_ENABLED = "true"\nOUTBOUND_WHITELIST_ENFORCE = "true"');
+  const enabled = source
+    .replace(/(\[env\.staging\.vars\][\s\S]*?)EMAIL_OUTBOUND_ENABLED = "(?:true|false)"/, '$1EMAIL_OUTBOUND_ENABLED = "true"')
+    .replace(/(\[env\.staging\.vars\][\s\S]*?)OUTBOUND_WHITELIST_ENFORCE = "(?:true|false)"/, '$1OUTBOUND_WHITELIST_ENFORCE = "true"');
   writeFileSync(configPath, enabled);
   function state(allowSandboxOutbound) {
     const checks = runStaticChecks({ configPath, checks: new Checks({ color: false }), allowSandboxOutbound });

@@ -40,5 +40,40 @@ await withLocalMailBrowser({ enablePatIssuance: true }, async page => {
   assert.match(content, /announcement@epocanvas\.com/i);
   const destination = new URL(await reader.locator('a[href*="settings/security"]').first().getAttribute('href'), page.url());
   assert.equal(destination.hash, '#settings/security');
+
+  for (const dark of [false, true]) {
+    await page.setViewportSize({ width: 1440, height: 812 });
+    const isDark = await page.locator('html').evaluate(html => html.classList.contains('dark'));
+    if (isDark !== dark) {
+      await page.locator('.theme-toggle-btn:visible').first().click();
+      await page.waitForFunction(expected => document.documentElement.classList.contains('dark') === expected &&
+        !document.documentElement.hasAttribute('data-theme-to'), dark);
+    }
+    for (const width of [320, 375, 390, 1440]) {
+      await page.setViewportSize({ width, height: 812 });
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
+      const layout = await page.evaluate(() => ({
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+        shadowWidth: document.querySelector('.content-html')?.shadowRoot?.querySelector('.shadow-content')?.getBoundingClientRect().width || 0
+      }));
+      assert.ok(layout.overflow <= 1, `horizontal overflow at ${width}px (dark=${dark}): ${layout.overflow}`);
+      assert.ok(layout.shadowWidth > 100 && layout.shadowWidth <= width + 1, `unexpected reader width at ${width}px: ${layout.shadowWidth}`);
+      const linkBox = await reader.locator('a[href*="settings/security"]').first().boundingBox();
+      assert.ok(linkBox && linkBox.width > 0 && linkBox.height > 0 && linkBox.x >= 0 && linkBox.x + linkBox.width <= width + 1,
+        `CTA clipped at ${width}px (dark=${dark}): ${JSON.stringify({ linkBox, layout })}`);
+    }
+  }
+  if (process.env.EPOMAIL_SCREENSHOT_DIR) {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    await fs.mkdir(process.env.EPOMAIL_SCREENSHOT_DIR, { recursive: true });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.screenshot({ path: path.join(process.env.EPOMAIL_SCREENSHOT_DIR, 'security-notice-dark-375.png') });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({ path: path.join(process.env.EPOMAIL_SCREENSHOT_DIR, 'security-notice-dark-1440.png') });
+  }
 });
 console.log('PASS: local PAT creation and revocation, official inbox delivery and security guidance.');

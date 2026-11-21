@@ -21,15 +21,20 @@ function fixture(t, candidate = staging, production = prod) {
 	return path;
 }
 
-test('checked-in config passes with three aliases on the same isolated Staging D1', () => {
-	assert.deepEqual(verifyStagingConfig(DEFAULT_CONFIG), { errors: [], placeholder: false });
+test('checked-in config passes with three aliases on the same isolated Staging D1 and bounded sandbox outbound', t => {
+	assert.ok(verifyStagingConfig(DEFAULT_CONFIG).errors.some(message => message.includes('外发')));
+	assert.deepEqual(verifyStagingConfig(DEFAULT_CONFIG, { allowSandboxOutbound: true }), { errors: [], placeholder: false });
+	const disabled = staging
+		.replace('EMAIL_OUTBOUND_ENABLED = "true"', 'EMAIL_OUTBOUND_ENABLED = "false"')
+		.replace('OUTBOUND_WHITELIST_ENFORCE = "true"', 'OUTBOUND_WHITELIST_ENFORCE = "false"');
+	assert.deepEqual(verifyStagingConfig(fixture(t, disabled)), { errors: [], placeholder: false });
 });
 
 test('comments, quoting and later environment sections are isolated by the Wrangler parser', t => {
 	const other = '\n# PLACEHOLDER_COMMENT\n[env.unrelated.vars]\nALLOW_URL_INIT = "false"\ndomain = ["epomail.bond"]\n';
-	assert.deepEqual(verifyStagingConfig(fixture(t, staging.replace('ALLOW_URL_INIT = "false"', "ALLOW_URL_INIT='false'") + other)),
+	assert.deepEqual(verifyStagingConfig(fixture(t, staging.replace('ALLOW_URL_INIT = "false"', "ALLOW_URL_INIT='false'") + other), { allowSandboxOutbound: true }),
 		{ errors: [], placeholder: false });
-	const { errors } = verifyStagingConfig(fixture(t, staging.replace('ALLOW_URL_INIT = "false"', '# ALLOW_URL_INIT = "false"') + other));
+	const { errors } = verifyStagingConfig(fixture(t, staging.replace('ALLOW_URL_INIT = "false"', '# ALLOW_URL_INIT = "false"') + other), { allowSandboxOutbound: true });
 	assert.ok(errors.some(message => message.includes('ALLOW_URL_INIT')));
 	assert.throws(() => verifyStagingConfig(fixture(t, staging + '\nALLOW_URL_INIT = "false"\n')));
 });
@@ -61,10 +66,10 @@ test('compares normalized domains and the route Wrangler would inherit from prod
 		.replace(/^(domain = ).+$/m, '$1["new.example.test"]');
 	const candidate = staging.replace(/^(domain = ).+$/m, '$1[\n  "@NEW.example.test.",\n]')
 		.replace(/^(admin = ).+$/m, '$1"admin@new.example.test"');
-	const { errors } = verifyStagingConfig(fixture(t, candidate, changedProd));
+	const { errors } = verifyStagingConfig(fixture(t, candidate, changedProd), { allowSandboxOutbound: true });
 	for (const field of ['邮件域名', '管理员邮箱', '路由']) assert.ok(errors.some(message => message.includes(field)));
 	assert.deepEqual(verifyStagingConfig(fixture(t, staging.replace('name = "epomail-staging"',
-		'name = "epomail-staging"\nroutes = []'), changedProd)), { errors: [], placeholder: false });
+		'name = "epomail-staging"\nroutes = []'), changedProd), { allowSandboxOutbound: true }), { errors: [], placeholder: false });
 });
 
 test('allowlisted Staging outbound needs explicit sandbox selection and strict enforcement', t => {
@@ -81,11 +86,11 @@ test('CLI distinguishes provisioned, placeholder-locked and hard-failure configs
 	const path = fixture(t, placeholder);
 	const invalid = fixture(t, placeholder.replace('binding = "kv"', 'binding = "missing"'));
 	const run = (...args) => spawnSync(process.execPath, [script, '--config', ...args], { encoding: 'utf8' });
-	assert.equal(run(path).status, 2);
-	const locked = run(path, '--allow-placeholders');
+	assert.equal(run(path, '--sandbox-outbound').status, 2);
+	const locked = run(path, '--sandbox-outbound', '--allow-placeholders');
 	assert.equal(locked.status, 0);
 	assert.match(locked.stdout, /\[LOCKED\]/);
-	assert.equal(run(invalid, '--allow-placeholders').status, 1);
+	assert.equal(run(invalid, '--sandbox-outbound', '--allow-placeholders').status, 1);
 });
 
 test('malformed mail domains, admin addresses and array-valued booleans cannot pass', t => {
@@ -104,8 +109,8 @@ test('malformed mail domains, admin addresses and array-valued booleans cannot p
 test('optional R2 declarations must use an isolated Staging bucket including its preview target', t => {
 	const r2 = '\n[[r2_buckets]]\nbinding="r2"\nbucket_name="prod-attachments"\n';
 	const r2Staging = '\n[[env.staging.r2_buckets]]\nbinding="r2"\nbucket_name="stage-attachments"\n';
-	assert.ok(verifyStagingConfig(fixture(t, staging, prod + r2)).errors.some(message => message.includes('R2')));
-	assert.deepEqual(verifyStagingConfig(fixture(t, staging + r2Staging, prod + r2)), { errors: [], placeholder: false });
+	assert.ok(verifyStagingConfig(fixture(t, staging, prod + r2), { allowSandboxOutbound: true }).errors.some(message => message.includes('R2')));
+	assert.deepEqual(verifyStagingConfig(fixture(t, staging + r2Staging, prod + r2), { allowSandboxOutbound: true }), { errors: [], placeholder: false });
 	const shared = fixture(t, staging + r2Staging + 'preview_bucket_name="prod-attachments"\n', prod + r2);
-	assert.ok(verifyStagingConfig(shared).errors.some(message => message.includes('r2_buckets 指向生产')));
+	assert.ok(verifyStagingConfig(shared, { allowSandboxOutbound: true }).errors.some(message => message.includes('r2_buckets 指向生产')));
 });
