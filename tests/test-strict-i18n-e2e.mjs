@@ -1,22 +1,24 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
 (async () => {
   console.log('=== 开始极严苛零泄漏 i18n 多语言端到端全链路自动化测试 ===');
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ 
     viewport: { width: 1440, height: 900 }
   });
   const page = await context.newPage();
 
-  const BASE = 'https://epomail.epocanvas.workers.dev';
+  const BASE = legacyOrigin;
   const chineseRegex = /[\u4e00-\u9fa5]/;
 
   try {
     // 1. 登录
     console.log('\n[Step 1] 正在登录生产环境...');
     const loginRes = await page.request.post(BASE + '/api/login', {
-      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginJson = await loginRes.json();
@@ -38,7 +40,7 @@ import assert from 'assert';
       await page.goto(BASE + '/login/', { waitUntil: 'networkidle' });
       await page.evaluate(({ token, langCode }) => {
         localStorage.setItem('token', token);
-        localStorage.setItem('loginEmail', 'admin@epomail.bond');
+        localStorage.setItem('loginEmail', legacyAdminEmail);
         localStorage.setItem('ui', JSON.stringify({ dark: false, locale: langCode, defaultTranslateLang: 'en' }));
         localStorage.setItem('setting', JSON.stringify({ lang: langCode }));
       }, { token, langCode });
@@ -112,7 +114,7 @@ import assert from 'assert';
     await page.goto(BASE + '/login/', { waitUntil: 'networkidle' });
     await page.evaluate(({ token }) => {
       localStorage.setItem('token', token);
-      localStorage.setItem('loginEmail', 'admin@epomail.bond');
+      localStorage.setItem('loginEmail', legacyAdminEmail);
       localStorage.setItem('ui', JSON.stringify({ dark: false, locale: 'zh-Hant', defaultTranslateLang: 'zh-Hant' }));
       localStorage.setItem('setting', JSON.stringify({ lang: 'zh-Hant' }));
     }, { token });

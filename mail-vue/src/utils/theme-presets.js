@@ -342,13 +342,30 @@ export function getPresetDesc(preset, lang = 'zh') {
   return preset.descZh || ''
 }
 
+/**
+ * Keep user supplied image URLs out of CSS injection contexts.
+ * Built-in gradient presets are handled separately by getWallpaperCssById.
+ */
+export function sanitizeImageUrl(value) {
+  if (typeof value !== 'string') return ''
+  const raw = value.trim()
+  if (!raw || /[\u0000-\u001f\u007f"'\\]/.test(raw) || raw.startsWith('//')) return ''
+  if (raw.startsWith('/')) return raw
+  try {
+    const url = new URL(raw)
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return ''
+    return url.href
+  } catch {
+    return ''
+  }
+}
+
 export function getWallpaperCssById(idOrUrl) {
   if (!idOrUrl || idOrUrl === 'none') return ''
   const preset = THEME_PRESETS.find(p => p.id === idOrUrl)
   const val = preset ? preset.url : idOrUrl
   if (!val) return ''
-  if (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('/')) {
-    return `url('${val}')`
-  }
-  return val
+  if (preset && (val.startsWith('linear-gradient(') || val.startsWith('radial-gradient('))) return val
+  const safeUrl = sanitizeImageUrl(val)
+  return safeUrl ? `url("${safeUrl}")` : ''
 }

@@ -8,7 +8,7 @@ import { and, asc, desc, eq, sql, like, inArray } from 'drizzle-orm';
 import totpUtils from '../utils/totp-utils';
 import cryptoUtils from '../utils/crypto-utils';
 import rateLimit from '../utils/rate-limit.js';
-import emailUtils from '../utils/email-utils';
+import emailUtils, { isConfiguredDomain } from '../utils/email-utils';
 import roleService from './role-service';
 import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n';
@@ -24,6 +24,7 @@ import KvConst from '../const/kv-const';
 import userContext from '../security/user-context.js';
 import account from '../entity/account.js';
 import { isActiveUser } from './privacy-revocation-service.js';
+import { readAuthorizedSession } from '../utils/session-auth-store.js';
 
 
 const publicService = {
@@ -122,7 +123,7 @@ const publicService = {
 				throw new BizError(t('notEmail'));
 			}
 
-			if (!c.env.domain.includes(emailUtils.getDomain(emailRow.email))) {
+			if (!isConfiguredDomain(c.env.domain, emailUtils.getDomain(emailRow.email))) {
 				throw new BizError(t('notEmailDomain'));
 			}
 
@@ -230,7 +231,7 @@ const publicService = {
 			if (!result) throw new BizError(t('authExpired'), 401);
 
 			const { userId, token } = result;
-			const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
+			const authInfo = await readAuthorizedSession(c, userId, token);
 
 			if (!authInfo || !Array.isArray(authInfo.tokens) || !authInfo.tokens.includes(token)) {
 				throw new BizError(t('authExpired'), 401);

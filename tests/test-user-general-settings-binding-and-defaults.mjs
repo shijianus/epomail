@@ -1,12 +1,14 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "node:assert";
 
 (async () => {
   console.log("=== 启动「常规默认设置与用户绑定、新账户全量默认、多账户相互隔离」E2E 审计 ===");
-  const browser = await chromium.launch({ headless: true, args: ["--lang=zh-CN"] });
+  const browser = await launchIsolatedChromium(chromium, { headless: true, args: ["--lang=zh-CN"] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   let adminToken = null;
   const timestamp = Date.now();
@@ -26,11 +28,11 @@ import assert from "node:assert";
     // --------------------------------------------------------------------------------------
     console.log("\n[步骤 1] 登录 Admin 并创建测试用户 A 与用户 B...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, "Admin 登录失败: " + JSON.stringify(loginJson));
+    assert.strictEqual(loginJson.code, 200, "Admin 登录失败: " + Number(loginJson?.code));
     adminToken = typeof loginJson.data === "string" ? loginJson.data : loginJson.data?.token;
     console.log("  ✓ Admin 登录成功");
 
@@ -82,7 +84,7 @@ import assert from "node:assert";
       headers: { "Content-Type": "application/json" }
     });
     const loginAJson = await loginARes.json();
-    assert.strictEqual(loginAJson.code, 200, "用户 A 登录失败: " + JSON.stringify(loginAJson));
+    assert.strictEqual(loginAJson.code, 200, "用户 A 登录失败: " + Number(loginAJson?.code));
     userAToken = typeof loginAJson.data === "string" ? loginAJson.data : loginAJson.data?.token;
 
     // 访问常规设置页面
@@ -193,7 +195,7 @@ import assert from "node:assert";
       headers: { "Content-Type": "application/json" }
     });
     const loginBJson = await loginBRes.json();
-    assert.strictEqual(loginBJson.code, 200, "用户 B 登录失败: " + JSON.stringify(loginBJson));
+    assert.strictEqual(loginBJson.code, 200, "用户 B 登录失败: " + Number(loginBJson?.code));
     userBToken = typeof loginBJson.data === "string" ? loginBJson.data : loginBJson.data?.token;
 
     // 模拟同一浏览器中登出用户 A 并登录用户 B

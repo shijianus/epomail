@@ -1,16 +1,18 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
-const BASE = "https://epomail.epocanvas.workers.dev";
-const ADMIN_EMAIL = "admin@epomail.bond";
-const ADMIN_PASS = "123456";
+const BASE = legacyOrigin;
+const ADMIN_EMAIL = legacyAdminEmail;
+const ADMIN_PASS = process.env.EPOMAIL_E2E_ADMIN_PASSWORD;
 
 async function run() {
   console.log("==========================================================================");
   console.log("=== 开始测试：邮件 AI 翻译格式还原 (表格/卡片/按钮)、暗黑模式与 OCR 审计 ===");
   console.log("==========================================================================\n");
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
 
@@ -41,7 +43,7 @@ async function run() {
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, "登录 code 必须为 200: " + JSON.stringify(loginJson));
+    assert.strictEqual(loginJson.code, 200, "登录 code 必须为 200: " + Number(loginJson?.code));
     const token = typeof loginJson.data === "string" ? loginJson.data : loginJson.data?.token;
     assert.ok(token, "必须获取到有效 Token");
     console.log("  ✓ Admin 登录成功，Token 正常提取\n");
@@ -141,7 +143,7 @@ async function run() {
     await page.goto(BASE + "/login/", { waitUntil: "networkidle" });
     await page.evaluate(({ token, richEmailHtml }) => {
       localStorage.setItem("token", token);
-      localStorage.setItem("loginEmail", "admin@epomail.bond");
+      localStorage.setItem("loginEmail", legacyAdminEmail);
       // 开启暗黑模式
       localStorage.setItem("ui", JSON.stringify({ dark: true, locale: "zh" }));
       document.documentElement.classList.add("dark");

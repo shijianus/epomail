@@ -1,9 +1,11 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
 (async () => {
   console.log('=== 开始多语言支持、多语言欢迎邮件与全域公告邮件 Playwright E2E 全链路测试 ===');
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ 
     viewport: { width: 1440, height: 900 },
     locale: 'zh-CN'
@@ -19,18 +21,18 @@ import assert from 'assert';
     console.log('  [Page Exception]:', err.message);
   });
 
-  const BASE = process.env.BASE_URL || 'https://epomail.epocanvas.workers.dev';
+  const BASE = process.env.BASE_URL || legacyOrigin;
 
   try {
     // Step 1: 登录管理账户
     console.log('\n[Checkpoint 1] 正在登录管理账户...');
     const loginRes = await page.request.post(BASE + '/api/login', {
-      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginJson = await loginRes.json();
     if (loginJson.code !== 200) {
-      throw new Error('登录失败: ' + JSON.stringify(loginJson));
+      throw new Error('登录失败: ' + Number(loginJson?.code));
     }
     const token = typeof loginJson.data === "string" ? loginJson.data : loginJson.data?.token;
     assert.ok(token, "必须获取到有效 Token");
@@ -41,7 +43,7 @@ import assert from 'assert';
     await page.goto(BASE + '/login/', { waitUntil: 'domcontentloaded' });
     await page.evaluate(({ token }) => {
       localStorage.setItem('token', token);
-      localStorage.setItem('loginEmail', 'admin@epomail.bond');
+      localStorage.setItem('loginEmail', legacyAdminEmail);
       localStorage.setItem('ui', JSON.stringify({ dark: false, locale: 'zh', defaultTranslateLang: 'zh' }));
       localStorage.setItem('setting', JSON.stringify({ lang: 'zh' }));
     }, { token });

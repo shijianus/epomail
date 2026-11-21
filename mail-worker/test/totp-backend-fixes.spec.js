@@ -3,7 +3,6 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import totpUtils from '../src/utils/totp-utils.js';
 import cryptoUtils from '../src/utils/crypto-utils.js';
 import JwtUtils from '../src/utils/jwt-utils.js';
-import loginService from '../src/service/login-service.js';
 import { dbInit } from '../src/init/init.js';
 
 const UID=980001, EMAIL='totp-backend@example.com', PASSWORD='test-only-password';
@@ -60,9 +59,30 @@ describe('TOTP backend security with real D1 mutation paths',()=>{
   expect(await env.kv.get(`auth-uid:${UID}`)).toBeNull();
   expect((await env.db.prepare('SELECT auth_version FROM user WHERE user_id=?').bind(UID).first()).auth_version).toBe(1);
   await env.kv.put(`auth-uid:${UID}`,JSON.stringify({tokens:['session-to-revoke'],user:{userId:UID,email:EMAIL}}));
-  await loginService.logout({env,req:{header:name=>name.toLowerCase()==='authorization'?jwt:null}},UID);
-  expect(await env.kv.get(`auth-uid:${UID}`)).toBeNull();
- });
+  const logout = token => SELF.fetch('https://example.com/api/logout', {
+   method: 'DELETE', headers: { Authorization: token }
+  });
+  const geo = token => SELF.fetch('https://example.com/api/my/geo', { headers: { Authorization: token } });
+  expect((await logout(jwt)).status).toBe(401);
+
+  // Enrollment consumed the current TOTP time step. Use distinct one-time
+  // recovery codes to sign in on two devices without reusing that proof.
+  async function loginWithRecovery(code) {
+   const pending = await api('/login', null, { email: EMAIL, password: PASSWORD });
+   expect(pending.data.mfaRequired).toBe(true);
+   const completed = await api('/login/totp', null, {
+    tempToken: pending.data.tempToken, code, isBackupCode: true
+   });
+   expect(completed.code).toBe(200);
+   expect(completed.data.token).toEqual(expect.any(String));
+   return completed.data.token;
+  }
+  const firstDevice = await loginWithRecovery(enabled.data.backupCodes[0]);
+  const secondDevice = await loginWithRecovery(enabled.data.backupCodes[1]);
+  expect((await logout(firstDevice)).status).toBe(200);
+  expect((await geo(firstDevice)).status).toBe(401);
+  expect((await geo(secondDevice)).status).toBe(200);
+ }, 60000);
  it('accumulates account lockout across distinct D1 pending MFA credentials',async()=>{
   await env.db.prepare('UPDATE user SET totp_enabled=1,totp_secret=? WHERE user_id=?').bind(await totpUtils.encryptSecret(SECRET,env),UID).run();
   const pending=[];
@@ -71,12 +91,13 @@ describe('TOTP backend security with real D1 mutation paths',()=>{
    expect(result.data.mfaRequired).toBe(true);pending.push(result.data.tempToken);
   }
   const actual=await totpUtils.generateTOTP(SECRET);const wrong=actual==='000000'?'111111':'000000';
+  const failKey=`login_fail:${EMAIL}|ip:local`;
   for(let i=0;i<4;i++){
    expect((await api('/login/totp',null,{tempToken:pending[0],code:wrong})).code).not.toBe(200);
-   expect(Number(await env.kv.get(`login_fail:${EMAIL}`))).toBe(i+1);
+   expect(Number(await env.kv.get(failKey))).toBe(i+1);
   }
   expect((await api('/login/totp',null,{tempToken:pending[1],code:wrong})).code).not.toBe(200);
-  expect(Number(await env.kv.get(`login_fail:${EMAIL}`))).toBe(5);
+  expect(Number(await env.kv.get(failKey))).toBe(5);
   expect((await api('/login/totp',null,{tempToken:pending[2],code:actual})).code).not.toBe(200);
   expect(await env.kv.get(`auth-uid:${UID}`)).toBeNull();
  });
@@ -97,5 +118,5 @@ describe('TOTP backend security with real D1 mutation paths',()=>{
   expect(stored.hashedCodes).toHaveLength(10);
   expect(stored.hashedCodes.filter(code=>code.used===0)).toHaveLength(10);
   expect(completed.data.backupCodes).not.toContain(backup.rawCodes[0]);
- });
+ }, 60000);
 });

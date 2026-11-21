@@ -1,9 +1,11 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
 (async () => {
   console.log("=== 开始「系统设置」用户资料控制卡片与「资料」分区权限 Playwright 自动化测试 ===");
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({ 
     viewport: { width: 1440, height: 900 },
     locale: "zh-CN"
@@ -12,13 +14,13 @@ import assert from "assert";
   page.on('console', msg => console.log('BROWSER LOG:', msg.type(), msg.text()));
   page.on('pageerror', err => console.log('BROWSER ERROR:', err));
 
-  const BASE = "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   try {
     // 1. 登录管理员
-    console.log("1. 正在登录 Cloudflare 生产环境...");
+    console.log("1. 正在登录 本地隔离环境...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();

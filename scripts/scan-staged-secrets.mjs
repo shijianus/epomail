@@ -194,6 +194,7 @@ export function scanTree(ref = 'HEAD') {
  */
 export function runSelfTest() {
   console.log('🧪 Running scanner self-test with isolated synthetic fixture...');
+  fs.mkdirSync(os.tmpdir(), { recursive: true });
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'epomail-sec-test-'));
   const tmpFile = path.join(tmpDir, 'synthetic-fixture.js');
 

@@ -1,51 +1,11 @@
-# Epocanvas Mail - Staging 回滚与容灾交接指南 (STAGING-ROLLBACK-HANDOFF.md)
+# EpoMail Staging 回滚交接
 
-> **当前部署环境**：`epomail-staging`
-> **当前部署 Version ID**：`b7962593-5735-4783-a7c4-7c9a302da341` (对应 Commit `fecde6d`)
-> **前一可用 Version ID**：`15339ebb-d842-45ae-81aa-4a49c0bbe2a6` (2026-10-24 23:20 UTC)
-> **回滚责任人**：Release Engineer / Site Ops
+Staging 回滚使用[统一的版本回退与数据恢复规程](ROLLBACK-PLAN.md)。从发布单读取候选 SHA、归档 SHA-256、Staging 账户与 Worker 名称、当前 Deployment ID、当前 Version ID、已演练的目标 Version ID，以及此次恢复点编号。交接人和复核人共同核对实际绑定。
 
----
+1. 在 Bash 中设置 `export EPOMAIL_ENV=staging`，并把发布单上的兼容版本赋给 `ROLLBACK_VERSION_ID`。执行统一规程的**锁定本次操作的环境**一节，确认只读查询返回的当前部署为本次验收使用的 Staging Worker。
+2. 在独立测试域暂停放量、外发、转发及其他对外通知。以真实受控邮箱记录在途和结果未知的邮件。按统一规程备份隔离环境的 D1、KV、附件及原始邮件对象，保留可用的恢复密钥版本。
+3. 执行已批准的版本回退，记录新 Deployment ID、活动 Version ID 和流量分配。以受控账户验证登录、收件、附件及已撤销会话，核对静态资源、调度和外发策略。验收完毕后按变更单恢复测试路由。
+4. 数据异常时使用空的隔离 D1、KV 和对象副本走**数据损坏时恢复到隔离资源**一节。需要测试空环境初始化时，可在新建隔离资源上调用受保护的 `POST /api/init` 建表、播种和升级。历史邮件、附件及回执从相应备份和对象版本中恢复。
+5. 将恢复点、目标和回退后的部署信息、演练时间、已核销的数据差异、业务验证与复核人关联到公测证据清单。轮换 Staging 凭据或撤销测试会话属于单独的处置动作，应使用当前测试环境绑定和凭据所有者批准的步骤。
 
-## 1. 部署回滚命令与规程
-
-若 Staging 在下一轮测试中发现阻断性缺陷需要回退至上一稳定版本：
-
-### 1.1 一键回退至上一版本 (Fast Rollback)
-```bash
-# 回滚 epomail-staging 至前一稳定部署版本
-pnpm --dir mail-worker exec wrangler rollback 15339ebb-d842-45ae-81aa-4a49c0bbe2a6 --config mail-worker/wrangler.toml --env staging
-```
-
-### 1.2 静态资源 Assets 同步保证
-- 由于前端构建产物（`mail-worker/dist`）通过 Wrangler `assets` 绑定与 Worker 声明同周期部署，执行 `wrangler rollback` 会将 Worker 代码与前端静态资产**严格原子级同步回退**，不存在静态资源版本错位。
-
----
-
-## 2. 数据库向下兼容性与回滚影响 (Data Compatibility)
-
-1. **D1 Schema 向后兼容**：
-   本次部署在 `epomail-staging-db` 中添加的表（如 `rate_limit_counter`、`auth_security_operation`、`mail_outbound_task`）和新字段（如 `email.trashed_at`、`user.auth_version`）均为纯增量扩展。回滚至旧版 Worker 后，旧代码执行原有 SQL 查询时直接忽略新增结构，数据库无需执行任何降级回退操作。
-2. **紧急数据清空与重建 SOP**：
-   若下一轮测试导致测试数据异常，需要将 Staging D1 清空重建：
-   ```bash
-   # 仅限测试环境：按需重新执行 /api/init
-   curl -X POST https://epomail-staging.epocanvas.workers.dev/api/init \
-     -H "X-Init-Secret: <your_staging_init_secret>"
-   ```
-
----
-
-## 3. 紧急熔断与凭证吊销
-
-1. **外发开关熔断**：
-   当前配置中 `EMAIL_OUTBOUND_ENABLED` 已经是 `"false"`。若被意外开启，可通过重新部署或修改环境变量立即切断：
-   ```toml
-   [env.staging.vars]
-   EMAIL_OUTBOUND_ENABLED = "false"
-   ```
-2. **Staging 会话即时全量失效**：
-   若需立即注销所有 Staging 在线用户会话，可通过 D1 将所有用户的 `auth_version` 自增 1：
-   ```bash
-   pnpm --dir mail-worker exec wrangler d1 execute epomail-staging-db --remote --command "UPDATE user SET auth_version = auth_version + 1;"
-   ```
+[公测执行计划](doc/release/PUBLIC-BETA-EXECUTION-PLAN.md) · [候选运维与验收](doc/public-beta-release-operations.md)

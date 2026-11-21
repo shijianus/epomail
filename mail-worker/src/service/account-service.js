@@ -1,8 +1,9 @@
 import BizError from '../error/biz-error';
 import verifyUtils from '../utils/verify-utils';
-import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES } from '../utils/email-utils';
+import emailUtils, { RESERVED_EMAIL_LOCAL_NAMES, isConfiguredDomain } from '../utils/email-utils';
 import userService from './user-service';
 import emailService from './email-service';
+import { purgeOwnedMail } from './mail-lifecycle-service.js';
 import { mailOrm as orm } from '../entity/orm';
 import account from '../entity/account';
 import { and, asc, eq, gt, inArray, count, sql, ne, or, lt, desc } from 'drizzle-orm';
@@ -12,7 +13,7 @@ import turnstileService from './turnstile-service';
 import roleService from './role-service';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
-import KvConst from '../const/kv-const';
+import { clearDeletedLoginFailures } from './login-failure-cleanup.js';
 import rbacGuard from './rbac-guard-service.js';
 
 const accountService = {
@@ -37,7 +38,7 @@ const accountService = {
 			throw new BizError(t('notEmail'));
 		}
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!isConfiguredDomain(c.env.domain, emailUtils.getDomain(email))) {
 			throw new BizError(t('notExistDomain'));
 		}
 
@@ -136,6 +137,13 @@ const accountService = {
 		).get();
 	},
 
+	selectActiveForUser(c, userId, preferredEmail) {
+		return orm(c).select({ accountId: account.accountId, email: account.email }).from(account)
+			.where(and(eq(account.userId, userId), eq(account.isDel, isDel.NORMAL), eq(account.status, 0)))
+			.orderBy(desc(sql`${account.email} = ${preferredEmail || ''} COLLATE NOCASE`),
+				desc(account.sort), asc(account.accountId)).limit(1).get();
+	},
+
 	selectByEmail(c, email) {
 		return orm(c).select().from(account).where(
 			and(
@@ -192,11 +200,15 @@ const accountService = {
 		const user = await userService.selectById(c, userId);
 		const accountRow = await this.selectById(c, accountId);
 
-		if (accountRow.email === user.email) {
+		if (!accountRow) {
+			throw new BizError(t('noUserAccount'), 404);
+		}
+
+		if (user && accountRow.email === user.email) {
 			throw new BizError(t('delMyAccount'));
 		}
 
-		if (accountRow.userId !== user.userId) {
+		if (!user || accountRow.userId !== user.userId) {
 			throw new BizError(t('noUserAccount'));
 		}
 
@@ -274,6 +286,10 @@ const accountService = {
 		if (roleRow?.roleCode === 'visitor') {
 			throw new BizError('【参观者模式】仅提供只读体验，不支持修改账号名称', 403, 'visitor_readonly');
 		}
+		const accountRow = accountId ? await this.selectById(c, accountId) : null;
+		if (!accountRow || Number(accountRow.userId) !== Number(userId)) {
+			throw new BizError(t('noUserAccount'), 404);
+		}
 		const lowerName = cleanName.toLowerCase();
 		const adminLocal = c?.env?.admin ? emailUtils.getName(c.env.admin).toLowerCase() : 'admin';
 		if ((lowerName === 'admin' || (adminLocal && lowerName === adminLocal)) && userRow.email !== c?.env?.admin) {
@@ -330,38 +346,22 @@ const accountService = {
 		if (aid === 1) {
 			throw new BizError('系统主站长信箱（Account 1）禁止物理删除！', 403);
 		}
-		let targetAcc = null;
-		try {
-			targetAcc = await orm(c).select().from(account).where(eq(account.accountId, aid)).get();
-		} catch (e) {}
-
-		if (targetAcc?.userId) {
-			await rbacGuard.assertCanManageUser(c, callerUserId, targetAcc.userId);
-		}
-
-		await emailService.physicsDeleteByAccountId(c, aid);
-		await orm(c).delete(account).where(eq(account.accountId, aid)).run();
-
-		if (targetAcc && c.env?.kv) {
-			try {
-				if (targetAcc.email) {
-					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.email.trim().toLowerCase()).catch(() => {});
-					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.email.trim()).catch(() => {});
-				}
-				if (targetAcc.name) {
-					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.name.trim().toLowerCase()).catch(() => {});
-					await c.env.kv.delete(KvConst.LOGIN_FAIL + targetAcc.name.trim()).catch(() => {});
-				}
-			} catch (e) {}
-		}
+		if (!Number.isSafeInteger(aid) || aid <= 0) throw new BizError(t('noUserAccount'), 400);
+		const targetAcc = await orm(c).select().from(account).where(eq(account.accountId, aid)).get();
+		if (!targetAcc) throw new BizError(t('noUserAccount'), 404);
+		await rbacGuard.assertCanManageUser(c, callerUserId, targetAcc.userId);
+		// Hold the authorized alias while KV is unavailable. The final guarded
+		// transaction rejects a renamed, restored or reassigned mailbox.
+		await purgeOwnedMail(c, targetAcc.userId, aid, { mailbox: targetAcc, retainLocator: true });
+		await clearDeletedLoginFailures(c, [], [targetAcc], targetAcc);
+		await purgeOwnedMail(c, targetAcc.userId, aid, { mailbox: targetAcc });
 	},
 
 	async setAllReceive(c, params, userId) {
-		let a = null
 		const { accountId } = params;
-		const accountRow = await this.selectById(c, accountId);
-		if (accountRow.userId !== userId) {
-			return;
+		const accountRow = accountId ? await this.selectById(c, accountId) : null;
+		if (!accountRow || accountRow.userId !== userId) {
+			throw new BizError(t('noUserAccount'), accountRow ? 403 : 404);
 		}
 		await orm(c).update(account).set({ allReceive: accountConst.allReceive.CLOSE }).where(eq(account.userId, userId)).run();
 		await orm(c).update(account).set({ allReceive: accountRow.allReceive ? 0 : 1 }).where(eq(account.accountId, accountId)).run();
@@ -370,10 +370,17 @@ const accountService = {
 	async setAsTop(c, params, userId) {
 		const { accountId } = params;
 		const userRow = await userService.selectById(c, userId);
+		const targetRow = accountId ? await this.selectById(c, accountId) : null;
+		if (!userRow || !targetRow || targetRow.userId !== userId) {
+			throw new BizError(t('noUserAccount'), targetRow ? 403 : 404);
+		}
 		const mainAccountRow = await accountService.selectByEmailIncludeDel(c, userRow.email);
+		if (!mainAccountRow) {
+			throw new BizError(t('noUserAccount'), 404);
+		}
 		let mainSort = mainAccountRow.sort === 0 ? 2 : mainAccountRow.sort + 1;
-		await orm(c).update(account).set({ sort: mainSort }).where(eq(account.email, userRow.email )).run();
-		await orm(c).update(account).set({ sort: mainSort - 1 }).where(and(eq(account.accountId, accountId),eq(account.userId,userId))).run();
+		await orm(c).update(account).set({ sort: mainSort }).where(eq(account.email, userRow.email)).run();
+		await orm(c).update(account).set({ sort: mainSort - 1 }).where(and(eq(account.accountId, accountId), eq(account.userId, userId))).run();
 	}
 };
 

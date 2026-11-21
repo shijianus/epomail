@@ -8,6 +8,7 @@ import result from '../model/result';
 import userContext from '../security/user-context';
 import constant from '../const/constant';
 import legalPolicyService from '../service/legal-policy-service.js';
+import { readJsonObject } from '../utils/request-body.js';
 
 app.get('/my/loginUserInfo', async (c) => {
 	const user = await userService.loginUserInfo(c, userContext.getUserId(c), userContext.getLoginEmail(c));
@@ -39,7 +40,7 @@ app.put('/my/setInitialPassword', async (c) => {
 });
 
 app.put('/my/resetPassword', async (c) => {
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	await userService.resetPassword(c, body, userContext.getUserId(c), {
 		requireCurrent: true,
 		currentPassword: body?.currentPassword
@@ -48,7 +49,7 @@ app.put('/my/resetPassword', async (c) => {
 });
 
 app.put('/my/updateProfile', async (c) => {
-	await userService.updateProfile(c, await c.req.json(), userContext.getUserId(c));
+	await userService.updateProfile(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
@@ -58,7 +59,7 @@ app.post('/my/uploadImage', async (c) => {
 });
 
 app.put('/my/setCustomLabels', async (c) => {
-	await userService.setCustomLabels(c, await c.req.json(), userContext.getUserId(c));
+	await userService.setCustomLabels(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
@@ -86,38 +87,38 @@ app.get('/my/totp/status', async (c) => {
 
 app.post('/my/totp/setup', async (c) => {
 	const userObj = userContext.getUser(c);
-	const data = await totpService.getSetupInfo(c, userContext.getUserId(c), userObj.email, await c.req.json());
+	const data = await totpService.getSetupInfo(c, userContext.getUserId(c), userObj.email, await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
 app.post('/my/totp/enable', async (c) => {
-	const data = await totpService.enableTotp(c, userContext.getUserId(c), await c.req.json());
+	const data = await totpService.enableTotp(c, userContext.getUserId(c), await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
 app.post('/my/totp/disable', async (c) => {
-	await totpService.disableTotp(c, userContext.getUserId(c), await c.req.json());
+	await totpService.disableTotp(c, userContext.getUserId(c), await readJsonObject(c));
 	return c.json(result.ok());
 });
 
 app.post('/my/totp/backup-codes', async (c) => {
-	const data = await totpService.regenerateBackupCodes(c, userContext.getUserId(c), await c.req.json());
+	const data = await totpService.regenerateBackupCodes(c, userContext.getUserId(c), await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
 app.post('/my/totp/view-backup-codes', async (c) => {
-	const data = await totpService.viewBackupCodes(c, userContext.getUserId(c), await c.req.json());
+	const data = await totpService.viewBackupCodes(c, userContext.getUserId(c), await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
 app.post('/my/passkey/setup', async (c) => {
 	const userObj = userContext.getUser(c);
-	const data = await totpService.getPasskeyRegistrationOptions(c, userContext.getUserId(c), userObj.email, await c.req.json());
+	const data = await totpService.getPasskeyRegistrationOptions(c, userContext.getUserId(c), userObj.email, await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
 app.post('/my/passkey/register', async (c) => {
-	const data = await totpService.registerPasskey(c, userContext.getUserId(c), await c.req.json());
+	const data = await totpService.registerPasskey(c, userContext.getUserId(c), await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
@@ -128,24 +129,28 @@ app.get('/my/passkey/list', async (c) => {
 
 app.delete('/my/passkey/:id', async (c) => {
 	const passkeyId = c.req.param('id');
-	await totpService.deletePasskey(c, userContext.getUserId(c), passkeyId, await c.req.json());
+	// The re-authentication proof is optional at the transport layer. The
+	// service still enforces it, but an empty DELETE body must become a normal
+	// validation failure instead of an uncaught JSON parser exception (HTTP 500).
+	const body = await c.req.json().catch(() => ({}));
+	await totpService.deletePasskey(c, userContext.getUserId(c), passkeyId, body);
 	return c.json(result.ok());
 });
 
 app.post('/my/totp/update', async (c) => {
-	const data = await totpService.updateTotp(c, userContext.getUserId(c), await c.req.json());
+	const data = await totpService.updateTotp(c, userContext.getUserId(c), await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
 app.post('/my/passkey/:id/approve-totp', async (c) => {
 	const passkeyId = c.req.param('id');
-	const data = await totpService.approvePasskeyWithTotp(c, userContext.getUserId(c), passkeyId, await c.req.json());
+	const data = await totpService.approvePasskeyWithTotp(c, userContext.getUserId(c), passkeyId, await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
 app.post('/my/passkey/:id/activate-timelock', async (c) => {
 	const passkeyId = c.req.param('id');
-	const data = await totpService.activateTimelockedPasskey(c, userContext.getUserId(c), passkeyId, await c.req.json());
+	const data = await totpService.activateTimelockedPasskey(c, userContext.getUserId(c), passkeyId, await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
@@ -157,24 +162,61 @@ app.post('/my/passkey/:id/test-options', async (c) => {
 
 app.post('/my/passkey/:id/test-verify', async (c) => {
 	const passkeyId = c.req.param('id');
-	const data = await totpService.verifyPasskeyTest(c, userContext.getUserId(c), passkeyId, await c.req.json());
+	const data = await totpService.verifyPasskeyTest(c, userContext.getUserId(c), passkeyId, await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
 app.put('/my/passkey/:id', async (c) => {
 	const passkeyId = c.req.param('id');
-	const { name } = await c.req.json();
+	const { name } = await readJsonObject(c);
 	await totpService.renamePasskey(c, userContext.getUserId(c), passkeyId, name);
 	return c.json(result.ok());
 });
 
 app.get('/my/exportData', async (c) => {
-	const data = await userService.exportUserData(c, userContext.getUserId(c), c.req.query());
-	return c.json(result.ok(data));
+	const params = c.req.query();
+	const userId = userContext.getUserId(c);
+	const first = await userService.exportUserData(c, userId, params);
+	c.header('Cache-Control', 'private, no-store');
+	if (params.paged === '1' || !Array.isArray(first.emails)) return c.json(result.ok(first));
+	const { emails, totalEmails, nextBefore, asOf, ...metadata } = first;
+	if (!nextBefore) return c.json(result.ok({ ...metadata, emails, totalEmails }));
+
+	// Keep the complete JSON envelope for existing download clients. A later
+	// read/decryption failure aborts the stream instead of closing a partial archive.
+	async function* chunks() {
+		const head = JSON.stringify(result.ok(metadata));
+		yield head.slice(0, -2) + ',"emails":[';
+		let rows = emails, cursor = nextBefore, count = 0;
+		while (true) {
+			for (const row of rows) {
+				yield (count ? ',' : '') + JSON.stringify(row);
+				count++;
+			}
+			if (!cursor) break;
+			const page = await userService.exportUserData(c, userId, {
+				...params, type: 'emails', before: cursor, asOf
+			});
+			rows = page.emails;
+			cursor = page.nextBefore;
+		}
+		yield `],"totalEmails":${count}}}`;
+	}
+	const iterator = chunks();
+	const encoder = new TextEncoder();
+	const body = new ReadableStream({
+		async pull(controller) {
+			const chunk = await iterator.next();
+			if (chunk.done) controller.close();
+			else controller.enqueue(encoder.encode(chunk.value));
+		},
+		cancel() { return iterator.return(); }
+	});
+	return c.body(body, 200, { 'Content-Type': 'application/json; charset=utf-8' });
 });
 
 app.post('/my/testTelegram', async (c) => {
-	const data = await telegramService.testPersonalBot(c, await c.req.json(), userContext.getUserId(c));
+	const data = await telegramService.testPersonalBot(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok(data));
 });
 
@@ -184,7 +226,7 @@ app.get('/my/apiTokens', async (c) => {
 });
 
 app.post('/my/apiTokens', async (c) => {
-	const data = await userService.createApiToken(c, userContext.getUserId(c), await c.req.json());
+	const data = await userService.createApiToken(c, userContext.getUserId(c), await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
@@ -200,12 +242,12 @@ app.get('/my/storage', async (c) => {
 });
 
 app.post('/my/storage/test', async (c) => {
-	const data = await userService.testUserStorage(c, userContext.getUserId(c), await c.req.json());
+	const data = await userService.testUserStorage(c, userContext.getUserId(c), await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
 app.put('/my/storage', async (c) => {
-	const data = await userService.updateUserStorage(c, userContext.getUserId(c), await c.req.json());
+	const data = await userService.updateUserStorage(c, userContext.getUserId(c), await readJsonObject(c));
 	return c.json(result.ok(data));
 });
 
@@ -229,7 +271,7 @@ app.delete('/my/oauthGrants/:id', async (c) => {
 
 // 解除特定应用授权 (通过 client_id 或 id)
 app.post('/my/revokeOauthGrant', async (c) => {
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const data = await oauthAppService.revokeGrant(c, userContext.getUserId(c), body.id || body.clientId);
 	return c.json(result.ok(data));
 });
@@ -275,10 +317,10 @@ app.delete('/my/oauthIdentities/:id', async (c) => {
 
 
 app.post('/my/security/reauth-options', async (c) => {
- return c.json(result.ok(await totpService.reauthOptions(c, userContext.getUserId(c), await c.req.json())));
+ return c.json(result.ok(await totpService.reauthOptions(c, userContext.getUserId(c), await readJsonObject(c))));
 });
 app.post('/my/security/reauth', async (c) => {
- return c.json(result.ok(await totpService.reauthenticate(c, userContext.getUserId(c), await c.req.json())));
+ return c.json(result.ok(await totpService.reauthenticate(c, userContext.getUserId(c), await readJsonObject(c))));
 });
 
 app.get('/my/legal/status', async (c) => {

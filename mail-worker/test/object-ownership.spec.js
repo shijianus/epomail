@@ -1,5 +1,6 @@
 import { env, SELF } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { parseHTML } from 'linkedom';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import attService from '../src/service/att-service.js';
 import settingService from '../src/service/setting-service.js';
@@ -167,6 +168,22 @@ describe('Object ownership and capability signing', () => {
 		});
 		const body = await response.json();
 		expect(body.code).toBe(401);
+	});
+
+	it('preserves the HTML serializer bytes for plain text and simple paragraphs', async () => {
+		const lookup = vi.spyOn(attService, 'selectOneByKeys');
+		for (const text of ['', 'plain text', '中文\r\n第二行 😀', 'quotes " and apostrophes\'']) {
+			for (const html of [text, '<p>' + text + '</p>']) {
+				expect(await attService.toImageUrlHtml({ env }, html, 2)).toEqual({
+					html: parseHTML(html).document.toString(), imageDataList: []
+				});
+			}
+		}
+		expect(lookup).not.toHaveBeenCalled();
+		for (const html of ['1 < 2', 'a > b & c', 'non\u00a0breaking', '<p>&amp;</p>',
+			'<P>upper</P>', '<p class=x>style</p>', '<p>nested <b>markup</b></p>', '<p>unclosed']) {
+			expect((await attService.toImageUrlHtml({ env }, html, 2)).html).toBe(parseHTML(html).document.toString());
+		}
 	});
 
 	it('never embeds another mailbox inline image while preparing a send', async () => {

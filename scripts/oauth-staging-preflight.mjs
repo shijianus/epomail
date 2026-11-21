@@ -35,6 +35,7 @@ if (args.help) {
   --base-url <url>    staging origin; checked for HTTPS and non-production
   --live              run read-only GET/OPTIONS probes against --base-url
   --allow-local       allow http://127.0.0.1 for local rehearsal only
+  --sandbox-outbound  validate explicitly enabled, allowlisted Staging outbound
   --json              machine-readable output
   --help              this message
 
@@ -46,7 +47,8 @@ with real staging credentials and a human completes the provider steps.
 }
 
 const checks = new Checks({ color: !args.json });
-runStaticChecks({ configPath: args.config ? args.config : DEFAULT_CONFIG, checks });
+runStaticChecks({ configPath: args.config ? args.config : DEFAULT_CONFIG, checks,
+	allowSandboxOutbound: args['sandbox-outbound'] === true });
 
 let base = '';
 if (args['base-url']) {

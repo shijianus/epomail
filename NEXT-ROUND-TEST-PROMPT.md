@@ -1,6 +1,6 @@
 # 下一轮独立测试任务指令 (NEXT-ROUND-TEST-PROMPT.md)
 
-> **使用方法**：在新开启的独立测试会话中，直接复制以下 Prompt 作为首轮提示词发送给 AI 代理，即可立即启动针对 Staging 真实环境的独立全量测试。
+> **历史测试交接**。下文记录 2026-11-07 部署的任务与资源。新候选的交接从其同步包、完整 SHA 和官方 Quality Gates 制品开始。请核对本次 Staging 的实际 Deployment ID、Version ID 与审核授权。[当前公测制品放行流程](doc/release/PUBLIC-BETA-PROMOTION.md)
 
 ---
 

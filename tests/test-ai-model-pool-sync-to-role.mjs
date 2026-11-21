@@ -1,3 +1,5 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
@@ -6,7 +8,7 @@ import assert from "assert";
   console.log("=== 开始测试：系统设置已选定模型池实时同步至角色权限 AI 允许模型下拉选项 ===");
   console.log("==========================================================================");
 
-  const browser = await chromium.launch({
+  const browser = await launchIsolatedChromium(chromium, {
     headless: true,
     args: ["--lang=zh-CN"]
   });
@@ -15,7 +17,7 @@ import assert from "assert";
     locale: "zh-CN"
   });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   let adminToken = null;
   let originalSetting = null;
@@ -25,11 +27,11 @@ import assert from "assert";
     // 1. 登录 Admin 账号
     console.log("\n[步骤 1] 登录 Admin 账号获取鉴权 Token...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "Admin 登录失败: " + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, "Admin 登录失败: " + Number(loginData?.code));
     adminToken = typeof loginData.data === "string" ? loginData.data : loginData.data?.token;
     console.log("  ✓ Admin 登录成功");
 

@@ -6,6 +6,9 @@ import { detectProvider } from '../utils/s3-signer';
 import { normalizeObjectKey } from '../utils/object-key-utils.js';
 import { buildSignedObjectUrl } from '../utils/object-token.js';
 import { safeObjectHeaders } from '../utils/object-response.js';
+import safeLogger from '../utils/safe-logger.js';
+import { decryptByoStorageConfig } from '../utils/storage-credential-crypto.js';
+import byoStorageMigrationService from './byo-storage-migration-service.js';
 
 function requireInboundRawObjectKey(key) {
 	if (typeof key !== 'string' || key !== key.trim() || !/^(?:attachments\/mail-raw-|mail-raw\/inbound\/)[a-f0-9]{64}\.enc$/.test(key)) {
@@ -39,14 +42,18 @@ const r2Service = {
 
 					if (forDeletion && !userRow) throw new Error('Original object storage owner is unavailable');
 					if (userRow && Number(userRow.byo_storage_enabled) === 1) {
-						let cfg = userRow.byo_storage_config;
-						if (typeof cfg === 'string') {
-							try { cfg = JSON.parse(cfg); } catch (e) { cfg = null; }
-						}
-						if (cfg && cfg.bucket && cfg.endpoint && cfg.s3AccessKey && cfg.s3SecretKey) {
+						const decrypted = await decryptByoStorageConfig(userRow.byo_storage_config, c.env, userId);
+						if (decrypted.ok && decrypted.state !== 'empty' && decrypted.config.bucket && decrypted.config.endpoint && decrypted.config.s3AccessKey && decrypted.config.s3SecretKey) {
+							// Lazy re-encrypt plaintext or older key-domain configs on non-deletion traffic
+							if (!forDeletion && decrypted.needsMigration) {
+								await byoStorageMigrationService.lazyMigrateRow(c, {
+									user_id: userId,
+									byo_storage_config: userRow.byo_storage_config
+								}).catch(() => {});
+							}
 							return {
 								type: 'USER_S3',
-								config: cfg
+								config: decrypted.config
 							};
 						}
 						throw new Error('Original BYO storage configuration is unavailable');
@@ -235,7 +242,7 @@ const r2Service = {
 				const directUrl = await s3Service.getPresignedDownloadUrl(c, safeKey, resolved.config, filename, 3600);
 				if (directUrl) return directUrl;
 			} catch (e) {
-				console.warn('Presigned download URL generation failed:', e.message);
+				safeLogger.warn('r2_presigned_download_url_failed', { error: e });
 			}
 		}
 

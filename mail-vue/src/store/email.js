@@ -122,6 +122,7 @@ export const useEmailStore = defineStore('email', {
         }
     },
     persist: {
-        pick: ['contentData'],
+        // Restore the view from the route and the server, including the current official marker.
+        pick: ['contentData.delType', 'contentData.showStar', 'contentData.showReply', 'contentData.showUnread'],
     },
 })

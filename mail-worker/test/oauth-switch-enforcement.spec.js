@@ -6,6 +6,7 @@ import settingService from '../src/service/setting-service.js';
 import cryptoUtils from '../src/utils/crypto-utils.js';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import oneTimeCredential, { OTC_PURPOSE } from '../src/utils/one-time-credential.js';
+import { encryptProviderSecret } from '../src/utils/oauth-secret-crypto.js';
 
 vi.setConfig({ testTimeout: 60000 });
 
@@ -327,6 +328,55 @@ describe('Module A: OAuth switch enforcement, stale state/token revocation, PKCE
 		expect(auth.errorCode).toBe('oauth_provider_unconfigured');
 	});
 
+	it('requires encrypted provider secrets in staging and decrypts migrated values at runtime', async () => {
+		const stagingEnv = {
+			...env,
+			ENVIRONMENT: 'staging',
+			oauth_client_enc_key: 'test-oauth-client-encryption-key-for-unit-tests'
+		};
+		const stagingContext = { env: stagingEnv, get: () => undefined, set: () => {} };
+		try {
+			await stagingEnv.kv.put('setting:', JSON.stringify({
+				oauthLoginEnabled: 1,
+				oauthProviders: {
+					github: { clientId: 'gh-staging-id', clientSecret: 'legacy-plaintext', privateKey: 'legacy-private-key', enabled: 1 }
+				}
+			}), { expirationTtl: 3600 });
+
+			await expect(oauthService.assertProviderEnabled(stagingContext, 'github'))
+				.rejects.toMatchObject({ errorCode: 'oauth_provider_secret_migration_required', code: 503 });
+			expect(await oauthService.getPublicProviders(stagingContext)).toEqual([]);
+
+			const encrypted = await encryptProviderSecret(stagingEnv, 'github', 'clientSecret', 'legacy-plaintext');
+			await stagingEnv.kv.put('setting:', JSON.stringify({
+				oauthLoginEnabled: 1,
+				oauthProviders: {
+					github: { clientId: 'gh-staging-id', clientSecret: encrypted, privateKey: 'legacy-private-key', enabled: 1 }
+				}
+			}), { expirationTtl: 3600 });
+			await expect(oauthService.assertProviderEnabled(stagingContext, 'github'))
+				.rejects.toMatchObject({ errorCode: 'oauth_provider_secret_migration_required', code: 503 });
+
+			const encryptedPrivateKey = await encryptProviderSecret(stagingEnv, 'github', 'privateKey', 'legacy-private-key');
+			await stagingEnv.kv.put('setting:', JSON.stringify({
+				oauthLoginEnabled: 1,
+				oauthProviders: {
+					github: { clientId: 'gh-staging-id', clientSecret: encrypted, privateKey: encryptedPrivateKey, enabled: 1 }
+				}
+			}), { expirationTtl: 3600 });
+			const envWithoutOAuthKey = { ...stagingEnv };
+			delete envWithoutOAuthKey.oauth_client_enc_key;
+			await expect(oauthService.assertProviderEnabled({ ...stagingContext, env: envWithoutOAuthKey }, 'github'))
+				.rejects.toMatchObject({ errorCode: 'oauth_provider_secret_unavailable', code: 503 });
+			const config = await oauthService.assertProviderEnabled(stagingContext, 'github');
+			expect(config.clientId).toBe('gh-staging-id');
+			expect(config.clientSecret).toBe('legacy-plaintext');
+			expect(config.privateKey).toBe('legacy-private-key');
+		} finally {
+			await stagingEnv.kv.delete('setting:');
+		}
+	});
+
 	it('revokes pending one-time credentials in D1 when settingService.set disables a provider or global OAuth', async () => {
 		const ctx = { env, get: () => undefined, set: () => {} };
 		await settingService.set(ctx, {
@@ -336,6 +386,10 @@ describe('Module A: OAuth switch enforcement, stale state/token revocation, PKCE
 				google: { clientId: 'gg-id', clientSecret: 'gg-sec', enabled: 1 }
 			}
 		});
+		const storedSetting = await env.db.prepare('SELECT oauth_providers FROM setting LIMIT 1').first();
+		const storedProviders = JSON.parse(storedSetting.oauth_providers);
+		expect(storedProviders.github.clientSecret).toMatch(/^v1:/);
+		expect(storedProviders.google.clientSecret).toMatch(/^v1:/);
 
 		const ghState = await oneTimeCredential.issue(ctx, {
 			purpose: OTC_PURPOSE.STATE,

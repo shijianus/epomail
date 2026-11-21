@@ -6,6 +6,8 @@ import userContext from "../security/user-context";
 import { isAdminUser } from "../utils/admin-utils";
 import BizError from "../error/biz-error";
 import rateLimit from '../utils/rate-limit.js';
+import safeLogger from '../utils/safe-logger.js';
+import readJsonObject from '../utils/request-body.js';
 
 function redirectToLogin(c, params) {
 	const query = new URLSearchParams(params);
@@ -76,7 +78,7 @@ async function handleBindCallback(c, provider, params, stateRow) {
 		}
 		return finish('conflict');
 	} catch (err) {
-		console.warn(`OAuth bind callback failed for ${provider}: ${err?.message || 'unknown error'}`);
+		safeLogger.warn('oauth_bind_callback_failed', { provider, error: err });
 		return finish('error');
 	}
 }
@@ -86,7 +88,7 @@ async function handleOAuthCallback(c) {
 	try {
 		const params = await readCallbackParams(c);
 		if (params.error) {
-			console.warn(`OAuth provider ${provider} returned an authorization error`);
+			safeLogger.warn('oauth_provider_auth_error', { provider });
 			return redirectToLogin(c, { error: 'oauth_denied' });
 		}
 		if (!params.code && !params.id_token) {
@@ -99,7 +101,7 @@ async function handleOAuthCallback(c) {
 		try {
 			stateRow = await oauthService.consumeState(c, provider, params.state);
 		} catch (_) {
-			console.warn(`OAuth state rejected for provider ${provider}`);
+			safeLogger.warn('oauth_state_rejected', { provider });
 			return redirectToLogin(c, { error: 'oauth_state_invalid' });
 		}
 
@@ -147,7 +149,7 @@ async function handleOAuthCallback(c) {
 		}
 		return c.redirect(`/login?${query.toString()}#oauth_bind=${bindProof}`);
 	} catch (err) {
-		console.warn(`OAuth callback failed for ${provider}: ${err?.message || 'unknown error'}`);
+		safeLogger.warn('oauth_callback_failed', { provider, error: err });
 		const isPolicyDisabled = ['oauth_disabled', 'oauth_provider_disabled', 'oauth_provider_unconfigured'].includes(err?.errorCode);
 		return redirectToLogin(c, { error: isPolicyDisabled ? 'oauth_disabled' : 'oauth_failed' });
 	}
@@ -175,7 +177,7 @@ app.get('/oauth/authorize/:provider', async (c, next) => {
 // Public: direct login with OAuth authorization code or ID token
 app.post('/oauth/:provider/login', async (c) => {
 	const provider = (c.req.param('provider') || '').trim().toLowerCase();
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	await oauthService.assertProviderEnabled(c, provider);
 
 	let loginParams = { ...body };
@@ -210,7 +212,7 @@ app.post('/oauth/:provider/login', async (c) => {
 // Public: exchange the short-lived callback code for the real mailbox token
 app.post('/oauth/exchange', async (c) => {
 	await rateLimit.check(c, { scope: 'oauth-exchange', limit: 60, windowSeconds: 900 });
-	const body = await c.req.json().catch(() => ({}));
+	const body = await readJsonObject(c);
 	const exchange = await oauthService.consumeLoginExchangeCode(c, body.code);
 	if (exchange.mfa) {
 		return c.json(result.ok({
@@ -229,7 +231,7 @@ app.post('/oauth/verify/:provider', async (c) => {
 		throw new BizError('Admin permission required to verify OAuth provider');
 	}
 	const provider = c.req.param('provider');
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	const verifyResult = await oauthService.verifyProvider(c, provider, body);
 	return c.json(result.ok(verifyResult));
 });
@@ -240,7 +242,7 @@ app.post('/oauth/callback/:provider', handleOAuthCallback);
 
 // Backwards compatibility for LinuxDo
 app.post('/oauth/linuxDo/login', async (c) => {
-	const body = await c.req.json();
+	const body = await readJsonObject(c);
 	await oauthService.assertProviderEnabled(c, 'linuxdo');
 	if (!body?.state || typeof body.state !== 'string') {
 		throw new BizError('Missing OAuth state', 400, 'oauth_state_required');
@@ -256,6 +258,6 @@ app.post('/oauth/linuxDo/login', async (c) => {
 
 // Bind user with email
 app.put('/oauth/bindUser', async (c) => {
-	const loginInfo = await oauthService.bindUser(c, await c.req.json());
+	const loginInfo = await oauthService.bindUser(c, await readJsonObject(c));
 	return c.json(result.ok(loginInfo));
 });

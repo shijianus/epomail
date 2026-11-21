@@ -22,8 +22,8 @@
         <div class="desktop-layout">
           <!-- Left Side: Identity Card -->
           <div class="profile-identity-card">
-            <div class="avatar" :style="profileData.userInfo.avatarUrl ? 'background-image: url(' + profileData.userInfo.avatarUrl + '); background-size: cover; background-position: center;' : ''">
-              <span v-if="!profileData.userInfo.avatarUrl">{{ profileData.userInfo.avatarInitials }}</span>
+            <div class="avatar" :style="avatarPhotoStyle">
+              <span v-if="!hasSafeAvatar">{{ profileData.userInfo.avatarInitials }}</span>
               <div class="verified-badge">
                 <svg class="ic-fill" style="width:20px; height:20px;" viewBox="0 0 24 24"><path d="M22.5 12.5c0-.67-.2-1.33-.57-1.89l1.45-2.02c.32-.44.38-1.01.15-1.5-.23-.49-.71-.8-1.25-.8h-2.47c-.43 0-.82-.24-1.02-.63l-1.1-2.22c-.25-.5-.73-.83-1.29-.89-.55-.06-1.1.17-1.46.61l-1.6 1.94c-.4.49-1.02.77-1.66.77s-1.26-.28-1.66-.77l-1.6-1.94c-.36-.44-.91-.67-1.46-.61-.56.06-1.04.39-1.29.89l-1.1 2.22c-.2-.39-.59.63-1.02-.63H3.74c-.54 0-1.02.31-1.25.8-.23.49-.17 1.06-.15-1.5l1.45 2.02c.37.56.57 1.22.57 1.89 0 .67-.2 1.33-.57 1.89l-1.45 2.02c-.32.44-.38 1.01-.15 1.5.23.49.71.8 1.25.8h2.47c.43 0 .82.24 1.02.63l1.1 2.22c.25.5.73.83 1.29.89.55.06 1.1-.17 1.46-.61l1.6-1.94c.4-.49 1.02-.77 1.66-.77s1.26.28 1.66.77l1.6 1.94c.36.44.91.67 1.46.61.56-.06 1.04-.39 1.29-.89l1.1-2.22c.2-.39.59-.63 1.02-.63h2.47c.54 0 1.02-.31 1.25-.8.23-.49.17-1.06-.15-1.5l-1.45-2.02c-.37-.56-.57-1.22-.57-1.89zM10.82 17.5l-4.52-4.52 1.41-1.41 3.11 3.11 7.21-7.21 1.41 1.41-8.62 8.62z"></path></svg>
               </div>
@@ -192,6 +192,7 @@ import { cvtR2Url } from "@/utils/convert.js"
 import { ElMessage } from "element-plus"
 import { resolveTabSession } from '@/utils/tab-session.js'
 import { formatUiDate, formatUiNumber } from '@/utils/ui-locale.js'
+import { COVER_PRESETS, sanitizeImageUrl } from '@/utils/theme-presets.js'
 
 const uiStore = useUiStore()
 const userStore = useUserStore()
@@ -323,6 +324,29 @@ const currentRoleName = computed(() => {
   return profileData.value?.userInfo?.roleName || t('roleBase')
 })
 
+const safeAvatarUrl = computed(() => {
+  const raw = String(profileData.value?.userInfo?.avatarUrl || '').trim()
+  if (!raw) return ''
+  if (/^data:image\/(?:png|jpe?g|gif|webp|avif|bmp);base64,[a-z0-9+/=]+$/i.test(raw) && raw.length <= 512 * 1024) {
+    return raw
+  }
+  const resolved = (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('/'))
+    ? raw
+    : cvtR2Url(raw)
+  return sanitizeImageUrl(resolved)
+})
+
+const hasSafeAvatar = computed(() => Boolean(safeAvatarUrl.value))
+
+const avatarPhotoStyle = computed(() => {
+  if (!safeAvatarUrl.value) return {}
+  return {
+    backgroundImage: `url("${safeAvatarUrl.value}")`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center'
+  }
+})
+
 const coverPhotoStyle = computed(() => {
   let bg = ''
   if (isOwnProfile.value && userStore.user?.backgroundUrl !== undefined && userStore.user?.backgroundUrl !== '') {
@@ -334,7 +358,9 @@ const coverPhotoStyle = computed(() => {
   if (!bg) return {}
 
   const trimmed = bg.trim()
-  if (trimmed.startsWith('linear-gradient') || trimmed.startsWith('radial-gradient')) {
+  const isPresetGradient = COVER_PRESETS.some(preset => preset.url === trimmed
+    && (trimmed.startsWith('linear-gradient(') || trimmed.startsWith('radial-gradient(')))
+  if (isPresetGradient) {
     return {
       backgroundImage: trimmed,
       backgroundSize: 'cover',
@@ -344,8 +370,10 @@ const coverPhotoStyle = computed(() => {
     const url = (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/'))
       ? trimmed
       : cvtR2Url(trimmed)
+    const safeUrl = sanitizeImageUrl(url)
+    if (!safeUrl) return {}
     return {
-      backgroundImage: `url('${url}')`,
+      backgroundImage: `url("${safeUrl}")`,
       backgroundSize: 'cover',
       backgroundPosition: 'center'
     }

@@ -23,7 +23,7 @@ const verifyInvalid = await totpUtils.verifyTOTP(secret, '000000', 1);
 if (otp !== '000000') {
 	assert.strictEqual(verifyInvalid.isValid, false);
 }
-console.log(`✅ TOTP Generate & Verify test passed (Secret: ${secret}, OTP: ${otp})`);
+console.log('TOTP generation and verification passed');
 
 // 3. Test AES-256-GCM Encryption & Decryption
 const mockEnv = { totp_enc_key: 'test-totp-encryption-key-placeholder' };

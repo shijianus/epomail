@@ -509,7 +509,7 @@ of a release branch; it should be scheduled as its own window.
 **`a1d0805` — account & init security**
 - `utils/admin-utils.js`: super-admin authority derives only from `env.admin`.
 - `service/user-service.js`: `|| uid === 1` purge bypass removed.
-- `init/init.js`: no seeding of `admin@epomail.cyou`/`123456`; no re-enabling of
+- `init/init.js`: no seeding of `admin@epomail.cyou`/`[REDACTED]`; no re-enabling of
   disabled visitor rows; `admin_initial_password` mandatory outside development;
   six `audit_*` fields moved to `setting_ext`.
 - `entity/setting.js` + `service/setting-service.js`: `setting` 102 → 96 columns

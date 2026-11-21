@@ -2,15 +2,17 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 export const HARD_LIMITS = Object.freeze({
   maxConcurrency: 32,
-  maxRequestsPerStage: 10_000,
-  maxStageMs: 300_000,
-  maxTotalMs: 30 * 60 * 1000,
+  maxRequestsPerStage: 32 * 30 * 60 + 1,
+  maxStageMs: 30 * 60 * 1000,
+  maxTotalMs: 32 * 60 * 1000,
   requestTimeoutMs: 8_000,
   shutdownGraceMs: 1_000
 });
 
 const LOOPBACK_HOST = '127.0.0.1';
-const TIMEOUT = Symbol('load-runner-timeout');
+const TRANSPORT_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'EPIPE', 'ETIMEDOUT',
+  'EHOSTUNREACH', 'ENETUNREACH', 'ENOBUFS', 'EMFILE', 'ENFILE', 'UND_ERR_SOCKET',
+  'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT']);
 
 function integer(value, name, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   if (!Number.isSafeInteger(value) || value < min || value > max) {
@@ -43,6 +45,17 @@ export function assertLoopbackBase(base) {
   return url.origin;
 }
 
+export function planSoak(durationMs, limited) {
+  integer(durationMs, 'soak duration', { min: 1, max: HARD_LIMITS.maxStageMs });
+  const ratePerSecond = limited ? 8 : 32;
+  return {
+    name: 'soak', durationMs, ratePerSecond, concurrency: limited ? 4 : 8,
+    // Allow the deadline itself (not the request limit) to close the last slot.
+    maxRequests: Math.ceil(durationMs * ratePerSecond / 1000) + 1,
+    requireFullDuration: true
+  };
+}
+
 function assertRelativePath(pathname) {
   if (typeof pathname !== 'string' || !pathname.startsWith('/') || pathname.startsWith('//')) {
     throw new Error('request path must be an absolute path on the generated local stack');
@@ -67,10 +80,6 @@ function mergeSignals(signal, timeoutMs) {
       signal?.removeEventListener('abort', onAbort);
     }
   };
-}
-
-function isAbortLike(error) {
-  return error?.name === 'AbortError' || error?.code === 'ABORT_ERR' || /timeout|aborted/i.test(String(error?.message || ''));
 }
 
 export function createLoopbackClient(base, {
@@ -109,6 +118,10 @@ export function createLoopbackClient(base, {
         transportError: false
       };
     } catch (error) {
+      const abortedByFuse = Boolean(options.signal?.aborted);
+      const code = error?.cause?.code ?? error?.code;
+      const transportCode = TRANSPORT_CODES.has(code) ? code : null;
+      const timeout = !abortedByFuse && (merged.signal.aborted || transportCode === 'ETIMEDOUT' || transportCode?.endsWith('_TIMEOUT') === true);
       return {
         endpoint: pathname.split('?')[0],
         method: options.method || 'GET',
@@ -117,8 +130,10 @@ export function createLoopbackClient(base, {
         json: null,
         text: '',
         latencyMs: Math.max(0, performance.now() - started),
-        timeout: isAbortLike(error),
-        transportError: !isAbortLike(error)
+        timeout,
+        abortedByFuse,
+        transportError: !timeout && !abortedByFuse,
+        transportCode
       };
     } finally {
       merged.cleanup();
@@ -176,6 +191,7 @@ export function summarizeStats(stats) {
     unexpected5xx: stats.unexpected5xx,
     contractFailure: stats.contractFailure,
     operationFailure: stats.operationFailure,
+    abortedByFuse: stats.abortedByFuse,
     timeout: stats.timeout,
     transportError: stats.transportError,
     ignoredAbort: stats.ignoredAbort,
@@ -192,14 +208,20 @@ export function summarizeStats(stats) {
 }
 
 function effectiveCode(result) {
+  const status = Number(result?.status);
+  if (Number.isFinite(status) && status >= 400) return status;
   const code = Number(result?.code);
   if (Number.isFinite(code) && code > 0) return code;
-  const status = Number(result?.status);
   return Number.isFinite(status) && status > 0 ? status : null;
 }
 
 function record(stats, result) {
   stats.total++;
+  if (result?.ignoredAbort) stats.ignoredAbort++;
+  if (result?.abortedByFuse) {
+    stats.abortedByFuse++;
+    return;
+  }
   if (Number.isFinite(result?.latencyMs)) stats.latencies.push(result.latencyMs);
   const code = effectiveCode(result);
   if (code !== null) stats.statusCounts.set(code, (stats.statusCounts.get(code) || 0) + 1);
@@ -209,7 +231,6 @@ function record(stats, result) {
       status: result.status, code: result.code, detail: result.diagnostic || null });
   }
   if (result?.operationFailure) stats.operationFailure++;
-  if (result?.ignoredAbort) stats.ignoredAbort++;
   if (result?.timeout) {
     stats.timeout++;
     return;
@@ -233,7 +254,7 @@ function record(stats, result) {
     stats.unexpected5xx++;
     return;
   }
-  stats.transportError++;
+  if (!result?.operationFailure) stats.transportError++;
 }
 
 function validateLimits(limits = HARD_LIMITS) {
@@ -247,30 +268,37 @@ function validateLimits(limits = HARD_LIMITS) {
   return hard;
 }
 
-async function operationWithDeadline(operation, context, timeoutMs, shutdownGraceMs) {
+async function operationWithDeadline(operation, context, timeoutMs, shutdownGraceMs, onTimeout) {
   let timer;
+  let graceTimer;
   let abortHandler;
   const operationPromise = Promise.resolve().then(() => operation(context));
-  operationPromise.catch(() => {});
   const abortPromise = new Promise(resolve => {
-    abortHandler = () => resolve({ value: TIMEOUT, timedOut: false, aborted: true });
+    abortHandler = () => resolve({ abortedByFuse: true });
     if (context.signal?.aborted) abortHandler();
     else context.signal?.addEventListener('abort', abortHandler, { once: true });
   });
   try {
     const outcome = await Promise.race([
-      operationPromise.then(value => ({ value, timedOut: false, aborted: false })),
-      new Promise(resolve => { timer = setTimeout(() => resolve({ value: TIMEOUT, timedOut: true, aborted: false }), timeoutMs); }),
+      operationPromise.then(value => ({ value })),
+      new Promise(resolve => {
+        timer = setTimeout(() => {
+          resolve({ timeout: true });
+          onTimeout();
+        }, timeoutMs);
+      }),
       abortPromise
     ]);
-    if (!outcome.timedOut && !outcome.aborted) return { value: outcome.value, timedOut: false, aborted: false, ignoredAbort: false };
+    clearTimeout(timer);
+    if (!outcome.timeout && !outcome.abortedByFuse) return outcome.value;
     const settled = await Promise.race([
       operationPromise.then(() => true, () => true),
-      delay(shutdownGraceMs).then(() => false)
+      new Promise(resolve => { graceTimer = setTimeout(() => resolve(false), shutdownGraceMs); })
     ]);
-    return { value: TIMEOUT, timedOut: outcome.timedOut, aborted: outcome.aborted, ignoredAbort: !settled };
+    return { ...outcome, ignoredAbort: !settled };
   } finally {
     clearTimeout(timer);
+    clearTimeout(graceTimer);
     context.signal?.removeEventListener('abort', abortHandler);
   }
 }
@@ -289,6 +317,7 @@ export async function runStage({
   operation,
   limits = HARD_LIMITS,
   stopOnUnexpectedStatus = true,
+  requireFullDuration = false,
   onComplete
 }) {
   const hard = validateLimits(limits);
@@ -301,7 +330,8 @@ export async function runStage({
 
   const startedAt = Date.now();
   const scheduleStarted = performance.now();
-  const deadline = startedAt + durationMs;
+  const driverStart = performance.eventLoopUtilization();
+  const scheduleDeadline = scheduleStarted + durationMs;
   const controller = new AbortController();
   const stats = newStats();
   const groups = new Map();
@@ -310,50 +340,69 @@ export async function runStage({
   let scheduling = true;
   let stopReason = 'stage_deadline';
   let timedOut = false;
+  let scheduleEnded;
+  let firstFailure = null;
+  let waitingForSlotMs = 0;
 
   const groupFor = kind => {
     const key = typeof kind === 'string' && kind ? kind : 'unknown';
-    if (!groups.has(key)) groups.set(key, newStats());
+    if (!groups.has(key)) groups.set(key, { ...newStats(), startedAt: stats.startedAt });
     return groups.get(key);
   };
   const stopScheduling = reason => {
-    if (scheduling || reason === 'request_timeout' || reason === 'transport_error') {
+    if (scheduling) {
+      scheduleEnded ??= performance.now();
       scheduling = false;
       stopReason = reason;
     }
   };
-  const hardStop = reason => {
+  const stopForFailure = (reason, context, result, abort) => {
     stopScheduling(reason);
-    if (!controller.signal.aborted) controller.abort(new Error(`stage stopped: ${reason}`));
+    if (!firstFailure) {
+      stopReason = reason;
+      firstFailure = {
+        reason, requestNumber: context.requestNumber, kind: context.kind ?? result?.kind ?? 'unknown',
+        method: context.method ?? null, endpoint: context.endpoint ?? null, subrequest: context.subrequest ?? null,
+        stageElapsedMs: Math.round(performance.now() - scheduleStarted),
+        operationElapsedMs: Math.round(performance.now() - context.started),
+        status: result?.status ?? null, code: result?.code ?? null,
+        transportCode: TRANSPORT_CODES.has(result?.transportCode) ? result.transportCode : null
+      };
+    }
+    if (abort && !controller.signal.aborted) controller.abort(new Error(`stage stopped: ${reason}`));
   };
-  const timer = setTimeout(() => stopScheduling('stage_deadline'), durationMs);
+  let timer;
+  const closeAtDeadline = () => {
+    const remaining = scheduleDeadline - performance.now();
+    if (remaining > 0) timer = setTimeout(closeAtDeadline, Math.ceil(remaining));
+    else stopScheduling('stage_deadline');
+  };
+  timer = setTimeout(closeAtDeadline, durationMs);
 
   const runOne = async (workerId, requestNumber) => {
-    const context = { stageName: name, workerId, requestNumber, signal: controller.signal };
+    const context = { stageName: name, workerId, requestNumber, signal: controller.signal, started: performance.now() };
     let result;
     try {
-      result = await operationWithDeadline(operation, context, hard.requestTimeoutMs, hard.shutdownGraceMs);
-      if (result.timedOut) {
-        timedOut = true;
-        result = { timeout: true, transportError: false, ignoredAbort: result.ignoredAbort, latencyMs: hard.requestTimeoutMs };
-        hardStop('request_timeout');
-      } else {
-        result = result.value;
-      }
+      result = await operationWithDeadline(operation, context, hard.requestTimeoutMs, hard.shutdownGraceMs,
+        () => stopForFailure('request_timeout', context, null, true));
     } catch (_) {
-      result = { timeout: false, transportError: true, latencyMs: 0 };
-      hardStop('transport_error');
+      result = { operationFailure: true };
     }
-    if (!result || typeof result !== 'object') result = { timeout: false, transportError: true, latencyMs: 0 };
+    if (!result || typeof result !== 'object') result = { operationFailure: true };
+    if (!Number.isFinite(result.latencyMs) && !result.abortedByFuse) {
+      result = { ...result, latencyMs: result.timeout ? hard.requestTimeoutMs : performance.now() - context.started };
+    }
     record(stats, result);
-    record(groupFor(result.kind), result);
+    record(groupFor(context.kind ?? result.kind), result);
     if (result.timeout) {
       timedOut = true;
-      hardStop('request_timeout');
+      stopForFailure('request_timeout', context, result, true);
     } else if (result.transportError) {
-      hardStop('transport_error');
+      stopForFailure('transport_error', context, result, true);
+    } else if (result.operationFailure) {
+      stopForFailure('operation_error', context, result, true);
     } else if (stopOnUnexpectedStatus && (result.contractFailure || result.unexpected4xx || result.unexpected5xx || (effectiveCode(result) >= 400 && !result.expected4xx))) {
-      stopScheduling('unexpected_status');
+      stopForFailure('unexpected_status', context, result, false);
     }
   };
 
@@ -362,18 +411,23 @@ export async function runStage({
       stopScheduling('request_limit');
       break;
     }
-    if (Date.now() >= deadline) {
+    if (performance.now() >= scheduleDeadline) {
       stopScheduling('stage_deadline');
       break;
     }
     if (active.size >= concurrency) {
+      const waitStart = performance.now();
       await Promise.race(active);
+      waitingForSlotMs += performance.now() - waitStart;
       continue;
     }
     const scheduledAt = scheduleStarted + (nextRequest * 1000 / ratePerSecond);
     const waitMs = scheduledAt - performance.now();
-    if (waitMs > 0) await delay(waitMs);
-    if (!scheduling || controller.signal.aborted || Date.now() >= deadline) {
+    if (waitMs > 0) {
+      await delay(Math.ceil(Math.min(waitMs, scheduleDeadline - performance.now())));
+      continue;
+    }
+    if (!scheduling || controller.signal.aborted || performance.now() >= scheduleDeadline) {
       stopScheduling('stage_deadline');
       break;
     }
@@ -390,9 +444,12 @@ export async function runStage({
   stats.finishedAt = performance.now();
   for (const group of groups.values()) group.finishedAt = stats.finishedAt;
   const finishedAt = Date.now();
-  const drainMs = Math.max(0, finishedAt - deadline);
+  const drainMs = Math.round(stats.finishedAt - scheduleEnded);
+  const schedulingMs = scheduleEnded - scheduleStarted;
   const stageCompleted = (stopReason === 'stage_deadline' || stopReason === 'request_limit') &&
-    !timedOut && stats.transportError === 0 && stats.operationFailure === 0 && stats.contractFailure === 0 &&
+    (!requireFullDuration || (stopReason === 'stage_deadline' && schedulingMs >= durationMs)) &&
+    !timedOut && stats.abortedByFuse === 0 && stats.ignoredAbort === 0 &&
+    stats.transportError === 0 && stats.operationFailure === 0 && stats.contractFailure === 0 &&
     stats.unexpected4xx === 0 && stats.unexpected5xx === 0;
   const result = {
     name,
@@ -403,9 +460,15 @@ export async function runStage({
     startedAt,
     finishedAt,
     elapsedMs: finishedAt - startedAt,
+    schedulingMs: Number(schedulingMs.toFixed(3)),
     drainMs,
     stageCompleted,
-    scheduledRequests: stats.total,
+    scheduledRequests: nextRequest,
+    firstFailure,
+    driver: {
+      eventLoopUtilization: Number(performance.eventLoopUtilization(driverStart).utilization.toFixed(4)),
+      waitingForConcurrencyMs: Math.round(waitingForSlotMs)
+    },
     ignoredAbort: stats.ignoredAbort,
     stopReason,
     timedOut,
@@ -426,13 +489,12 @@ export async function runStages(stages, { limits = HARD_LIMITS, onStageComplete 
   let stopped = false;
   for (const stage of stages) {
     const remaining = totalDeadline - Date.now();
-    if (remaining <= 0) {
+    if (remaining < stage.durationMs) {
       stopped = true;
       break;
     }
     const result = await runStage({
       ...stage,
-      durationMs: Math.min(stage.durationMs, hard.maxStageMs, remaining),
       limits: hard,
       onComplete: onStageComplete
     });

@@ -1,12 +1,14 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "node:assert";
 
 (async () => {
   console.log("=== 启动 Role 弹窗滑块锁定、预设模板 3x2 对齐与真实身份组用户全链路审计 ===");
-  const browser = await chromium.launch({ headless: true, args: ["--lang=zh-CN"] });
+  const browser = await launchIsolatedChromium(chromium, { headless: true, args: ["--lang=zh-CN"] });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" });
   const page = await context.newPage();
-  const BASE = process.env.TEST_BASE_URL || "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
 
   let adminToken = null;
   let testRoleId = null;
@@ -21,11 +23,11 @@ import assert from "node:assert";
     // --------------------------------------------------------------------------------------
     console.log("\n[步骤 1] 登录 Admin 账号...");
     const loginRes = await page.request.post(BASE + "/api/login", {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, "Admin 登录失败: " + JSON.stringify(loginJson));
+    assert.strictEqual(loginJson.code, 200, "Admin 登录失败: " + Number(loginJson?.code));
     adminToken = typeof loginJson.data === "string" ? loginJson.data : loginJson.data?.token;
     console.log("  ✓ Admin 登录成功");
 
@@ -227,7 +229,7 @@ import assert from "node:assert";
       headers: { "Content-Type": "application/json" }
     });
     const userLoginJson = await userLoginRes.json();
-    assert.strictEqual(userLoginJson.code, 200, "测试用户登录失败: " + JSON.stringify(userLoginJson));
+    assert.strictEqual(userLoginJson.code, 200, "测试用户登录失败: " + Number(userLoginJson?.code));
     const testUserToken = typeof userLoginJson.data === "string" ? userLoginJson.data : userLoginJson.data?.token;
 
     // 获取该用户 /api/my/loginUserInfo 校验 permKeys

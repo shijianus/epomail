@@ -19,6 +19,16 @@ async function fingerprint(value) {
 	return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+export async function getConsentedPersonalTelegram(c, owner, settings) {
+	if (!isActiveUser(owner) || Number(settings.userTgForward ?? 1) !== 1) return null;
+	const profile = await c.env.kv.get('USER_PROFILE_' + owner.userId, { type: 'json' });
+	// D1 advances before a settings update reaches KV. A stale profile must
+	// not authorize either a notification link or a test message.
+	if (Number(profile?.telegramShareVersion ?? 0) !== Number(owner.telegramShareVersion)) return null;
+	const tg = profile?.personalTelegram;
+	return tg?.enabled === true && tg.botToken && tg.chatId ? tg : null;
+}
+
 async function loadState(c, emailId, channel) {
 	const message = await mailOrm(c).select().from(email).where(eq(email.emailId, emailId)).get();
 	if (!message || Number(message.isDel) !== 0 || Number(message.status) === emailConst.status.SAVING) return null;
@@ -39,14 +49,8 @@ async function loadState(c, emailId, channel) {
 	const settings = await settingService.query(c);
 	let config;
 	if (channel === 'personal') {
-		if (!owner || Number(settings.userTgForward ?? 1) !== 1) return null;
-		const raw = await c.env.kv.get('USER_PROFILE_' + userId);
-		const profile = raw ? JSON.parse(raw) : {};
-		const tg = profile.personalTelegram;
-		// A settings update increments D1 before touching KV. Until that write
-		// reaches this reader, the old profile cannot mint a new-version link.
-		if (Number(profile.telegramShareVersion ?? 0) !== Number(owner.telegramShareVersion)) return null;
-		if (tg?.enabled !== true || !tg.botToken || !tg.chatId) return null;
+		const tg = await getConsentedPersonalTelegram(c, owner, settings);
+		if (!tg) return null;
 		config = [channel, tg.botToken, tg.chatId, tg.topicId || '', tg.mode || 'privacy',
 			tg.notifyCodeOnly ?? true, tg.includePreview ?? true];
 	} else if (channel === 'system') {

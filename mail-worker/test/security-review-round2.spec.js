@@ -7,7 +7,7 @@
  */
 import { env, SELF } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import settingService from '../src/service/setting-service.js';
+import settingService, { personalTokenPolicy } from '../src/service/setting-service.js';
 import oauthService from '../src/service/oauth-service.js';
 import loginService from '../src/service/login-service.js';
 import userService from '../src/service/user-service.js';
@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS user (
 	status INTEGER NOT NULL DEFAULT 0,
 	is_del INTEGER NOT NULL DEFAULT 0,
 	auth_version INTEGER NOT NULL DEFAULT 0,
+	telegram_share_version INTEGER NOT NULL DEFAULT 0,
+	deletion_requested_at TEXT DEFAULT '', deletion_status TEXT DEFAULT '',
 	byo_storage_enabled INTEGER NOT NULL DEFAULT 0,
 	byo_storage_config TEXT NOT NULL DEFAULT '{}'
 )`;
@@ -482,15 +484,19 @@ describe('Signed object URL as consumed by the browser', () => {
 });
 
 describe('Exception sanitization at the public OAuth entry point', () => {
-	it('returns a generic 500 body for a malformed JSON request', async () => {
+	it('returns a validation response for a malformed JSON request', async () => {
 		const response = await SELF.fetch('http://example.com/api/oauth/github/login', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: '{'
 		});
 		const body = await response.json();
-		expect(body.code).toBe(500);
-		expect(body.message).toBe('Internal Server Error');
+		expect(response.status).toBe(400);
+		expect(body).toMatchObject({
+			code: 400,
+			message: 'Invalid JSON request body',
+			errorCode: 'INVALID_JSON'
+		});
 		expect(JSON.stringify(body)).not.toMatch(/SyntaxError|at JSON\.parse|\/D:/);
 	});
 });
@@ -535,6 +541,39 @@ describe('Personal access token storage hardening', () => {
 		}
 	});
 
+	it('disables new production and staging PATs by default and preserves management of existing tokens', async () => {
+		const settings = vi.spyOn(settingService, 'query').mockResolvedValue({ userApiSupport: 1 });
+		try {
+			for (const environment of ['production', 'staging']) {
+				const gatedEnv = { ...env, ENVIRONMENT: environment, ENABLE_PAT_ISSUANCE: undefined };
+				expect(personalTokenPolicy(gatedEnv, { userApiSupport: 1 }).userApiSupport).toBe(0);
+				await expect(userService.createApiToken({ env: gatedEnv }, userId, { name: 'disabled' }))
+					.rejects.toMatchObject({ code: 403, errorCode: 'pat_issuance_disabled' });
+			}
+			const optedIn = { ...env, ENVIRONMENT: 'staging', ENABLE_PAT_ISSUANCE: 'true' };
+			expect(personalTokenPolicy(optedIn, { userApiSupport: 0 }).userApiSupport).toBe(0);
+			const created = await userService.createApiToken({ env: optedIn }, userId, { name: 'compatible', scopes: ['emails:read'] });
+			const off = { env: { ...optedIn, ENABLE_PAT_ISSUANCE: 'false' } };
+			expect(await userService.getApiTokens(off, userId)).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.id })]));
+			await userService.deleteApiToken(off, userId, created.id);
+			expect((await userService.getApiTokens(off, userId)).some(item => item.id === created.id)).toBe(false);
+		} finally {
+			settings.mockRestore();
+		}
+	});
+
+	it('rejects explicitly empty, mixed or unrecognized scopes before issuing credentials', async () => {
+		const settings = vi.spyOn(settingService, 'query').mockResolvedValue({ userApiSupport: 1 });
+		try {
+			for (const scopes of [[], null, 'emails:read', ['unknown'], ['emails:read', 'unknown']]) {
+				await expect(userService.createApiToken({ env }, userId, { name: 'scope-test', scopes }))
+					.rejects.toMatchObject({ code: 400, errorCode: 'invalid_scope' });
+			}
+		} finally {
+			settings.mockRestore();
+		}
+	});
+
 	it('migrates a legacy plaintext token on read and removes its KV index', async () => {
 		const legacy = 'epo_live_' + 'a'.repeat(48);
 		await env.kv.put(profileKey, JSON.stringify({
@@ -558,9 +597,8 @@ describe('Telegram test endpoint binding', () => {
 		await env.kv.put('USER_PROFILE_' + userId, JSON.stringify({
 			personalTelegram: { enabled: true, botToken: savedToken, chatId: '12345' }
 		}));
-		const userSpy = vi.spyOn(userService, 'selectById').mockResolvedValue({
-			userId, email: 'telegram-review@example.com', status: 0, isDel: 0
-		});
+		await env.db.prepare('INSERT INTO user (user_id, email) VALUES (?, ?)').bind(userId, 'telegram-review@example.com').run();
+		const settingsSpy = vi.spyOn(settingService, 'query').mockResolvedValue({ userTgForward: 1 });
 		try {
 			const { default: telegramService } = await import('../src/service/telegram-service.js');
 			await expect(telegramService.testPersonalBot({ env }, {
@@ -568,7 +606,8 @@ describe('Telegram test endpoint binding', () => {
 				chatId: '12345'
 			}, userId)).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
 		} finally {
-			userSpy.mockRestore();
+			settingsSpy.mockRestore();
+			await env.db.prepare('DELETE FROM user WHERE user_id = ?').bind(userId).run();
 			await env.kv.delete('USER_PROFILE_' + userId);
 		}
 	});

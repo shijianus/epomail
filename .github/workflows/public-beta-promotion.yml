@@ -1,0 +1,118 @@
+name: Verify public beta promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Full 40-character commit SHA reviewed in Staging
+        type: string
+        required: true
+      evidence_sha256:
+        description: SHA-256 of the exact reviewed evidence JSON file
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    outputs:
+      quality-run: ${{ steps.ci.outputs.run }}
+      quality-attempt: ${{ steps.ci.outputs.attempt }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify all three push checks and pin the Quality Gates build
+        id: ci
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const { requireProtectedReleaseBranch, requirePromotionBuild } = require('./scripts/lib/release-workflows.cjs');
+            const branch = requireProtectedReleaseBranch(context.ref, process.env.GITHUB_REF_PROTECTED);
+            if (context.payload.inputs?.candidate_sha !== context.sha || !/^[a-f0-9]{64}$/.test(context.payload.inputs?.evidence_sha256 ?? '')) {
+              throw new Error('Dispatch inputs must pin this branch SHA and the reviewed evidence digest');
+            }
+            const result = await requirePromotionBuild(github, context.repo, context.sha, branch);
+            core.setOutput('run', String(result.id));
+            core.setOutput('attempt', String(result.run_attempt));
+            core.info(result.html_url);
+
+  verify:
+    needs: candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: public-beta-promotion
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: '24.14.0'
+      - name: Require an independent protected environment approval for this run
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const { requireIndependentApproval } = require('./scripts/lib/release-workflows.cjs');
+            const { data } = await github.request('GET /repos/{owner}/{repo}/actions/runs/{run_id}/approvals', {
+              ...context.repo, run_id: context.runId
+            });
+            const reviewer = requireIndependentApproval(data, 'public-beta-promotion', [context.actor, process.env.GITHUB_TRIGGERING_ACTOR]);
+            core.info(`Environment approved by ${reviewer}`);
+      - uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: epomail-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/promotion-package
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.candidate.outputs.quality-run }}
+      - name: Verify accepted package and real staging evidence
+        shell: bash
+        env:
+          EVIDENCE_SHA256: ${{ inputs.evidence_sha256 }}
+          EPOMAIL_PUBLIC_BETA_EVIDENCE: ${{ secrets.EPOMAIL_PUBLIC_BETA_EVIDENCE }}
+          EPOMAIL_TRUSTED_STAGING_ORIGIN: ${{ vars.EPOMAIL_TRUSTED_STAGING_ORIGIN }}
+          EPOMAIL_STAGING_ACCOUNT_ID: ${{ vars.EPOMAIL_STAGING_ACCOUNT_ID }}
+          EPOMAIL_STAGING_DEPLOYMENTS_TOKEN: ${{ secrets.EPOMAIL_STAGING_DEPLOYMENTS_TOKEN }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          : "${EPOMAIL_PUBLIC_BETA_EVIDENCE:?Missing reviewed evidence}" "${EPOMAIL_TRUSTED_STAGING_ORIGIN:?Missing trusted staging origin}"
+          : "${CF_ACCESS_CLIENT_ID:?Missing staging Access client}" "${CF_ACCESS_CLIENT_SECRET:?Missing staging Access secret}"
+          : "${EPOMAIL_STAGING_ACCOUNT_ID:?Missing staging account ID}" "${EPOMAIL_STAGING_DEPLOYMENTS_TOKEN:?Missing staging deployments read token}"
+          package="$RUNNER_TEMP/promotion-package"
+          (cd "$package" && sha256sum epomail-candidate.tar.gz | cmp - epomail-candidate.tar.gz.sha256)
+          test "$(tar -xOzf "$package/epomail-candidate.tar.gz" ./SOURCE_SHA)" = "$GITHUB_SHA"
+          umask 077
+          evidence=$(mktemp "$RUNNER_TEMP/public-beta-evidence.XXXXXX")
+          trap 'rm -f "$evidence"' EXIT
+          printf '%s' "$EPOMAIL_PUBLIC_BETA_EVIDENCE" > "$evidence"
+          unset EPOMAIL_PUBLIC_BETA_EVIDENCE
+          test "$(sha256sum "$evidence" | cut -d' ' -f1)" = "$EVIDENCE_SHA256"
+          node scripts/public-beta-gate.mjs --scope mail-public-beta --artifact "$package/epomail-candidate.tar.gz" \
+            --evidence "$evidence" --staging-origin "$EPOMAIL_TRUSTED_STAGING_ORIGIN"
+      - name: Recheck push CI against the approved build before publishing
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          QUALITY_RUN: ${{ needs.candidate.outputs.quality-run }}
+          QUALITY_ATTEMPT: ${{ needs.candidate.outputs.quality-attempt }}
+        with:
+          script: |
+            const { requirePromotionBuild } = require('./scripts/lib/release-workflows.cjs');
+            await requirePromotionBuild(github, context.repo, context.sha, process.env.GITHUB_REF_NAME, {
+              id: process.env.QUALITY_RUN,
+              attempt: process.env.QUALITY_ATTEMPT
+            });
+      - name: Retain the accepted bytes for tag publication
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: public-beta-package-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/promotion-package/epomail-candidate.tar.gz
+            ${{ runner.temp }}/promotion-package/epomail-candidate.tar.gz.sha256
+          retention-days: 14
+          if-no-files-found: error

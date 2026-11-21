@@ -1,19 +1,22 @@
+import { advanceDailyQuota, sendQuotaPeriodStart } from '../utils/send-quota-period.js';
+import { personalForwardingAvailable, readForwardPolicy, setForwardPolicy } from './forward-consent.js';
 import BizError from '../error/biz-error';
 import accountService from './account-service';
 import { userOrm as orm, mailOrm } from '../entity/orm';
 import user from '../entity/user';
 import account from '../entity/account';
-import { and, asc, count, desc, eq, gte, inArray, sql } from 'drizzle-orm';
-import { emailConst, isDel, roleConst, userConst } from '../const/entity-const';
+import { and, asc, count, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { emailConst, isDel, userConst } from '../const/entity-const';
 import { email } from '../entity/email';
 import { att } from '../entity/att';
 import KvConst from '../const/kv-const';
 import cryptoUtils from '../utils/crypto-utils';
 import emailService from './email-service';
+import { purgeOwnedMail } from './mail-lifecycle-service.js';
 import dayjs from 'dayjs';
 import permService from './perm-service';
 import roleService from './role-service';
-import emailUtils from '../utils/email-utils';
+import emailUtils, { isConfiguredDomain } from '../utils/email-utils';
 import fileUtils from '../utils/file-utils';
 import kvObjService from './kv-obj-service';
 import saltHashUtils from '../utils/crypto-utils';
@@ -33,9 +36,31 @@ import userContext from '../security/user-context.js';
 import { authVersionOf } from '../utils/one-time-credential.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import { mailSha256 } from '../utils/mail-pipeline.js';
+import safeLogger from '../utils/safe-logger.js';
+import { sealPersonalBotToken } from '../utils/oauth-secret-crypto.js';
+import { encryptByoStorageConfig } from '../utils/storage-credential-crypto.js';
+import { clearDeletedLoginFailures } from './login-failure-cleanup.js';
 import { deleteKvKeys, deleteKvMatching, forEachKvPage } from '../utils/kv-revocation.js';
 import { assertStorageCanChange, beginAccountDeletion, deleteAccountEvidence, getObjectDeletionCounts,
 	isActiveUser, readPrivacyState, revokeAccountAccess, revokeTelegramLinks, setDeletionStatus } from './privacy-revocation-service.js';
+import { updateSessionUserFields, deleteUserSessionsFromDb, revokeAllUserSessions } from '../utils/session-auth-store.js';
+
+function apiTokenMetadata(item) {
+	return {
+		id: item.id, name: item.name,
+		tokenPrefix: typeof item.tokenPrefix === 'string' ? item.tokenPrefix.slice(0, 16) : '',
+		scopes: Array.isArray(item.scopes) ? item.scopes : [],
+		createdAt: item.createdAt || null, expiresAt: item.expiresAt || null, lastUsedAt: item.lastUsedAt || null
+	};
+}
+
+function personalTelegramSettings(stored = {}) {
+	return {
+		enabled: stored.enabled === true, botTokenConfigured: Boolean(stored.botToken),
+		chatId: stored.chatId || '', topicId: stored.topicId || '', mode: stored.mode || 'privacy',
+		notifyCodeOnly: stored.notifyCodeOnly === true, includePreview: stored.includePreview === true
+	};
+}
 
 const userService = {
 
@@ -49,7 +74,7 @@ const userService = {
 			.returning({ authVersion: user.authVersion }).get();
 		if (!changed) throw new BizError(t('authExpired'), 409, 'auth_changed');
 		// D1 is authoritative even if a concurrent stale KV writer restores a token.
-		await c.env.kv.delete(KvConst.AUTH_INFO + row.userId).catch(() => {});
+		await revokeAllUserSessions(c, row.userId, { ignoreKvError: true });
 		return changed.authVersion;
 	},
 
@@ -84,12 +109,7 @@ const userService = {
 			throw new BizError(err.message || 'Invalid custom labels');
 		}
 		await orm(c).update(user).set({ customLabels: sanitizedLabels }).where(eq(user.userId, userId));
-		
-		const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo && authInfo.user) {
-			authInfo.user.customLabels = sanitizedLabels;
-			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		}
+		await updateSessionUserFields(c, userId, { customLabels: sanitizedLabels });
 	},
 
 	async updateProfile(c, params, userId) {
@@ -138,9 +158,20 @@ const userService = {
                 || (tg.includePreview !== undefined && typeof tg.includePreview !== 'boolean')) {
                 throw new BizError('Invalid Telegram settings', 400, 'invalid_telegram_settings');
             }
+            const savedToken = profile.personalTelegram?.botToken || '';
+            let botToken = savedToken;
+            if (tg.botToken !== undefined) {
+                if (typeof tg.botToken !== 'string' || tg.botToken.length > 200 || tg.botToken.trim().startsWith('v1:')) {
+                    throw new BizError('Invalid Telegram bot token', 400, 'invalid_telegram_settings');
+                }
+                botToken = tg.botToken.trim();
+            }
+            if (botToken && !botToken.startsWith('v1:')) {
+                botToken = await sealPersonalBotToken(c.env, userId, botToken);
+            }
             safeParams.personalTelegram = {
                 enabled: tg.enabled,
-                botToken: typeof tg.botToken === 'string' ? tg.botToken.trim().slice(0, 200) : '',
+                botToken,
                 chatId: typeof tg.chatId === 'string' || typeof tg.chatId === 'number' ? String(tg.chatId).trim().slice(0, 100) : '',
                 topicId: typeof tg.topicId === 'string' || typeof tg.topicId === 'number' ? String(tg.topicId).trim().slice(0, 50) : '',
                 mode: tg.mode,
@@ -230,7 +261,7 @@ const userService = {
             if (!pfw || typeof pfw !== 'object' || Array.isArray(pfw) || typeof pfw.enabled !== 'boolean') {
                 throw new BizError(t('forwardingNotSupported'), 400, 'invalid_forwarding_settings');
             }
-            if (pfw.enabled && (!['all', 'alias'].includes(pfw.mode) || pfw.keepCopy === false)) {
+            if (pfw.enabled && (!personalForwardingAvailable(c.env) || !['all', 'alias'].includes(pfw.mode) || pfw.keepCopy === false)) {
                 throw new BizError(t('forwardingNotSupported'), 400, 'forwarding_option_unavailable');
             }
             if (pfw.targets !== undefined && typeof pfw.targets !== 'string') {
@@ -260,17 +291,33 @@ const userService = {
         // Bound every free-form field so one request cannot fill a 25 MB KV
         // value or force oversized public responses.
         const boundedString = (value, max) => typeof value === 'string' ? value.slice(0, max) : '';
-        const profileImageUrl = (value) => {
+        const profileImageUrl = (value, { allowGradient = false } = {}) => {
             if (value === undefined || value === null || value === '') return '';
             const text = String(value).trim();
             if (!text) return '';
+            if (/[\u0000-\u001f\u007f"'\\<>]/.test(text) || text.startsWith('//')) {
+                throw new BizError('Invalid profile image URL', 400, 'invalid_profile_url');
+            }
+            // Allow small legacy inline images, but never a multi-megabyte data URL.
+            if (/^data:image\/(?:png|jpe?g|gif|webp|avif|bmp);base64,[a-z0-9+/=\s]+$/i.test(text) && text.length <= 512 * 1024) {
+                return text;
+            }
             if (text.length > 2048) {
                 throw new BizError('Profile image URL is too long', 400, 'invalid_profile_url');
             }
-            if (/^https?:\/\//i.test(text) || text.startsWith('/')) return text;
-            // Allow small legacy inline images, but never a multi-megabyte data URL.
-            if (/^data:image\/(?:png|jpe?g|gif|webp|avif|bmp);base64,/i.test(text) && text.length <= 512 * 1024) {
+            if (allowGradient && /^(?:linear|radial)-gradient\(\s*[a-z0-9#%,.\s-]+\)$/i.test(text) && !/\b(?:url|var|attr|expression)\b/i.test(text)) {
                 return text;
+            }
+            if (text.startsWith('/')) {
+                return text;
+            }
+            if (/^https?:\/\//i.test(text)) {
+                try {
+                    const parsed = new URL(text);
+                    if (['http:', 'https:'].includes(parsed.protocol) && !parsed.username && !parsed.password) {
+                        return text;
+                    }
+                } catch (_) {}
             }
             throw new BizError('Invalid profile image URL', 400, 'invalid_profile_url');
         };
@@ -278,9 +325,9 @@ const userService = {
         if (safeParams.nickname !== undefined) safeParams.nickname = boundedString(safeParams.nickname, 64);
         if (safeParams.bio !== undefined) safeParams.bio = boundedString(safeParams.bio, 2000);
         if (safeParams.signature !== undefined) safeParams.signature = boundedString(safeParams.signature, 500);
-        if (safeParams.background !== undefined) safeParams.background = boundedString(safeParams.background, 2048);
+        if (safeParams.background !== undefined) safeParams.background = profileImageUrl(safeParams.background, { allowGradient: true });
         if (safeParams.avatarUrl !== undefined) safeParams.avatarUrl = profileImageUrl(safeParams.avatarUrl);
-        if (safeParams.backgroundUrl !== undefined) safeParams.backgroundUrl = profileImageUrl(safeParams.backgroundUrl);
+        if (safeParams.backgroundUrl !== undefined) safeParams.backgroundUrl = profileImageUrl(safeParams.backgroundUrl, { allowGradient: true });
         if (safeParams.themeMode !== undefined) {
             safeParams.themeMode = ['auto', 'light', 'dark', 'system'].includes(safeParams.themeMode)
                 ? safeParams.themeMode : 'auto';
@@ -292,6 +339,7 @@ const userService = {
             const revocation = await revokeTelegramLinks(c, userId);
             profile.telegramShareVersion = revocation.version;
         }
+        if (safeParams.personalForwarding !== undefined) await setForwardPolicy(c, userId, safeParams.personalForwarding);
         Object.assign(profile, safeParams);
         await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 
@@ -306,7 +354,7 @@ const userService = {
                         : 'Auto-forwarding disabled'
                 });
             } catch (e) {
-                console.error('Failed to send forwarding notice:', e);
+                safeLogger.error('forwarding_notice_failed', { userId, error: e });
             }
         }
 
@@ -320,22 +368,20 @@ const userService = {
                         : 'Telegram Bot disabled'
                 });
             } catch (e) {
-                console.error('Failed to send telegram notice:', e);
+                safeLogger.error('telegram_notice_failed', { userId, error: e });
             }
         }
 
-        const authInfo = await c.env.kv.get(KvConst.AUTH_INFO + userId, { type: 'json' });
-		if (authInfo && authInfo.user) {
-            // Only sync safe UI/profile attributes to session cache.
-            // NEVER allow mutating security identity fields (userId, email, type, roleId, status, isDel, etc.)!
-            const safeSessionFields = ['nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels', 'signature', 'personalForwarding', 'lang'];
-            for (const f of safeSessionFields) {
-                if (safeParams[f] !== undefined) {
-                    authInfo.user[f] = safeParams[f];
-                }
+        const safeSessionFields = ['nickname', 'bio', 'avatarUrl', 'backgroundUrl', 'customLabels', 'signature', 'personalForwarding', 'lang'];
+        const userPatch = {};
+        for (const f of safeSessionFields) {
+            if (safeParams[f] !== undefined) {
+                userPatch[f] = safeParams[f];
             }
-			await c.env.kv.put(KvConst.AUTH_INFO + userId, JSON.stringify(authInfo), { expirationTtl: constant.TOKEN_EXPIRE });
-		}
+        }
+        if (Object.keys(userPatch).length > 0) {
+            await updateSessionUserFields(c, userId, userPatch);
+        }
 	},
 	
 	async uploadImage(c, userId) {
@@ -367,7 +413,8 @@ const userService = {
 
             const res = await fetch(`${externalHost}/upload`, {
                 method: 'POST',
-                body: newFormData
+                body: newFormData,
+                signal: AbortSignal.timeout(15000)
             });
 
             if (!res.ok) {
@@ -388,7 +435,10 @@ const userService = {
         }
 
         const storageQuotaService = (await import('./storage-quota-service')).default;
-        await storageQuotaService.checkQuotaAvailable(c, userId, arrayBuffer.byteLength);
+        const quotaCheck = await storageQuotaService.checkQuotaAvailable(c, userId, arrayBuffer.byteLength);
+        if (!quotaCheck?.allowed) {
+            throw new BizError(quotaCheck?.reason || 'Storage quota exceeded', 413, 'storage_quota_exceeded');
+        }
 
         const buffHash = await fileUtils.getBuffHash(arrayBuffer);
         const ext = fileUtils.imageExtensionForMime(detectedMime);
@@ -507,16 +557,10 @@ const userService = {
         user.themeWallpaperOpacity = profile.themeWallpaperOpacity ?? 85;
         user.themeMode = profile.themeMode || 'auto';
         user.lang = profile.lang || '';
-        user.personalTelegram = profile.personalTelegram || {
-            enabled: false,
-            botToken: '',
-            chatId: '',
-            topicId: '',
-            mode: 'privacy',
-            notifyCodeOnly: false,
-            includePreview: false
-        };
-        user.personalForwarding = profile.personalForwarding || {
+        user.personalTelegram = personalTelegramSettings(profile.personalTelegram || {});
+        const forwarding = personalForwardingAvailable(c.env)
+            ? (await readForwardPolicy(c, userId, profile)).preferences : profile.personalForwarding;
+        user.personalForwarding = forwarding || {
             enabled: false,
             targets: '',
             mode: 'all',
@@ -524,7 +568,7 @@ const userService = {
             keepCopy: true,
             addPrefix: true
         };
-        user.apiTokens = Array.isArray(profile.apiTokens) ? profile.apiTokens : [];
+        user.apiTokens = Array.isArray(profile.apiTokens) ? profile.apiTokens.filter(Boolean).map(apiTokenMetadata) : [];
         user.clientCountry = c.req.header('cf-ipcountry') || c.req.raw?.cf?.country || '';
 
 		let remainingBackupCodes = 0;
@@ -558,7 +602,20 @@ const userService = {
 		return user;
 	},
 
-	async getUserQuota(c, userId) {
+	async getUserQuota(c, userId, storageUsage) {
+		try {
+			const usage = storageUsage === undefined
+				? await (await import('./storage-quota-service')).default.getUserStorageUsage(c, userId) : storageUsage;
+			if (!usage || !Number.isSafeInteger(usage.emailCount) || usage.emailCount < 0
+				|| !Number.isSafeInteger(usage.usedBytes) || usage.usedBytes < 0) throw new Error('Storage usage is unknown');
+			const limits = await this.getDeliveryLimits(c, userId, usage);
+			return { ...limits, usedEmails: usage.emailCount, usedStorageBytes: usage.usedBytes };
+		} catch {
+			throw new BizError('Storage quota unavailable', 503, 'quota_unavailable');
+		}
+	},
+
+	async getDeliveryLimits(c, userId, usage) {
 		try {
 			const DEFAULT_MAX_EMAILS = 5000;
 			const configuredMaxEmails = c.env.max_emails ?? DEFAULT_MAX_EMAILS;
@@ -569,14 +626,10 @@ const userService = {
 				throw new Error('Mailbox quota configuration is invalid');
 			}
 			const maxEmails = Math.min(emailLimit, DEFAULT_MAX_EMAILS);
-			const storageQuotaService = (await import('./storage-quota-service')).default;
-			const usage = await storageQuotaService.getUserStorageUsage(c, userId);
-			if (!usage || !Number.isSafeInteger(usage.emailCount) || usage.emailCount < 0
-				|| !Number.isSafeInteger(usage.usedBytes) || usage.usedBytes < 0
-				|| !Number.isFinite(usage.quotaMb) || usage.quotaMb < 0
+			if (!usage || usage.userId !== userId || !Number.isFinite(usage.quotaMb) || usage.quotaMb < 0
 				|| !Number.isFinite(usage.quotaBytes) || usage.quotaBytes < 0
 				|| ![0, 1].includes(usage.byoStorageEnabled) || typeof usage.isVisitor !== 'boolean') {
-				throw new Error('Storage quota usage is unknown');
+				throw new Error('Storage quota policy is unknown');
 			}
 			const dbFullFlag = await c.env.kv.get('db_full_status');
 			if (dbFullFlag !== null && dbFullFlag !== 'true' && dbFullFlag !== 'false') {
@@ -587,9 +640,6 @@ const userService = {
 				maxEmails,
 				maxStorageMB: usage.quotaMb,
 				maxStorageBytes: usage.quotaBytes,
-				// Actual MAIL_DB occupancy (including trash/SAVING), not reservations.
-				usedEmails: usage.emailCount,
-				usedStorageBytes: usage.usedBytes,
 				byoStorageEnabled: usage.byoStorageEnabled,
 				bypassStorage,
 				isVisitor: usage.isVisitor,
@@ -626,12 +676,12 @@ const userService = {
 		try {
 			await getUserDb(c).prepare("UPDATE user SET initial_password_hash = '' WHERE user_id = ?").bind(userId).run();
 		} catch (err) {
-			console.warn('Failed to clear initial password marker:', err.message);
+			safeLogger.warn('initial_password_marker_clear_failed', { userId, error: err });
 		}
 
 		// Password changes invalidate every existing session. The user must log
 		// in again with the new credential.
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		await revokeAllUserSessions(c, userId);
 
 		try {
 			let profile = {};
@@ -642,7 +692,7 @@ const userService = {
 			profile.passwordUpdatedAt = new Date().toISOString();
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 		} catch (e) {
-			console.error('Failed to update password timestamp', e);
+			safeLogger.error('password_timestamp_update_failed', { userId, error: e });
 		}
 
 		try {
@@ -650,7 +700,7 @@ const userService = {
 			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
 			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSWORD_CHANGED);
 		} catch (e) {
-			console.error('Failed to send password changed notice:', e);
+			safeLogger.error('password_changed_notice_failed', { userId, error: e });
 		}
 	},
 
@@ -682,7 +732,7 @@ const userService = {
 			).bind(passwordHash, userId, passwordHash).run();
 			return Number(result?.meta?.changes ?? 0) > 0;
 		} catch (err) {
-			console.error('Failed to persist initial password marker:', err);
+			safeLogger.error('initial_password_marker_persist_failed', { userId, error: err });
 			return false;
 		}
 	},
@@ -764,7 +814,7 @@ const userService = {
 				generatedHash,
 				authVersion: authVersionOf(userRow)			};
 		} catch (err) {
-			console.error('Failed to evaluate initial password eligibility:', err);
+			safeLogger.error('initial_password_eligibility_failed', { userId, error: err });
 			return status;
 		}
 	},
@@ -813,13 +863,13 @@ const userService = {
 		try {
 			await c.env.kv.delete(KvConst.INITIAL_PASSWORD + userId);
 		} catch (err) {
-			console.error('Failed to clear initial password marker:', err);
+			safeLogger.error('initial_password_kv_clear_failed', { userId, error: err });
 		}
 
 		// Invalidate every session, including this one, exactly like a normal
 		// password change: the user signs in again with the credential they
 		// just chose.
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		await revokeAllUserSessions(c, userId);
 
 		try {
 			let profile = {};
@@ -830,7 +880,7 @@ const userService = {
 			profile.passwordUpdatedAt = new Date().toISOString();
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
 		} catch (e) {
-			console.error('Failed to update password timestamp', e);
+			safeLogger.error('initial_password_timestamp_update_failed', { userId, error: e });
 		}
 
 		try {
@@ -838,7 +888,7 @@ const userService = {
 			const { SECURITY_EVENT_TYPES } = await import('../const/security-notice-templates.js');
 			await securityNoticeService.sendNotice(c, userId, SECURITY_EVENT_TYPES.PASSWORD_CHANGED);
 		} catch (e) {
-			console.error('Failed to send password changed notice:', e);
+			safeLogger.error('initial_password_changed_notice_failed', { userId, error: e });
 		}
 
 		return { success: true };
@@ -952,40 +1002,33 @@ const userService = {
 			.select({ accountId: account.accountId, userId: account.userId, email: account.email, name: account.name })
 			.from(account).where(inArray(account.userId, userIds)).all();
 
-		const identifiers = new Set();
-		for (const u of usersToDelete) {
-			if (u.email) {
-				identifiers.add(u.email.trim());
-				identifiers.add(u.email.trim().toLowerCase());
-			}
-		}
-		for (const a of accountsToDelete) {
-			if (a.email) {
-				identifiers.add(a.email.trim());
-				identifiers.add(a.email.trim().toLowerCase());
-			}
-			if (a.name) {
-				identifiers.add(a.name.trim());
-				identifiers.add(a.name.trim().toLowerCase());
-			}
+		try {
+			await clearDeletedLoginFailures(c, usersToDelete, accountsToDelete);
+		} catch (error) {
+			for (const id of userIds) await setDeletionStatus(c, id, 'cleanup_failed');
+			throw error;
 		}
 
 		// 2. 统计这批待删用户今日的发件数量，用于精准扣减当日全局发送配额计数器
-		const dateStr = dayjs().format('YYYY-MM-DD');
+		const dateStr = new Date().toISOString().slice(0, 10);
 		let sentTodayCount = 0;
 		try {
-			const todayStartIso = dayjs().startOf('day').toISOString();
-			const todayStartMs = dayjs().startOf('day').valueOf();
-			const todayEndMs = dayjs().endOf('day').valueOf();
+			const todayStartIso = dateStr + 'T00:00:00.000Z';
+			const todayStartMs = Date.parse(todayStartIso);
+			const todayEndMs = todayStartMs + 86400000 - 1;
 
 			// 优先使用 SQLite datetime() 规范化比较候选发件
 			const sentRows = await mailOrm(c)
-				.select({ emailId: email.emailId, createTime: email.createTime })
+				.select({ createTime: email.createTime, recipient: email.recipient })
 				.from(email)
 				.where(and(
 					inArray(email.userId, userIds),
 					eq(email.type, emailConst.type.SEND),
-					sql`datetime(${email.createTime}) >= datetime(${todayStartIso})`
+					sql`datetime(${email.createTime}) >= datetime(${todayStartIso})`,
+					sql`NOT EXISTS (SELECT 1 FROM mail_outbound_task t WHERE t.task_id=${email.outboundTaskId}
+						AND t.user_id=${email.userId} AND (t.counted_day IS NOT NULL OR t.state!='ACCEPTED'))`,
+					inArray(email.status, [emailConst.status.SENT, emailConst.status.DELIVERED, emailConst.status.BOUNCED,
+						emailConst.status.COMPLAINED, emailConst.status.DELAYED, emailConst.status.NOONE])
 				))
 				.all();
 
@@ -998,7 +1041,13 @@ const userService = {
 					const ts = new Date(isoFormatted).getTime();
 					if (isNaN(ts)) return true;
 					return ts >= todayStartMs && ts <= todayEndMs;
-				}).length;
+				}).reduce((total, row) => {
+					try {
+						const recipients = JSON.parse(row.recipient);
+						if (Array.isArray(recipients)) return total + recipients.length;
+					} catch { /* Older single-recipient rows can have a plain address. */ }
+					return total + 1;
+				}, 0);
 			}
 		} catch (e) {
 			console.warn('[user-service] Failed to count sentTodayCount:', e);
@@ -1047,13 +1096,13 @@ const userService = {
 		try {
 			const kv = c.env.kv;
 			for (const id of userIds) {
+				await deleteUserSessionsFromDb(c, id);
 				await deleteKvKeys(kv, [KvConst.AUTH_INFO + id, 'USER_PROFILE_' + id,
-					'HAS_WELCOME_' + id, 'USER_KNOWN_ENV_' + id]);
+					'HAS_WELCOME_' + id, 'WELCOME_ISSUED_' + id, 'USER_KNOWN_ENV_' + id]);
 				for (const prefix of [`REVOKED_GRANT_${id}_`, `HAS_GLOBAL_EMAIL_${id}_`, `static/avatar/${id}/`]) {
 					await deleteKvMatching(kv, prefix);
 				}
 			}
-			await deleteKvKeys(kv, [...identifiers].map(identifier => KvConst.LOGIN_FAIL + identifier));
 			await forEachKvPage(kv, KvConst.RISK_IP_ACCOUNTS, async keys => {
 				for (const key of keys) {
 					const ids = await kv.get(key.name, { type: 'json' });
@@ -1276,7 +1325,7 @@ const userService = {
 		await rbacGuard.assertCanManageUser(c, callerUserId, Number(userId));
 		await this.assertAdminStepUp(c, callerUserId, operatorPassword);
 		await this.resetPassword(c, { password }, userId);
-		await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+		await revokeAllUserSessions(c, userId);
 	},
 
 	async setStatus(c, params, callerUserId) {
@@ -1297,7 +1346,7 @@ const userService = {
 			.run();
 
 		if (nextStatus === userConst.status.BAN) {
-			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
+			await revokeAllUserSessions(c, userId);
 		}
 	},
 
@@ -1335,14 +1384,12 @@ const userService = {
 
 		await orm(c)
 			.update(user)
-			.set({ type })
+			.set({ type, authVersion: sql`coalesce(${user.authVersion}, 0) + 1` })
 			.where(eq(user.userId, userId))
 			.run();
 
 		await this.updateUserInfo(c, userId, true);
-		try {
-			await c.env.kv.delete(KvConst.AUTH_INFO + userId);
-		} catch (e) {}
+		await revokeAllUserSessions(c, userId, { ignoreKvError: true });
 	},
 
 	async getBlogLevelInfo(c, userId) {
@@ -1474,14 +1521,21 @@ const userService = {
 
 	async add(c, params, callerUserId) {
 
-		const { email, type, password } = params;
+		let { email, type, password } = params;
+		email = typeof email === 'string' ? email.trim().toLowerCase() : '';
+		if (!verifyUtils.isEmail(email) || email.length > 254) {
+			throw new BizError(t('notEmail'));
+		}
+		if (typeof password !== 'string') {
+			throw new BizError(t('pwdMinLength'));
+		}
 
 		// Creating an account is a role grant: the new user receives `type`.
 		// Without this guard any holder of `user:add` (e.g. a moderator) could
 		// mint an account with a more privileged role and use it to escalate.
 		await rbacGuard.assertCanAssignRole(c, callerUserId, Number(type));
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!isConfiguredDomain(c.env.domain, emailUtils.getDomain(email))) {
 			throw new BizError(t('notEmailDomain'));
 		}
 
@@ -1539,16 +1593,13 @@ const userService = {
 
 			await userService.updateUserInfo(c, userId, true);
 
-			const acc = await accountService.insert(c, { userId: userId, email, type, name: assignedName });
+			await accountService.insert(c, { userId: userId, email, type, name: assignedName });
 
 			try {
 				const emailService = (await import('./email-service')).default;
-				const accountRow = acc || await accountService.selectByEmail(c, email);
-				if (accountRow) {
-					await emailService.deliverWelcomeEmailToUser(c, userId, accountRow.accountId, email, { forceWelcome: true });
-				}
+				await emailService.ensureWelcomeEmailForUser(c, userId, email);
 			} catch (err) {
-				console.error('Failed to deliver welcome email on user add:', err);
+				safeLogger.error('user_add_welcome_email_failed', { userId, error: err });
 			}
 		} catch (err) {
 			// The user row, profile KV entry and primary account are separate
@@ -1559,6 +1610,7 @@ const userService = {
 					orm(c).delete(user).where(eq(user.userId, userId)).run(),
 					getMailDb(c).prepare('DELETE FROM account WHERE user_id = ? AND email = ?').bind(userId, email).run(),
 					c.env.kv.delete('USER_PROFILE_' + userId),
+					deleteUserSessionsFromDb(c, userId),
 					c.env.kv.delete(KvConst.AUTH_INFO + userId)
 				]);
 			}
@@ -1567,13 +1619,12 @@ const userService = {
 	},
 
 	async resetDaySendCount(c) {
-		const roleList = await roleService.selectByIdsAndSendType(c, 'email:send', roleConst.sendType.DAY);
-		const roleIds = roleList.map(action => action.roleId);
-		await orm(c).update(user).set({ sendCount: 0 }).where(inArray(user.type, roleIds)).run();
+		await advanceDailyQuota(getUserDb(c)).run();
 	},
 
 	async resetSendCount(c, params) {
-		await orm(c).update(user).set({ sendCount: 0 }).where(eq(user.userId, params.userId)).run();
+		await getUserDb(c).prepare(`UPDATE user SET send_count=0, send_quota_period=MAX(send_quota_period, ?),
+			send_quota_generation=send_quota_generation+1 WHERE user_id=?`).bind(sendQuotaPeriodStart(), params.userId).run();
 	},
 
 	async restore(c, params, callerUserId) {
@@ -1639,92 +1690,82 @@ const userService = {
 			throw new BizError(t('purgeRequireBannedMsg') || '必须先对该用户进行【封禁】处理，才能强制清空其邮件释放空间', 400);
 		}
 
-		const quota = await this.getUserQuota(c, uid);
-
-		const starService = (await import('./star-service')).default;
-		try {
-			await starService.removeByUserIds(c, [uid]);
-		} catch (e) {}
-
-		await emailService.physicsDeleteUserIds(c, [uid]);
-
-		return {
-			userId: uid,
-			releasedStorageBytes: quota.usedStorageBytes,
-			releasedEmails: quota.usedEmails
-		};
+		return purgeOwnedMail(c, uid);
 	},
 
 	async exportUserData(c, userId, options = {}) {
-		const userRow = await userService.selectById(c, userId);
-		if (!userRow) throw new BizError('User not found');
-
-		const range = typeof options?.range === 'string' ? options.range : 'all';
-		const emailConditions = [eq(email.userId, userId), eq(email.isDel, 0)];
-		if (range === '30d') {
-			emailConditions.push(gte(email.createTime, dayjs().subtract(30, 'day').format('YYYY-MM-DD HH:mm:ss')));
-		} else if (range === '1y') {
-			emailConditions.push(gte(email.createTime, dayjs().subtract(1, 'year').format('YYYY-MM-DD HH:mm:ss')));
+		const type = options.type ?? 'full';
+		const range = options.range ?? 'all';
+		if (!['full', 'emails', 'contacts'].includes(type) || !['all', '30d', '1y'].includes(range)) {
+			throw new BizError('Unknown export type or date range', 400, 'invalid_export_scope');
+		}
+		const userRow = await this.selectById(c, userId);
+		if (!userRow) throw new BizError('User not found', 404);
+		const data = { exportTime: new Date().toISOString(), version: '1.0.0' };
+		if (type !== 'emails') {
+			const stored = await c.env.kv.get('USER_PROFILE_' + userId);
+			const profile = stored ? JSON.parse(stored) : {};
+			data.user = { profile: {
+				nickname: profile.nickname || '', bio: profile.bio || '', avatarUrl: profile.avatarUrl || '',
+				backgroundUrl: profile.backgroundUrl || profile.background || '', gender: profile.gender || '',
+				birthday: profile.birthday || '', phones: profile.phones || [], addresses: profile.addresses || {}
+			} };
+			data.customLabels = userRow.customLabels ? JSON.parse(userRow.customLabels) : null;
+			if (type === 'contacts') return data;
+			const [accountRow, roleRow] = await Promise.all([
+				accountService.selectByEmailIncludeDel(c, userRow.email), roleService.selectById(c, userRow.type)
+			]);
+			Object.assign(data.user, { userId: userRow.userId, email: userRow.email, name: accountRow?.name || '',
+				createTime: userRow.createTime, role: roleRow?.name || '' });
 		}
 
-		const [account, roleRow, userEmails] = await Promise.all([
-			accountService.selectByEmailIncludeDel(c, userRow.email),
-			roleService.selectById(c, userRow.type),
-			mailOrm(c).select().from(email).where(and(...emailConditions)).all()
-		]);
-
-		let profile = {};
-		try {
-			const profileStr = await c.env.kv.get('USER_PROFILE_' + userId);
-			if (profileStr) profile = JSON.parse(profileStr);
-		} catch (e) {}
-
-		let decryptedEmails = userEmails;
-		try {
-			const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
-			decryptedEmails = await Promise.all(userEmails.map(em => emailCryptoUtils.decryptEmailRecord(em, cryptoKey)));
-		} catch (err) {
-			console.error('Decryption during export:', err);
+		const cursor = options.before === undefined ? null : Number(options.before);
+		const asOf = options.asOf === undefined ? data.exportTime : options.asOf;
+		if ((cursor !== null && (!Number.isSafeInteger(cursor) || cursor <= 0))
+			|| typeof asOf !== 'string' || !dayjs(asOf).isValid()) {
+			throw new BizError('Invalid export cursor', 400, 'invalid_export_cursor');
 		}
-
-		return {
-			exportTime: new Date().toISOString(),
-			version: '1.0.0',
-			user: {
-				userId: userRow.userId,
-				email: userRow.email,
-				name: account?.name || '',
-				createTime: userRow.createTime,
-				role: roleRow?.name || '',
-				profile: {
-					nickname: profile.nickname || '',
-					bio: profile.bio || '',
-					avatarUrl: profile.avatarUrl || '',
-					backgroundUrl: profile.backgroundUrl || profile.background || '',
-					gender: profile.gender || '',
-					birthday: profile.birthday || '',
-					phones: profile.phones || [],
-					addresses: profile.addresses || {}
-				}
-			},
-			emails: decryptedEmails.map(em => ({
-				emailId: em.emailId,
-				messageId: em.messageId,
-				toEmail: em.toEmail,
-				recipient: em.recipient,
-				sendEmail: em.sendEmail,
-				name: em.name,
-				subject: em.subject,
-				createTime: em.createTime,
-				content: em.content,
-				text: em.text,
-				isSpam: em.isSpam,
-				unread: em.unread,
-				labels: em.labels
-			})),
-			customLabels: userRow.customLabels ? JSON.parse(userRow.customLabels) : null,
-			totalEmails: decryptedEmails.length
+		const conditions = [eq(email.userId, userId), eq(email.isDel, 0)];
+		if (cursor !== null) conditions.push(lt(email.emailId, cursor));
+		if (range !== 'all') {
+			const since = range === '30d' ? dayjs(asOf).subtract(30, 'day') : dayjs(asOf).subtract(1, 'year');
+			conditions.push(sql`datetime(${email.createTime}) >= datetime(${since.toISOString()})`);
+		}
+		// Bound both the number and estimated size of bodies loaded into one worker.
+		const candidates = await mailOrm(c).select({ id: email.emailId,
+			bytes: sql`LENGTH(CAST(IFNULL(${email.subject}, '') AS BLOB)) + LENGTH(CAST(IFNULL(${email.text}, '') AS BLOB))
+				+ LENGTH(CAST(IFNULL(${email.content}, '') AS BLOB))`
+		}).from(email).where(and(...conditions)).orderBy(desc(email.emailId)).limit(26).all();
+		const ids = [];
+		let bytes = 0;
+		for (const row of candidates) {
+			if (ids.length === 25 || (ids.length && bytes + row.bytes > 1024 * 1024)) break;
+			ids.push(row.id);
+			bytes += row.bytes;
+		}
+		const nextBefore = ids.length < candidates.length ? ids[ids.length - 1] : null;
+		const fields = {
+			emailId: email.emailId, messageId: email.messageId, toEmail: email.toEmail, recipient: email.recipient,
+			sendEmail: email.sendEmail, name: email.name, subject: email.subject, createTime: email.createTime,
+			content: email.content, text: email.text, isSpam: email.isSpam, unread: email.unread, labels: email.labels
 		};
+		data.emails = ids.length ? await mailOrm(c).select(fields).from(email)
+			.where(and(...conditions, inArray(email.emailId, ids))).orderBy(desc(email.emailId)).all() : [];
+		const encrypted = row => emailCryptoUtils.ENCRYPTED_FIELDS.some(field =>
+			emailCryptoUtils.inspectEncryptedValue(row[field]).encrypted);
+		if (data.emails.some(encrypted)) {
+			try {
+				const cryptoKey = await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId);
+				data.emails = await Promise.all(data.emails.map(row => emailCryptoUtils.decryptEmailRecord(row, cryptoKey)));
+				if (data.emails.some(encrypted)) throw new Error('Unreadable encrypted field');
+			} catch (error) {
+				safeLogger.error('export_decryption_failed', { userId, error });
+				throw new BizError('Some mail could not be decrypted for export', 503, 'export_unreadable');
+			}
+		}
+		data.totalEmails = data.emails.length;
+		Object.assign(data, { asOf, nextBefore });
+		return data;
 	},
 
 	async getApiTokens(c, userId) {
@@ -1756,15 +1797,7 @@ const userService = {
 			item.tokenHash = tokenHash;
 			item.tokenPrefix = tokenPrefix;
 			delete item.token;
-			tokens.push({
-				id: item.id,
-				name: item.name,
-				tokenPrefix,
-				scopes: Array.isArray(item.scopes) ? item.scopes : [],
-				createdAt: item.createdAt || null,
-				expiresAt: item.expiresAt || null,
-				lastUsedAt: item.lastUsedAt || null
-			});
+			tokens.push(apiTokenMetadata(item));
 		}
 		if (migrated) {
 			await c.env.kv.put('USER_PROFILE_' + userId, JSON.stringify(profile));
@@ -1774,22 +1807,20 @@ const userService = {
 
 	async createApiToken(c, userId, params) {
 		await this.assertNotVisitor(c, userId);
-		const settingService = (await import('./setting-service')).default;
+		const { default: settingService, personalTokenPolicy } = await import('./setting-service.js');
 		const settingData = await settingService.query(c);
-		if (Number(settingData.userApiSupport ?? 1) === 0) {
-			throw new BizError('第三方 API 与开发者访问功能已被管理员停用 / Third-party API support is disabled', 403);
+		if (!personalTokenPolicy(c.env, settingData).userApiSupport) {
+			throw new BizError('Personal access token issuance is disabled', 403, 'pat_issuance_disabled');
 		}
 
 		const { name, expiresInDays, scopes } = params || {};
 		const safeName = typeof name === 'string' ? name.trim().slice(0, 100) : '';
 		if (!safeName) throw new BizError('Token name is required');
 		const allowedScopes = new Set(['emails:read', 'emails:send', 'profile:read']);
-		const requestedScopes = Array.isArray(scopes)
-			? scopes.filter(scope => allowedScopes.has(scope))
-			: [];
-		const tokenScopes = requestedScopes.length > 0
-			? [...new Set(requestedScopes)]
-			: ['emails:read', 'emails:send', 'profile:read'];
+		if (scopes !== undefined && (!Array.isArray(scopes) || scopes.length === 0 || scopes.some(scope => !allowedScopes.has(scope)))) {
+			throw new BizError('Invalid personal access token scopes', 400, 'invalid_scope');
+		}
+		const tokenScopes = [...new Set(scopes === undefined ? allowedScopes : scopes)];
 		const days = expiresInDays === undefined || expiresInDays === null || expiresInDays === ''
 			? null
 			: Number(expiresInDays);
@@ -1835,7 +1866,7 @@ const userService = {
 				detail: `Token: ${tokenObj.name} (${days ? days + 'd' : 'never'})`
 			});
 		} catch (e) {
-			console.error('Failed to send PAT notice:', e);
+			safeLogger.error('pat_created_notice_failed', { userId, error: e });
 		}
 
 		// The plaintext value is returned exactly once. Only its SHA-256 hash is
@@ -1924,12 +1955,14 @@ const userService = {
 			customDomain: (customDomain || '').trim()
 		};
 
+		const encryptedConfig = await encryptByoStorageConfig(cleanConfig, c.env, userId);
+
 		const userDb = (await import('../utils/db-accessor')).getUserDb(c);
 		await userDb.prepare(`
 			UPDATE user 
 			SET byo_storage_enabled = 1, byo_storage_config = ? 
 			WHERE user_id = ?
-		`).bind(JSON.stringify(cleanConfig), userId).run();
+		`).bind(encryptedConfig, userId).run();
 
 		return {
 			ok: true,
@@ -1955,7 +1988,7 @@ const userService = {
 				detail: 'BYO Storage unlinked and reset to system default'
 			});
 		} catch (e) {
-			console.error('Failed to send storage purged notice:', e);
+			safeLogger.error('storage_purged_notice_failed', { userId, error: e });
 		}
 
 		return {

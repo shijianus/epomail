@@ -1340,8 +1340,9 @@ const downloadBackupCodesTxt = () => {
 }
 
 const printBackupCodes = () => {
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open('', '_blank', 'noopener,noreferrer');
   if (!printWindow) return;
+  const safeCodes = backupCodesList.value.map(code => escapeHtml(code));
   printWindow.document.write(`
     <html>
       <head>
@@ -1357,7 +1358,7 @@ const printBackupCodes = () => {
         <p>Keep these codes safe. Each code can be used only once.</p>
         <hr/>
         <ol>
-          ${backupCodesList.value.map(c => `<li class="code-item"><strong>${c}</strong></li>`).join('')}
+          ${safeCodes.map(code => `<li class="code-item"><strong>${code}</strong></li>`).join('')}
         </ol>
       </body>
     </html>
@@ -1439,8 +1440,9 @@ const downloadViewBackupCodesTxt = () => {
 }
 
 const printViewBackupCodes = () => {
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open('', '_blank', 'noopener,noreferrer');
   if (!printWindow) return;
+  const safeCodes = viewBackupCodesList.value.map(code => escapeHtml(code));
   printWindow.document.write(`
     <html>
       <head>
@@ -1456,7 +1458,7 @@ const printViewBackupCodes = () => {
         <p>Keep these codes safe. Each code can be used only once.</p>
         <hr/>
         <ol>
-          ${viewBackupCodesList.value.map(c => `<li class="code-item"><strong>${c}</strong></li>`).join('')}
+          ${safeCodes.map(code => `<li class="code-item"><strong>${code}</strong></li>`).join('')}
         </ol>
       </body>
     </html>
@@ -1961,8 +1963,9 @@ const downloadRegenBackupCodesTxt = () => {
 }
 
 const printRegenBackupCodes = () => {
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open('', '_blank', 'noopener,noreferrer');
   if (!printWindow) return;
+  const safeCodes = regenResultCodes.value.map(code => escapeHtml(code));
   printWindow.document.write(`
     <html>
       <head>
@@ -1978,7 +1981,7 @@ const printRegenBackupCodes = () => {
         <p>Old backup codes have been invalidated. Keep these codes safe.</p>
         <hr/>
         <ol>
-          ${regenResultCodes.value.map(c => `<li class="code-item"><strong>${c}</strong></li>`).join('')}
+          ${safeCodes.map(code => `<li class="code-item"><strong>${code}</strong></li>`).join('')}
         </ol>
       </body>
     </html>
@@ -1986,6 +1989,15 @@ const printRegenBackupCodes = () => {
   printWindow.document.close();
   printWindow.focus();
   printWindow.print();
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ==========================================

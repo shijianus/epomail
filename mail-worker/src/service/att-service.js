@@ -1,6 +1,7 @@
 import { mailOrm as orm } from '../entity/orm';
 import { att } from '../entity/att';
-import { and, eq, isNull, inArray, desc, asc } from 'drizzle-orm';
+import email from '../entity/email';
+import { and, eq, isNull, inArray, desc, asc, getTableColumns } from 'drizzle-orm';
 import r2Service from './r2-service';
 import constant from '../const/constant';
 import fileUtils from '../utils/file-utils';
@@ -16,6 +17,12 @@ import storageQuotaService from './storage-quota-service';
 import { getMailDb } from '../utils/db-accessor';
 import { normalizeObjectKey } from '../utils/object-key-utils';
 import { buildBoundedInserts, prepareMailQuery } from '../utils/mail-pipeline.js';
+
+function ownedMailAttachments(c) {
+	return orm(c).select(getTableColumns(att)).from(att).innerJoin(email, and(
+		eq(att.emailId, email.emailId), eq(att.userId, email.userId), eq(att.accountId, email.accountId)
+	));
+}
 
 const ATTACHMENT_CONTENT_PATTERN = /{{domain}}(attachments\/[A-Za-z0-9._-]+)/g;
 
@@ -193,7 +200,7 @@ const attService = {
 			return [];
 		}
 
-		return orm(c).select().from(att).where(
+		return ownedMailAttachments(c).where(
 			and(
 				eq(att.emailId, emailId),
 				eq(att.userId, userId),
@@ -208,6 +215,11 @@ const attService = {
 		const { r2Domain } = await settingService.query(c);
 		const ossDomain = domainUtils.toOssDomain(r2Domain);
 
+		// These two forms contain no images and already match linkedom's output.
+		// Its text serializer escapes angle brackets, ampersands and NBSP.
+		if (typeof content === 'string' && /^(?:[^<>&\u00a0]*|<p>[^<>&\u00a0]*<\/p>)$/.test(content)) {
+			return { imageDataList: [], html: content };
+		}
 		const { document } = parseHTML(content);
 
 		const images = Array.from(document.querySelectorAll('img'));
@@ -441,7 +453,7 @@ const attService = {
 	},
 
 	selectByEmailIds(c, emailIds) {
-		return orm(c).select().from(att).where(
+		return ownedMailAttachments(c).where(
 			and(
 				inArray(att.emailId, emailIds),
 				eq(att.type, attConst.type.ATT)

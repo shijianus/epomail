@@ -1,8 +1,10 @@
+import { setForwardPolicy } from './forward-consent.js';
 import BizError from '../error/biz-error.js';
 import KvConst from '../const/kv-const.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import { deleteKvKeys, deleteKvMatching } from '../utils/kv-revocation.js';
 import deviceTrustService from './device-trust-service.js';
+import { deleteUserSessionsFromDb } from '../utils/session-auth-store.js';
 
 export async function readPrivacyState(c, userId) {
 	return getUserDb(c).prepare(`
@@ -125,8 +127,12 @@ export async function revokeAccountAccess(c, userId) {
 		return Number(value?.userId ?? value?.user?.userId) === owner;
 	};
 	const tasks = [
+		async () => {
+			if (await tableExists(getMailDb(c), 'mail_forward_policy')) await setForwardPolicy(c, owner, { enabled: false, targets: '' });
+		},
 		() => getMailDb(c).prepare('UPDATE account SET is_del = 1, status = 1, all_receive = 0 WHERE user_id = ?')
 			.bind(owner).run(),
+		() => deleteUserSessionsFromDb(c, owner),
 		() => deleteKvKeys(kv, [KvConst.AUTH_INFO + owner, KvConst.INITIAL_PASSWORD + owner,
 			KvConst.TOTP_SETUP + owner, KvConst.WEBAUTHN_SETUP + owner, KvConst.WEBAUTHN_TEST + owner]),
 		() => deviceTrustService.revokeAllTrust(c, owner),
@@ -168,7 +174,17 @@ export async function deleteAccountEvidence(c, userId) {
 	for (const table of ['auth_security_operation', 'auth_totp_replay', 'mail_send_quota_reservation']) {
 		if (await tableExists(db, table)) await db.prepare(`DELETE FROM ${table} WHERE user_id=?`).bind(userId).run();
 	}
+	if (await tableExists(db, 'mail_global_audience')) {
+		await db.batch([
+			db.prepare('DELETE FROM mail_global_audience WHERE user_id=? OR broadcast_id IN (SELECT broadcast_id FROM mail_global_operation WHERE owner_id=?)').bind(userId,userId),
+			db.prepare('DELETE FROM mail_global_operation WHERE owner_id=?').bind(userId)
+		]);
+	}
 	const mailDb = getMailDb(c);
+	for (const table of ['mail_welcome_receipt', 'mail_global_receipt']) {
+		if (await tableExists(mailDb, table)) await mailDb.prepare(`DELETE FROM ${table} WHERE user_id=?`).bind(userId).run();
+	}
+	if (await tableExists(mailDb, 'mail_forward_policy')) await mailDb.prepare('DELETE FROM mail_forward_policy WHERE user_id=?').bind(userId).run();
 	if (await tableExists(mailDb, 'mail_forward_task')) {
 		await mailDb.prepare('DELETE FROM mail_forward_task WHERE user_id=?').bind(userId).run();
 	}

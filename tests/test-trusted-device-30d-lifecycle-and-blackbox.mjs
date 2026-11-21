@@ -43,7 +43,7 @@ assert(issueResult && issueResult.trustedDeviceToken, 'Should successfully issue
 assert(issueResult.trustedDeviceToken.startsWith('epodt_v1.'), 'Token must have opaque epodt_v1 prefix');
 assert.strictEqual(issueResult.maxSessionEpoch, issueResult.trustEpoch + 5184000, 'maxSessionEpoch must be exactly trustEpoch + 60 days');
 
-console.log('✓ Token issued successfully:', issueResult.trustedDeviceToken.slice(0, 32) + '...');
+console.log('Credential creation succeeded');
 
 // 2. Verify payload masking (no plain timestamps exposed)
 const parts = issueResult.trustedDeviceToken.split('.');

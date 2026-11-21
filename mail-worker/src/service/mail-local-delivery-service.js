@@ -1,23 +1,24 @@
-import { sql, eq } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
 import { mailOrm } from '../entity/orm.js';
 import email from '../entity/email.js';
 import account from '../entity/account.js';
 import { att } from '../entity/att.js';
-import { getMailDb } from '../utils/db-accessor.js';
+import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import { mailTransactionGuard } from '../utils/mail-transaction.js';
-import { assertMailRowSize, buildBoundedInserts, prepareMailQuery, mailSha256, normalizeMailAddress } from '../utils/mail-pipeline.js';
+import { assertMailRowSize, buildBoundedInserts, prepareMailQuery, mailQuotaCondition, validatedMailQuotaCondition, quotaWriteStatus, mailSha256, normalizeMailAddress } from '../utils/mail-pipeline.js';
 import emailCryptoUtils from '../utils/email-crypto-utils.js';
 import { emailConst, settingConst, isDel } from '../const/entity-const.js';
 import { isAdminUser } from '../utils/admin-utils.js';
 import BizError from '../error/biz-error.js';
 import settingService from './setting-service.js';
 import userService from './user-service.js';
+import storageQuotaService from './storage-quota-service.js';
 import roleService from './role-service.js';
 import r2Service from './r2-service.js';
 import fileUtils from '../utils/file-utils.js';
 import telegramService from './telegram-service.js';
 import { applyRules } from '../email/rule-engine.js';
-import forwardService from './mail-forward-service.js';
+import { forwardIntentStatements, forwardPlan } from './forward-consent.js';
 
 const encoder = new TextEncoder();
 const bodyBytes = row => ['subject', 'text', 'content', 'code']
@@ -33,30 +34,26 @@ function sameStorage(left, right) {
 		.every(field => String(left.config?.[field] || '') === String(right.config?.[field] || ''));
 }
 
-function quotaCondition({ userId, incomingBytes, maxStorageBytes, maxEmails, bypassStorage }) {
-	return {
-		sql: `(?=1 OR ?=0 OR (
-			COALESCE((SELECT SUM(LENGTH(CAST(IFNULL(subject,'') AS BLOB))+LENGTH(CAST(IFNULL(text,'') AS BLOB))+
-				LENGTH(CAST(IFNULL(content,'') AS BLOB))+LENGTH(CAST(IFNULL(code,'') AS BLOB))) FROM email WHERE user_id=?),0)
-			+ COALESCE((SELECT SUM(size) FROM attachments WHERE user_id=?),0)
-			+ COALESCE((SELECT SUM(reserved_bytes) FROM mail_receive_claim WHERE user_id=? AND state IN ('CLAIMED','SAVING','RETRY') AND lease_until>unixepoch()),0)
-			+ COALESCE((SELECT SUM(reserved_bytes) FROM mail_outbound_task WHERE user_id=? AND state IN ('PREPARED','SENDING','UNKNOWN')),0)
-			+ ?<=?)) AND (?=0 OR (
-			(SELECT COUNT(*) FROM email WHERE user_id=?)
-			+ COALESCE((SELECT SUM(reserved_count) FROM mail_receive_claim WHERE user_id=? AND state IN ('CLAIMED','SAVING','RETRY') AND lease_until>unixepoch()),0)
-			+ COALESCE((SELECT SUM(reserved_count) FROM mail_outbound_task WHERE user_id=? AND state IN ('PREPARED','SENDING','UNKNOWN')),0)
-			+ 1<=?))`,
-		params: [bypassStorage ? 1 : 0, maxStorageBytes, userId, userId, userId, userId, incomingBytes, maxStorageBytes,
-			maxEmails, userId, userId, userId, maxEmails]
-	};
-}
+const recipientLookup = `SELECT 1 AS recorded, NULL AS accountId, NULL AS userId, NULL AS status, NULL AS isDel
+	FROM mail_local_delivery WHERE task_id=?1 AND recipient=?2
+	UNION ALL SELECT 0, account_id, user_id, status, is_del FROM account
+	WHERE email COLLATE NOCASE=?2 AND lower(email)=?2 LIMIT 1`;
 
-async function recordBounce(c, taskId, leaseToken, recipient, reason) {
+async function recordBounce(c, taskId, leaseToken, recipient, reason, unlessAllowed) {
 	const db = getMailDb(c);
 	const guard = mailTransactionGuard(c, senderLease, [taskId, leaseToken]);
-	await db.batch([guard.before,
-		db.prepare(`INSERT INTO mail_local_delivery(task_id,recipient,state,reason) VALUES (?,?,'BOUNCED',?)
-			ON CONFLICT(task_id,recipient) DO NOTHING`).bind(taskId, recipient, reason), guard.after]);
+	const statements = [guard.before,
+		db.prepare(`INSERT INTO mail_local_delivery(task_id,recipient,state,reason)
+			SELECT ?,?,'BOUNCED',? WHERE ${unlessAllowed ? `NOT (${unlessAllowed.sql})` : '1'}
+			ON CONFLICT(task_id,recipient) DO NOTHING`).bind(taskId, recipient, reason, ...(unlessAllowed?.params || [])), guard.after];
+	if (!unlessAllowed) {
+		await db.batch(statements);
+		return true;
+	}
+	// Recheck exhausted quota in the same transaction as the bounce. A slot
+	// freed since the preflight can still receive this message.
+	statements.push(db.prepare('SELECT state FROM mail_local_delivery WHERE task_id=? AND recipient=?').bind(taskId, recipient));
+	return (await db.batch(statements)).at(-1).results.length > 0;
 }
 
 async function copyAttachments(c, attachments, sourceUserId, recipientUserId, recipientAccountId, taskId, recipient) {
@@ -96,31 +93,98 @@ async function copyAttachments(c, attachments, sourceUserId, recipientUserId, re
 	return { rows, replacements, stagedKeys };
 }
 
-export async function deliverLocalMail(c, recipients, sender, attachments = [], { taskId, leaseToken } = {}) {
+// Resume the exact archived operation, including its sender-owned attachments.
+// Never route a recovered local task through an external transport.
+export async function resumeArchivedLocalDelivery(c, task) {
+	const payload = JSON.parse(task.payload_json);
+	let sender = await mailOrm(c).select().from(email).where(and(
+		eq(email.emailId, task.email_id), eq(email.userId, task.user_id), eq(email.accountId, task.account_id),
+		eq(email.outboundTaskId, task.task_id), eq(email.type, emailConst.type.SEND), eq(email.status, emailConst.status.SAVING)
+	)).get();
+	if (!sender) throw new Error('Local delivery archive is unavailable');
+	const recipients = JSON.parse(sender.recipient).map(item => normalizeMailAddress(item.address));
+	if (!recipients.length || recipients.some(address => !address) || !Array.isArray(payload.recipients)
+		|| JSON.stringify(payload.recipients.map(normalizeMailAddress)) !== JSON.stringify(recipients)) {
+		throw new Error('Archived local recipient list does not match the dispatch');
+	}
+	const receipts = (await getMailDb(c).prepare('SELECT recipient,state,reason FROM mail_local_delivery WHERE task_id=?')
+		.bind(task.task_id).all()).results || [];
+	if (recipients.every(address => receipts.some(row => row.recipient === address))) {
+		// Finalize recorded outcomes even if the sender has since been paused.
+		// This branch cannot publish another mailbox copy or contact a provider.
+		return finishLocalDelivery(c, receipts, sender, task.task_id, task.lease_token);
+	}
+	const db = getUserDb(c);
+	const reserved = await db.prepare("SELECT quantity FROM mail_send_quota_reservation WHERE task_id=? AND user_id=? AND state='reserved'")
+		.bind(task.task_id, task.user_id).first();
+	if (reserved?.quantity !== recipients.length) throw new Error('Local dispatch reservation requires reconciliation');
+	const setting = await settingService.query(c);
+	const domains = new Set((setting.domainList || []).map(value => String(value).replace(/^@/, '').toLowerCase()));
+	const identity = await storageQuotaService.selectMailPolicyIdentity(c, task.user_id);
+	const owner = identity?.user;
+	const mailbox = await mailOrm(c).select().from(account).where(and(eq(account.accountId, task.account_id),
+		eq(account.userId, task.user_id), eq(account.status, 0), eq(account.isDel, 0))).get();
+	if (setting.send !== settingConst.send.OPEN || recipients.some(address => !domains.has(address.split('@').pop()))
+		|| !owner || Number(owner.status) !== 0 || Number(owner.isDel) !== 0
+		|| !mailbox || normalizeMailAddress(mailbox.email) !== normalizeMailAddress(sender.sendEmail)) {
+		throw new Error('Local dispatch is paused by current sender or domain policy');
+	}
+	const ban = await db.prepare("SELECT 1 AS banned FROM audit_log WHERE email=? AND warning_type='ban' AND status='banned' LIMIT 1")
+		.bind(mailbox.email).first();
+	if (ban) throw new Error('Local dispatch is paused by sender restrictions');
+	const files = await mailOrm(c).select().from(att).where(and(eq(att.emailId, sender.emailId), eq(att.userId, sender.userId))).all();
+	if (files.length !== payload.attachmentCount) throw new Error('Archived local attachments are incomplete');
+	if (!isAdminUser(c, owner)) {
+		const role = identity.role;
+		if (!role || role.sendType === 'ban' || (files.length && Number(role.allowAttachment) === 0)
+			|| !roleService.hasAvailDomainPerm(role.availDomain || '', mailbox.email)) throw new Error('Local dispatch is paused by sender role');
+	}
+	const cipherFields = emailCryptoUtils.ENCRYPTED_FIELDS.filter(field => emailCryptoUtils.inspectEncryptedValue(sender[field]).encrypted);
+	if (cipherFields.length) {
+		const key = await emailCryptoUtils.getEmailRecordKey(c.env, task.user_id, [sender]);
+		sender = await emailCryptoUtils.decryptEmailRecord(sender, key);
+		if (cipherFields.some(field => emailCryptoUtils.inspectEncryptedValue(sender[field]).encrypted)) {
+			throw new Error('Local delivery archive could not be decrypted');
+		}
+	}
+	return deliverLocalMail(c, recipients, sender, files, { taskId: task.task_id, leaseToken: task.lease_token });
+}
+
+export async function deliverLocalMail(c, recipients, sender, attachments = [], { taskId, leaseToken, dispatchIdentity } = {}) {
 	if (!taskId || !leaseToken || !sender.emailId) throw new BizError('Local delivery requires a durable send task', 409, 'outbound_task_required');
 	const addresses = [...new Set(recipients.map(normalizeMailAddress))];
 	if (!addresses.length || addresses.length > 100) throw new BizError('Invalid local recipients', 400, 'invalid_recipient');
 	const db = getMailDb(c);
-	const validSender = await db.prepare(`SELECT 1 AS valid FROM mail_outbound_task
-		WHERE task_id=? AND user_id=? AND account_id=? AND email_id=? AND provider='local' AND state='SENDING'
-		AND lease_token=? AND lease_until>unixepoch()`).bind(taskId, sender.userId, sender.accountId, sender.emailId, leaseToken).first();
-	if (!validSender) throw new BizError('Local sender task does not match its archive', 409, 'outbound_lease_lost');
+	// A missing address produces an empty joined row. A missing or stale sender
+	// lease produces no row at all. Existing receipts win over account lookup.
+	const firstLookup = await db.prepare(`SELECT r.* FROM mail_outbound_task t
+		LEFT JOIN (${recipientLookup}) r ON 1
+		WHERE t.task_id=?1 AND t.user_id=?3 AND t.account_id=?4 AND t.email_id=?5
+		AND t.provider='local' AND t.state='SENDING' AND t.lease_token=?6 AND t.lease_until>unixepoch()`)
+		.bind(taskId, addresses[0], sender.userId, sender.accountId, sender.emailId, leaseToken).first();
+	if (!firstLookup) throw new BizError('Local sender task does not match its archive', 409, 'outbound_lease_lost');
 	const setting = await settingService.query(c);
 	const failedRecipients = [];
-	for (const recipient of addresses) {
-		const receipt = await db.prepare('SELECT state FROM mail_local_delivery WHERE task_id=? AND recipient=?').bind(taskId, recipient).first();
-		if (receipt) continue;
-		const recipientAccount = await mailOrm(c).select().from(account).where(sql`lower(${account.email})=${recipient}`).get();
+	const readReceipts = db.prepare('SELECT recipient,state,reason FROM mail_local_delivery WHERE task_id=?').bind(taskId);
+	let completedReceipts;
+	for (const [index, recipient] of addresses.entries()) {
+		const lookup = index === 0 ? firstLookup : await db.prepare(recipientLookup).bind(taskId, recipient).first();
+		if (lookup?.recorded) continue;
+		const recipientAccount = lookup?.accountId == null ? null : lookup;
 		let owner = null;
+		let identity;
 		let reason = null;
 		if (setting.receive === settingConst.receive.CLOSE) reason = 'Receiving is disabled';
 		else if (!recipientAccount && setting.noRecipient === settingConst.noRecipient.CLOSE) reason = 'Recipient not found';
 		else if (recipientAccount) {
-			owner = await userService.selectByIdIncludeDel(c, recipientAccount.userId);
+			const selfDispatch = addresses.length === 1 && !attachments.length && recipientAccount.userId === sender.userId
+				&& dispatchIdentity?.user?.userId === sender.userId;
+			identity = selfDispatch ? dispatchIdentity : await storageQuotaService.selectMailPolicyIdentity(c, recipientAccount.userId);
+			owner = identity?.user;
 			if (!owner || Number(owner.status) !== 0 || Number(owner.isDel) !== 0
 				|| Number(recipientAccount.status) !== 0 || Number(recipientAccount.isDel) !== 0) reason = 'Recipient is unavailable';
 			else if (!isAdminUser(c, owner)) {
-				const role = await roleService.selectById(c, owner.type);
+				const role = identity.role;
 				if (!role || !roleService.hasAvailDomainPerm(role.availDomain || '', recipient)
 					|| roleService.isBanEmail(role.banEmail || '', sender.sendEmail)) reason = 'Recipient policy rejects this sender';
 			}
@@ -131,8 +195,21 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 		}
 		const userId = Number(recipientAccount?.userId) || 0;
 		const accountId = Number(recipientAccount?.accountId) || 0;
-		const quota = userId ? await userService.getUserQuota(c, userId) : { maxStorageBytes: 0, maxEmails: 0, bypassStorage: true };
+		// Attachments may require I/O before the receipt transaction. Retain their
+		// preflight. A text-only receipt can validate usage inside its atomic write.
+		const direct = Boolean(userId && !attachments.length);
+		const usage = userId && !direct ? await storageQuotaService.getLocalDeliveryStorageUsage(c, userId, identity, setting) : null;
+		let quota = { maxStorageBytes: 0, maxEmails: 0, bypassStorage: true };
+		if (direct) {
+			try {
+				const policy = await storageQuotaService.getDeliveryPolicy(c, userId, identity, setting);
+				quota = await userService.getDeliveryLimits(c, userId, policy);
+			} catch {
+				throw new BizError('Recipient quota is unavailable', 503, 'quota_unavailable');
+			}
+		} else if (userId) quota = await userService.getUserQuota(c, userId, usage);
 		if (quota.quotaStorageBlocked || quota.dbFull) {
+			if (direct) await storageQuotaService.getLocalDeliveryStorageUsage(c, userId, identity, setting);
 			await recordBounce(c, taskId, leaseToken, recipient, 'Recipient storage is unavailable');
 			continue;
 		}
@@ -180,84 +257,68 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 		// stored row if the instance mail mode requires it.
 		const notificationSnapshot = { ...values, userId, accountId };
 		if (userId && emailCryptoUtils.shouldEncryptEmail(setting.allMailMode, values)) {
-			values = await emailCryptoUtils.encryptEmailRecord(values, await emailCryptoUtils.getUserEmailCryptoKey(c.env, userId));
+			values = await emailCryptoUtils.encryptEmailRecord(values, await emailCryptoUtils.getEmailRecordKey(c.env, userId));
 		}
 		assertMailRowSize(values);
-		const quotaCheck = quotaCondition({ userId, incomingBytes: bodyBytes(values) + copied.rows.reduce((sum, item) => sum + item.size, 0),
-			maxStorageBytes: quota.maxStorageBytes, maxEmails: quota.maxEmails, bypassStorage: quota.bypassStorage || quota.byoStorageEnabled === 1 });
-		const available = await db.prepare(`SELECT (${quotaCheck.sql}) AS allowed`).bind(...quotaCheck.params).first();
-		if (!available?.allowed) {
-			await recordBounce(c, taskId, leaseToken, recipient, 'Recipient quota is exhausted');
-			continue;
-		}
-		const accountCheck = userId ? 'EXISTS(SELECT 1 FROM account WHERE account_id=? AND user_id=? AND status=0 AND is_del=0)' : '1=1';
+		const incomingBytes = bodyBytes(values) + copied.rows.reduce((sum, item) => sum + item.size, 0);
+		const bypassStorage = quota.bypassStorage || quota.byoStorageEnabled === 1;
+		const buildQuota = direct ? validatedMailQuotaCondition : mailQuotaCondition;
+		const quotaCheck = buildQuota({ userId, incomingBytes, maxStorageBytes: quota.maxStorageBytes,
+			maxEmails: quota.maxEmails, bypassStorage });
+		const appearsFull = usage && ((!bypassStorage && quota.maxStorageBytes > 0
+			&& usage.usedBytes + usage.reservedBytes + incomingBytes > quota.maxStorageBytes)
+			|| (quota.maxEmails > 0 && usage.emailCount + usage.reservedCount + 1 > quota.maxEmails));
+		if (appearsFull && await recordBounce(c, taskId, leaseToken, recipient, 'Recipient quota is exhausted', quotaCheck)) continue;
+		const accountCheck = userId
+			? 'EXISTS(SELECT 1 FROM account WHERE account_id=? AND user_id=? AND status=0 AND is_del=0 AND lower(email)=?)'
+			: 'NOT EXISTS(SELECT 1 FROM account WHERE email COLLATE NOCASE=? AND lower(email)=?)';
+		const accountParams = userId ? [accountId, userId, recipient] : [recipient, recipient];
 		const guard = mailTransactionGuard(c, `${senderLease} AND (${quotaCheck.sql}) AND ${accountCheck} AND NOT EXISTS(
 			SELECT 1 FROM mail_local_delivery WHERE task_id=? AND recipient=?)`,
-			[taskId, leaseToken, ...quotaCheck.params, ...(userId ? [accountId, userId] : []), taskId, recipient]);
-		const statements = [guard.before, prepareMailQuery(c, mailOrm(c).insert(email).values(values)),
+			[taskId, leaseToken, ...quotaCheck.params, ...accountParams, taskId, recipient]);
+		const plannedForward = await forwardPlan(c, setting, notificationSnapshot);
+		const statements = [guard.before, prepareMailQuery(c, mailOrm(c).insert(email).values(values).returning({ emailId: email.emailId })),
+			...forwardIntentStatements(c, plannedForward, deliveryKey),
 			...buildBoundedInserts(chunk => mailOrm(c).insert(att).values(chunk), copied.rows.map(row => ({ ...row,
 				emailId: sql`(SELECT email_id FROM email WHERE receive_claim_key=${deliveryKey})` }))).map(query => prepareMailQuery(c, query)),
 			db.prepare(`INSERT INTO mail_local_delivery(task_id,recipient,email_id,state)
 				SELECT ?,?,email_id,'DELIVERED' FROM email WHERE receive_claim_key=?`).bind(taskId, recipient, deliveryKey),
 			...copied.stagedKeys.map(key => db.prepare('DELETE FROM object_deletion_queue WHERE object_key=? AND user_id=?').bind(key, userId)), guard.after];
-		await db.batch(statements);
+		const lastRecipient = index === addresses.length - 1;
+		if (lastRecipient) statements.push(readReceipts);
+		let results;
 		try {
-			if (!userId || !owner) continue;
-			const inserted = await db.prepare('SELECT email_id AS emailId FROM email WHERE receive_claim_key=?')
-				.bind(deliveryKey).first();
-			if (!inserted?.emailId) continue;
+			results = await db.batch(statements);
+		} catch (cause) {
+			if (!direct) throw cause;
+			const failure = [cause?.message, cause?.cause?.message].join(' ');
+			if (!/CHECK constraint failed:\s*valid\s*=\s*1/i.test(failure)) {
+				if (/no such (?:table|column)|integer overflow/i.test(failure))
+					await storageQuotaService.getLocalDeliveryStorageUsage(c, userId, identity, setting);
+				throw cause;
+			}
+			// A rejected guard also covers a replaced lease, a changed mailbox or a
+			// duplicate receipt. Only a genuine, still-full mailbox may be bounced.
+			// A moved or disabled account must never cause a quota bounce for its previous owner.
+			const unlessAllowed = { sql: `(${quotaCheck.sql} OR NOT (${accountCheck}))`, params: [...quotaCheck.params, ...accountParams] };
+			if (await recordBounce(c, taskId, leaseToken, recipient, 'Recipient quota is exhausted', unlessAllowed)) continue;
+			if (await quotaWriteStatus(db, quotaCheck) === null)
+				throw new BizError('Storage quota unavailable', 503, 'quota_unavailable');
+			// A slot can open between the initial assertion and the bounce. Keep the
+			// same account/lease/receipt guards on the one retry.
+			results = await db.batch(statements);
+		}
+		if (lastRecipient) completedReceipts = results.at(-1).results;
+		try {
+			if (!userId || !owner || Number(setting.userTgForward ?? 1) !== 1) continue;
+			const emailId = results[1].results[0]?.email_id;
+			if (!emailId) continue;
 			const profile = await c.env.kv.get('USER_PROFILE_' + userId, { type: 'json' });
-			const notificationRow = { ...notificationSnapshot, emailId: inserted.emailId };
+			const notificationRow = { ...notificationSnapshot, emailId };
 			const ptg = profile?.personalTelegram;
-			if (Number(setting.userTgForward ?? 1) === 1
-				&& ptg?.enabled === true && ptg.botToken && ptg.chatId) {
+			if (ptg?.enabled === true && ptg.botToken && ptg.chatId) {
 				await telegramService.sendPersonalEmailToBot(c, notificationRow, ptg)
 					.catch(err => console.warn('Local personal Telegram notification failed:', err.message));
-			}
-			const pfw = profile?.personalForwarding;
-			if (Number(setting.userEmailForward ?? 1) === 1 && pfw?.enabled === true && pfw.targets) {
-				const mode = pfw.mode || 'all';
-				const local = recipient.split('@')[0].toLowerCase();
-				const prefixes = String(pfw.aliasPrefixes || '').split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
-				const shouldForward = mode === 'all'
-					|| (mode === 'alias' && prefixes.some(p => local.startsWith(p) || local === p));
-				if (shouldForward) {
-					const localDomains = new Set((setting.domainList || [])
-						.map(value => String(value).replace(/^@/, '').toLowerCase()));
-					const targets = String(pfw.targets).split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-					const { default: emailService } = await import('./email-service.js');
-					for (const target of targets) {
-						const targetDomain = target.split('@').pop();
-						if (!target || target === recipient.toLowerCase()
-							|| target === String(sender.sendEmail || '').toLowerCase()
-							|| localDomains.has(targetDomain)) continue;
-						const forwardTask = await forwardService.enqueueForwardTask(c, {
-							userId,
-							accountId,
-							emailId: inserted.emailId,
-							target,
-							addPrefix: !!pfw.addPrefix
-						}).catch(err => {
-							console.warn('Local personal forwarding enqueue failed:', err.message);
-							return null;
-						});
-						if (forwardTask) {
-							await forwardService.processForwardTask(c, forwardTask.task_id)
-								.catch(err => console.warn('Local personal forwarding task failed:', err.message));
-						} else {
-							await emailService.send(c, {
-								receiveEmail: [target],
-								subject: notificationRow.subject,
-								content: notificationRow.content,
-								text: notificationRow.text,
-								// Forward from the recipient's own mailbox. The sender's
-								// account belongs to a different user, so emailService.send
-								// would reject it as sendEmailNotCurUser.
-								accountId
-							}, userId).catch(err => console.warn('Local personal forwarding failed:', err.message));
-						}
-					}
-				}
 			}
 		} catch (notifyError) {
 			// Notification and forwarding are secondary to the committed mailbox
@@ -272,9 +333,13 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 		error.failedRecipients = failedRecipients.map(item => item.recipient);
 		throw error;
 	}
-	const result = await db.prepare('SELECT recipient,state,reason FROM mail_local_delivery WHERE task_id=?').bind(taskId).all();
-	const receipts = result.results || [];
+	const receipts = completedReceipts ?? (await readReceipts.all()).results ?? [];
 	if (addresses.some(address => !receipts.some(row => row.recipient === address))) throw new Error('Local delivery is incomplete');
+	return finishLocalDelivery(c, receipts, sender, taskId, leaseToken);
+}
+
+async function finishLocalDelivery(c, receipts, sender, taskId, leaseToken) {
+	const db = getMailDb(c);
 	const rejected = receipts.filter(row => row.state === 'BOUNCED');
 	const guard = mailTransactionGuard(c, senderLease, [taskId, leaseToken]);
 	await db.batch([guard.before,
@@ -282,7 +347,8 @@ export async function deliverLocalMail(c, recipients, sender, attachments = [], 
 			.bind(rejected.length ? emailConst.status.BOUNCED : emailConst.status.DELIVERED,
 				rejected.length ? JSON.stringify({ message: 'Some local recipients rejected delivery', rejected }) : '', sender.emailId, sender.userId, taskId),
 		db.prepare(`UPDATE mail_outbound_task SET state='ACCEPTED',provider='local',reserved_bytes=0,reserved_count=0,
-			lease_until=0,updated_at=CURRENT_TIMESTAMP WHERE task_id=? AND state='SENDING' AND lease_token=?`).bind(taskId, leaseToken), guard.after]);
+			counted_day=date('now'),counted_recipients=?,lease_until=0,updated_at=CURRENT_TIMESTAMP
+			WHERE task_id=? AND state='SENDING' AND lease_token=?`).bind(receipts.length, taskId, leaseToken), guard.after]);
 	return receipts;
 }
 

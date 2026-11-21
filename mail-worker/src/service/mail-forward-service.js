@@ -1,3 +1,5 @@
+import { forwardPlan, personalForwardingAvailable } from './forward-consent.js';
+import settingService from './setting-service.js';
 import { getMailDb } from '../utils/db-accessor.js';
 import r2Service from './r2-service.js';
 import emailCryptoUtils from '../utils/email-crypto-utils.js';
@@ -16,44 +18,29 @@ function isPermanent(error) {
 	return error?.forwardPermanent === true || error?.errorCode === 'provider_rejected';
 }
 
-/**
- * One durable forwarding delivery per (mailbox, message, target). The row is
- * deliberately independent of the inbound claim: a completed inbound claim
- * must not turn a failed forwarding copy into an invisible log line.
- */
-export async function enqueueForwardTask(c, { userId, accountId, emailId, target, addPrefix = false }) {
-	if (!Number.isSafeInteger(Number(userId)) || Number(userId) <= 0
-		|| !Number.isSafeInteger(Number(accountId)) || Number(accountId) <= 0
-		|| !Number.isSafeInteger(Number(emailId)) || Number(emailId) <= 0
-		|| typeof target !== 'string' || !target.includes('@')) return null;
+async function readActiveForwardSource(c, task) {
 	const db = getMailDb(c);
-	const taskId = crypto.randomUUID();
-	try {
-		await db.prepare(`INSERT INTO mail_forward_task
-			(task_id,user_id,account_id,email_id,target,add_prefix,state,attempts,next_retry_at)
-			VALUES (?,?,?,?,?,?,'PENDING',0,CURRENT_TIMESTAMP)
-			ON CONFLICT(user_id,email_id,target) DO NOTHING`)
-			.bind(taskId, Number(userId), Number(accountId), Number(emailId),
-				String(target).trim().toLowerCase(), addPrefix ? 1 : 0).run();
-		return await db.prepare('SELECT * FROM mail_forward_task WHERE user_id=? AND email_id=? AND target=?')
-			.bind(Number(userId), Number(emailId), String(target).trim().toLowerCase()).first();
-	} catch (error) {
-		// Before the upgrade migration exists, keep the old synchronous fallback
-		// alive instead of losing forwarding entirely.
-		if (isMissingTable(error)) return null;
-		throw error;
-	}
-}
-
-async function loadForwardSource(c, task) {
-	const db = getMailDb(c);
-	const row = await db.prepare('SELECT * FROM email WHERE email_id=? AND user_id=?')
-		.bind(task.email_id, task.user_id).first();
+	const row = await db.prepare('SELECT * FROM email WHERE email_id=? AND user_id=? AND account_id=? AND is_del=0')
+		.bind(task.email_id, task.user_id, task.account_id).first();
 	if (!row) {
 		const error = new Error('Forward source message no longer exists');
 		error.forwardPermanent = true;
 		throw error;
 	}
+	const settings = await settingService.query(c);
+	const plan = await forwardPlan(c, settings, { userId: task.user_id, accountId: task.account_id,
+		toEmail: row.to_email, sendEmail: row.send_email, isDel: row.is_del });
+	if (!plan || plan.revision !== task.policy_revision || !plan.targets.includes(task.target)) {
+		const error = new Error('Forwarding consent is no longer current');
+		error.forwardPermanent = true;
+		throw error;
+	}
+	return row;
+}
+
+async function loadForwardSource(c, task) {
+	const db = getMailDb(c);
+	const row = await readActiveForwardSource(c, task);
 	let source = row;
 	if (emailCryptoUtils.ENCRYPTED_FIELDS.some(field => String(row[field] || '').startsWith(emailCryptoUtils.CIPHER_PREFIX))) {
 		source = await emailCryptoUtils.decryptEmailRecord(row,
@@ -89,11 +76,18 @@ async function loadForwardSource(c, task) {
 }
 
 async function deliverForwardTask(c, task) {
+	if (!personalForwardingAvailable(c.env)) {
+		const error = new Error('Personal forwarding is disabled for this deployment');
+		error.forwardPermanent = true;
+		throw error;
+	}
 	const { source, attachments } = await loadForwardSource(c, task);
 	const { default: emailService } = await import('./email-service.js');
 	const subject = (task.add_prefix
 		? `[Fwd] ${source.subject || ''}`
 		: (source.subject || '')).slice(0, 998);
+	// Recheck after attachment I/O, immediately before handing the job to the sender.
+	await readActiveForwardSource(c, task);
 	await emailService.send(c, {
 		accountId: task.account_id,
 		receiveEmail: [task.target],
@@ -148,9 +142,7 @@ export async function processForwardTasks(c, { limit = 20 } = {}) {
 			// Existing deployments that have not rerun /init still need the
 			// durable queue. The scheduled maintenance context is the safe place
 			// to install the schema; inbound request paths stay DDL-free.
-			try { await ensureMailReliabilitySchema(c); } catch (migrationError) {
-				console.warn('Forward-task schema initialization failed:', migrationError?.message || migrationError);
-			}
+			await ensureMailReliabilitySchema(c);
 			return { checked: 0, sent: 0, failed: 0, migrated: true };
 		}
 		throw error;
@@ -165,4 +157,4 @@ export async function processForwardTasks(c, { limit = 20 } = {}) {
 	return { checked: (rows.results || []).length, sent, failed };
 }
 
-export default { enqueueForwardTask, processForwardTask, processForwardTasks };
+export default { processForwardTask, processForwardTasks };

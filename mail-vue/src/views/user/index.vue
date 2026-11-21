@@ -82,7 +82,7 @@
             </el-table-column>
           </template>
 
-          <!-- 加密模式 (Mode 2 [E2EE]): 严格管理零知识合规指标——被检举次数 + 举报他人次数 + 邮箱占用总空间 -->
+          <!-- 加密存储模式 (Mode 2) 展示的管理指标：被检举次数 + 举报他人次数 + 邮箱占用总空间 -->
           <template v-else-if="currentMode === 2">
             <el-table-column min-width="130" :label="$t('tabTotalStorageSpace')" prop="storageSize">
               <template #default="props">
@@ -1022,14 +1022,13 @@ function handlePurgeUserEmails(userRow) {
       type: 'warning'
     }
   ).then(() => {
-    userPurgeEmails(userRow.userId).then(() => {
+    userPurgeEmails(userRow.userId).then(result => {
       ElMessage({
-        message: t('purgeEmailsSuccess'),
+        message: t('purgeEmailsSuccess', { count: result.releasedEmails, queued: result.queuedObjectKeys }),
         type: 'success',
         plain: true
       });
-      userRow.receiveEmailCount = 0;
-      userRow.sendEmailCount = 0;
+      getUserList(false);
     });
   });
 }

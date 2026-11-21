@@ -1,9 +1,11 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 import path from 'path';
 import fs from 'fs';
 
-const BASE = process.env.TEST_BASE_URL || 'https://mail.epocanvas.com';
+const BASE = legacyOrigin;
 const SCREENSHOT_DIR = '/root/.gemini/antigravity-cli/brain/68a65650-4c47-46f7-a04e-1d2bc6734d72/screenshots';
 
 if (!fs.existsSync(SCREENSHOT_DIR)) {
@@ -13,7 +15,7 @@ if (!fs.existsSync(SCREENSHOT_DIR)) {
 console.log(`=== 开始在真实生产环境 ${BASE} 执行 Playwright 视觉截屏与隐式注释全链路验证 ===\n`);
 
 (async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: 'zh-CN',
@@ -29,11 +31,11 @@ console.log(`=== 开始在真实生产环境 ${BASE} 执行 Playwright 视觉截
     // 1. 登录真实生产接口
     console.log(`[Step 1] 正在通过 API 登录生产环境 ${BASE}...`);
     const loginRes = await page.request.post(`${BASE}/api/login`, {
-      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' },
     });
     const loginJson = await loginRes.json();
-    assert.strictEqual(loginJson.code, 200, `登录失败: ${JSON.stringify(loginJson)}`);
+    assert.strictEqual(loginJson.code, 200, `登录失败: ${Number(loginJson?.code)}`);
     const token = typeof loginJson.data === 'string' ? loginJson.data : loginJson.data?.token;
     assert.ok(token, '未能获取到有效 token');
     console.log('✓ 生产环境认证成功，获取到管理员 Token\n');
@@ -93,7 +95,7 @@ console.log(`=== 开始在真实生产环境 ${BASE} 执行 Playwright 视觉截
     await page.goto(`${BASE}/login/`, { waitUntil: 'domcontentloaded', timeout: 15000 });
     await page.evaluate(({ token }) => {
       localStorage.setItem('token', token);
-      localStorage.setItem('loginEmail', 'admin@epomail.bond');
+      localStorage.setItem('loginEmail', legacyAdminEmail);
       localStorage.setItem('ui', JSON.stringify({ dark: false, locale: 'zh', defaultTranslateLang: 'zh' }));
       localStorage.setItem('setting', JSON.stringify({ lang: 'zh' }));
       localStorage.setItem('locale', 'zh');

@@ -459,6 +459,19 @@ function handleLogoError() {
   logoLoadFailed.value = true
 }
 
+function parseSafeRedirectUrl(rawUri) {
+  if (!rawUri || typeof rawUri !== 'string') return null
+  try {
+    const parsed = new URL(rawUri)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null
+    }
+    return parsed
+  } catch (_) {
+    return null
+  }
+}
+
 async function handleConfirmAuthorize() {
   authorizing.value = true
   try {
@@ -472,15 +485,16 @@ async function handleConfirmAuthorize() {
     }
 
     const res = await confirmOAuthAuthorize(payload)
-    if (res && res.redirectUri) {
-      // 1. Popup Window Flow
+    const safeRedirectUrl = parseSafeRedirectUrl(res?.redirectUri)
+    if (safeRedirectUrl) {
+      // 1. Popup Window Flow (restrict postMessage to verified client origin)
       if (window.opener && !window.opener.closed) {
         try {
           window.opener.postMessage({
             type: 'EPOMAIL_OAUTH_SUCCESS',
             code: res.code,
             state: res.state
-          }, '*')
+          }, safeRedirectUrl.origin)
           window.close()
           return
         } catch (e) {
@@ -489,7 +503,7 @@ async function handleConfirmAuthorize() {
       }
 
       // 2. Direct Redirect Flow
-      window.location.replace(res.redirectUri)
+      window.location.replace(safeRedirectUrl.toString())
     }
   } catch (err) {
     ElMessage.error(err.message || t('authorizeFailed'))
@@ -499,9 +513,9 @@ async function handleConfirmAuthorize() {
 }
 
 function handleCancel() {
-  const targetUri = authInfo.redirectUri || route.query.redirect_uri
-  if (targetUri) {
-    const cancelUrl = new URL(targetUri)
+  // Only honor the server-verified redirect URI, never an unverified query parameter
+  const cancelUrl = parseSafeRedirectUrl(authInfo.redirectUri)
+  if (cancelUrl) {
     cancelUrl.searchParams.set('error', 'access_denied')
     cancelUrl.searchParams.set('error_description', 'The user cancelled the authorization request')
     if (authInfo.state || route.query.state) {
@@ -513,7 +527,7 @@ function handleCancel() {
         window.opener.postMessage({
           type: 'EPOMAIL_OAUTH_CANCEL',
           error: 'access_denied'
-        }, '*')
+        }, cancelUrl.origin)
         window.close()
         return
       } catch (e) {

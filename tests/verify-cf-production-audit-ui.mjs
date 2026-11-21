@@ -1,6 +1,8 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 
-const BASE = 'https://mail.epocanvas.com';
+const BASE = legacyOrigin;
 let pass = 0, fail = 0;
 const failures = [];
 
@@ -17,7 +19,7 @@ function ok(cond, label) {
 
 async function run() {
   console.log('================================================================');
-  console.log('=== Cloudflare 生产环境 (mail.epocanvas.com) 真实上线检视实测 ===');
+  console.log('=== 本地隔离环境 (mail.epocanvas.com) 真实上线检视实测 ===');
   console.log(`=== 目标路由: ${BASE}/mail/u/0/#manage/admin/audit ===`);
   console.log('================================================================\n');
 
@@ -29,18 +31,18 @@ async function run() {
     const loginRes = await fetch(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@epomail.cyou', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
+      body: JSON.stringify({ email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
     });
     const loginJson = await loginRes.json();
     if (loginJson.code === 200 && loginJson.data?.token) {
       token = loginJson.data.token;
       ok(true, '管理员登录成功 (admin@epomail.cyou)');
     } else {
-      console.warn('  ! admin@epomail.cyou 登录返回:', loginJson);
+      console.warn('  ! admin@epomail.cyou 登录返回:', Number(loginJson?.code));
       const loginRes2 = await fetch(`${BASE}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
+        body: JSON.stringify({ email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
       });
       const loginJson2 = await loginRes2.json();
       if (loginJson2.code === 200 && loginJson2.data?.token) {
@@ -55,7 +57,7 @@ async function run() {
 
     // 2. 启动 Chromium
     console.log('\n[步骤 2] 启动 Chromium 渲染引擎进入公网控制台...');
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'
@@ -65,13 +67,13 @@ async function run() {
       localStorage.setItem('token', t);
       localStorage.setItem('locale', 'zh');
       localStorage.setItem('roleCode', 'admin');
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'admin@epomail.cyou' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyAdminEmail }]));
     }, { t: token });
 
     const page = await context.newPage();
 
     // 3. 访问控制台页面
-    console.log('\n[步骤 3] 导航至公网生产路由...');
+    console.log('\n[步骤 3] 导航至本地隔离路由...');
     await page.goto(`${BASE}/mail/u/0/#manage/admin/audit`, { waitUntil: 'networkidle', timeout: 35000 });
     await page.waitForSelector('.kpi-card', { timeout: 25000 });
     await page.waitForTimeout(3000);
@@ -212,7 +214,7 @@ async function run() {
     ok(!jumperExists, '分页组件已对齐用户列表规范，零冗长 jumper 元素');
 
     // 步骤 4: 视口截图
-    console.log('\n[步骤 4] 截取公网生产环境完整视口截图...');
+    console.log('\n[步骤 4] 截取本地隔离环境完整视口截图...');
     await page.screenshot({ path: 'tests/cf_production_threat_verified.png', fullPage: true });
     console.log('  ✓ 滥用威胁视口截图已保存至: tests/cf_production_threat_verified.png');
 

@@ -8,6 +8,7 @@ import { isAdminUser } from '../utils/admin-utils.js';
 import permService from './perm-service.js';
 import { getUserDb, getMailDb } from '../utils/db-accessor.js';
 import { assertOutboundAllowed } from '../utils/outbound-policy.js';
+import { escapeHtml } from '../utils/safe-email-html.js';
 
 const PUNITIVE_ACCOUNT_TEMPLATES = new Set(['FIRST_BAN', 'MAINTAIN_BAN', 'REJECT_APPEAL']);
 // Resend retains keys for 24h. Leave a one-hour margin; the FIRST attempt is
@@ -228,48 +229,24 @@ const decisionNoticeService = {
 			`EpoCanvas Mail 安全与合规中心`
 		].filter(Boolean).join('\n');
 
-		const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; padding: 24px; margin: 0; }
-  .card { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; }
-  .header { padding: 20px 24px; background: ${tpl.isPunitive ? '#fef2f2' : '#f0fdf4'}; border-bottom: 1px solid ${tpl.isPunitive ? '#fee2e2' : '#dcfce7'}; }
-  .title { margin: 0; font-size: 17px; font-weight: 600; color: ${tpl.isPunitive ? '#991b1b' : '#166534'}; }
-  .body { padding: 24px; font-size: 14px; line-height: 1.6; color: #334155; }
-  .meta-grid { margin: 16px 0; padding: 12px 16px; background: #f8fafc; border-radius: 6px; border: 1px solid #edf2f7; font-size: 13px; }
-  .meta-row { display: flex; margin-bottom: 6px; }
-  .meta-label { width: 90px; color: #64748b; font-weight: 500; }
-  .meta-val { flex: 1; color: #0f172a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .notice-desc { margin: 16px 0; font-size: 14px; }
-  .footer { padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
-</style>
-</head>
-<body>
-  <div class="card">
-    <div class="header">
-      <h2 class="title">${tpl.titleZh}</h2>
+		const fields = [['案件编号', cNo], ['依据代码', basisText], ['生效状态', tpl.effectiveZh],
+			['能力影响', tpl.capabilityZh], ['处理时间', timestamp]];
+		const metadata = fields.map(([label, value]) =>
+			`<p style="margin: 0 0 8px;"><strong>${label}:</strong> <span>${escapeHtml(value)}</span></p>`).join('\n');
+		const htmlContent = `<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+  <div style="max-width: 600px; margin: 0 auto; border: 1px solid #cbd5e1; background-color: #ffffff; color: #1e293b; overflow-wrap: anywhere; line-height: 1.6;">
+    <h2 style="margin: 0; padding: 14px 16px; font-size: 19px; color: ${tpl.isPunitive ? '#991b1b' : '#166534'}; background-color: ${tpl.isPunitive ? '#fef2f2' : '#f0fdf4'};">${escapeHtml(tpl.titleZh)}</h2>
+    <div style="padding: 16px; font-size: 16px;">
+      <div style="padding: 12px; background-color: #f1f5f9; font-size: 14px;">${metadata}</div>
+      <p style="margin: 16px 0;">${escapeHtml(decisionDesc)}</p>
+      ${notes ? `<p style="padding: 10px 12px; background-color: #f1f5f9; border-left: 3px solid #64748b; white-space: pre-wrap;">${escapeHtml(notes)}</p>` : ''}
+      <p style="margin: 16px 0 0;">${escapeHtml(appealInfo)}</p>
     </div>
-    <div class="body">
-      <div class="meta-grid">
-        <div class="meta-row"><span class="meta-label">案件编号:</span><span class="meta-val">${cNo}</span></div>
-        <div class="meta-row"><span class="meta-label">依据代码:</span><span class="meta-val">${basisText}</span></div>
-        <div class="meta-row"><span class="meta-label">生效状态:</span><span class="meta-val">${tpl.effectiveZh}</span></div>
-        <div class="meta-row"><span class="meta-label">能力影响:</span><span class="meta-val">${tpl.capabilityZh}</span></div>
-        <div class="meta-row"><span class="meta-label">处理时间:</span><span class="meta-val">${timestamp}</span></div>
-      </div>
-      <p class="notice-desc">${decisionDesc}</p>
-      ${notes ? `<p style="padding: 10px 14px; background: #f1f5f9; border-left: 3px solid #94a3b8; border-radius: 4px; font-size: 13px;">${notes}</p>` : ''}
-      <p style="margin-top: 18px; font-size: 13px; color: #475569;">${appealInfo}</p>
-    </div>
-    <div class="footer">
-      EpoCanvas Mail 安全与合规中心 · 系统自动留痕
-    </div>
+    <p style="margin: 0; padding: 12px 16px; background-color: #f8fafc; color: #475569; font-size: 14px;">EpoCanvas Mail 安全与合规中心 · 系统自动留痕</p>
   </div>
-</body>
-</html>`;
+</body></html>`;
 
 		return {
 			templateCode: tpl.code,
@@ -331,7 +308,7 @@ const decisionNoticeService = {
 			const key = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
 			const messageId = `<notice-${key}@epocanvas.com>`;
 			let payload = {
-				userId, accountId: accRow.account_id,
+				isOfficial: 1, userId, accountId: accRow.account_id,
 				sendEmail: 'announcement@epocanvas.com', name: 'Epocanvas Mail 官方安全中心',
 				subject, content: htmlContent, text: textContent || '',
 				toEmail: targetEmail, toName: userName,
@@ -416,8 +393,7 @@ const decisionNoticeService = {
 		const payloadStr = JSON.stringify({ restrictedToken, user: user || null, caseId: caseId || null });
 
 		if (userDb) {
-			try {
-				await userDb.prepare(`
+			await userDb.prepare(`
 					INSERT INTO one_time_exchange_code (code_hash, user_id, email, case_id, token_payload, consumed, expires_at)
 					VALUES (?, ?, ?, ?, ?, 0, ?)
 				`).bind(
@@ -427,20 +403,11 @@ const decisionNoticeService = {
 					caseId ? String(caseId) : null,
 					payloadStr,
 					expiresAt
-				).run();
-			} catch (_) {
-				console.warn('Restricted exchange code persistence failed');
-			}
+			).run();
+			return rawCode;
 		}
 
-		// 辅助 KV 兼容
-		if (c?.env?.kv) {
-			try {
-				await c.env.kv.put(`restricted_code:${rawCode}`, payloadStr, { expirationTtl: ttlSeconds });
-			} catch (_) {}
-		}
-
-		return rawCode;
+		throw new Error('Restricted exchange code requires authoritative D1 storage');
 	},
 
 	/**

@@ -1,20 +1,22 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 
-const BASE_URL = 'https://epomail.epocanvas.workers.dev';
+const BASE_URL = legacyOrigin;
 
 (async () => {
   console.log('=== 开始测试 1. Zip选填规则 2. 下拉菜单与滑块/后缀对齐 3. SVG国旗呈现 4. 电话与地址下拉优化 ===');
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 }
   });
   const page = await context.newPage();
 
   // 登录获取认证
-  console.log('1. 正在登录 Cloudflare 生产环境...');
+  console.log('1. 正在登录 本地隔离环境...');
   const res = await page.request.post(BASE_URL + '/api/login', {
-    data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' }
+    data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' }
   });
   const token = (await res.json()).data?.token;
   if (!token) throw new Error('登录获取 token 失败');

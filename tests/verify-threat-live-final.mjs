@@ -1,9 +1,11 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert';
 
-const BASE = 'https://mail.epocanvas.com';
-const ADMIN_EMAIL = 'admin@epomail.cyou';
-const ADMIN_PWD = (process.env.EPOMAIL_LIVE_E2E_ADMIN_PASSWORD || process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
+const BASE = legacyOrigin;
+const ADMIN_EMAIL = legacyAdminEmail;
+const ADMIN_PWD = (process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '');
 
 async function test() {
   console.log('=== [E2E] 生产环境全真栈自动化终验 ===');
@@ -17,7 +19,7 @@ async function test() {
   assert.ok(token, '成功获取管理员 Token');
   console.log('✓ 成功获取管理员凭证');
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: 'zh-CN'

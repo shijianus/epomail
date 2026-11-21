@@ -1,68 +1,45 @@
 #!/usr/bin/env node
-/**
- * 生产发布全量门禁与上线就绪核验脚本
- * (Production Release Readiness & Preflight Verification Suite)
- *
- * 职能：
- * 1. 静态验证全仓 Git 提交状态与分支对齐；
- * 2. 静态验证多语言 6 语言对称性与零硬编码；
- * 3. 静态扫描工作区零机密泄露与凭据隔离；
- * 4. 核验前端产物完整性 (mail-worker/dist, mail-worker/dist/login, sw.js)；
- * 5. 核验 Cloudflare Worker 生产配置安全基线 (ALLOW_URL_INIT, 密钥定义, 接收 MTA 头声明)；
- * 6. 可选在线探针 (--base-url <url> [--init-secret <secret>])，执行零破坏性读探针。
- *
- * 用法：
- *   node scripts/verify-production-readiness.mjs
- *   node scripts/verify-production-readiness.mjs --json
- *   node scripts/verify-production-readiness.mjs --base-url https://mail.epocanvas.com
- *   node scripts/verify-production-readiness.mjs --base-url https://mail.epocanvas.com --init-secret <secret>
- */
+/** Local production configuration/build preflight with optional read-only HTTPS probes. */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { parseToml } from './lib/oauth-staging.mjs';
+import { validateBaseOrigin } from './check-privacy-readiness.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const workerDir = path.join(rootDir, 'mail-worker');
 const distDir = path.join(workerDir, 'dist');
-const loginDistDir = path.join(distDir, 'login');
 const wranglerPath = path.join(workerDir, 'wrangler.toml');
 
 export const MANDATORY_SECRETS = [
   { name: 'jwt_secret', desc: 'JWT HS256 签名与对象签名主键', critical: true },
   { name: 'totp_enc_key', desc: 'TOTP 密钥与敏感凭证 AES-256-GCM 主密钥', critical: true },
+  { name: 'oauth_client_enc_key', desc: 'OAuth 凭证及用户 Telegram Bot Token 的 AES-256-GCM 信封密钥', critical: true },
   { name: 'email_enc_key', desc: '邮件密文静态存储加密密钥', critical: true },
   { name: 'init_secret', desc: '独立系统初始化与架构升级鉴权头 (x-init-secret)', critical: true },
+  { name: 'scheduled_secret', desc: '独立的外部调度密钥', critical: false },
   { name: 'resend_webhook_secret', desc: 'Resend Webhook Svix 验签密钥', critical: false },
   { name: 'admin_initial_password', desc: '首次部署时初始化站长管理员强口令 (≥8 位)', critical: true }
 ];
 
-export const MANDATORY_ENV_VARS = [
-  'INBOUND_AUTHSERV_ID',
-  'ALLOW_URL_INIT',
-  'EMAIL_OUTBOUND_ENABLED'
-];
-
 export function parseArgs(argv) {
-  const result = {
-    help: false,
-    json: false,
-    baseUrl: '',
-    initSecret: '',
-    skipTests: false
-  };
+  const result = { help: false, json: false, baseUrl: '' };
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') result.help = true;
     else if (arg === '--json') result.json = true;
-    else if (arg === '--skip-tests') result.skipTests = true;
-    else if (arg === '--base-url') result.baseUrl = argv[++i] || '';
-    else if (arg.startsWith('--base-url=')) result.baseUrl = arg.split('=')[1];
-    else if (arg === '--init-secret') result.initSecret = argv[++i] || '';
-    else if (arg.startsWith('--init-secret=')) result.initSecret = arg.split('=')[1];
+    else if (arg === '--base-url' || arg.startsWith('--base-url=')) {
+      const value = arg === '--base-url' ? argv[++i] : arg.slice('--base-url='.length);
+      if (!value || value.startsWith('-')) throw new Error('--base-url requires an origin');
+      result.baseUrl = value;
+    } else {
+      // Do not echo unknown arguments, which may contain an old inline secret.
+      throw new Error('Unsupported option. Run with --help for supported flags.');
+    }
   }
   return result;
 }
@@ -110,7 +87,7 @@ export function checkGitStatus(suite) {
     const status = execSync('git status --porcelain', { cwd: rootDir, encoding: 'utf8' }).trim();
 
     if (status) {
-      suite.warn('GIT-01', '工作树存在未提交改动', `${status.split('\n').length} 项改动`);
+      suite.fail('GIT-01', '工作树存在未提交改动', `${status.split('\n').length} 项改动`);
     } else {
       suite.pass('GIT-01', '工作树整洁度 (Clean Working Tree)', `Branch: ${branch}, Hash: ${shortHash}`);
     }
@@ -121,10 +98,10 @@ export function checkGitStatus(suite) {
   }
 }
 
-export function checkBuildArtifacts(suite) {
-  const mainIndex = path.join(distDir, 'index.html');
-  const loginIndex = path.join(loginDistDir, 'index.html');
-  const swFile = path.join(distDir, 'sw.js');
+export function checkBuildArtifacts(suite, directory = distDir) {
+  const mainIndex = path.join(directory, 'index.html');
+  const loginIndex = path.join(directory, 'login/index.html');
+  const swFile = path.join(directory, 'sw.js');
 
   if (fs.existsSync(mainIndex) && fs.statSync(mainIndex).size > 200) {
     suite.pass('BUILD-01', '前端核心资源已生成', `size: ${fs.statSync(mainIndex).size} bytes`);
@@ -141,138 +118,106 @@ export function checkBuildArtifacts(suite) {
   if (fs.existsSync(swFile)) {
     suite.pass('BUILD-03', 'Service Worker 离线套件已构建', 'dist/sw.js');
   } else {
-    suite.warn('BUILD-03', '未找到 Service Worker 离线套件 (dist/sw.js)');
+    suite.fail('BUILD-03', '未找到 Service Worker 离线套件 (dist/sw.js)');
   }
 }
 
-export function checkWranglerConfig(suite) {
-  if (!fs.existsSync(wranglerPath)) {
-    suite.fail('CFG-01', 'Wrangler 配置文件缺失', wranglerPath);
+export function checkWranglerConfig(suite, configPath = wranglerPath) {
+  let config;
+  try {
+    config = parseToml(fs.readFileSync(configPath, 'utf8'));
+  } catch (_) {
+    suite.fail('CFG-01', '无法读取 Wrangler 配置');
     return;
   }
-  const config = fs.readFileSync(wranglerPath, 'utf8');
 
-  // 1. 检查禁止 URL 传入初始化密钥
-  if (config.includes('ALLOW_URL_INIT = "false"')) {
-    suite.pass('CFG-02', '安全基线：URL 初始化接口已禁用 (ALLOW_URL_INIT=false)');
+  // Top-level vars and bindings are the production target for this repository.
+  const vars = config.vars || {};
+  if (String(vars.ENVIRONMENT) === 'production') {
+    suite.pass('CFG-01', '生产环境标识已显式固定为 production');
   } else {
-    suite.fail('CFG-02', '高风险基线：ALLOW_URL_INIT 必须显式设为 "false"');
+    suite.fail('CFG-01', '生产 [vars] 必须显式声明 ENVIRONMENT = \"production\"');
   }
 
-  // 2. 检查 D1 与 KV 绑定完整性
-  const hasUserDb = config.includes('binding = "USER_DB"');
-  const hasMailDb = config.includes('binding = "MAIL_DB"');
-  const hasKv = config.includes('binding = "kv"');
-
-  if (hasUserDb && hasMailDb && hasKv) {
-    suite.pass('CFG-03', 'D1 数据库与 KV 命名空间绑定完整', 'USER_DB, MAIL_DB, kv');
+  if (String(vars.ALLOW_URL_INIT) === 'false') {
+    suite.pass('CFG-02', '生产配置明确禁用 URL 初始化');
   } else {
-    suite.fail('CFG-03', 'D1 数据库或 KV 命名空间绑定不全');
+    suite.fail('CFG-02', '生产 [vars] 必须显式禁用 URL 初始化');
   }
 
-  // 3. 检查生产凭证硬编码防护
-  for (const secret of MANDATORY_SECRETS) {
-    const reg = new RegExp(`^\\s*${secret.name}\\s*=`, 'm');
-    if (reg.test(config)) {
-      suite.fail('CFG-04', `严厉红线：${secret.name} 被明文写在 wrangler.toml 中！`, '必须改用 wrangler secret put');
-      return;
-    }
-  }
-  suite.pass('CFG-04', '配置安全隔离：未在 wrangler.toml 检出任何明文 Secret');
-
-  // 4. 检查 INBOUND_AUTHSERV_ID
-  if (config.includes('INBOUND_AUTHSERV_ID')) {
-    suite.pass('CFG-05', 'MTA 接收头认证域已配置 (INBOUND_AUTHSERV_ID)');
+  const hasBinding = (entries, binding, id, format) =>
+    Array.isArray(entries) && entries.filter(entry => entry.binding === binding).length === 1
+    && entries.some(entry => entry.binding === binding && format.test(entry[id] || ''));
+  const d1Id = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+  if (['USER_DB', 'MAIL_DB', 'db'].every(binding =>
+    hasBinding(config.d1_databases, binding, 'database_id', d1Id))
+    && hasBinding(config.kv_namespaces, 'kv', 'id', /^[a-f0-9]{32}$/i)) {
+    suite.pass('CFG-03', '生产 D1 和 KV 绑定齐全且格式有效');
   } else {
-    suite.info('CFG-05', 'INBOUND_AUTHSERV_ID 缺省 (默认信任 mx.cloudflare.net)');
+    suite.fail('CFG-03', '生产 D1 或 KV 绑定缺失、重复或格式无效');
+  }
+
+  const sections = [config, vars, ...Object.values(config.env || {}).flatMap(env => [env, env.vars || {}])];
+  const hardcoded = MANDATORY_SECRETS.filter(({ name }) =>
+    sections.some(section => Object.keys(section).some(key => key.toLowerCase() === name)));
+  if (hardcoded.length) {
+    suite.fail('CFG-04', 'Wrangler 配置声明了机密字段', hardcoded.map(({ name }) => name).join(', '));
+  } else {
+    suite.pass('CFG-04', 'Wrangler 配置未声明已知机密字段');
+  }
+
+  if (['true', 'false'].includes(String(vars.EMAIL_OUTBOUND_ENABLED))) {
+    suite.pass('CFG-05', '生产外发开关已显式配置', String(vars.EMAIL_OUTBOUND_ENABLED));
+  } else {
+    suite.fail('CFG-05', '生产 [vars] 必须显式配置外发开关');
   }
 }
 
-export async function runLiveProbes(baseUrl, initSecret, suite) {
+export async function runLiveProbes(baseUrl, suite, request = fetch) {
+  let origin;
   try {
-    const url = new URL(baseUrl);
-    if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
-      suite.fail('LIVE-01', '在线探针仅允许使用 HTTPS 协议或本地回环', baseUrl);
-      return;
-    }
-  } catch (err) {
-    suite.fail('LIVE-01', '非法的 Base URL 地址', err.message);
+    origin = validateBaseOrigin(baseUrl);
+  } catch (_) {
+    suite.fail('LIVE-01', '在线探针要求 HTTPS origin 或 HTTP 本地回环');
     return;
   }
 
-  suite.info('LIVE-00', '启动部署后存活探针与安全协议自测', baseUrl);
-
-  // 1. 检查公开配置
+  const get = pathname => request(new URL(pathname, origin), {
+    redirect: 'error', signal: AbortSignal.timeout(8000)
+  });
   try {
-    const configRes = await fetch(`${baseUrl}/api/setting/websiteConfig`, { signal: AbortSignal.timeout(8000) });
-    if (configRes.ok) {
-      const data = await configRes.json();
-      suite.pass('LIVE-02', '公网公开配置端点响应正常 (/api/setting/websiteConfig)', `code: ${configRes.status}`);
-      if (typeof data.data?.oauthSwitches === 'object' || typeof data.data?.legalTerms === 'string') {
-        suite.pass('LIVE-03', '站点法律告知与基础配置结构合法');
-      }
-    } else {
-      suite.fail('LIVE-02', '公网公开配置端点访问异常', `HTTP ${configRes.status}`);
+    const response = await get('/api/setting/websiteConfig');
+    const data = response.ok ? await response.json() : null;
+    if (data?.code !== 200 || !data.data || Array.isArray(data.data)
+      || typeof data.data.oauthLoginEnabled !== 'number'
+      || !data.data.oauthProviders || typeof data.data.oauthProviders !== 'object') {
+      throw new Error('Invalid public config response');
     }
-  } catch (err) {
-    suite.fail('LIVE-02', '公开配置端点连接失败', err.message);
+    suite.pass('LIVE-02', '公开配置返回预期 JSON');
+  } catch (_) {
+    suite.fail('LIVE-02', '公开配置不可用或响应不符合契约');
   }
 
-  // 2. 检查静态登录前端挂载
   try {
-    const loginRes = await fetch(`${baseUrl}/login/`, { signal: AbortSignal.timeout(8000) });
-    if (loginRes.ok) {
-      suite.pass('LIVE-04', '独立登录子应用静态路由正常挂载 (/login/)', `HTTP ${loginRes.status}`);
-    } else {
-      suite.fail('LIVE-04', '登录子应用静态路由访问异常', `HTTP ${loginRes.status}`);
+    const response = await get('/login/');
+    if (!response.ok || !/text\/html/i.test(response.headers.get('Content-Type') || '')) {
+      throw new Error('Invalid login page response');
     }
-  } catch (err) {
-    suite.fail('LIVE-04', '登录子应用静态路由连接失败', err.message);
-  }
-
-  // 3. 检查敏感限流表状态 (通过空密码登录触发，期望业务安全拦截，严禁 503 限流表缺损)
-  try {
-    const loginProbe = await fetch(`${baseUrl}/api/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'probe@epomail.invalid', password: 'probe-password-123' }),
-      signal: AbortSignal.timeout(8000)
-    });
-    let body = {};
-    try { body = await loginProbe.json(); } catch (_) {}
-
-    if (loginProbe.status === 503) {
-      suite.fail('LIVE-05', '致命隐患：/api/login 返回 503！rate_limit_counter 表缺失或 D1 离线！');
-    } else if (loginProbe.status === 400 || loginProbe.status === 401 || (loginProbe.status === 200 && (body.code === 501 || body.code === 400 || body.code === 401 || /密码|不存在|错误/i.test(body.message || '')))) {
-      suite.pass('LIVE-05', '敏感限流与认证接口安全网正常 (D1 限流与业务拦截正常，无 503 缺表崩溃)', `HTTP ${loginProbe.status}, code: ${body.code || loginProbe.status}`);
-    } else {
-      suite.warn('LIVE-05', '登录接口返回非预期状态码', `HTTP ${loginProbe.status}`);
+    const html = await response.text();
+    const moduleScript = [...html.matchAll(/<script\b[^>]*>/gi)]
+      .find(([tag]) => /\btype=["']module["']/.test(tag));
+    const source = moduleScript?.[0].match(/\bsrc=["']([^"']+)["']/)?.[1];
+    const asset = source && new URL(source, new URL('/login/', origin));
+    if (!asset || asset.origin !== origin || !asset.pathname.startsWith('/login/')
+      || !asset.pathname.endsWith('.js')) throw new Error('Invalid login asset');
+    const script = await get(asset.pathname);
+    if (!script.ok || !/(javascript|ecmascript)/i.test(script.headers.get('Content-Type') || '')) {
+      throw new Error('Login asset unavailable');
     }
-  } catch (err) {
-    suite.fail('LIVE-05', '登录接口测试失败', err.message);
-  }
-
-  // 4. 若提供了 initSecret，测试 /api/init 幂等性 (远程全库探测耗时约 15-30s)
-  if (initSecret) {
-    try {
-      const initProbe = await fetch(`${baseUrl}/api/init`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-init-secret': initSecret
-        },
-        signal: AbortSignal.timeout(45000)
-      });
-      if (initProbe.ok) {
-        suite.pass('LIVE-06', '系统初始化接口验证通过 (/api/init 具备幂等性与合法授权)', `HTTP ${initProbe.status}`);
-      } else {
-        suite.fail('LIVE-06', '系统初始化接口授权或执行失败', `HTTP ${initProbe.status}`);
-      }
-    } catch (err) {
-      suite.fail('LIVE-06', '初始化接口调用失败', err.message);
-    }
-  } else {
-    suite.info('LIVE-06', '未提供 --init-secret，跳过 /api/init 在线授权初始化测试');
+    await script.body?.cancel();
+    suite.pass('LIVE-04', '独立登录页面和脚本可访问');
+  } catch (_) {
+    suite.fail('LIVE-04', '独立登录页面或脚本不可用');
   }
 }
 
@@ -280,19 +225,9 @@ export async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   if (args.help) {
-    console.log(`
-生产发布全量门禁与上线就绪核验套件 (verify-production-readiness)
-
-用法：
-  node scripts/verify-production-readiness.mjs [选项]
-
-选项：
-  --json                       输出机器可读的 JSON 格式
-  --base-url <https://origin>  执行在线部署探针
-  --init-secret <secret>       在线测试 /api/init 授权初始化
-  --skip-tests                 跳过全量本地测试回归
-  --help, -h                   显示本帮助信息
-`);
+    console.log('Usage: node scripts/verify-production-readiness.mjs [--json] [--base-url <origin>]\n'
+      + 'Checks local build/configuration and optionally runs read-only GET probes. '
+      + 'This is one release check, not a public beta decision.');
     process.exit(0);
   }
 
@@ -315,11 +250,14 @@ export async function main() {
 
   // 4. 在线探针 (若指定)
   if (args.baseUrl) {
-    await runLiveProbes(args.baseUrl, args.initSecret, suite);
+    await runLiveProbes(args.baseUrl, suite);
   }
 
   const summary = {
     timestamp: new Date().toISOString(),
+    check: 'production-preflight',
+    result: suite.hasFailures() ? 'FAIL' : 'PASS',
+    liveProbes: args.baseUrl ? 'REQUESTED' : 'NOT_RUN',
     git: gitInfo,
     passed: suite.results.filter(r => r.status === 'PASS').length,
     failed: suite.results.filter(r => r.status === 'FAIL').length,
@@ -334,9 +272,9 @@ export async function main() {
     console.log('\n-------------------------------------------------------------');
     console.log(`核验结果总计: PASS=${summary.passed} FAIL=${summary.failed} WARN=${summary.warned} INFO=${summary.info}`);
     if (suite.hasFailures()) {
-      console.log('❌ [RELEASE BLOCKED] 存在阻断性问题，请修复后再推进生产上线！\n');
+      console.log('❌ [PREFLIGHT FAILED] 生产预检失败\n');
     } else {
-      console.log('✅ [RELEASE READY] 生产前置门禁全部绿灯，准许推进生产发布！\n');
+      console.log('✅ [PREFLIGHT PASSED] 本次预检通过。公测结论由完整验收证据决定。\n');
     }
   }
 

@@ -12,6 +12,7 @@ import { getUserDb } from '../utils/db-accessor';
 import { isAdminUser } from '../utils/admin-utils';
 import permService from './perm-service';
 import { isPenaltyLinkedToCase, normalizeCaseReference } from '../utils/audit-case-link';
+import { revokeAllUserSessions } from '../utils/session-auth-store.js';
 
 let tablesEnsured = false;
 
@@ -566,7 +567,7 @@ const auditService = {
 			}
 		}
 
-		// Check mode: allMailMode (1: All, 0: Privacy, 2: Encrypted E2EE)
+		// Check mode: allMailMode (1: All, 0: Privacy, 2: Encrypted at rest)
 		const allMailMode = Number(settings?.allMailMode ?? 1);
 
 		// 第二轮修复：批量附加独立申诉台账轮次 (R1/R2/R3... 可区分，含各轮办理结果)。
@@ -1779,11 +1780,11 @@ const auditService = {
 
 		// A. 封禁动作：清除 KV 会话缓存，阻断旧会话，生成受限通知凭证
 		if (['ban', 'ban_account', 'banned'].includes(actionType)) {
-			if (targetUser && c?.env?.kv) {
+			if (targetUser && c?.env) {
 				try {
-					await c.env.kv.delete(KvConst.AUTH_INFO + targetUser.userId);
+					await revokeAllUserSessions(c, targetUser.userId, { ignoreKvError: true });
 				} catch (e) {
-					console.warn('Failed to evict user auth info KV:', e.message);
+					console.warn('Failed to evict user auth info:', e.message);
 				}
 			}
 

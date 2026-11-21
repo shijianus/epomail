@@ -1,7 +1,9 @@
+import { legacyOrigin, legacyAdminEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = 'https://mail.epocanvas.com';
+const BASE = legacyOrigin;
 let pass = 0, fail = 0;
 const failures = [];
 
@@ -18,7 +20,7 @@ function ok(cond, label) {
 
 async function runAudit() {
   console.log('================================================================');
-  console.log('=== Cloudflare 生产环境「邮箱封禁管控」改造审计核验 (Playwright) ===');
+  console.log('=== 本地隔离环境「邮箱封禁管控」改造审计核验 (Playwright) ===');
   console.log(`=== 目标地址: ${BASE}/mail/u/0/#manage/admin/audit ===`);
   console.log('================================================================\n');
 
@@ -29,7 +31,7 @@ async function runAudit() {
     const loginRes = await fetch(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@epomail.cyou', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
+      body: JSON.stringify({ email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
     });
     const loginJson = await loginRes.json();
     assert.strictEqual(loginJson.code, 200, '登录接口返回成功 200');
@@ -38,7 +40,7 @@ async function runAudit() {
 
     // 2. 启动浏览器注入会话
     console.log('\n[步骤 2] 启动 Chromium 渲染公网真实页面...');
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'
@@ -47,7 +49,7 @@ async function runAudit() {
     await context.addInitScript(({ t }) => {
       localStorage.setItem('token', t);
       localStorage.setItem('locale', 'zh');
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'admin@epomail.cyou' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyAdminEmail }]));
     }, { t: token });
 
     const page = await context.newPage();

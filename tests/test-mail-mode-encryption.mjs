@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { emailConst } from '../mail-worker/src/const/entity-const.js';
 import emailCryptoUtils from '../mail-worker/src/utils/email-crypto-utils.js';
 
 console.log('--- Starting Comprehensive Email Encryption & Mail Mode Test Suite ---');
@@ -95,7 +96,7 @@ console.log('\n[Test 7] Testing 3 Mail Modes (全部邮件模式 / 隐私邮件�
 const inboxEmail = { isDel: 0, isSpam: 0, status: 0 };
 const trashEmail = { isDel: 1, isSpam: 0, status: 0 };
 const spamEmail = { isDel: 0, isSpam: 1, status: 0 };
-const nooneEmail = { isDel: 0, isSpam: 0, status: 2 };
+const nooneEmail = { isDel: 0, isSpam: 0, status: emailConst.status.NOONE };
 
 // Mode 1: 全部邮件模式 -> Never encrypt (all plaintext)
 assert.strictEqual(emailCryptoUtils.shouldEncryptEmail(1, inboxEmail), false, 'Mode 1: inbox should be plaintext');

@@ -1,4 +1,5 @@
-import { fetchMock } from 'cloudflare:test';
+import { env, fetchMock } from 'cloudflare:test';
+import { ensureSessionRevocationSchema } from '../src/utils/session-revocation.js';
 import { beforeAll, beforeEach } from 'vitest';
 
 function blockUnmockedNetwork() {
@@ -7,4 +8,6 @@ function blockUnmockedNetwork() {
 }
 
 beforeAll(blockUnmockedNetwork);
+// Minimal-schema suites must satisfy the session JWT authority prerequisite.
+beforeAll(() => ensureSessionRevocationSchema({ env }));
 beforeEach(blockUnmockedNetwork);

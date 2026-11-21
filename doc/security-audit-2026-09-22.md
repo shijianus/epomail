@@ -295,7 +295,7 @@ $ git branch -a --contains 0d01966
   remotes/origin/master        ← 已进入远端历史
 ```
 
-`0d01966`（2026-09-19）中，`wrangler-test.toml` 与 `wrangler-dev.toml` 各含一把长度 36 的 `jwt_secret`，`wrangler.toml` 与 `worker-configuration.d.ts` 含一把长度 38 的 `totp_enc_key`——**均无 `dev`/`placeholder`/`123456` 等占位特征**，属生产可用强度候选。相关值在 `5cfdaf9`（"密钥安全体系隔离"）中自 `wrangler.toml` 移除，但**历史对象不可回收**，任何具备克隆权限者可直接 `git show 0d01966:mail-worker/wrangler-dev.toml` 复原。
+`0d01966`（2026-09-19）中，`wrangler-test.toml` 与 `wrangler-dev.toml` 各含一把长度 36 的 `jwt_secret`，`wrangler.toml` 与 `worker-configuration.d.ts` 含一把长度 38 的 `totp_enc_key`——**均无 `dev`/`placeholder`/`[REDACTED]` 等占位特征**，属生产可用强度候选。相关值在 `5cfdaf9`（"密钥安全体系隔离"）中自 `wrangler.toml` 移除，但**历史对象不可回收**，任何具备克隆权限者可直接 `git show 0d01966:mail-worker/wrangler-dev.toml` 复原。
 
 **事实二：HEAD 上密钥位点仍然受版本控制。**
 
@@ -304,7 +304,7 @@ $ git ls-files --error-unmatch mail-worker/worker-configuration.d.ts   → TRACK
 $ git check-ignore -v mail-worker/wrangler-action.toml                → 无命中（未忽略）
 $ git show HEAD:mail-worker/worker-configuration.d.ts
   16:  jwt_secret: "<REDACTED-WEAK-6-CHAR-VALUE>";
-  17:  totp_enc_key: "local-dev-totp-enc-key-NOT-FOR-PROD";
+  17:  totp_enc_key: "[REDACTED]";
   15:  admin: "admin@epomail.bond";
 ```
 

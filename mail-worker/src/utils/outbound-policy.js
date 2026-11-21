@@ -18,10 +18,11 @@ export function assertOutboundAllowed(c, recipients, { domains = [] } = {}) {
 	// Callers dispatching through a provider must not supply local domains: even
 	// a same-domain security notice leaves the instance when sent by a provider.
 	const enabled = env.EMAIL_OUTBOUND_ENABLED;
-	if (enabled !== undefined && String(enabled).trim().toLowerCase() !== 'true') {
+	if (String(enabled).trim().toLowerCase() !== 'true') {
 		throw new BizError('External email outbound is disabled in this environment', 403, 'outbound_disabled');
 	}
-	const enforce = String(env.ENVIRONMENT || '').trim().toLowerCase() === 'staging'
+	const environment = String(env.ENVIRONMENT || '').trim().toLowerCase();
+	const enforce = ['staging', 'production'].includes(environment)
 		|| String(env.OUTBOUND_WHITELIST_ENFORCE || '').trim().toLowerCase() === 'true';
 	if (!enforce) return;
 	const allowed = new Set([

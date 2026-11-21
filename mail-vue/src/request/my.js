@@ -1,4 +1,5 @@
 import http from '@/axios/index.js';
+import { isSameTabIdentity, resolveTabSession } from '@/utils/tab-session.js';
 
 export function loginUserInfo() {
     return http.get('/my/loginUserInfo')
@@ -106,8 +107,26 @@ export function getGeo() {
     return http.get('/my/geo');
 }
 
-export function exportUserData(params) {
-    return http.get('/my/exportData', { params });
+export async function exportUserData(params = {}) {
+    const session = resolveTabSession();
+    const getPage = async query => {
+        const page = await http.get('/my/exportData', { params: query });
+        if (!isSameTabIdentity(session, resolveTabSession())) throw new Error('Export session changed');
+        return page;
+    };
+    if (params.type === 'contacts') return getPage(params);
+    const result = await getPage({ ...params, paged: 1 });
+    let cursor = result.nextBefore;
+    while (cursor != null) {
+        const page = await getPage({ ...params, type: 'emails', paged: 1, before: cursor, asOf: result.asOf });
+        if (page.nextBefore != null && page.nextBefore >= cursor) throw new Error('Invalid export cursor');
+        result.emails.push(...page.emails);
+        cursor = page.nextBefore;
+    }
+    result.totalEmails = result.emails.length;
+    delete result.asOf;
+    delete result.nextBefore;
+    return result;
 }
 
 export function testTelegramBot(data) {

@@ -792,7 +792,7 @@ import { useUiStore } from '@/store/ui.js'
 import { useSettingStore } from '@/store/setting.js'
 import { updateProfile, uploadImage } from '@/request/my.js'
 import { parseInlineMarkdown } from '@/utils/md-parser.js'
-import { THEME_PRESETS, COVER_PRESETS, getPresetName } from '@/utils/theme-presets.js'
+import { THEME_PRESETS, COVER_PRESETS, getPresetName, sanitizeImageUrl } from '@/utils/theme-presets.js'
 import { normalizeUiLocale } from '@/utils/ui-locale.js'
 
 defineOptions({
@@ -973,18 +973,20 @@ async function handleUploadCustomCover({ file }) {
 
 function applyCustomUrlWallpaper() {
   const url = customWallpaperUrl.value.trim()
-  if (!url) return
-  uiStore.setThemeWallpaper(url)
-  updateProfile({ themeWallpaper: url }).catch(() => {})
+  const safeUrl = sanitizeImageUrl(url)
+  if (!safeUrl) return
+  uiStore.setThemeWallpaper(safeUrl)
+  updateProfile({ themeWallpaper: safeUrl }).catch(() => {})
   customWallpaperDialogShow.value = false
   ElMessage.success(t('wallpaperApplied'))
 }
 
 function applyCustomUrlCover() {
   const url = customCoverUrl.value.trim()
-  if (!url) return
-  userStore.user.backgroundUrl = url
-  updateProfile({ backgroundUrl: url }).catch(() => {})
+  const safeUrl = sanitizeImageUrl(url)
+  if (!safeUrl) return
+  userStore.user.backgroundUrl = safeUrl
+  updateProfile({ backgroundUrl: safeUrl }).catch(() => {})
   customCoverDialogShow.value = false
   ElMessage.success(t('coverPhotoUpdated'))
 }

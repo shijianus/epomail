@@ -1,9 +1,11 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 
 (async () => {
   console.log("=== 开始「资料分区 - 第三方应用与数据共享板块」全链路端到端审计 ===");
-  const browser = await chromium.launch({
+  const browser = await launchIsolatedChromium(chromium, {
     headless: true,
     args: ["--disable-ipv6", "--no-sandbox", "--disable-setuid-sandbox"]
   });
@@ -25,7 +27,7 @@ import assert from "assert";
     }
   });
 
-  const BASE = "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
   let authToken = null;
   let testUserId = null;
   let grantedId = null;
@@ -48,7 +50,7 @@ import assert from "assert";
     // -----------------------------------------------------------------------------------
     console.log("1. 正在以站长身份登录 (admin@epomail.bond)...");
     const loginRes = await requestWithRetry(() => page.request.post(`${BASE}/api/login`, {
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { "Content-Type": "application/json" }
     }));
     const loginData = await loginRes.json();
@@ -148,7 +150,7 @@ import assert from "assert";
     const tokenData = await tokenRes.json();
     assert.ok(tokenData.access_token, "必须返回 access_token");
     const accessToken = tokenData.access_token;
-    console.log("✓ 成功获取 Access Token (前20字符):", accessToken.substring(0, 20) + "...");
+    console.log("✓ 成功获取 Access Token");
 
     // 调用 UserInfo
     const userInfoRes = await requestWithRetry(() => page.request.get(`${BASE}/api/oauth/userinfo`, {
@@ -156,7 +158,7 @@ import assert from "assert";
     }));
     assert.strictEqual(userInfoRes.status(), 200, "UserInfo 应当正常响应 200");
     const userInfoData = await userInfoRes.json();
-    assert.strictEqual(userInfoData.email, "admin@epomail.bond", "邮箱必须匹配");
+    assert.strictEqual(userInfoData.email, legacyAdminEmail, "邮箱必须匹配");
     console.log("✓ UserInfo 响应正常:", userInfoData.email);
 
     // -----------------------------------------------------------------------------------

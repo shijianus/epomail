@@ -16,6 +16,8 @@
  *   - audit rows record the event without any one-time secret.
  */
 import { env, SELF } from 'cloudflare:test';
+import { getTableColumns } from 'drizzle-orm';
+import account from '../src/entity/account.js';
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import cryptoUtils from '../src/utils/crypto-utils.js';
 import totpUtils from '../src/utils/totp-utils.js';
@@ -125,6 +127,17 @@ async function seedSession(userId, email, token, meta = null) {
 	if (meta) authInfo.tokenMeta = { [token]: { ...meta, authVersion } };
 	await env.kv.put(`auth-uid:${userId}`, JSON.stringify(authInfo), { expirationTtl: 3600 });
 	return jwt;
+}
+
+// Identity binding revokes every previous session. Exercise actual credential
+// issuance here so the replacement token is admitted by the durable authority.
+async function signInAgain(email) {
+	const response = await api('/login', { method: 'POST', body: { email, password: PASSWORD } });
+	const body = await readJson(response);
+	expect(response.status, body.errorCode || body.message).toBe(200);
+	expect(body.code, body.errorCode || body.message).toBe(200);
+	expect(body.data.token).toEqual(expect.any(String));
+	return body.data.token;
 }
 
 async function addSession(userId, token, meta = null) {
@@ -277,6 +290,11 @@ function resetRateLimits() {
 
 beforeAll(async () => {
 	await env.db.prepare(CREATE_USER).run();
+	// A returning identity fixture has no mailbox. Sign-in still checks the
+	// real account table before deciding whether to issue a welcome message.
+	const accountColumns = Object.values(getTableColumns(account)).map(column =>
+		`"${column.name}" ${column.getSQLType()}${column.primary ? ' PRIMARY KEY' : ''}`);
+	await env.db.prepare(`CREATE TABLE IF NOT EXISTS account (${accountColumns.join(',')})`).run();
 	await env.db.prepare(CREATE_OAUTH).run();
 	await ensureOtcTable(env.db);
 	await ensureBindClaimTable(env.db);
@@ -536,7 +554,7 @@ describe('binding an additional identity', () => {
 		});
 		expect((await readJson(committed)).code).toBe(200);
 		expect((await readJson(await api('/my/oauthIdentities', { token: tokenA }))).code).toBe(401);
-		const freshTokenA = await seedSession(USER_A, EMAIL_A, 'session-a-after-bind');
+		const freshTokenA = await signInAgain(EMAIL_A);
 
 		const second = await startGithubBind(freshTokenA);
 		expect(second.body.code).toBe(409);
@@ -619,7 +637,8 @@ describe('binding an additional identity', () => {
 		});
 		expect((await readJson(first)).code).toBe(200);
 		expect((await readJson(await api('/my/oauthIdentities', { token: tokenA }))).code).toBe(401);
-		const freshTokenA = await seedSession(USER_A, EMAIL_A, 'session-a-after-claim');
+		expect((await readJson(await api('/my/oauthIdentities', { token: tokenA }))).code).toBe(401);
+		const freshTokenA = await signInAgain(EMAIL_A);
 
 		const replay = await api('/my/oauthIdentities/bind/complete', {
 			method: 'POST', token: freshTokenA, body: { token: claim }

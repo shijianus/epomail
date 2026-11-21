@@ -181,6 +181,7 @@ function createIsolatedDb() {
     );
 
     CREATE TABLE email (
+      is_official INTEGER NOT NULL DEFAULT 0,
       email_id INTEGER PRIMARY KEY AUTOINCREMENT,
       send_email TEXT,
       name TEXT,

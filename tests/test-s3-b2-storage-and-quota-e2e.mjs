@@ -1,3 +1,6 @@
+import { initializeLegacyStack } from './helpers/legacy-initialize.mjs';
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from "playwright";
 import assert from "assert";
 import s3Signer from "../mail-worker/src/utils/s3-signer.js";
@@ -81,31 +84,29 @@ import r2Service from "../mail-worker/src/service/r2-service.js";
   // [Step 3] E2E 验证: 生产环境部署、DDL 升级、API 测试与前端资料分区审计
   // ---------------------------------------------------------------------------
   console.log("\n[Step 3] 端到端验证: 生产环境 API 链路与资料设置分区...");
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: "zh-CN"
   });
   const page = await context.newPage();
 
-  const BASE = "https://epomail.epocanvas.workers.dev";
+  const BASE = legacyOrigin;
   let authToken = null;
 
   try {
     // 3.1 触发 DDL 升级
-    console.log("  -> 触发 /api/init/123456 执行 v3_10DB 存储扩展字段更新...");
-    const initRes = await page.request.get(`${BASE}/api/init/123456`);
-    assert.strictEqual(initRes.status(), 200, "数据库初始化必须返回 200");
+    await initializeLegacyStack();
     console.log("  ✓ DDL 幂等升级完成");
 
     // 3.2 管理员登录
     console.log("  -> 生产环境管理员登录...");
     const loginRes = await page.request.post(`${BASE}/api/login`, {
       headers: { "Content-Type": "application/json" },
-      data: { email: "admin@epomail.bond", password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' }
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, "管理员登录必须返回 200: " + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, "管理员登录必须返回 200: " + Number(loginData?.code));
     authToken = loginData.data.token;
     console.log("  ✓ 认证成功，获取 JWT 令牌");
 

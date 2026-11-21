@@ -27,11 +27,14 @@ const byteSize = row => ['subject', 'text', 'content', 'code']
 async function identitySchema(db) {
 	await db.prepare(`CREATE TABLE IF NOT EXISTS user (
 		user_id INTEGER PRIMARY KEY, email TEXT NOT NULL, type INTEGER NOT NULL,
+		status INTEGER DEFAULT 0, is_del INTEGER DEFAULT 0, custom_labels TEXT DEFAULT '[]',
 		storage_quota_mb INTEGER NOT NULL DEFAULT 0, byo_storage_enabled INTEGER NOT NULL DEFAULT 0,
 		byo_storage_config TEXT NOT NULL DEFAULT '{}'
 	)`).run();
 	await db.prepare(`CREATE TABLE IF NOT EXISTS role (
-		role_id INTEGER PRIMARY KEY, storage_quota_mb INTEGER, role_code TEXT
+		role_id INTEGER PRIMARY KEY, storage_quota_mb INTEGER, role_code TEXT,
+		send_type TEXT DEFAULT 'count', send_count INTEGER DEFAULT 10, allow_attachment INTEGER DEFAULT 1,
+		avail_domain TEXT DEFAULT '', ban_email TEXT DEFAULT ''
 	)`).run();
 	// Let the real settingService query every production projection without
 	// invoking application bootstrap, seeding an admin, or mocking its ORM.
@@ -43,6 +46,7 @@ async function identitySchema(db) {
 
 async function mailSchema(db) {
 	await db.prepare(`CREATE TABLE IF NOT EXISTS email (
+		is_official INTEGER NOT NULL DEFAULT 0,
 		email_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
 		account_id INTEGER NOT NULL DEFAULT 0, subject TEXT, text TEXT, content TEXT, code TEXT DEFAULT '',
 		is_del INTEGER NOT NULL DEFAULT 0, status INTEGER NOT NULL DEFAULT 0,
@@ -160,6 +164,16 @@ async function withoutTable(db, table, run) {
 }
 
 describe('Mail quota consistency (real D1, separate identity and mail databases)', () => {
+	it('reads one settings snapshot per public-storage attachment check', async () => {
+		await fixture(async ({ c }) => {
+			const settings = vi.spyOn(settingService, 'query');
+			expect(await storageQuotaService.checkAttachmentSizeLimit(c, USER_ID, 26 * MIB)).toMatchObject({
+				allowed: false, isByo: false, maxSizeMb: 25
+			});
+			expect(settings).toHaveBeenCalledTimes(1);
+		});
+	});
+
 	it('counts UTF-8 bytes of all four stored fields and routes usage and role configuration to their own databases', async () => {
 		await fixture(async ({ c }) => {
 			const rows = [
@@ -184,6 +198,9 @@ describe('Mail quota consistency (real D1, separate identity and mail databases)
 				maxEmails: 50, maxStorageMB: 5, maxStorageBytes: 5 * MIB, usedEmails: 4, usedStorageBytes: usedBytes,
 				byoStorageEnabled: 0, bypassStorage: false, isVisitor: false, quotaStorageBlocked: false, dbFull: false
 			});
+			const checked = await storageQuotaService.checkQuotaAvailable(c, USER_ID, 1);
+			expect(await userService.getUserQuota(c, USER_ID, checked.usage)).toEqual(await userService.getUserQuota(c, USER_ID));
+			await expect(userService.getUserQuota(c, OTHER_ID, checked.usage)).rejects.toMatchObject({ code: 503, errorCode: 'quota_unavailable' });
 		});
 	});
 
@@ -217,6 +234,15 @@ describe('Mail quota consistency (real D1, separate identity and mail databases)
 					.bind(crypto.randomUUID(), USER_ID, crypto.randomUUID(), state, 9 * MIB).run();
 			}
 			expect(await storageQuotaService.getUserStorageUsage(c, USER_ID)).toMatchObject({ emailCount: 1, usedBytes: byteSize(row) });
+			const identity = await storageQuotaService.selectMailPolicyIdentity(c, USER_ID);
+			expect(identity).toMatchObject({ user: { userId: USER_ID, type: ROLE_ID }, role: { roleId: ROLE_ID, storageQuotaMb: 5 } });
+			const setting = await settingService.query(c);
+			const identityRead = vi.spyOn(userDb, 'prepare');
+			const delivery = await storageQuotaService.getLocalDeliveryStorageUsage(c, USER_ID, identity, setting);
+			expect(delivery).toMatchObject({ emailCount: 1, usedBytes: byteSize(row), reservedCount: 9, reservedBytes: 34 * MIB });
+			expect(identityRead).not.toHaveBeenCalled();
+			identityRead.mockRestore();
+			await expect(storageQuotaService.getUserStorageUsage(c, OTHER_ID, identity)).rejects.toMatchObject({ errorCode: 'storage_usage_unknown' });
 			expect(await userService.getUserQuota(c, USER_ID)).toMatchObject({ maxEmails: 50, usedEmails: 1, usedStorageBytes: byteSize(row) });
 			// This preflight is advisory. Reservation writers must atomically add
 			// outstanding unmaterialized bytes/count; used* must not include them twice.
@@ -263,8 +289,14 @@ describe('Mail quota consistency (real D1, separate identity and mail databases)
 	it('allows a legacy type=0 administrator to use system defaults without hiding missing assigned roles', async () => {
 		await fixture(async ({ c }) => {
 			await userDb.prepare('UPDATE user SET type = 0 WHERE user_id = ?').bind(USER_ID).run();
+			const legacy = await storageQuotaService.selectMailPolicyIdentity(c, USER_ID);
+			expect(legacy.role).toBeNull();
+			expect(await storageQuotaService.getUserStorageUsage(c, USER_ID, legacy)).toMatchObject({ quotaMb: 500 });
 			expect(await userService.getUserQuota(c, USER_ID)).toMatchObject({ maxStorageMB: 500, isVisitor: false, quotaStorageBlocked: false });
 			await userDb.prepare('UPDATE user SET type = ? WHERE user_id = ?').bind(ROLE_ID + 1, USER_ID).run();
+			const orphan = await storageQuotaService.selectMailPolicyIdentity(c, USER_ID);
+			expect(orphan.role).toBeNull();
+			await expect(storageQuotaService.getUserStorageUsage(c, USER_ID, orphan)).rejects.toMatchObject({ errorCode: 'storage_usage_unknown' });
 			await expectUnavailable(c);
 		});
 	});

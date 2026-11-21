@@ -75,7 +75,7 @@
             <div class="sender-meta">
               <div class="name-date">
                 <span class="sender-name">{{ currentEmail.name || $t('noSender') }}</span>
-                <span v-if="currentEmail.sendEmail === 'announcement@epocanvas.com' || currentEmail.sendEmail === 'admin@epocanvas.com' || currentEmail.isOfficial" class="official-verified-badge" :title="$t('officialVerified')">
+                <span v-if="currentEmail.isOfficial === 1" class="official-verified-badge" :title="$t('officialVerified')">
                   <Icon icon="ri:verified-badge-fill" width="16" height="16" style="color: #0284c7; vertical-align: middle;" />
                 </span>
                 <span class="sender-email">&lt;{{ currentEmail.sendEmail }}&gt;</span>
@@ -97,7 +97,7 @@
 
         <el-scrollbar class="detail-body-scrollbar">
           <div class="email-body-content">
-            <ShadowHtml class="shadow-html" :html="formatImage(currentEmail.content)" :message-key="currentEmail.emailId || currentEmail.hash" :trusted-image-urls="trustedImageUrls" v-if="currentEmail.content" />
+            <ShadowHtml class="shadow-html" :official="currentEmail.isOfficial === 1" :html="formatImage(currentEmail.content)" :message-key="currentEmail.emailId || currentEmail.hash" :trusted-image-urls="trustedImageUrls" v-if="currentEmail.content" />
             <pre v-else class="email-text">{{ currentEmail.text || $t('noContent') }}</pre>
           </div>
         </el-scrollbar>

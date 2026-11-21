@@ -726,6 +726,7 @@
                     :active-value="1" 
                     :inactive-value="0"
                     v-model="setting.userApiSupport"
+                    :disabled="setting.patIssuanceAvailable !== true"
                   />
                 </div>
               </div>
@@ -2924,13 +2925,13 @@
 
           <template v-else-if="storageScanResult">
             <!-- Top Health Summary Banner (Compact Row) -->
-            <div class="scan-summary-banner" :class="{ warn: storageScanResult.healthScore < 80 }">
+            <div class="scan-summary-banner" :class="{ warn: storageScanResult.healthScore < 100 }">
               <div class="sum-left">
-                <Icon :icon="storageScanResult.healthScore >= 80 ? 'fluent:checkmark-circle-24-filled' : 'fluent:warning-24-filled'" width="26" height="26" class="sum-icon" />
+                <Icon :icon="storageScanResult.healthScore === 100 ? 'fluent:checkmark-circle-24-filled' : 'fluent:warning-24-filled'" width="26" height="26" class="sum-icon" />
                 <div class="sum-title">
-                  {{ $t('storageHealthScore') }}: <strong>{{ storageScanResult.healthScore }}%</strong>
-                  <el-tag size="small" :type="storageScanResult.healthScore >= 80 ? 'success' : 'warning'" effect="light" style="margin-left: 8px;">
-                    {{ storageScanResult.healthScore >= 80 ? $t('storageHealthHealthy') : $t('storageHealthWarn') }}
+                  {{ $t('storageHealthScore') }}: <strong>{{ storageScanResult.healthScore == null ? $t('unknown') : storageScanResult.healthScore + '%' }}</strong>
+                  <el-tag size="small" :type="storageScanResult.healthScore === 100 ? 'success' : 'warning'" effect="light" style="margin-left: 8px;">
+                    {{ storageScanResult.healthScore === 100 ? $t('storageHealthHealthy') : $t('storageHealthWarn') }}
                   </el-tag>
                   <el-tooltip effect="dark" :content="storageScanResult.message">
                     <Icon class="warning" icon="fe:warning" width="16" height="16" style="margin-left: 6px; vertical-align: -2px; cursor: pointer; color: var(--el-text-color-secondary);"/>
@@ -2949,6 +2950,25 @@
               </div>
             </div>
 
+            <details v-if="storageScanResult.probes" class="scan-probe-history" :open="storageScanResult.status !== 'ok'">
+              <summary>{{ $t('storageProbeHistory.title') }}</summary>
+              <p>{{ $t('storageProbeHistory.scanned') }} · <time :datetime="storageScanResult.scannedAt">{{ new Date(storageScanResult.scannedAt).toLocaleString(locale) }}</time></p>
+              <p v-if="storageScanResult.historyAvailable === false">{{ $t('storageProbeHistory.unavailable') }}</p>
+              <table>
+                <thead><tr><th>{{ $t('storageProbeHistory.dependency') }}</th><th>{{ $t('storageProbeHistory.current') }}</th><th>{{ $t('storageProbeHistory.last') }}</th></tr></thead>
+                <tbody>
+                  <tr v-for="(probe, name) in storageScanResult.probes" :key="name">
+                    <td>{{ probeLabels[name] ?? name }}</td>
+                    <td>
+                      {{ probeStatuses[probe.status] ?? probeStatuses.unknown }}
+                      <small v-if="name === 'deletionQueue'">{{ $t('storageProbeHistory.queue', { pending: storageScanResult.deletionQueue?.pending ?? $t('unknown'), failed: storageScanResult.deletionQueue?.failed ?? $t('unknown') }) }}</small>
+                      <small v-if="name === 'inboundRawCleanup'">{{ $t('storageProbeHistory.raw', { retrying: storageScanResult.inboundRawCleanup?.retrying ?? $t('unknown'), review: storageScanResult.inboundRawCleanup?.manualReview ?? $t('unknown') }) }}</small>
+                    </td>
+                    <td><time v-if="probe.lastSuccessAt" :datetime="probe.lastSuccessAt">{{ new Date(probe.lastSuccessAt).toLocaleString(locale) }}</time><span v-else>{{ $t('storageProbeHistory.none') }}</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </details>
             <!-- 2-Column Side-by-Side Metrics Grid -->
             <div class="scan-2col-grid">
               <!-- Left Column: KV 边缘高速缓存 -->
@@ -2966,7 +2986,7 @@
 
                 <div class="metrics-grid">
                   <div class="metric-item">
-                    <span class="m-val">{{ storageScanResult.kv?.authKeys || 0 }}</span>
+                    <span class="m-val">{{ storageScanResult.kv?.status === 'unknown' ? $t('unknown') : (storageScanResult.kv?.authKeys ?? 0) }}</span>
                     <span class="m-lbl">
                       {{ $t('kvAuthKeys') }}
                       <el-tooltip effect="dark" :content="$t('kvAuthKeysDesc')">
@@ -2975,7 +2995,7 @@
                     </span>
                   </div>
                   <div class="metric-item">
-                    <span class="m-val">{{ storageScanResult.kv?.configKeys || 0 }}</span>
+                    <span class="m-val">{{ storageScanResult.kv?.status === 'unknown' ? $t('unknown') : (storageScanResult.kv?.configKeys ?? 0) }}</span>
                     <span class="m-lbl">
                       {{ $t('kvConfigKeys') }}
                       <el-tooltip effect="dark" :content="$t('kvConfigKeysDesc')">
@@ -2984,7 +3004,7 @@
                     </span>
                   </div>
                   <div class="metric-item">
-                    <span class="m-val">{{ storageScanResult.kv?.attachmentKeys || 0 }}</span>
+                    <span class="m-val">{{ storageScanResult.kv?.status === 'unknown' ? $t('unknown') : (storageScanResult.kv?.attachmentKeys ?? 0) }}</span>
                     <span class="m-lbl">
                       {{ $t('kvAttachmentKeys') }}
                       <el-tooltip effect="dark" :content="$t('kvAttachmentKeysDesc')">
@@ -2993,7 +3013,7 @@
                     </span>
                   </div>
                   <div class="metric-item">
-                    <span class="m-val">{{ storageScanResult.kv?.totalKeys || 0 }}</span>
+                    <span class="m-val">{{ storageScanResult.kv?.status === 'unknown' ? $t('unknown') : (storageScanResult.kv?.totalKeys ?? 0) }}</span>
                     <span class="m-lbl">
                       {{ $t('kvTotalKeys') }}
                       <el-tooltip effect="dark" :content="$t('kvTotalKeysDesc')">
@@ -3019,29 +3039,29 @@
 
                 <div class="metrics-grid">
                   <div class="metric-item">
-                    <span class="m-val">{{ storageScanResult.d1?.totalAttachments || 0 }}</span>
+                    <span class="m-val">{{ storageScanResult.d1?.status === 'unknown' ? $t('unknown') : (storageScanResult.d1?.totalAttachments ?? 0) }}</span>
                     <span class="m-lbl">{{ $t('d1TotalAttachments') }}</span>
                   </div>
                   <div class="metric-item">
-                    <span class="m-val">{{ storageScanResult.d1?.totalMb || 0 }} MB</span>
+                    <span class="m-val">{{ storageScanResult.d1?.status === 'unknown' ? $t('unknown') : (storageScanResult.d1?.totalMb ?? 0) }} MB</span>
                     <span class="m-lbl">{{ $t('d1TotalSize') }}</span>
                   </div>
                   <div class="metric-item">
-                    <span class="m-val">{{ storageScanResult.d1?.distinctKeys || 0 }}</span>
+                    <span class="m-val">{{ storageScanResult.d1?.status === 'unknown' ? $t('unknown') : (storageScanResult.d1?.distinctKeys ?? 0) }}</span>
                     <span class="m-lbl">{{ $t('d1DistinctKeys') }}</span>
                   </div>
                   <div class="metric-item">
-                    <span class="m-val">{{ storageScanResult.storage?.activeEngine || 'KV' }}</span>
+                    <span class="m-val">{{ storageScanResult.storage?.activeEngine || $t('unknown') }}</span>
                     <span class="m-lbl">{{ $t('storageEngine') }}</span>
                   </div>
                 </div>
 
                 <!-- MIME Breakdown -->
                 <div class="mime-breakdown-row">
-                  <span class="mime-pill"><Icon icon="solar:gallery-wide-linear" width="12" height="12"/> {{ $t('d1Images') }}: {{ storageScanResult.d1?.imageCount || 0 }}</span>
-                  <span class="mime-pill"><Icon icon="fluent:document-pdf-20-regular" width="12" height="12"/> {{ $t('d1Pdfs') }}: {{ storageScanResult.d1?.pdfCount || 0 }}</span>
-                  <span class="mime-pill"><Icon icon="fluent:video-clip-20-regular" width="12" height="12"/> {{ $t('d1Media') }}: {{ storageScanResult.d1?.mediaCount || 0 }}</span>
-                  <span class="mime-pill"><Icon icon="fluent:folder-zip-20-regular" width="12" height="12"/> {{ $t('d1Other') }}: {{ storageScanResult.d1?.otherCount || 0 }}</span>
+                  <span class="mime-pill"><Icon icon="solar:gallery-wide-linear" width="12" height="12"/> {{ $t('d1Images') }}: {{ storageScanResult.d1?.status === 'unknown' ? $t('unknown') : (storageScanResult.d1?.imageCount ?? 0) }}</span>
+                  <span class="mime-pill"><Icon icon="fluent:document-pdf-20-regular" width="12" height="12"/> {{ $t('d1Pdfs') }}: {{ storageScanResult.d1?.status === 'unknown' ? $t('unknown') : (storageScanResult.d1?.pdfCount ?? 0) }}</span>
+                  <span class="mime-pill"><Icon icon="fluent:video-clip-20-regular" width="12" height="12"/> {{ $t('d1Media') }}: {{ storageScanResult.d1?.status === 'unknown' ? $t('unknown') : (storageScanResult.d1?.mediaCount ?? 0) }}</span>
+                  <span class="mime-pill"><Icon icon="fluent:folder-zip-20-regular" width="12" height="12"/> {{ $t('d1Other') }}: {{ storageScanResult.d1?.status === 'unknown' ? $t('unknown') : (storageScanResult.d1?.otherCount ?? 0) }}</span>
                 </div>
               </div>
             </div>
@@ -3625,6 +3645,8 @@ import ShadowHtml from "@/components/shadow-html/index.vue";
 import {getTextWidth} from "@/utils/text.js";
 import {fileToBase64} from "@/utils/file-utils.js";
 import {formatDetailDate} from "@/utils/day.js";
+import {isSameTabIdentity, resolveTabSession} from '@/utils/tab-session.js'
+import {retainStorageProbeTimes} from '@/utils/storage-probe-history.js'
 import {useI18n} from 'vue-i18n';
 import {useRouter} from 'vue-router';
 import {getRoleGroupSlug} from '@/utils/role-utils.js';
@@ -3678,6 +3700,24 @@ const attachmentRuleForm = reactive({
 const storageScanShow = ref(false)
 const scanningStorage = ref(false)
 const storageScanResult = ref(null)
+const probeLabels = computed(() => ({
+  kv: t('storageProbeHistory.names.kv'),
+  d1: t('storageProbeHistory.names.d1'),
+  byo: t('storageProbeHistory.names.byo'),
+  orphans: t('storageProbeHistory.names.orphans'),
+  deletionQueue: t('storageProbeHistory.names.deletionQueue'),
+  inboundRawCleanup: t('storageProbeHistory.names.inboundRawCleanup'),
+  s3: t('storageProbeHistory.names.s3'),
+  engine: t('storageProbeHistory.names.engine'),
+  settings: t('storageProbeHistory.names.settings')
+}))
+const probeStatuses = computed(() => ({
+  ok: t('storageProbeHistory.status.ok'),
+  unknown: t('storageProbeHistory.status.unknown'),
+  partial: t('storageProbeHistory.status.partial'),
+  error: t('storageProbeHistory.status.error'),
+  not_configured: t('storageProbeHistory.status.not_configured')
+}))
 const cleaningStorage = ref(false)
 
 const backgroundImage = ref('')
@@ -4821,7 +4861,7 @@ const verificationSelectWidth = computed(() => `${Math.ceil(Math.max(96, ...['en
 const mailModeOptions = computed(() => [
   { value: 1, label: `${t('allMailMode')} (Level 1)` },
   { value: 0, label: `${t('privacyMailMode')} (Level 2 [${t('recommendedTag')}])` },
-  { value: 2, label: `${t('encryptedMailMode')} (Level 3 [E2EE])` }
+  { value: 2, label: `${t('encryptedMailMode')} (Level 3)` }
 ]);
 
 // Use the longest translated option, with a narrow-screen CSS cap.
@@ -5009,7 +5049,7 @@ function getSettings() {
     settingData.addEmail = Number(settingData.addEmail) === 0 ? 0 : 1
     settingData.userTgForward = settingData.userTgForward !== undefined ? Number(settingData.userTgForward) : 1
     settingData.userEmailForward = settingData.userEmailForward !== undefined ? Number(settingData.userEmailForward) : 1
-    settingData.userApiSupport = settingData.userApiSupport !== undefined ? Number(settingData.userApiSupport) : 1
+    settingData.userApiSupport = Number(settingData.userApiSupport ?? 0)
     settingData.aiEnabled = settingData.aiEnabled !== undefined && settingData.aiEnabled !== null ? Number(settingData.aiEnabled) : 1
     settingData.aiDailyQuota = settingData.aiDailyQuota !== undefined && settingData.aiDailyQuota !== null ? Number(settingData.aiDailyQuota) : 0
     settingData.aiRateLimitRpm = settingData.aiRateLimitRpm !== undefined && settingData.aiRateLimitRpm !== null ? Number(settingData.aiRateLimitRpm) : 60
@@ -6063,14 +6103,18 @@ async function openStorageScanDialog() {
 }
 
 async function handleRunStorageScan() {
+  if (scanningStorage.value) return
   scanningStorage.value = true
+  storageScanResult.value = null
+  const identity = resolveTabSession()
   try {
     const res = await scanStorage()
     const data = res?.data !== undefined ? res.data : res
-    if (data) {
-      storageScanResult.value = data
-      ElMessage.success(t('storageScanSuccess'))
-    }
+    if (!data) throw new Error(t('scanFailed'))
+    if (identity && !isSameTabIdentity(identity, resolveTabSession())) return
+    storageScanResult.value = retainStorageProbeTimes(data, identity)
+    if (data.healthScore === 100) ElMessage.success(t('storageScanSuccess'))
+    else ElMessage.warning(t('storageHealthWarn'))
   } catch (e) {
     ElMessage.error(e.message || t('scanFailed'))
   } finally {
@@ -6086,9 +6130,18 @@ async function handleCleanupStorage() {
       type: 'warning'
     })
     cleaningStorage.value = true
-    const res = await cleanupStorage()
-    const data = res?.data !== undefined ? res.data : res
-    ElMessage.success(data?.message || t('cleanupStorageDone'))
+    let page = {}
+    const visited = new Set()
+    while (page) {
+      const key = JSON.stringify(page)
+      if (visited.has(key)) throw new Error(t('cleanFailed'))
+      visited.add(key)
+      const res = await cleanupStorage(page)
+      const data = res?.data !== undefined ? res.data : res
+      if (data?.ok !== true) throw new Error(t('cleanFailed'))
+      page = data.next
+    }
+    ElMessage.success(t('cleanupStorageDone'))
     await handleRunStorageScan()
   } catch (e) {
     if (e !== 'cancel') {
@@ -6116,6 +6169,7 @@ async function handleTestAdminTelegram() {
   testingTg.value = true;
   try {
     await testTelegramBot({
+      scope: 'system',
       botToken: token,
       chatId: String(chatId).trim(),
     });
@@ -9552,6 +9606,15 @@ form .el-button {
         border-radius: 6px;
       }
     }
+  }
+
+  .scan-probe-history {
+    margin-block: 12px;
+    overflow-x: auto;
+    summary { cursor: pointer; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 4px 6px; text-align: start; border-bottom: 1px solid var(--el-border-color-light); }
+    small { display: block; }
   }
 
   .scan-2col-grid {

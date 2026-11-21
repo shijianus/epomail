@@ -1,3 +1,5 @@
+import { legacyOrigin, legacyAdminEmail } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
@@ -6,7 +8,7 @@ import assert from 'assert';
   console.log('=== 开始针对真实生产环境 shijianus-blog 标签页图片与授权页的 Playwright 审计 ===');
   console.log('========================================================================');
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchIsolatedChromium(chromium, { headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: 'zh-CN'
@@ -16,18 +18,18 @@ import assert from 'assert';
   page.on('console', msg => console.log('BROWSER LOG:', msg.type(), msg.text()));
   page.on('pageerror', err => console.log('BROWSER ERROR:', err));
 
-  const DOMAIN_BASE = 'https://mail.epocanvas.com';
-  const BASE = 'https://epomail.epocanvas.workers.dev';
+  const DOMAIN_BASE = legacyOrigin;
+  const BASE = legacyOrigin;
 
   try {
     // 1. 登录管理员账号
     console.log('\n[步骤 1] 登录账号 admin@epomail.bond 获取鉴权 Token...');
     const loginRes = await page.request.post(BASE + '/api/login', {
-      data: { email: 'admin@epomail.bond', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
+      data: { email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' },
       headers: { 'Content-Type': 'application/json' }
     });
     const loginData = await loginRes.json();
-    assert.strictEqual(loginData.code, 200, '登录应成功: ' + JSON.stringify(loginData));
+    assert.strictEqual(loginData.code, 200, '登录应成功: ' + Number(loginData?.code));
     const token = loginData.data?.token;
 
     // 2. 注入 Token 至 DOMAIN_BASE

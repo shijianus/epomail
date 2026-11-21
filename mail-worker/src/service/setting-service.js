@@ -1,3 +1,5 @@
+import { startBroadcast, advanceBroadcast } from './global-broadcast-operation.js';
+import { personalForwardingAvailable } from './forward-consent.js';
 import KvConst from '../const/kv-const';
 import settingEntity from '../entity/setting';
 import orm from '../entity/orm';
@@ -86,6 +88,14 @@ import {t} from '../i18n/i18n'
 import verifyRecordService from './verify-record-service';
 import userContext from '../security/user-context';
 import { isDualDbMode, getDbModeInfo } from '../utils/db-accessor';
+import { encryptProviderSecret } from '../utils/oauth-secret-crypto.js';
+
+// A deployment must opt in only after installing and verifying a compatible
+// PAT consumer. Revoking existing credentials never requires issuance.
+export function personalTokenPolicy(env, settings) {
+	const available = env?.ENABLE_PAT_ISSUANCE === 'true' || env?.ENABLE_PAT_ISSUANCE === true;
+	return { patIssuanceAvailable: available, userApiSupport: available && Number(settings?.userApiSupport ?? 1) === 1 ? 1 : 0 };
+}
 
 const settingService = {
 
@@ -406,6 +416,7 @@ const settingService = {
 		// request still need the real provider credentials.
 		const settingRow = {
 			...cachedSetting,
+			...personalTokenPolicy(c.env, cachedSetting),
 			resendTokens: { ...(cachedSetting.resendTokens || {}) },
 			oauthProviders: this.sanitizeOAuthProviders(cachedSetting.oauthProviders)
 		};
@@ -580,6 +591,13 @@ const settingService = {
 					const nextValue = incoming[secretField];
 					if (!nextValue || String(nextValue).includes('******')) {
 						merged[secretField] = previous[secretField] || '';
+					}
+					const plaintext = typeof merged[secretField] === 'string'
+						&& merged[secretField]
+						&& !merged[secretField].startsWith('v1:');
+					const productionLike = ['production', 'staging'].includes(String(c.env?.ENVIRONMENT || '').toLowerCase());
+					if (plaintext && (c.env?.oauth_client_enc_key || productionLike)) {
+						merged[secretField] = await encryptProviderSecret(c.env, key, secretField, merged[secretField]);
 					}
 				}
 				if (merged.enabled !== 1 && merged.enabled !== true) {
@@ -898,24 +916,21 @@ const settingService = {
 		await this.set(c, savePayload);
 
 		const user = (await import('../entity/user')).default;
-		const account = (await import('../entity/account')).default;
+		const accountService = (await import('./account-service')).default;
 		const emailService = (await import('./email-service')).default;
 		const { eq, and } = await import('drizzle-orm');
 
 		const users = await orm(c).select({
 			userId: user.userId,
 			email: user.email,
-		}).from(user).where(eq(user.status, 0)).all();
+		}).from(user).where(and(eq(user.status, 0), eq(user.isDel, 0))).all();
 
 		let deliverCount = 0;
 		for (const u of users) {
-			const acc = await orm(c).select({
-				accountId: account.accountId,
-				name: account.name
-			}).from(account).where(and(eq(account.userId, u.userId), eq(account.isDel, 0))).limit(1).get();
+			const acc = await accountService.selectActiveForUser(c, u.userId, u.email);
 
 			if (acc) {
-				const res = await emailService.deliverWelcomeEmailToUser(c, u.userId, acc.accountId, u.email, {
+				const res = await emailService.deliverWelcomeEmailToUser(c, u.userId, acc.accountId, acc.email, {
 					subject: welcomeSubject,
 					expireDays: welcomeExpireDays,
 					content: welcomeContent,
@@ -931,16 +946,11 @@ const settingService = {
 	},
 
 	async getGlobalEmailConfig(c) {
-		await this.ensureSettingColumns(c);
-		const settingRow = await this.get(c, true);
-		let cfg = settingRow.globalEmailConfig || {};
-		if (typeof cfg === 'string') {
-			try { cfg = JSON.parse(cfg); } catch (e) { cfg = {}; }
-		}
-		return cfg;
+		const row = await orm(c).select({ config: settingEntity.globalEmailConfig }).from(settingEntity).get();
+		return JSON.parse(row?.config || '{}');
 	},
 
-	async sendGlobalBroadcastEmail(c, params) {
+	async sendGlobalBroadcastEmail(c, params, actorId = 0) {
 		await this.ensureSettingColumns(c);
 		let {
 			subject,
@@ -996,15 +1006,15 @@ const settingService = {
 		expireDays = Number(expireDays) >= 0 ? Number(expireDays) : 0;
 		sendToNewUsers = Number(sendToNewUsers) === 1 ? 1 : 0;
 		isStarred = isStarred === 0 ? 0 : 1;
-		const nowIso = new Date().toISOString();
+		targetRoleIds = [...new Set(targetRoleIds)].sort((a,b) => a-b);
 
 		if (!text && content) {
 			const emailUtils = (await import('../utils/email-utils')).default;
 			text = emailUtils.htmlToText(content);
 		}
 
-		const globalConfig = {
-			active: 1,
+		const config = {
+			lang: params?.lang || '',
 			subject,
 			content,
 			text: text || '',
@@ -1014,78 +1024,17 @@ const settingService = {
 			expireDays,
 			sendToNewUsers,
 			isStarred,
-			senderName: senderName || null,
-			lastBroadcastTime: nowIso
+			senderName: senderName || null
 		};
-
-		await this.set(c, {
-			globalEmailConfig: globalConfig
-		});
-
-		if (sendToNewUsers === 1) {
-			try {
-				await c.env.kv.put('ACTIVE_GLOBAL_EMAIL', JSON.stringify(globalConfig));
-			} catch (e) {}
-		} else {
-			try {
-				await c.env.kv.delete('ACTIVE_GLOBAL_EMAIL');
-			} catch (e) {}
-		}
-
-		const user = (await import('../entity/user')).default;
-		const account = (await import('../entity/account')).default;
+		const { op, fresh } = await startBroadcast(c, actorId, params?.operationId, config);
+		if (fresh) await this.refresh(c);
+		const accountService = (await import('./account-service')).default;
 		const emailService = (await import('./email-service')).default;
-		const { eq, and, inArray } = await import('drizzle-orm');
-
-		let users = [];
-		if (targetType === 'roles' && targetRoleIds.length > 0) {
-			users = await orm(c).select({
-				userId: user.userId,
-				email: user.email,
-				type: user.type
-			}).from(user).where(and(
-				eq(user.status, 0),
-				eq(user.isDel, 0),
-				inArray(user.type, targetRoleIds)
-			)).all();
-		} else {
-			users = await orm(c).select({
-				userId: user.userId,
-				email: user.email,
-				type: user.type
-			}).from(user).where(and(eq(user.status, 0), eq(user.isDel, 0))).all();
-		}
-
-		let deliverCount = 0;
-		for (const u of users) {
-			const acc = await orm(c).select({
-				accountId: account.accountId,
-				name: account.name
-			}).from(account).where(and(eq(account.userId, u.userId), eq(account.isDel, 0))).orderBy(account.sort).limit(1).get();
-
-			if (acc) {
-				const res = await emailService.deliverGlobalEmailToUser(c, u.userId, acc.accountId, u.email, {
-					subject,
-					content,
-					text,
-					lang: params?.lang,
-					templates: normalizedTemplates || globalConfig.templates || null,
-					expireDays,
-					isStarred,
-					senderName: senderName || null
-				});
-				if (res) deliverCount++;
-			}
-		}
-
-		return {
-			success: true,
-			deliverCount,
-			totalUsers: users.length,
-			targetType,
-			targetRoleIds,
-			sendToNewUsers
-		};
+		const progress = await advanceBroadcast(c, op, async (id, current) => {
+			const mailbox = await accountService.selectActiveForUser(c, id, current.email);
+			if (mailbox) await emailService.deliverGlobalEmailToUser(c, id, mailbox.accountId, mailbox.email, current.config, false);
+		});
+		return { ...progress, targetType, targetRoleIds, sendToNewUsers, broadcastId: op.broadcast_id };
 	},
 
 	async websiteConfig(c) {
@@ -1134,18 +1083,10 @@ const settingService = {
 			allMailMode: settingRow.allMailMode ?? 0,
 			totp: settingRow.totp ?? 1,
 			forceTotp: settingRow.forceTotp ?? 0,
-			forwardEmail: settingRow.forwardEmail || '',
 			forwardStatus: settingRow.forwardStatus ?? 1,
-			welcomeSubject: settingRow.welcomeSubject || '',
-			welcomeExpireDays: settingRow.welcomeExpireDays ?? 7,
-			welcomeAutoSend: settingRow.welcomeAutoSend ?? 1,
-			welcomeLastBroadcast: settingRow.welcomeLastBroadcast || '',
-			welcomeTemplates: settingRow.welcomeTemplates || {},
-			welcomeLang: settingRow.welcomeLang || 'zh',
-			globalEmailConfig: settingRow.globalEmailConfig || {},
 			userTgForward: settingRow.userTgForward ?? 1,
-			userEmailForward: settingRow.userEmailForward ?? 1,
-			userApiSupport: settingRow.userApiSupport ?? 1,
+			userEmailForward: personalForwardingAvailable(c.env) ? (settingRow.userEmailForward ?? 1) : 0,
+			...personalTokenPolicy(c.env, settingRow),
 			aiEnabled: settingRow.aiEnabled ?? 1,
 			aiModel: settingRow.aiModel || '',
 			aiModels: settingRow.aiModels || settingRow.aiModel || '',
@@ -1175,6 +1116,9 @@ const settingService = {
 				contentProcessing: normalizeContentProcessing(settingRow.contentProcessing, c),
 				oauthLoginEnabled: settingRow.oauthLoginEnabled ?? 0,
 			oauthProviders: (() => {
+				if (Number(settingRow.oauthLoginEnabled) !== 1) {
+					return {};
+				}
 				let p = settingRow.oauthProviders;
 				if (typeof p === 'string') {
 					try { p = JSON.parse(p); } catch (_) { p = {}; }
@@ -1182,13 +1126,18 @@ const settingService = {
 					p = {};
 				}
 				const sanitized = {};
+				const envName = String(c?.env?.ENVIRONMENT || '').toLowerCase();
+				const productionLike = ['staging', 'production', 'prod'].includes(envName);
 				for (const [k, v] of Object.entries(p)) {
 					if (v && typeof v === 'object') {
+						const isEnabled = v.enabled === 1 || v.enabled === true;
+						if (!isEnabled) continue;
 						const hasClientId = Boolean(v.clientId && typeof v.clientId === 'string' && v.clientId.trim() !== '');
 						const hasClientSecret = Boolean(v.clientSecret && typeof v.clientSecret === 'string' && v.clientSecret.trim() !== '');
-						const isConfigured = (hasClientId && hasClientSecret) ? 1 : 0;
+						const unmigratedSecret = productionLike && hasClientSecret && !String(v.clientSecret).startsWith('v1:');
+						const isConfigured = (hasClientId && hasClientSecret && !unmigratedSecret) ? 1 : 0;
 						sanitized[k] = {
-							enabled: (v.enabled === 1 || v.enabled === true) ? 1 : 0,
+							enabled: 1,
 							configured: isConfigured,
 							clientId: v.clientId || '',
 							name: v.name || '',

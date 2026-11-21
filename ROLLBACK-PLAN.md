@@ -1,98 +1,83 @@
-# Epocanvas Mail - 部署失败与安全事件应急回滚方案 (ROLLBACK-PLAN.md)
+# EpoMail 版本回退与数据恢复
 
-> **文档适用范围**：Cloudflare 生产环境（`mail.epocanvas.com` 及多租户域名）
-> **应对场景**：
-> 1. 新版本发布失败、静态资源加载异常或核心业务接口 500 熔断。
-> 2. 突发零日漏洞利用、重大越权攻击或系统密钥泄漏安全事件。
-> 3. D1 数据库写入冲突或数据异常损坏。
+生产与 Staging 共用本规程。由当班发布负责人记录目标账户、Worker、当前部署 ID、候选 SHA、归档摘要，以及演练通过的回退 Version ID。数据负责人保管恢复点和存储清单。操作中的原始日志、备份与收件信息保存在受限位置，发布记录只引用脱敏摘要。
 
----
+## 锁定本次操作的环境
 
-## 1. Cloudflare Workers 秒级极速回滚 (Instant Code Rollback)
+从候选仓库启动 Bash。将 `EPOMAIL_ENV` 设为发布单上的 `staging` 或 `production`。生产使用配置顶层，Staging 使用命名环境。选定账户与制品后，在同一 shell 执行后续步骤。只读查询失败或返回的 Worker、部署、版本与发布单不符时，先纠正目标。
 
-Cloudflare Workers 具备全量版本快照机制，每次 `wrangler deploy` 均会生成全局唯一的 Version ID。
-
-### 1.1 查询历史部署版本
 ```bash
-cd mail-worker
-# 查询最近部署成功的稳定版本列表与 Version ID
-npx wrangler deployments list
+set -euo pipefail
+repo=$(git rev-parse --show-toplevel)
+worker=(pnpm --dir "$repo/mail-worker" exec wrangler)
+target=(--config "$repo/mail-worker/wrangler.toml")
+case "${EPOMAIL_ENV:?Select staging or production}" in
+  staging) target+=(--env staging) ;;
+  production) ;;
+  *) echo 'Unknown environment' >&2; exit 2 ;;
+esac
+"${worker[@]}" deployments status "${target[@]}" --json
+"${worker[@]}" versions view "${ROLLBACK_VERSION_ID:?Set the rehearsed Worker Version ID}" "${target[@]}" --json
 ```
 
-### 1.2 执行一键秒级版本回滚
+核对该版本在当前数据库结构、登录与邮件加密密钥下通过过演练，前端与登录资源也可以加载。历史版本 ID 与公测制品的 Git SHA 各有不同用途。
+
+## 发布前建立恢复点
+
+1. 在批准的窗口暂停写入或排队新入站，记录切点、积压任务、附件及已送交供应商的邮件。按有效配置列出所有物理 D1 UUID、KV 命名空间和实际使用的 R2、S3 或 B2 桶。多个绑定指向相同 UUID 时只备份一次。多个物理库逐个导出时需保持共同写入边界，或记录可供对账的变更流水。
+2. 在仓库外已挂载的私有加密备份卷上准备 `BACKUP_ROOT`。下面的命令创建新的 0700 目录。从发布单提供一个实际物理库的绑定名（例如 `MAIL_DB`）和 UUID 后执行导出。对于不同 UUID，依次用对应绑定和 UUID 运行第二个代码块，使用同一个 `backup` 目录。
+
 ```bash
-# 回滚至上一个稳定版本（例如：625c1291-386f-4ff9-8d8c-465ca1422f4f）
-npx wrangler rollback <STABLE_VERSION_ID> --message "Emergency Rollback: Production Incident"
-```
-- **时延**：Cloudflare 全球边缘节点在 3-5 秒内完成流量热切换。
-- **静态资源保障**：历史版本的 Assets 静态资源在 Cloudflare 存储上具备不可变哈希（Immutable Content Hash），回滚代码后前端静态文件自动对齐，无白屏或脚本错位风险。
-
----
-
-## 2. D1 数据库时间点恢复与防灾方案 (D1 Point-in-Time Recovery)
-
-### 2.1 部署前强制备份 (Pre-Deployment Snapshot)
-在执行任何生产数据库升级或全量发布前，必须执行全量结构与数据快照：
-```bash
-# 导出当前生产数据库完整备份到本地归档
-cd mail-worker
-npx wrangler d1 export epomail --remote --output="./backups/d1-backup-$(date +%Y%m%d_%H%M%S).sql"
+umask 077
+backup=$(bash "$repo/scripts/create-recovery-dir.sh" "${BACKUP_ROOT:?Set the existing private backup volume}")
 ```
 
-### 2.2 生产数据库灾难恢复 (Disaster Recovery)
-若数据库因恶意攻击或异常写入发生严重逻辑损坏：
 ```bash
-# 从 Cloudflare D1 自动快照或本地备份执行恢复
-# 1. 恢复至指定备份快照文件
-npx wrangler d1 execute epomail --remote --file="./backups/d1-backup-STABLE.sql"
-
-# 2. 或利用 Cloudflare 控制台自带的时间点恢复 (Time Travel Restore) 恢复至故障前时刻
+: "${D1_BINDING:?Set the source binding}" "${SOURCE_D1_UUID:?Set the reviewed source UUID}"
+uuid_re='^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+[[ $SOURCE_D1_UUID =~ $uuid_re ]]
+actual=$("${worker[@]}" d1 info "$D1_BINDING" "${target[@]}" --json | jq -er '.uuid')
+[[ $actual == "$SOURCE_D1_UUID" ]]
+dump="$backup/$actual.sql"
+[[ ! -e $dump ]]
+"${worker[@]}" d1 export "$D1_BINDING" "${target[@]}" --remote --output "$dump"
+test -s "$dump"
+(cd "$backup" && sha256sum "$actual.sql" > "$actual.sql.sha256" && sha256sum -c "$actual.sql.sha256")
 ```
 
----
+3. 按实际后端保存 KV 数据与元数据、附件和原始邮件对象的版本清单及独立可恢复副本。记录恢复所需的密钥版本引用并确认可从凭据系统取回。将 D1 导出、各存储恢复点和摘要归档到受限备份库，按保留策略处置临时副本。只有隔离恢复演练通过后，该恢复点才能支持公测签署。
 
-## 3. 突发安全事件应急响应与止血方案 (Emergency Security Containment)
+## Worker 版本回退
 
-### 3.1 紧急切断外发 (Outbound Kill-Switch)
-若发生恶意发信爆破或垃圾邮件伪造事件，立即切断全站外发通道，阻断外部域名信誉受损：
+发生故障时先停止放量，在上游暂停外发和个人转发，保留已送达、发送中与状态未知的任务。获批回退后在上述已核验环境执行一次。执行完成后核对新 deployment ID、目标 Version ID 与实际流量，再通过受信 origin 核对 `/api/version`。用隔离账户验证登录、静态资源、附件读取、会话撤销及外发限制，并记录恢复耗时。
+
 ```bash
-# 临时关闭外发总开关 (无需重新打包代码)
-cd mail-worker
-npx wrangler deploy --var EMAIL_OUTBOUND_ENABLED:false
+"${worker[@]}" rollback "$ROLLBACK_VERSION_ID" "${target[@]}" --message "${ROLLBACK_REASON:?Set the incident or rehearsal reference}"
+"${worker[@]}" deployments status "${target[@]}" --json
 ```
 
-### 3.2 紧急密钥轮换 SOP (Secret Rotation Procedure)
-若发生机密泄漏疑虑（如开发人员误将凭据提交到外部，或员工离职安全交接）：
+## 数据损坏时恢复到隔离资源
 
-1. **轮换 `jwt_secret`（全网会话强制下线）**：
-   ```bash
-   npx wrangler secret put jwt_secret
-   # 输入高强度全新随机字符串（>= 32 字符）
-   ```
-   *影响*：所有已签发的用户登录 Token、附件能力签名、内部调度 Secret 瞬间失效，全网客户端强制重新登录。
-2. **轮换 `init_secret`（封死初始化端点）**：
-   ```bash
-   npx wrangler secret put init_secret
-   # 阻止任何使用泄露旧口令触发数据库修改的恶意请求
-   ```
-3. **轮换 `totp_enc_key` 与 `email_enc_key`**：
-   - ⚠️ **注意**：静态数据加密密钥轮换前，必须执行离线数据平滑重加密迁移工具；禁止在未重加密旧密文时直接覆写，否则会导致历史加密邮件无法解密。
+Worker 回退后 D1、KV 与对象存储仍保有原有状态。数据负责人按故障窗口记录待补写的收件、已发回执和用户变更。在独立的恢复配置中准备一个新建空库，使用单独的恢复绑定 `RECOVERY_DB`，逐个还原物理库。该配置为恢复环境的顶层配置，使用绝对路径。先核对恢复账户、目标数据库 ID 与所有在线数据库 ID；指定的恢复 UUID 必须由隔离资源清单提供。对每个源库使用上一步归档的 SQL 及摘要。
 
-### 3.3 攻击源 IP 阻断与 WAF 规则介入
-若受到特定恶意 IP 段针对 `/api/login` 或 `/api/register` 的高频攻击：
-1. 登录 Cloudflare 控制台 ➡️ **Security** ➡️ **WAF** ➡️ **Custom Rules**。
-2. 针对受攻击路径（如 `http.request.uri.path eq "/api/login"` 且 `ip.src in {恶意IP段}`）创建 `Block` 规则，由 Cloudflare 边缘节点直接掐断 TCP 连接，减轻 Worker CPU 负载。
+```bash
+: "${RECOVERY_CONFIG:?Set the absolute path to the isolated Wrangler config}"
+: "${RECOVERY_D1_UUID:?Set the approved empty recovery database UUID}"
+[[ $RECOVERY_CONFIG == /* && -f $RECOVERY_CONFIG ]]
+[[ $RECOVERY_D1_UUID =~ $uuid_re && $SOURCE_D1_UUID =~ $uuid_re ]]
+[[ $RECOVERY_D1_UUID != "$SOURCE_D1_UUID" && ! -e "$backup/$RECOVERY_D1_UUID.sql" ]]
+recovery=(--config "$RECOVERY_CONFIG")
+actual=$("${worker[@]}" d1 info RECOVERY_DB "${recovery[@]}" --json | jq -er '.uuid')
+[[ $actual == "$RECOVERY_D1_UUID" ]]
+tables=$("${worker[@]}" d1 execute RECOVERY_DB "${recovery[@]}" --remote --json \
+  --command "SELECT COUNT(*) AS n FROM sqlite_schema WHERE type IN ('table','view') AND name NOT GLOB 'sqlite_*' AND name NOT GLOB '_cf_*'" | jq -er '.[0].results[0].n')
+[[ $tables == 0 ]]
+(cd "$backup" && sha256sum -c "$SOURCE_D1_UUID.sql.sha256")
+"${worker[@]}" d1 execute RECOVERY_DB "${recovery[@]}" --remote --file "$backup/$SOURCE_D1_UUID.sql"
+```
 
----
+将恢复 Worker 的 KV 与对象绑定指向隔离副本。按同一恢复点核对表结构、邮件和附件数量，抽查可读性、附件摘要与密钥版本。用受控账号完成登录、收件、会话撤销和附件下载，逐项核销切点后的变更与供应商回执。存在差异时保留在用资源及故障现场。达到发布单的恢复目标后，由数据负责人复核并批准切换，保留恢复前快照和回切方法。将候选 SHA、制品摘要、时间窗、验证记录和复核人归入 `recovery` 证据。
 
-## 4. 故障现场取证与事后复盘规程 (Forensic & Post-Mortem SOP)
+## 事件处置
 
-1. **保留审计日志与快照**：
-   - 故障发生时，立即保留 `auth_security_operation`、`rate_limit_counter` 及 D1 审计日志表。
-   - 通过 Cloudflare Tail 实时捕获异常日志并留存：
-     ```bash
-     npx wrangler tail --format=json > incident-logs-$(date +%Y%m%d).json
-     ```
-2. **复盘会议与改进输出**：
-   - 事故处置完成后 24 小时内，安全团队与 Release Engineer 联合输出复盘报告（Post-Mortem）。
-   - 将根因分析、防御缺口转化为自动化对抗性测试用例，并在更新修复后重新执行 Frozen 门禁。
+凭据负责人通过受保护的凭据渠道轮换涉及的密钥，复核访问记录。JWT 与初始化、定时调度、静态数据加密的密钥应分别处理；静态加密密钥需保留可解密的旧版本，并在隔离数据上验证重加密与回退。SRE 可以在上游临时暂停异常路径、应用限流，并将脱敏审计证据及恢复时间归入事故记录。[公测候选运维与验收](doc/public-beta-release-operations.md) · [Cloudflare Worker 回退](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/) · [D1 导入与导出](https://developers.cloudflare.com/d1/best-practices/import-export-data/)

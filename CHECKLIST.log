@@ -1,3 +1,353 @@
+### 容量重验与派发授权（2026-11-21）
+
+- [x] 保留 f79e4a8 两轮容量的 1131/871 实测，按既有逐轮 960 门槛判第二轮失败。
+- [x] 完成发件邮箱归属、封禁、配额及邮件加解密热路径修改。完整开发提交和专项测试索引见 REPORTS.md 同日记录。
+- [x] 53ab 候选由原有仓库规则检出 5 处固定测试密钥；两份测试改用临时随机密钥，保留此前失败记录。
+- [ ] 冻结和公测放行按最终提交、官方归档及实际远端环境记录。
+
+### 邮件可读性、隔离验收与冻结复核（2026-11-21）
+
+- [x] `7ba703c2e054d4ad07818dd73d1cd1d663186239` 完整测试定位到六个欢迎模板不符合静态本地化资源契约。`3b47db2a2989fce314679b9cacdf7f5fcae8156b` 保持六语 Vue/Worker 的主题和正文输出逐字节不变，通过原四项国际化检查及四组故意引入错误的负例验证。
+- [x] 对 `02a228cca187cad48fe73d1801906e0d933bb739` 追加正文焦点截图，复现品牌框及 5 个功能插图栏为空。使用安全 HTML 修复 6 语新旧欢迎模板，修改为 `433c644d08cc6e94bf89749122e65429174a83f0`、`dbe8320f72d3b4327aacd978720e0872883dd95f`。补充 `e513ca7ff00be3f555f9bc1dae22ee59a46c4bfa` 的实拍和存量回归，真实邮箱通过 32/32。前一个候选的完整源码门禁为 Worker 811/811、Node 327/327。
+- [x] 在 `e89aec0eddbbd119edd934cca28610fa2943223f` 完成全套源码验收后，从真实 320 像素截图发现同色与过度缩放，并在旧归档验证新浏览器断言会失败。
+- [x] 核验欢迎、公告、普通宽表邮件、安全通知和受限长文书。修复与真实浏览器记录见 REPORTS.md，分别对应 `55503ea092ac43499f5561f11ac333ab2c2457dd`、`c1ad3bdcea15a5f1cc90b05bb5e5f5dbfaece32b`、`cbe2031b3699eefa1673552e511ea55797847a54`、`9d4fa89d65f398fb4675f6c561c57a7ad01bffac`。
+- [x] 将旧登录、多因素、系统邮件和管理动作切入隔离环境，复查旧验收会写到何处、哪些诊断会回显认证内容。提交 `6f68e3d5574a362e51595f71d7a541ebb67a6445`、`2be4941d00e661821ba6c7864b4ac7f938f9a583`、`28c1c08d309eac25782e2f2e7ca6533b56f124bd`、`e2e7ce7c06e1bb4321127b43ecea9927c15bccf2`。
+- [x] 精确限制旧 QA 的 Node 与浏览器出站。在合并后的 106 个旧入口上逐项做语法及错误目标拒绝或隔离包装核验，三个有明确测试数据的业务入口通过正向实测。工作提交为 `f35bd61eea21fa94f5f2fd3376f959a8999ca771`、`1a2ec15a6dc29c2cd346e74dac5305d77722affb`、`63d712a4987a9856bbf490b702870a868f6a24f3`。
+- [x] 对 7 份历史文档及 5 份旧测试按已登记指纹清理认证资料明文，代码提交 `c2ab2d9ec47a50e08e1b76e0b08e12379b924161`。发布候选从公开修复分支基线单次快进，保存完整修复后的树。以上为 Work 阶段验证使用的提交号。
+- [ ] 维护者在允许的发布分支取得实际候选同 SHA 的三项 push CI。开放公测前，归档受保护 Staging 的真实部署、收发、回滚、历史凭据处置和独立审批证据。
+
+### 公测候选的持久状态与冻结验收（2026-11-21）
+
+- [x] 按修前提交 `df6f52d64ac15a70c0c827e8c5e0aae1282eff6b` 运行源码、解包归档、分库和吞吐/长稳基线。
+- [x] 集成事务统计、配额和回执、会话/角色读取、清理分页与官方构建复现。代码提交 `e7112f6727ee36c6ea1c7abb97f65d7690770b10`，压测覆盖提交 `171f92e8d3b7df34bccc703b229d7fa838c6cffc`。
+- [x] 在隔离 Workerd/D1 运行发信、实时鉴权、欢迎与公告专项，另按 SQLite 查询计划核对活动预留和 UTF-8 正文用量索引。
+- [x] 在整合构建实测 8 个并发发送与 8 个同键重放，计数为 8/8。容量预试完成 1046/960。最终独立重建与重复验收按最终提交及制品 SHA-256 归档。
+- [x] `818f18dcf8f0fa4425804ae6b8a9ab93aa3b53dc` 的新旧 Worker 混写会话专项 15/15 通过。
+- [x] `9d2d31c6de7c39fea7ed104560a90c40cc6dd1d0` 管理广播在间断后补齐剩余受众，限制用户和已撤下活动由权威状态拦截。22/22 专项、4/4 迁移及 1/1 客户端重试通过。
+- 发布决策与证据按被测成品归档。请从交付记录读取最终 SHA 及摘要，再核对三项正式 CI 和受保护 Staging 的批准。[专项记录](REPORTS.md)
+
+- [x] 敏感操作后通过真实登录验证新会话，四项先前失败的断言已修复。两组测试提交为 `1cdf2068966123e72fb4783a6f3eaba3e8b20277` 与 `bc99b933887f96f8bacf2bb8140dcc4f4de507e6`。
+- [x] `c7aee7222d0df0c32d23fb7b6b6ed514c650c0eb` 保留失败重试所需的账号/别名归属，按当前归属清理登录计数。真实隐私服务 35/35 通过。
+
+### 移动收件箱状态栏与容量诊断（2026-11-21）
+
+- 界面修复 `2795009632726315bcae8394a3a13463e87413a6`（`2795009`）。在 375×812 的实拍收件箱中，底部隐私模式与审计状态换行后被固定高度裁掉。移动状态栏现在随内容增高，两个标签均保留全文；写信按钮位于正文内，随底栏高度避让。
+- 用原候选归档复测，新的浏览器断言在 375 像素宽度捕捉到两处裁切。重新构建前端和 Worker 后，全真栈 Chromium 通过 16/16，包含 320、375、390 像素宽度的文字边界和写信按钮检查。四项六语言检查通过，临时数据库随测试清理。
+- 压测诊断 `dfa6745f44be7b2c3944795b3ece7f8d8382b741`（`dfa6745`）。样本不足的运行保留各阶段短缺和独立的读取、登录延迟结果。原容量门槛与安全停止条件保留；Node 24 压测单元测试 11/11。
+
+### 邮件对账、额度与恢复交付（2026-11-21）
+
+- 外发对账 `80a1fda8c471a5ec6dad36072f5573cb6679e025`，日额度迁移与失败退款 `cd2d8ef16085451c11da08be33b0b46e3d6d71f7`。可靠性专项 54/54，额度边界及并发迁移专项 5/5。
+- 恢复目录与隔离流程 `6c0765ff8c51c39bfe26ea37516b8e0df48465a9`，其 CI 守护由 `4feba7bc15f46424cd913af22feccd8d5979feef` 接入。已完成本地隔离 D1 导出、恢复与校验。
+- 解包候选的隐私 CI `b4a3b9adb03c9fbbe5d7c5aec2d486c0c3230385`。实际构建、浏览器、负载和 Git 同步状态随该版本交付包记录。[复审结果](REPORTS.md) · [公测晋级](doc/release/PUBLIC-BETA-PROMOTION.md)
+
+### 公测晋级和 Staging 隔离复审（2026-11-21）
+
+- `57a9831af0d55087575add0bae2ebff9e8b6a36e`（`57a9831`）将晋级关联到受保护分支和获审查的构建，并在发布标签前复核运行与目标提交。活动部署和流量从 Cloudflare 的只读接口取得。
+- `33e2766c34dd793b20792cdfb551d98096417e2e`（`33e2766`）用 Wrangler 配置解析器检查源文件及解包后的 Staging 配置。配置允许关闭外发，也支持显式开启收件人白名单沙箱。
+- 三组专项测试 32/32，覆盖跳过检查、部署或标签发生变化、配置缺失和跨环境资源复用。受保护 Staging 的真实邮件、调度、恢复及独立审批须绑定实际发布候选。操作步骤见[公测制品放行](doc/release/PUBLIC-BETA-PROMOTION.md)。
+
+### 公测第二轮容量与幂等验收（2026-11-20）
+
+- 代码提交 `72428e0b0a95fb38afc4a9b334bb1d97333f3fb2`（`72428e0`）合并读取、保留逐请求撤销和原子配额，新增可复现的逐请求诊断。发送补充提交 `fb7ea0ef1c92cf52ed7897961e39bfa0ffaaf400`（`fb7ea0e`）消除新归档重复读取及新预留的预查。针对发送、可靠性、配额和本地投递的五组 D1 测试 167 项通过。
+- `a597c4e8afe1069130ab2d9a7228a1e59903728e`（`a597c4e`）关联被测归档并扩展容量门禁；`db365f61f38cca1598b0061748f86307d65e67a3`（`db365f6`）更新发布分支全历史扫描与精确误报回归。制品、最终完整测试及公网同步状态见同版本交付包。推广前需关闭历史凭据工单，完成两轮容量验收和受保护 Staging 的签署。
+- 下一步、验收责任与回滚条件见 [公测交付与本轮验收](doc/public-beta-capacity-and-handoff.md)。
+
+### 公测候选容量复核（2026-11-20）
+
+- 在基线 `4fafcfb1da4eb115394d601b660162e3df727303` 上复核新发件配额路径，消除同一次请求对同一用户邮件和附件用量的重复聚合。重放处理、数据库容量开关和 D1 原子预留继续独立校验。
+- 管理页面按六种语言逐项校验探针名称和状态（提交 `a89325f84e69b99579b0ca605a23392c312f25a6`）。容量报告随每份制品保存；受保护的公测门禁仍要求同制品的真实邮件、恢复、性能和审批证据。
+
+### 公测补充修复（2026-11-20）
+
+- 代码 `bde85248c71aec53cab65449675cc1b589d938b6`（`bde8524`），此前的归档入口校验修复为 `a36f055637e5f599fea4190961daef1bd91f31af`。
+- 原始邮件连续清理失败后进入人工处置队列，后台反复告警直至解决。管理员可查看失败数、待处置数及上次成功探测时间；未观测到的当前数量始终为未知。个人 Telegram 测试发送与管理员系统测试分别验证权限和用户同意。
+- 已验证 59 项真实本地 Worker / D1 清理与体检用例、65 项 Telegram 与相关权限回归，以及 16 项收发事务回归。运维步骤包含历史邮件分类统计、旧机器人令牌换钥、数据库迁移和定向重试。正式公测等待本候选的受保护验收记录。
+
+### 公测候选修复与验收交接（2026-11-20）
+
+- 基线 `4fafcfb1da4eb115394d601b660162e3df727303`，代码提交 `04144ffd9ea908e72543162ddcd87d339321b623`（`04144ff`）。
+- 已修复管理员删除、草稿持久化、发件幂等与收件人逐项恢复、可信通知标志、静态加密说明、原件清理、收件去重、按令牌的会话期限、范围导出和存储体检。个人邮件转发和 PAT 签发需部署显式启用。
+- 发布工作流按归档内 SHA 与摘要核对构建，正式及 beta 标签使用经独立审批的同一制品。迁移顺序、外发开关、真实邮箱与回滚操作见 `doc/public-beta-release-operations.md`。
+- 已在本地验证生产构建、隔离数据库冷启动、登录、站内收发、附件和迁移。公测放行需受保护 Staging 对同一候选完成真实收发、签名回调、长稳、回滚及独立签署。此条为开发记录。
+
+### F1–F3 修复同步、全吊销一致性加固与 CI 门禁清零 (2026-11-16)
+*   **关联提交 (Git Commit)**: `e861810a867f911456a7d759a220cfeb13254449` (Short: `e861810`；前置代码提交 `fe7373ced14ce60f0aa92634207d199ec6889a52`)
+*   **部署环境 (Deployment)**: 仅本地隔离 workerd / D1 / KV / Chromium；未部署 Staging / Production。
+*   **基线与来源**: `fix/public-beta-go-blockers-2026-11-07` / 远端基线 `89fbedf4fd1f49823a60ec3793cdb5cd5785aa07`。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 保留远端 D1 `user_session` / 并发 batch / 10 会话限制 / KV miss 自愈 / OAuth 脱敏与凭证迁移入口；新增 `v3_27DB` + `intDB` 持久哈希撤销表 `session_revocation`，阻止旧 KV/刷新恢复已登出单会话，并在 `persistSessionRecord` KV 写回时过滤已撤销令牌。
+    - [x] 补齐全吊销路径一致性：`userService.setType`（角色变更）同步递增 D1 `auth_version` 且不再吞掉 `revokeAllUserSessions` 异常；`removeSessionTokens` 同步写入 `session_revocation`。
+    - [x] BYO / 邮件迁移及回滚范围在 SQL WHERE (`LIMIT` 前) 生效；严格校验 ID、游标与上限，显式 `[]` 保持空范围，`dryRun` 零写入。
+    - [x] 迁移、检查与回滚支持主键 cursor 续跑（`hasMore`/`nextCursor`/`inspectionComplete`），`encryption-status` 分离邮件 `cursor` 与 `byoCursor`；局部页与含非目标域记录时禁止声明 `fullyMigrated` 或可退役旧密钥。
+    - [x] 修复远端 CI 两项阻塞：移除 `doc/release/FULL-AUDIT-AND-STRESS-2026-11-16.md` 第 3–4 行尾随空格解决 PR #2 `Diff hygiene` 失败；将 `d320ffb` 已改写为随机 UUID 的 2 条 `security-audit-fixes-2026-11-16.spec.js` 合成夹具指纹合规登记至 `.secret-scan-baseline.json` 解决 `secret-scan --history` 失败。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] `mail-worker` Vitest（Node `24.13.0` / pnpm `10.34.5`）：`57/57` 文件 `685/685` 通过 (`522.32s`，含 F1–F3 新增/扩展 14 项及 `setType`/`removeSessionTokens` 吊销回归)。
+    - [x] Node 明确范围 `270/270` (`6.81s`)、登录前端 `tsc` + `29/29`、双前端构建 + `wrangler deploy --dry-run` (438 assets)、i18n 四门禁、三包 `pnpm audit --prod --audit-level=high` (0 漏洞)、工作树密钥扫描 (1344 文件 0 命中)、**全历史密钥扫描 (5023 blobs 0 命中)**、`git diff --check f01db11...HEAD` 与暂存检查全绿。
+    - [x] 本地全真栈与 Chromium 回归：`fullstack-smoke` `22/22`、`privacy-fullstack` `11/11`、`fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13`、`limited-beta` 3m 压测 `1800` 请求 0 非预期错误 (`readP95=51ms`, `authP95=565.65ms`)，进程与临时目录清理完成。
+    - [ ] 未执行项：CI 固定 Node `24.14.0`（待本次 `push --all` 后远端 Actions 完成核对）、`>=15m` 容量长稳、真实云环境与邮件服务商验收未执行。
+*   **追溯材料**: `doc/FIX-SESSION-AND-MIGRATIONS-2026-11-16.md`、`doc/DEVELOPMENT-AUDIT-2026-11-16.md`、`doc/verification-current.json`。
+
+### EpoMail 顽固风险优化、D1+KV 并发会话闭环与生产历史密文全量迁移上线 (2026-11-16)
+*   **关联提交 (Git Commit)**: `c3c434ddc375d40fe95adcc11f5fde827293cd1e` (Short: `c3c434d`)
+*   **部署环境 (Deployment)**:
+    - `Cloudflare Staging (epomail-staging.epocanvas.workers.dev)` — Version ID: `e386552f-eb12-4939-b4f0-cf12f10315be` (已恢复 Access `302` 拦截)
+    - `Cloudflare Production (mail.epocanvas.com / mail.epomail.bond / mail.epomail.cyou)` — Version ID: `1aaa552b-fd34-4653-8ed6-3db0d2efb806` (Tag: `c3c434ddc375d40fe95adcc11f5fde827293cd1e`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 实现 D1 `user_session` 原子持久表 (`init.js` `v3_26DB` + `intDB`) + KV 边缘自愈机制 (`session-auth-store.js`)，覆盖所有会话验证 (`security.js` / `user-context.js` / `index.js` / `oauth-provider-service.js` / `public-service.js`) 与全部吊销路径。
+    - [x] 优化 `setting-service.js` `websiteConfig`，禁止向未启用 OAuth 或禁用提供商输出 `clientId` 等元数据，并清理生产 D1 历史废置 `github` 占位配置 (`"[REDACTED]"`)。
+    - [x] 新增 `oauth-app-service.js` 原地加密迁移、`setting-api.js` `/setting/security/oauth-apps/migrate` 及 `x-init-secret` 门禁 `POST /api/init/security-migrate`。
+    - [x] 物理清理 Staging 遗留 `p4-stress-6f5aa1a7` 角色与 794 条关联压测邮件，并在根 `package.json` 固定 `packageManager: pnpm@10.34.5`。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 全量自动化回归：`mail-worker` Vitest `55/55` 文件 `671/671` PASS (`509.55s`)、Node `208/208`、`temp_login_ui` `tsc` + `29/29`、`scripts/build-prod.mjs`、`fullstack-smoke` `22/22`、`fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13`、`i18n` 四件套、`secret-scan` (1,337 文件) 与 `wrangler deploy --dry-run` 全绿。
+    - [x] CF Staging 实网验证：`10` 并发同用户登录 `10/10` 生效、`16` 并发风暴 `16/16` HTTP 200 且稳定留存最新 `10` 令牌（`0` 次 503）、单端登出隔离 (`401`/`200`)、`websiteConfig` 脱敏为 `{}`，测后清理与 Access 复锁 `302`。
+    - [x] CF Production 上线与迁移：完成临时备份（测后物理销毁）、`POST /api/init/security-migrate` 原地将 `3/3 oauth_app` 加密为 `v1:` (`plain_apps=0`) 与 **`135/135` 历史邮件迁移至 `email_enc_key` (`unmigrated_emails=0`, `undecryptableRows=0`)**；三域名 `/api/version` 对齐、`verify-production-readiness` 通过、`c=8 n=40` 突发只读 `40/40` 200、`Chromium 375px` `0` 溢出、D1 (`users=123, emails=201, rl_rows=0`) 零损零残留。
+
+### Epocanvas Mail 深度安全审计修复、CF Staging 压测验收与 Production 正式部署上线 (2026-11-16)
+*   **关联提交 (Git Commit)**: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0` (Short: `d320ffb`)
+*   **部署环境 (Deployment)**:
+    - `Cloudflare Staging (epomail-staging.epocanvas.workers.dev)` — Version IDs: `62912e7c-1593-4cc6-95a4-de64e1694096` / `371e907c-c853-44f9-855b-c81c36c8aef2` (已恢复 Access 拦截，匿名返回 `302`)
+    - `Cloudflare Production (mail.epocanvas.com / mail.epomail.bond / mail.epomail.cyou)` — Version ID: `a0408c1a-0234-4b1a-8dd9-ca805ab59767` (Tag: `d320ffb8b5718a24faa705a7a12b9a29dfbd62a0`)
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 修复 `login-service.js` 未知/已删账号 PBKDF2 缺省 `c.env` 触发 Free Plan 10ms CPU 超限 (`503 1102`) 缺陷，并将 KV 并发会话持久化升级为写前预读合并 + 6 次指数抖动退避。
+    - [x] 新增 `session-auth-store.js` (`mergeSessionRecords`, `updateSessionUserFields`, `removeSessionTokens`) 统一替换 `email-service.js`、`user-service.js`、`oauth-identity-service.js` 原始覆写逻辑与 7 天 TTL 误降级缺陷。
+    - [x] 修复 `user-service.js` `uploadImage` 未校验 `checkQuotaAvailable().allowed` 导致的存储配额绕过（返回 `413 storage_quota_exceeded`）。
+    - [x] 收紧 `oauth-provider-service.js` PKCE `id_token` 签名密钥校验与解密 fail-closed，并为 `oauth-app-service.js` `ensureTables` 密钥轮换补齐加密入库。
+    - [x] 为 `account-service.js` 补充不存在/越权 `404/403` 防护，全 API 统一采用 `readJsonObject(c)` 返回 `400 INVALID_JSON`，修复 `restricted-notice.vue` `useRouter` 导入及 DOMPurify 标签策略。
+    - [x] 生产环境运维闭环：预先导出全量 D1 备份后，原子升级 9 项核心凭证为 `secret_text`（精确保留 `totp_enc_key` 兼容 135 封历史密文与 1 名 2FA 用户，旋转 6 位明文弱 `jwt_secret`），注入 `PBKDF2_WRITER_ITERATIONS="100000"`、补充 `docs.epocanvas.com/epomail/mail/*` (`5.4`) 法务披露并执行 `/api/init` 幂等迁移。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地依赖与双前端构建：`corepack pnpm@10.34.5` 恢复 `deepmerge` 补丁，执行 `scripts/build-prod.mjs` 零报错产出，`temp_login_ui` `tsc` + `29/29` 全绿。
+    - [x] 本地自动化测试矩阵：`mail-worker` Vitest `55/55` 文件 `668/668` (`505.13s`) + 补丁恢复后安全定向复测 + `wrangler deploy --dry-run` (438 assets)、Node 套件 `208/208`、`fullstack-smoke` `22/22`、`fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13`、`i18n` 四件套与 `secret-scan` (1,335 文件) 全绿。
+    - [x] Cloudflare Staging 实网验证：端到端功能 `16/16`、Chromium 桌面/移动端（`375px` 0 溢出）、`16c` 突发 `159/160` 200、`12c` PBKDF2 并发登录 `0/12` `503`、`60s` 长稳 `226/226` HTTP 200，测后 D1 `leftovers=0` 并收口 Access。
+    - [x] Cloudflare Production 实网验证：三域名 `/api/version` 200 对齐 `d320ffb`、`verify-production-readiness` `11/11 PASS`、`check-privacy-readiness` `ready`、Fail-Closed 端点与 `INVALID_JSON` 拦截正常、只读基线/突发/30s 长稳共 `256/256` HTTP 200（`0` 错误/`1102`）、Chromium 桌面/移动渲染正常；本地备份、临时报告及 2 条探针 `rate_limit_counter` 已物理清除（`rate_limit_rows=0`, D1 `users=123, emails=201`）。
+
+### 公测安全加固补丁同步与本机复验 (2026-11-15)
+*   **关联提交 (Git Commit)**: `18d633fa066ca67efd198822c9297f67a1355d93` (Short: `18d633f`，基线 `0a213435134f5ef2b2f8cabdf569117007f9ceae`；补丁 `epomail-public-beta-hardening.patch` SHA256 `847f244c4f29d616c5bafaeaac514906cf2edcda8aa06c3183540a9e71b0b85e`)
+*   **部署环境 (Deployment)**: `本地隔离 Miniflare/local-stack (127.0.0.1)`；未登录任何外部账户，零接触 `mail.epocanvas.com` 与生产 D1/KV/R2
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 完整同步 24 个既定加固补丁文件与本机实测压力报告（`backend-stress-limited-beta-0a21343.json`、`backend-stress-capacity-0a21343.json`）：覆盖 OAuth Provider 密钥 AES-GCM 加密与缺失/明文配置 fail-closed、OAuth 畸形 JSON 返回 400 与错误净化、Session 并发刷新/登出收敛、OAuth 注册回滚清理、默认角色唯一性、管理员账号同步失败阻断、`production` 外发收件人白名单及审计证据。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] `npx --yes pnpm@10.34.5 install --frozen-lockfile`：通过
+    - [x] `mail-worker` Vitest (`CI=true ./node_modules/.bin/vitest run --maxWorkers=1`)：`54/54` 文件、`659/659` 用例 PASS
+    - [x] 根目录 Node 测试 (`node --test tests/*.test.mjs`)：`208/208` PASS
+    - [x] `temp_login_ui`：`tsc --noEmit` PASS、`29/29` 用例 PASS、`vite build` + `copy-login-dist.mjs` PASS
+    - [x] `mail-vue`：`vite build --mode release` + `copy-login-dist.mjs` PASS
+    - [x] `tests/fullstack-smoke.mjs`：`22/22` PASS（自动清理完成）
+    - [x] 安全与多语言静态门禁：`secret-scan.mjs`（1335 文件零密钥告警）、`i18n-symmetry.mjs`、`i18n-audit.mjs`、`i18n-hardcoded.mjs`、`i18n-auth-locale.mjs` 全部 PASS
+    - [x] `scripts/verify-production-readiness.mjs --json`：提交后干净工作树 `9/9 PASS`（`liveProbes: NOT_RUN`）
+    - [x] 本机 `limited-beta` 压测（`reports/final/backend-stress-limited-beta-0a21343.json`，SHA256 `33263f4f489966200b5a3d45079925e9a9c515bc95de1601f174a9d678c8c36f`）：**PASS**（7 阶段完成、1800 请求 + 5 登录、0 非预期 4xx/5xx/超时、读 P95 `50.41ms`、登录 P95 `587.8ms`）
+    - [ ] 本机 `capacity` 压测（`reports/final/backend-stress-capacity-0a21343.json`，SHA256 `0744324af060fdaf86cc5d5330b53a3a3d0daaeb271d8dc9201f536a6ed9a36a`）：**FAIL**（`ramp-32` 完成 `525/1280`，低于样本下限 `960`，0 非预期 4xx/5xx/超时，已原样保留失败证据）
+    - [ ] 公测准入裁决：**NO-GO**（未完成真实 Staging 外部集成、容量、回滚、告警等外部门禁前不得宣称公测 GO）
+
+### 本机公测候选终审（2026-11-15）
+*   **候选提交**: `99cbf588abfd4b6a7777493d374d753aaacb9021` (`fix/public-beta-local-hardening-2026-11-15`)
+*   **范围**: 仅本机隔离 D1/KV 与 127.0.0.1 local-stack；未登录外部账户、未部署生产、未接触真实用户数据。
+*   **代码与功能验收**: Worker Vitest `54/54` 文件、`659/659` 用例；根目录 Node `208/208`；temp_login_ui `tsc --noEmit` + `29/29`；fullstack-smoke `22/22`；双前端构建、secret scan、i18n 四门禁全部通过。
+*   **本机压力证据**: `reports/final/backend-stress-limited-beta-84ca0bb.json` 通过（3 分钟 soak、1802 请求 + 5 次登录、0 非预期 4xx/5xx、0 超时，读 P95 108.45ms，认证 P95 924.48ms）；`reports/final/backend-stress-capacity-99cbf58.json` 保留失败（ramp-32 `764/1280`，下限 `960`，0 非预期 4xx/5xx/超时）。
+*   **发布裁决**: 本机候选验证完成，但公测仍 `NO-GO / 待外部验收`；必须在隔离 Staging 完成 Access 放行、真实容量与长稳、provider/外发/Webhook/R2、备份恢复、回滚和告警值班证据后复评。详见 `doc/release/PUBLIC-BETA-LOCAL-AUDIT-2026-11-15.md`。
+
+### OAuth Provider 密钥加密与启用 Fail-Closed (2026-11-15)
+*   **后续加固提交**: `84509560298620c04ea2a69ea5b19997b9e41e55`, `73e1a335157773e6f626c36641bba951c80f7bc0`, `0e79d316d0961a0fd2989a97f742d637529e7314`（privateKey migration gate、settings 持久化断言、缺失密钥 503 fail-closed）
+*   **关联提交 (Git Commit)**: `4dea05e5d0739039ca4f8f5a2389fa5f87d3edc9` (Short: `4dea05e`)
+*   **部署环境 (Deployment)**: 仅本地源码与隔离单元验证，未部署、未访问生产或外部账户
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] `setting.oauthProviders` 的 `clientSecret`/`privateKey` 在配置密钥可用时使用独立 OAuth AES-GCM 根密钥加密，并以 provider 与字段名绑定 AAD。
+    - [x] staging/production 启用已存明文 provider secret 时返回 `503 oauth_provider_secret_migration_required`，不允许绕过，公开 provider 列表同步隐藏未迁移配置。
+    - [x] 保持 OAuth 全局与 provider 默认关闭，保留本地/测试旧数据 dual-read，供迁移前读取但不在生产启用。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] `node --check`：OAuth service、setting service、加密工具及两个测试文件通过。
+    - [x] Web Crypto 自测：provider secret 加密/解密通过，跨 provider/字段 AAD 替换被拒绝。
+    - [ ] Vitest 定向套件：因当前工作树依赖目录需重新安装且 pnpm frozen lockfile 的 patchedDependencies 配置不一致，本轮未能执行；交付前必须在完整依赖环境重跑并纳入全量矩阵。
+
+---
+
+### EpoMail P0 安全加固交接合入、Turnstile CSP 修复与全量复验 (2026-11-15)
+*   **关联提交 (Git Commit)**: `e49a987ab63a9d76346538225827f94fc0b39a55` (Short: `e49a987`，在原样应用补丁提交 `d2b813b967e52efb6a6b7e3685714f816c9ff7cb` 之上修复 Turnstile CSP；基线 `36871d180f4739092ecabbdc469a907ddc71a541`；补丁 `epomail-p0-hardening-dd11b37.patch` SHA256: `e28855f8554fa9529519828bf92d0f00117960d8ca15a54abba94aeb4454b9ed`)
+*   **部署环境 (Deployment)**: 本地隔离 Miniflare D1/KV 与本地 Chrome 浏览器回归；生产环境 (`mail.epocanvas.com`) 零接触；Cloudflare Staging 未在本机重新部署
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 原样应用 `epomail-p0-hardening-dd11b37.patch`（`d2b813b`）：WebAuthn 计数器冲突返回 `409 passkey_counter_conflict`、验签失败返回 `403 passkey_verification_failed`、登录/注册/TOTP 与全局 Hono JSON 解析异常返回 `400 INVALID_JSON`、Passkey `DELETE` 兼容空请求体、`email-key/migrate` 传递 `dryRun`、`staging/production` 启用 HTTPS 308 重定向与安全响应头、保留 `doc/release/P0-HARDENING-2026-11-15.md` 与 `reports/p0/*.json`（其中 `capacity.json` 保持 `FAIL`）。
+    - [x] 修复 Chrome 实测暴露的 Turnstile CSP 阻塞（`e49a987`）：`d2b813b` 在运行 `fullstack-browser-e2e` 时因默认 `Content-Security-Policy` 未放行 `https://challenges.cloudflare.com` 导致 `mail-vue/index.html` 加载 Turnstile 报错（10/11 通过，1 项失败）；已在 `mail-worker/src/index.js` 将 `https://challenges.cloudflare.com` 加入 `script-src` 与 `frame-src 'self' https://challenges.cloudflare.com`，并在 `mail-worker/test/index.spec.js` 补充断言。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 依赖锁文件核验：仓库根、`mail-worker`、`mail-vue`、`temp_login_ui` 四包 `npx --yes pnpm@10.34.5 install --frozen-lockfile` 全部通过。
+    - [x] 构建与前端单测：`temp_login_ui` `tsc --noEmit` + `29/29` 单测 + `vite build`、`mail-vue` `vite build --mode release` + `copy-login-dist.mjs` 全部通过。
+    - [x] Worker 与 Node 回归（基于 `e49a987`）：定向 P0 Vitest `4/4` 文件 `41/41` 通过；`mail-worker` 全量 Vitest `51/51` 文件 `645/645` 通过（`462.30s`）；`node --test tests/*.test.mjs tests/helpers/*.test.mjs` `237/237` 通过。
+    - [x] 本地全真栈与浏览器 E2E（基于 `e49a987`）：`fullstack-smoke` `22/22`、`privacy-fullstack` `11/11`、`fullstack-browser-e2e` `11/11`、`oauth-bind-login-ui-e2e` `13/13` 全部通过且自动清理零残留。
+    - [x] 静态门禁与配置安全：`verify-production-readiness.mjs --json` `8` passed / `0` failed (`liveProbes=NOT_RUN`)、`verify-staging-config.mjs` 通过、`secret-scan.mjs`（工作树 `1326` 文件 + 历史 `4925` blobs）`0` 命中、六语 `i18n` 四件套全绿、`git diff --check` 无空白/冲突错误。
+    - [ ] `BLOCKED / 尚待人工及线上 Staging 门禁`：受本环境出站 DNS 解析超时影响，隔离 Staging 未完成重部署与 `/api/version` 在线核验；仍需在隔离 Staging 完成部署校验、Access 授权放行、公网 HTTP 全梯度压测（含 Staging `capacity`、`>=15m` soak、provider-failure、backup/restore、rollback）及历史凭据轮换后方可评估受控公测。
+
+---
+
+### EpoMail 公测前安全收尾、隔离 Staging 验收、压测恢复与准入终审 (2026-11-15)
+*   **关联提交 (Git Commit)**: `e75305491edf9300475ab45ddc8cc2450c48addf` (Short: `e753054`，基于 `6c0c01058a39062569241300edf28b91e125c668`)
+*   **部署环境 (Deployment)**: 本地隔离 Miniflare D1/KV + Cloudflare Staging (`https://epomail-staging.epocanvas.workers.dev`，当前线上版本 `598171bf-042a-4ffb-937c-b90f4ca82ab4` @ `6c0c010`)；生产环境零接触、零外部账号登录
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 修复 `mail-worker/src/utils/email-crypto-utils.js` 回滚密钥环顺序与 `email-key-migration-service.js` 可空 `code` CAS，并完善惰性重加密。
+    - [x] 全量迁移 `resend-api`, `email-service`, `login-service`, `oauth-provider-service`, `oauth-service`, `user-service` 至 `safeLogger` 与 `AbortSignal.timeout(15000)`。
+    - [x] 收紧 `user-service.js` `profileImageUrl`/渐变校验并修复 `mail-vue/src/views/profile/index.vue` 安全计算头像样式。
+    - [x] 新增 `master` RBAC 保护的 `/setting/security/*` 加密状态、迁移与确认回滚 API，补充 `security-hardening-p3.spec.js` (11/11) 与 `deepmerge-hardening.test.mjs` (6/6) 并清洗触发 `gitleaks` 的测试字面量。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 依赖与供应链：`4` 包 `pnpm@10.34.5 install --frozen-lockfile` 零锁文件差异；`npm` 上游 `audit --prod` 仅 `mail-worker` 报告 1 低危传递 `deepmerge@4.3.1` (`CVE-2026-93753`，本地补丁拦截且 `6/6` 测试通过)。
+    - [x] 代码/前端/浏览器全量：`mail-worker` Vitest `49/49` 文件 `634/634` (`448.68s`)；`temp_login_ui` `tsc` + `29/29` + build；`mail-vue` release build + SHA256 记录；Node 回归 `237/237`；`fullstack-smoke` `22/22`、`fullstack-browser-e2e` `11/11`、`privacy-fullstack` `11/11`、`oauth-bind-login-ui-e2e` `13/13`。
+    - [x] 静态门禁与预检：`scan-staged-secrets` (`gitleaks --staged`) 0 命中、`secret-scan` (1320 文件 / 4899 历史 blobs) 0 未豁免、六语 `i18n` 四件套全过、`verify-production-readiness.mjs`（提交前 7/8，文档提交后于干净 `HEAD` 执行终验）。
+    - [x] 隔离 Staging 与容灾演练：只读/Fail-Closed 探针（401/403/503）正常；D1 `epomail-staging-db` 备份 (`390,011 bytes`, SHA256 `9c45048...`) 恢复至临时 SQLite 校验 `ok` 并清理；记录版本回滚演练 `598171bf -> a1a24b3f -> 598171bf`。
+    - [x] 压力与长稳恢复：`limited-beta --soak=3m` (`1,796+5` req, `rc=0`)、48c 突发 (`240/240`)、D1/KV 锁争用、幂等重放 (`deliveredCopies=1`)、`SIGKILL` 重启恢复与上游异常收敛 (`0` 密钥泄漏) 通过；`capacity` (`ramp-16` 464/640 `rc=1`) 与 `>15m` 长稳（`9,150` req, `0 5xx/timeout`, `P95=30.89ms`, 因 `scope=login 30/900s` 触发 34x429 致严格脚本 `rc=1`）已完整保留失败日志。
+    - [ ] `BLOCKED / 需人工执行`：Staging 重部署对齐、补齐 5 项 Secrets、配置 `legalNotice`/`crons`、修复双默认角色、有账号态全链路与外部 OAuth/Resend/Webhook/BYO/Cron 验收、历史凭据/旧会话轮换及 5xx/429/Cron 告警/值班体制。
+
+---
+
+### 公测前全量漏洞审计与修复 (2026-11-14)
+*   **关联提交 (Git Commit)**: `fb04eeb42a5ec527c78a302bee45dcd5891ffbc4` (Short: `fb04eeb`)
+*   **测试契约提交 (Test Contract Commit)**: `1f24e67` (Short: `1f24e67`)
+*   **追加安全提交 (Security Hardening Commit)**: `f52867b5d14878f94d00d0560fb1c636ea467fd0` (Short: `f52867b`)
+*   **差异卫生提交 (Diff Hygiene Commit)**: `f46b20bbce563c7fe4766b4c76de553657217232` (Short: `f46b20b`)
+*   **供应链与日志提交 (Supply Chain and Logging Commit)**: `e632fcd` (Short: `e632fcd`)
+*   **依赖回归提交 (Dependency Regression Commit)**: `b994976` (Short: `b994976`)
+*   **部署环境 (Deployment)**: 本地隔离 D1/KV 与静态构建，未触碰生产和外部账户
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 账号失败计数绑定来源、D1 一次性兑换码、申诉原子限流、10 会话上限、域名精确匹配。
+    - [x] 备份码打印、邮件打印、注册旧令牌、壁纸/封面 URL 注入修复。
+    - [x] Hono/ECharts 安全升级、固定 pnpm workspace 配置、fix/** CI 门禁和临时目录稳定性修复。
+    - [x] 修复四个发布文档 EOF 空白、Telegram 上游错误正文日志泄露、deepmerge 原型污染防护。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Worker 定向安全套件 103/103。
+    - [x] Worker 单元测试 43/43。
+    - [x] deepmerge 原型污染回归 3/3，pnpm frozen lockfile 安装通过。
+    - [x] Worker 全量 Vitest 48 个文件 / 623/623。
+    - [x] 登录 UI typecheck 与测试 29/29。
+    - [x] 隐私与 URL 注入回归 31/31。
+    - [x] 全栈 HTTP 冒烟 22/22，测试数据和进程清理完成。
+    - [x] i18n 门禁、密钥扫描、git diff --check 通过。
+    - [x] 固定 pnpm 10.34.5 构建生成主站、登录应用和 Service Worker。
+    - [x] 生产预检 8/8 通过，候选提交工作树清洁。
+    - [ ] 浏览器 E2E 需在可运行 Chromium 的 CI 环境复验。
+    - [ ] 真实 Staging 外部发信、Webhook、OAuth 与历史凭据轮换需运维阶段完成。
+
+### EpoMail 存量 user.update_time 迁移兼容性修复与定向回归 (2026-11-14)
+*   **关联提交 (Git Commit)**: `a3f5e6b115c7b942af5a554d5b447b05e07bd7b7` (Short: `a3f5e6b`，基于 `967e01d7`)
+*   **根因与变更 (Root Cause & Fix)**:
+    - [x] 根因定位：在隔离旧库升级与回滚兼容演练中发现，`mail-worker/src/init/init.js` 中 `v3_14DB` 对缺少 `update_time` 的旧 `user` 表执行 `ALTER TABLE user ADD COLUMN update_time DATETIME DEFAULT CURRENT_TIMESTAMP` 会触发 SQLite `Cannot add a column with non-constant default` 报错并被异常捕获跳过，进而导致后续主站长/演示账号播种与更新语句因缺列报错（`table user has no column named update_time`）。
+    - [x] 迁移修复：`mail-worker/src/init/init.js` 改用幂等辅助函数 `addMissingColumns` 执行 `ALTER TABLE user ADD COLUMN update_time DATETIME;` 并在缺值行回填 `COALESCE(create_time, datetime('now'))`，同步消除吞错隐患；在 `mail-worker/test/beta-migrations.spec.js` 新增存量旧表 `user.update_time` 升级、回填及重复迁移幂等用例。
+    - [x] 定向回归验证：隔离 SQLite 旧库迁移/失败重试/重复升级/`8e65f36` 回滚兼容与 Staging D1 快照恢复 4 项场景全部通过；Worker 迁移专项 `init-visitor-security.spec.js` + `beta-migrations.spec.js` 2 文件 12/12 通过。
+
+---
+
+### EpoMail 压测工具环回代理 503 根因修复与接手复验 (2026-11-14)
+*   **关联提交 (Git Commit)**: `9033982f150673b33a0f8c51538bbf6ec5bdb6e4` (Short: `9033982`，基于交接候选 `8efec93d`)
+*   **根因与变更 (Root Cause & Fix)**:
+    - [x] 根因定位：通过 `ProxyWorker.js` 异常插桩与 `workerd` keep-alive 探测确认，Wrangler `ProxyWorker` 到 `UserWorker` 的环回 HTTP 连接池在并发重叠请求（`send-replay` 跨 125ms 调度窗口使 `send-external-disabled` 抽取次级空闲连接）命中 Miniflare 约 5,000ms 服务端空闲断开，抛出 `"Error: Network connection lost."`；而 Wrangler `4.90.0` `ProxyWorker.js` 因 `urlFromParts` 缺失路径比对将其误判为 Worker 重启并返回 503。
+    - [x] 测试隔离层修复：新增 `tests/helpers/local-stack-runtime.mjs` 并在 `tests/helpers/local-stack.mjs` 中通过 `unstable_DevEnv` 轻量化 `proxyFactory` 直连校验后的 `127.0.0.1` Miniflare UserWorker 监听端口，完整保留子进程组隔离、环境变量过滤与临时目录物理清理。
+    - [x] 定向回归验证：`local-stack` + `load-runner` 单元测试 29/29、`fullstack-smoke` 22/22、`privacy-fullstack` 11/11、Chromium `fullstack-browser-e2e` 11/11、Chromium `oauth-bind-login-ui-e2e` 13/13 及 `backend-stress --profile=limited-beta --soak=3m`（1,801 请求、0 异常、读 P95 36.63ms、认证 P95 574.77ms）全部通过。
+
+---
+
+### EpoMail 公测阻断修复和本地验证 (2026-11-13)
+*   **关联提交 (Git Commit)**: `304e15fab459ba3fc26c825a00c1d6f052083f66` (Short: `304e15f`)
+*   **验证环境**: 本地隔离 Worker、D1/KV；GitHub 和 Staging 仅匿名读取。
+*   **变更**: 统一外发与原生转发门禁、六语发信错误、按环境预检、Worker 版本识别、浏览器 CI、候选包与独立压测、证据校验。
+*   **本地验证**:
+    - [x] Worker 全量回归 48 文件 / 618 项通过；全栈 HTTP 冒烟 13/13；登录单测 29/29。
+    - [x] 构建、生产/Staging dry-run、候选包无自定义构建钩子 dry-run；本地生产预检 8/8。
+    - [x] 本地 3 分钟负载测试 7 阶段 / 1,801 个操作样本通过，临时进程与状态清理已核验。
+    - [x] 六语、候选证据回归 13/13、本地内置凭据扫描通过。
+    - [ ] 浏览器回归待 CI。当前容器 Chromium 下载失败，系统浏览器启动时套接字被拒绝。
+    - [ ] 新候选的远端 CI、部署版本确认、邮件真实收发、回执、定时、迁移及恢复实测。
+*   **裁决**: `BLOCK`，后续按 [公测执行计划](doc/release/PUBLIC-BETA-EXECUTION-PLAN.md) 逐项验收。
+
+---
+
+### Epomail 最终根因治理、全量自动化回归与发布就绪报告归档 (2026-11-07)
+*   **关联 PR (Pull Request)**: PR #2 (`fix/public-beta-go-blockers-2026-11-07` ➡️ `release/2026-10-31`)
+*   **关联提交 (Git Commit)**: `0c8d3fee6d3b479576f4a977f70a4f3a9c86816f` (Short: `0c8d3fe`)
+*   **部署环境 (Deployment)**: `本地全真栈 / GitHub Actions CI (生产 625c1291 零触碰，Staging 待显式授权)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 归档发布就绪终审报告：新增 doc/release/EPOMAIL-FULL-GO-RELEASE-READINESS-2026-11-07.md，详细记录 Release Identity 矩阵、真实根因分析、代码改动清单、Phase C 后端安全复核、自动化测试全集、GitHub Actions 10/10 SUCCESS 凭据、Staging 差距表、集成测试、生产准备与最终 CONDITIONAL 裁决。
+    - [x] 深度定位历史 CI Run 42390243560 压测 503 真实根因，确认业务代码 `outbound_disabled` 契约严格正确，最新 CI Run 42396207517 全绿通过 3m soak 压测。
+    - [x] 更新 REPORTS.md 与 CHECKLIST.log 交付记录与审计索引。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-worker dry-run 438 个资产打包就绪 (5,738.98 KiB)
+    - [x] 单元测试套件：mail-worker Vitest 47 个测试文件、612 个测试用例 100% PASS (584s)
+    - [x] 冷启动全栈冒烟：tests/fullstack-smoke.mjs 13/13 项全真栈检查全绿通过
+    - [x] 浏览器回归测试：tests/oauth-bind-login-ui-e2e.mjs 13/13 项桌面与移动端端到端全绿通过
+    - [x] 压力与恢复测试：tests/backend-stress.mjs 7 阶段 1,800 请求 0 异常 5xx，Read P95 74.86ms，Auth P95 600.55ms 全部通过
+    - [x] 前端单元与类型：temp_login_ui 29/29 测试全绿，TypeScript 类型检查零报错
+    - [x] 密钥扫描门禁：scripts/secret-scan.mjs 1,304 文件 + 4,759 git 历史对象 0 密钥泄露
+    - [x] 多语言对称闭环：i18n 六语言字典 100% 对称，代码字面量引用零缺失，零未包裹硬编码
+    - [x] 零假数据残留：测试数据全部在 finally 物理清理，临时目录和进程树干净回收
+
+---
+
+### 最终公测交付终审报告归档与全分支安全推送 (2026-11-07)
+*   **关联 PR (Pull Request)**: PR #2 (`fix/public-beta-go-blockers-2026-11-07` ➡️ `release/2026-10-31`)
+*   **部署环境 (Deployment)**: `本地全真栈 / GitHub Actions CI (生产 625c1291 零触碰，Staging 待显式授权)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 归档公测就绪终审报告：新增 doc/release/FINAL-PUBLIC-BETA-READINESS-2026-11-07.md，详细记录 Release Identity 矩阵、Blocker 处置结果、Phase C 9 项安全规约复核证据、本地自动化测试汇总、CI 门禁矩阵、Staging 差距表、阻断清单与 CONDITIONAL 交付终审结论。
+    - [x] 更新 REPORTS.md 与 CHECKLIST.log 审计索引与交付流水。
+    - [x] 执行 git diff --check、secret-scan 与 i18n 静态扫描，确认零违规。
+    - [x] 执行非覆盖式完整推送 (git push --all) 至远端仓库，保障本地全部分支与远端完全同步，无冲突。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-worker dry-run 438 个资产打包就绪 (5,738.98 KiB)
+    - [x] 单元测试套件：mail-worker Vitest 47 个测试文件、612 个测试用例 100% PASS
+    - [x] 密钥扫描门禁：scripts/secret-scan.mjs 1303 文件 0 密钥泄露
+    - [x] 多语言对称闭环：i18n 六语言字典 100% 对称，代码字面量引用零缺失，零未包裹硬编码
+    - [x] 本地压测验证：backend-stress limited-beta 3m soak 1,800 请求 0 异常 5xx，SLO 全部达标
+    - [x] 零假数据残留：测试临时数据物理清理，D1/KV 还原
+
+---
+
+### 最终安全收敛、差异复核与正式交付完整推送 (2026-11-07)
+*   **关联 PR (Pull Request)**: PR #2 (`fix/public-beta-go-blockers-2026-11-07` ➡️ `release/2026-10-31`)
+*   **远端 CI 官方核验 (GitHub Actions 100% PASS)**:
+    - `Offline Secret Scanning Gate`: Run ID `42356089449` (`success`)
+    - `Security Audit`: Run ID `42356089352` (`success`)
+    - `Quality Gates`: Run ID `42356089465` (`success`, 8/8 jobs all passed)
+*   **部署环境 (Deployment)**: `本地全真栈 / GitHub Actions CI (生产 625c1291 零触碰，Staging 待显式授权)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 完成最终交付报告归档：新增 doc/release/FINAL-SECURITY-CONVERGENCE-2026-11-07.md，详细记录真实身份矩阵、10 项模块差异复核、测试证据、环境边界与终审裁决。
+    - [x] 更新 REPORTS.md 与 CHECKLIST.log 审计索引与交付流水。
+    - [x] 执行 git diff --check、secret-scan 与 i18n 静态扫描，确认零违规。
+    - [x] 遵守严格推送准则，非覆盖式完整推送 (--all) 至远端仓库。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-worker dry-run 438 个资产打包就绪 (5738.98 KiB)
+    - [x] 单元测试套件：mail-worker Vitest 47 个测试文件、612 个测试用例 100% PASS (498.3s)
+    - [x] 密钥扫描门禁：scripts/secret-scan.mjs 1302 文件 0 密钥泄露
+    - [x] 多语言对称闭环：i18n 六语言字典 100% 对称，代码字面量引用零缺失，零未包裹硬编码
+    - [x] 零假数据残留：测试数据物理清理，D1/KV 还原
+
+---
+
+### B1–B12 公测阻断项全量修复、Exact-SHA CI 加固与发布收敛核验 (2026-11-07)
+*   **关联提交 (Git Commit)**: `7554aeeee0dc1bbb5afaa34e0ba8cf7664f4add3` (Short: `7554aee`)
+*   **关联 PR (Pull Request)**: PR #2 (`fix/public-beta-go-blockers-2026-11-07` ➡️ `release/2026-10-31`)
+*   **远端 CI 官方核验 (GitHub Actions 100% PASS)**:
+    - `Offline Secret Scanning Gate`: Run ID `42352380334` (conclusion: `success`)
+    - `Security Audit`: Run ID `42352380109` (conclusion: `success`)
+    - `Quality Gates`: Run ID `42352380209` (conclusion: `success`, 7/7 jobs all passed)
+*   **部署环境 (Deployment)**: `本地全真栈 / GitHub Actions CI (epomail-staging 待授权)`
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] B1 HTTP 错误状态契约：BizError 4xx/5xx 作为真实 HTTP status，与 JSON code 保持绝对一致，前端 Axios 拦截器适配结构化业务错误读取，429 保留 Retry-After。
+    - [x] B2 统一安全脱敏日志：实现 Safe Redacted Logger，集中脱敏 Authorization, Cookie, JWT, Refresh Token, OAuth Code, Secret, 密码, TOTP, SQL 参数与邮件正文。
+    - [x] B3 scheduled_secret 物理隔离：定时任务与 Cron 触发仅校验独立 scheduled_secret，恒时比较，未配置 Fail-Closed，彻底杜绝与管理员凭据碰撞。
+    - [x] B4 AI 翻译输出 XSS 防护：提取前剔除 script/iframe/object/svg/events，占位符回填文本转义清洗，中立化 javascript:/vbscript:/shadowrootmode，废弃未校验的大模型原生 HTML 回退。
+    - [x] B5 统一出网 safeFetch SSRF 防御：协议白名单 (HTTP/HTTPS)，全面拦截 IPv4/IPv6 私网、回环、本地链路及云元数据端点（含十进制/十六进制变体），redirect: manual，跨域剥离敏感头，5MB 流量封顶。
+    - [x] B6 OAuth Redirect URI 严格全等匹配：录入与授权端全对称校验，禁止通配符、片段与用户信息，强制 HTTPS（127.0.0.1 除外），严格执行 RFC 6749 Section 3.1.2.4 字符串全等匹配。
+    - [x] B7 OAuth 授权码先验后原子核销：消除先 consume 后校验的错误消耗缺陷，先做完整只读校验，全部凭据合法后通过条件更新 WHERE consumed = 0 进行原子 CAS 核销。
+    - [x] B8 OAuth 客户端密钥信封加密：引入 AES-256-GCM 信封加密，AAD 绑定 clientId，D1 仅存 v1:iv:tag:ciphertext，支持遗留明文双读平滑迁移，无密钥 Fail-Closed。
+    - [x] B9 Webhook 未知事件与状态不可逆保护：未知事件安全记录 status: 'ignored' 并返回 HTTP 200，乱序到达的已发送事件禁止将 delivered 或 dead_letter 倒退回 sent。
+    - [x] B10 Workers AI 健康检查真实异常透传：测试异常坚决返回 success: false 并分类上报真实 reason (binding_missing, model_not_found, quota_exceeded, timeout, inference_failed)。
+    - [x] B11 CI 工作流硬化与供应链安全：Actions 完整 40 位 SHA 锁定，runner 统一 ubuntu-24.04，Gitleaks 带 SHA-256 完整性校验且 Fail-Closed，去除 continue-on-error，加入供应链 audit。
+    - [x] B12 制度文件治理建议草案：保持 AGENTS.md 零侵入，撰写独立治理修订建议案，分析并阻断 Commit Hash 自引用死循环。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：temp_login_ui 构建通过 (2.5s)，mail-vue 构建通过 (14.5s)，Wrangler deploy dry-run 438 个资产校验通过
+    - [x] 单元测试套件：mail-worker Vitest 47 个测试文件、612 个测试用例 100% PASS
+    - [x] 浏览器端到端：tests/oauth-bind-login-ui-e2e.mjs 13/13 全场景 PASS
+    - [x] 全真栈冷启动烟测：tests/fullstack-smoke.mjs 13/13 自动化全绿通过 (cleanup complete)
+    - [x] 压测与契约回归：tests/backend-stress.mjs 7 个阶段 100% 达成，SLO 全部达标
+    - [x] 多语言对称闭环：i18n 六语言字典 100% 对称，代码字面量引用零缺失，零未包裹硬编码
+    - [x] 密钥扫描门禁：scripts/secret-scan.mjs 1,288 文件无密钥泄露，scan-staged-secrets.mjs --self-test PASS
+    - [x] 零假数据残留：测试数据均在 finally 块中完成物理清理与 D1/KV 还原
+
+---
+
 ### PR 模式质量门禁 diff-hygiene 修复与 GitHub Actions 全绿闭环 (2026-11-07)
 *   **关联提交 (Git Commit)**: `192183258217f6fc6e861e27d87b881d589f3065` (Short: `1921832`)
 *   **部署环境 (Deployment)**: `GitHub Actions Quality Gates (#36, PR #37)`
@@ -542,7 +892,7 @@
 *   **关联提交 (Git Commit)**: `748643a8989c27b0a14dbed4922ed29759092bf0` (Short: `748643a`)；前置模块提交 `4aefb562a380f04d01d0290b5690b26769e6104f` (`4aefb56`)、`a1d080559b9a05e1751cfd44c993ef9d17626170` (`a1d0805`)
 *   **部署环境 (Deployment)**: 本地全真栈 workerd + D1/KV 隔离回归、Worker dry-run 打包、`mail-vue` 生产构建；**未执行任何远程部署或生产库修改，统一推送 `origin/release/2026-10-31`**
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:
-    - [x] 模块 B（固定账号与初始化安全）：移除 `admin-utils.js` 与 `user-service.js` 中 `userId === 1` 超管提权及清理豁免；`init.js` 停止播种/复活 `admin@epomail.cyou` (`123456`) 并在生产冷启动缺失 `admin_initial_password` 时安全失败；将 6 个 `audit_*` 配置迁入 `setting_ext`（`setting` 表降至 96 列，彻底消除 D1 100 列上限报错）。
+    - [x] 模块 B（固定账号与初始化安全）：移除 `admin-utils.js` 与 `user-service.js` 中 `userId === 1` 超管提权及清理豁免；`init.js` 停止播种/复活 `admin@epomail.cyou` (`[REDACTED]`) 并在生产冷启动缺失 `admin_initial_password` 时安全失败；将 6 个 `audit_*` 配置迁入 `setting_ext`（`setting` 表降至 96 列，彻底消除 D1 100 列上限报错）。
     - [x] 模块 A（认证与 OAuth 服务端强制）：`oauthService` / `oauthApi` / `oauthIdentityService` 全端点统一 `assertProviderEnabled` 强制校验总开关、Provider 开关与完整凭据（含修复 Apple 空 `clientSecret` 假阳性）；禁用总开关或单 Provider 时通过 `oneTimeCredential.revokeClientFlows` 即时吊销在途 `state` / `login_code` / `bind` 凭证；补齐 OAuth 客户端 S256 PKCE 闭环、直调登录 `state` 强校验及内置 OAuth2 Provider 常量时间密钥比对与 scope 裁剪。
     - [x] 模块 C（核心邮件链路与跨用户隔离）：修复 `cascadeDeleteEmails` 未校验归属即跨用户物理删除附件/对象存储与星标的 P0 漏洞；收紧 `emailService.list` / `latest` 显式 `accountId` 归属校验与 `starService` 归属过滤及密文解密；在 `emailService.send` 外发前强制执行 `EMAIL_OUTBOUND_ENABLED`、`OUTBOUND_WHITELIST` 及附件数量/大小/配额预检；修复 `emailService.read` 缺失 `.run()` 及双库模式 `getMailDb`/`getUserDb` 路由。
     - [x] 交接归档：新增 `doc/rc-2026-10-31-handoff.md`，完整记录真实测试结果、`NOT-TESTED` 外部联调边界、生产存量 `admin@epomail.cyou` 独立处置 SQL 与下一阶段 Windows 兼容性清单。
@@ -4975,7 +5325,7 @@
     2. **[P0] 全新部署引导链三重断裂修复 (Fresh-Deploy Bootstrap Chain Fix)**:
        - **角色播种守卫重构**：`v3_13DB` 原以 `roleCount===0` 为播种条件，被 `v1_1DB` 先行插入的遗留「普通用户」(custom) 永久阻断成死代码；改为按六个标准 `role_code` 精准计数判定，保留「站长删除 LV.0/LV.1 不被强制复活」的原设计意图；
        - **缺失列补齐**：`email.labels`、`user.custom_labels`、`user.update_time` 三列在 drizzle entity 中声明但 CREATE TABLE 与全部 124 条迁移均未覆盖（邮件列表/注册/身份接口全新库直接 500）；`intDB` 的 CREATE TABLE 已内建三列，并在 `v3_14DB` 新增 pragma 检查式幂等 ALTER 兼容存量库，`custom_labels` 默认值与 entity 的 `getDefaultUserLabelsString()` 严格一致；
-       - **主站长账号引导**：`v3_14DB` 新增 `c.env.admin` 账号不存在时的 INSERT 路径（PBKDF2 哈希初始密码 123456 + master 角色 + 主信箱行），并在存在时兜底晋升 master；与 `adminReserved` 注册拦截闭环，全新部署仅需访问 `/api/init/<jwt_secret>` 即可完成全部引导；
+       - **主站长账号引导**：`v3_14DB` 新增 `c.env.admin` 账号不存在时的 INSERT 路径（PBKDF2 哈希初始密码 [REDACTED] + master 角色 + 主信箱行），并在存在时兜底晋升 master；与 `adminReserved` 注册拦截闭环，全新部署仅需访问 `/api/init/<jwt_secret>` 即可完成全部引导；
        - 顺带将 `v2_7DB` 的 `auto_refresh_time` RENAME 改为 pragma 条件执行，消除全新库迁移噪音告警。
     3. **[P2] zh-Hant 系统标签简繁映射修复 (zh-Hant Label Mapping)**:
        - 数据库预置标签实体「待办」在 zh-Hant 界面呈简体残留；`label-i18n.js` 补入 `待办`/`待辦` 变体映射（原仅覆盖 `代办`），单元断言 5/5 通过（zh-Hant `t(todoTag)=代辦`）。
@@ -4984,11 +5334,11 @@
        - 生产改由 `npx wrangler secret put jwt_secret` / `totp_enc_key` 注入（一次设置持久生效，部署不丢失）；本地开发由 gitignore 排除的 `mail-worker/.dev.vars` 承载（wrangler dev 实测自动加载 ✓），入库模板 `.dev.vars.example` 同步提供；
        - `.gitignore` 新增 `.dev.vars` / `**/.dev.vars`（保留 `.dev.vars.example`）；
        - 新增 `mail-worker/DEPLOY-SECRETS.md` 部署密钥指引（清单、注入命令、轮换、`/init` 门禁关联、初始密码提示）；
-       - 测试夹具脱敏：`totp-backend-fixes.spec.js`、`worker-configuration.d.ts`、`test-totp-backend-fixes.mjs` 中硬编码的生产 `totp_enc_key` 值替换为 `local-dev-totp-enc-key-NOT-FOR-PROD` 测试值；`git grep` 审计追踪文件零真实密钥残留。
+       - 测试夹具脱敏：`totp-backend-fixes.spec.js`、`worker-configuration.d.ts`、`test-totp-backend-fixes.mjs` 中硬编码的生产 `totp_enc_key` 值替换为 `[REDACTED]` 测试值；`git grep` 审计追踪文件零真实密钥残留。
     5. **[加固] `/email/latest` 缺参防御 (Latest Endpoint Hardening)**:
        - 原实现缺省 `accountId`/`allReceive` 时将 `undefined` 直接绑定 D1 抛 `D1_TYPE_ERROR`；现补 `emailId` 数值归一、accountId 缺省回退用户首个信箱、无信箱优雅返回空列表，前端契约（三参齐全）与非契约调用均实测 200。
 *   **自动化测试与完整核验 (Testing & Full Verification, 全部本地执行)**:
-    - **全新库端到端引导核验**：清空 `.wrangler/state` 后冷启动 `wrangler dev`，仅凭 `/api/init/<secret>` 完成引导——6 角色播种（visitor/master/user_lv0/user_lv1/moderator + 遗留 custom，权限 4~34 项齐备）、参观者与主站长双账号及其信箱自动创建、三列齐备，随后管理员 `123456` 直接登录成功；
+    - **全新库端到端引导核验**：清空 `.wrangler/state` 后冷启动 `wrangler dev`，仅凭 `/api/init/<secret>` 完成引导——6 角色播种（visitor/master/user_lv0/user_lv1/moderator + 遗留 custom，权限 4~34 项齐备）、参观者与主站长双账号及其信箱自动创建、三列齐备，随后管理员 `[REDACTED]` 直接登录成功；
     - **API 功能核验套件** `tests/verify-local-functional-20260919.mjs`：25 项断言 25/25 全绿（登录身份/信箱/邮件收发/设置/角色用户/注册欢迎邮件/OAuth/安全面），临时用户 `DELETE /user/delete?userIds=` 物理清理 code=200，零假数据残留；
     - **浏览器级 UI 核验**（Playwright，新构建产物）：`/inbox` 渲染 0 错误、`/admin` 主页内容完整且无 accountStore 错误、`/email`（非路由）正确落入 404 且无 profile 噪音错误、en 模式 CJK 残留 0、zh-Hant 模式简体特有字 0；
     - **回归套件**：`test-totp-login-ui-e2e.mjs` 8/8 全绿、`test-multilingual-email-templates-e2e.mjs` Part A 37/37 全绿、i18n 三件套（对称 2032 键/键缺失 0/硬编码扫描）持续全绿；
@@ -5576,7 +5926,7 @@
          - 修复 `admin-utils.js`，严格限定站长 `isAdminEmail` 与 `isAdminUser` 必须严格等于系统环境变量 `c.env.admin`（`admin@epomail.bond`）或 `User 1` 本身，绝不跨域名扩散至任何其他同名前缀的邮箱或账号；
          - 纯用户名登录仅支持在输入纯字符串 `"admin"`（不带 `@`）时作为快捷别名映射至 `c.env.admin`。
     2. **独立还原演示参观者账号 `admin@epomail.cyou` (Decoupled Demo Visitor Account)**:
-       - 账号与信箱彻底解耦：在 D1 数据库中物理重建独立的演示参观者用户（`user_id: 9`，`email: 'admin@epomail.cyou'`，统一安全密码 `123456`，角色类型 `type: 2`，对应 `role_code: 'visitor'`，参观者）；
+       - 账号与信箱彻底解耦：在 D1 数据库中物理重建独立的演示参观者用户（`user_id: 9`，`email: 'admin@epomail.cyou'`，统一安全密码 `[REDACTED]`，角色类型 `type: 2`，对应 `role_code: 'visitor'`，参观者）；
        - 信箱所有权物理对齐：在 `account` 表中将 `admin@epomail.cyou`（`account_id: 99`）的归属物理绑定至 User 9（参观者），超级管理员 User 1 名下仅保留系统主站长信箱 `admin@epomail.bond`（`account_id: 1`），两者完全隔离，绝不串号、绝不跨域共享；
        - `init.js` 自愈机制修正：废除 `v3_14DB` 中自动将各域名 `admin@...` 账号夺取并绑定至 User 1 的破坏性逻辑，改为持久化确保演示参观者账号独立运行于 `visitor` 角色之下。
     3. **参观者权限防线严格锁定与越权防御 (Strict Visitor Permissions Enforcement)**:
@@ -5641,11 +5991,11 @@
        - 在生产 D1 `account` 表中，为超级管理员（`user_id: 1`）完整绑定 `admin@epomail.cyou`（`account_id: 99, all_receive: 1`），与 `admin@epomail.bond` 并存；
        - 在 `init.js` 的 `v3_14DB` 中增加管理员多域名账号自愈同步机制，无论系统何时配置多域名，均自动为站长初始化所有域名的管理员专属信箱，双域名收发件与别名管理完全打通。
     3. **管理员登录凭证与密码核验 (Password Verification & Assurance)**:
-       - 确认站长管理员（User 1）密码在系统内确认为统一安全密码 `123456`，站长在登录界面可直接使用 `admin@epomail.cyou`（或 `admin@epomail.bond` 或 `admin`）搭配密码 `123456` 登录；
+       - 确认站长管理员（User 1）密码在系统内确认为统一安全密码 `[REDACTED]`，站长在登录界面可直接使用 `admin@epomail.cyou`（或 `admin@epomail.bond` 或 `admin`）搭配密码 `[REDACTED]` 登录；
        - 如需更换为其他自定义密码，站长可在登录后进入「个人设置 -> 安全」随时进行密码修改。
     4. **Playwright 生产环境真实端到端全维度审计 100% 全绿 (Comprehensive Live E2E Audit)**:
        - 升级专属审计脚本 `tests/audit-hardcoded-defaults-optimization.mjs`：
-         - 步骤 0：实测使用 `admin@epomail.cyou` + `123456` API 登录 100% 成功返回 Token；实测使用 `admin@epomail.bond` 与纯用户名 `admin` 登录 100% 成功；验证管理员账户列表同时拥有 `admin@epomail.cyou` 和 `admin@epomail.bond`；实测浏览器通过 `/login/index.html` 页面输入 `admin@epomail.cyou` 成功跳转进入 `/inbox`；
+         - 步骤 0：实测使用 `admin@epomail.cyou` + `[REDACTED]` API 登录 100% 成功返回 Token；实测使用 `admin@epomail.bond` 与纯用户名 `admin` 登录 100% 成功；验证管理员账户列表同时拥有 `admin@epomail.cyou` 和 `admin@epomail.bond`；实测浏览器通过 `/login/index.html` 页面输入 `admin@epomail.cyou` 成功跳转进入 `/inbox`；
          - 步骤 1：跨域名注册 `admin@epomail.cyou`、同名用户跨域名抢注、别名防抢占全链路拦截 100% 通过；
          - 步骤 2：参观者无 `user:query` 权限、后端防篡改、UI 禁用徽章、侧边栏隐藏、接口 403 严格拦截 100% 通过；
          - 步骤 3：OAuth 应用管理 `EpoCanvasImage` 与 `shijianus-blog` 完整保全与密钥脱敏 100% 通过；
@@ -8264,7 +8614,7 @@
         3. **未登录访客公开查看禁止状态（401拦截）**：`screenshot_public_profile_guest_blocked.png`
         4. **已登录账户专属查看状态**：`screenshot_public_profile_logged_in.png`
     *   执行 `npx wrangler deploy`，成功完成联合构建与 Cloudflare Workers 全网部署（Version ID: `dc176bba-24e3-4410-8a27-204a81758e75`）。
-    *   调用 `/init/123456` 成功触发生产端数据库无缝完成 `v3_5DB` 迁移。
+    *   调用 `/init/[REDACTED]` 成功触发生产端数据库无缝完成 `v3_5DB` 迁移。
 
 ### 优化：语境说明外置至个性化设置项并补充自定义前端UI失效提醒 (2026-08-21)
 *   **功能需求 (Feature)**: 

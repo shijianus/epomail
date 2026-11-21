@@ -51,6 +51,10 @@ export function emailRead(emailIds, unread) {
 
 const composeKeyState = new WeakMap();
 
+export function emailSendStatus(accountId, idempotencyKey) {
+    return http.get('/email/send-status', { params: { accountId, idempotencyKey }, noMsg: true })
+}
+
 export function emailSend(form,progress, options = {}) {
     const idempotencyKey = options.idempotencyKey || idempotencyKeyForCompose(form, composeKeyState);
     return http.post('/email/send', { ...form, idempotencyKey },{

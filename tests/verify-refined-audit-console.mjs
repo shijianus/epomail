@@ -1,8 +1,10 @@
+import { legacyOrigin, legacyAdminEmail, legacyUserEmail, legacyFetch as fetch } from './helpers/legacy-target.mjs';
+import { launchIsolatedChromium } from './helpers/legacy-browser.mjs';
 import { chromium } from 'playwright';
 import assert from 'assert';
 
-const BASE = process.env.TARGET_URL || 'https://mail.epocanvas.com';
-const USER_EMAIL = 'audit_normal_1789140856529@epomail.bond';
+const BASE = legacyOrigin;
+const USER_EMAIL = legacyUserEmail;
 const USER_PWD = process.env.EPOMAIL_E2E_USER_PASSWORD || '';
 
 let pass = 0, fail = 0;
@@ -65,7 +67,7 @@ async function run() {
     const visitorLoginRes = await safeFetch(`${BASE}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@epomail.cyou', password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
+      body: JSON.stringify({ email: legacyAdminEmail, password: process.env.EPOMAIL_E2E_ADMIN_PASSWORD || '' })
     });
     const visitorLoginJson = await visitorLoginRes.json();
     assert.strictEqual(visitorLoginJson.code, 200, '持证巡检账号登录成功');
@@ -92,7 +94,7 @@ async function run() {
 
     // 2. 启动浏览器加载操作报告控制台
     console.log('\n[步骤 2] 启动 Chromium 渲染操作报告控制台 (#manage/admin/audit)...');
-    browser = await chromium.launch({ headless: true });
+    browser = await launchIsolatedChromium(chromium, { headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       locale: 'zh-CN'
@@ -100,7 +102,7 @@ async function run() {
 
     await context.addInitScript(({ t }) => {
       localStorage.setItem('token', t);
-      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: 'admin@epomail.cyou' }]));
+      localStorage.setItem('epo_sessions', JSON.stringify([{ u: 0, token: t, email: legacyAdminEmail }]));
     }, { t: visitorToken });
 
     const page = await context.newPage();
@@ -113,7 +115,7 @@ async function run() {
           code: 200,
           data: {
             userId: 9,
-            email: 'admin@epomail.cyou',
+            email: legacyAdminEmail,
             name: '开源体验',
             permKeys: ['*'],
             role: { roleId: 6, roleCode: 'master', name: '站长' }

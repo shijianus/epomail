@@ -1,24 +1,23 @@
-# E2E 测试凭据注入说明
+# E2E 测试环境和凭据
 
-为避免将真实账号口令写入公开仓库，所有端到端脚本不再内置生产/测试账号密码。运行前请在本地环境或 CI Secret 中显式注入：
-
-| 环境变量 | 用途 |
-| --- | --- |
-| `EPOMAIL_E2E_ADMIN_PASSWORD` | 站长/管理员账号密码 |
-| `EPOMAIL_E2E_USER_PASSWORD` | 普通用户账号密码 |
-| `EPOMAIL_E2E_VISITOR_PASSWORD` | 参观者演示账号密码 |
-| `EPOMAIL_E2E_TEST_PASSWORD` | 脚本临时创建的一次性账号密码 |
-
-示例（Git Bash）：
+公测回归使用一次性本地 Worker、测试身份和隔离数据。安装项目锁定的依赖和 Chromium 后，在仓库根目录运行。已有解包候选时，将 `EPOMAIL_CANDIDATE_DIR` 指向包含 `SOURCE_SHA`、`bundle` 和 `dist` 的目录。
 
 ```bash
-export EPOMAIL_E2E_ADMIN_PASSWORD='<仅在本地会话中设置>'
-export EPOMAIL_E2E_USER_PASSWORD='<仅在本地会话中设置>'
-export EPOMAIL_E2E_TEST_PASSWORD='<仅在本地会话中设置>'
-node tests/verify-live-cf-production.mjs
+node tests/fullstack-smoke.mjs
+node tests/fullstack-browser-e2e.mjs
 ```
 
-变量缺失时，脚本会以空密码安全失败，绝不会回退到历史默认口令或仓库内硬编码值。
+这两个入口自行启动和清理本地服务。使用既有隔离服务的历史测试入口读取 `EPOMAIL_TEST_ORIGIN`，值为 `http://127.0.0.1:<端口>`。启动本地测试实例并创建用例需要的隔离账号后，再运行相应入口。项目用于真实 Staging 的晋级流程和权限记录见[公测制品放行](../doc/release/PUBLIC-BETA-PROMOTION.md)。
+
+| 环境变量 | 适用的测试身份 |
+| --- | --- |
+| `EPOMAIL_E2E_ADMIN_EMAIL`、`EPOMAIL_E2E_USER_EMAIL` | 历史回环测试的管理员和普通账号，默认分别为 `admin@example.com`、`user@example.com` |
+| `EPOMAIL_E2E_ADMIN_PASSWORD` | 当前隔离实例的测试管理员 |
+| `EPOMAIL_E2E_USER_PASSWORD` | 当前实例的普通测试用户 |
+| `EPOMAIL_E2E_VISITOR_PASSWORD` | 当前实例的测试访客 |
+| `EPOMAIL_E2E_TEST_PASSWORD` | 用例自行创建的一次性测试用户 |
+
+按脚本实际需要注入凭据。测试账号、邮件和附件归该测试实例所有，执行结束后清理。涉及真实账号的历史风险保留在下节并由账号所有者核验。
 
 ## 历史遗留账号处置
 

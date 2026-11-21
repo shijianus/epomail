@@ -1,6 +1,8 @@
 import { env } from 'cloudflare:test';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import telegramService from '../src/service/telegram-service.js';
+import userService from '../src/service/user-service.js';
+import { sealPersonalBotToken } from '../src/utils/oauth-secret-crypto.js';
 
 const userId = 57101;
 const accountId = 57102;
@@ -68,6 +70,7 @@ beforeAll(async () => {
 		status INTEGER NOT NULL DEFAULT 0, is_del INTEGER NOT NULL DEFAULT 0, all_receive INTEGER NOT NULL DEFAULT 0
 	)`).run();
 	await env.db.prepare(`CREATE TABLE IF NOT EXISTS email (
+		is_official INTEGER NOT NULL DEFAULT 0,
 		email_id INTEGER PRIMARY KEY, send_email TEXT, name TEXT, account_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
 		subject TEXT, code TEXT NOT NULL DEFAULT '', text TEXT, content TEXT, to_email TEXT NOT NULL DEFAULT '',
 		type INTEGER NOT NULL DEFAULT 0, status INTEGER NOT NULL DEFAULT 0, is_del INTEGER NOT NULL DEFAULT 0,
@@ -101,6 +104,47 @@ afterAll(async () => {
 });
 
 describe('personal Telegram notification preferences', () => {
+	it('tests the saved and enabled bot using its stored credential and destination', async () => {
+		const token = '123456:abcdefghijklmnopqrstuvwxyz123456';
+		const botToken = await sealPersonalBotToken(env, userId, token);
+		await setProfile({ ...config, botToken, topicId: '31' });
+		const transport = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+		expect(await telegramService.testPersonalBot(c, { chatId: config.chatId, topicId: '31' }, userId)).toEqual({ success: true });
+		expect(transport).toHaveBeenCalledTimes(1);
+		const [url, options] = transport.mock.calls[0];
+		expect(url).toBe(`https://api.telegram.org/bot${token}/sendMessage`);
+		expect(JSON.parse(options.body)).toMatchObject({ chat_id: config.chatId, message_thread_id: 31 });
+	});
+
+	it('reserves system settings tests for the active deployment administrator', async () => {
+		const admin = 'telegram-admin@example.test';
+		const ctx = { ...c, env: { ...env, admin } };
+		const params = { scope: 'system', botToken: '123456:abcdefghijklmnopqrstuvwxyz123456', chatId: settings.tgChatId };
+		const actor = vi.spyOn(userService, 'selectById').mockResolvedValue({ email: 'user@example.test', isDel: 0, status: 0 });
+		const transport = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+		await setProfile(null);
+		await expect(telegramService.testPersonalBot(ctx, params, userId)).rejects.toMatchObject({ code: 403 });
+		expect(transport).not.toHaveBeenCalled();
+		actor.mockResolvedValue({ email: admin, isDel: 0, status: 0 });
+		await expect(telegramService.testPersonalBot(ctx, params, userId)).resolves.toEqual({ success: true });
+		expect(transport).toHaveBeenCalledTimes(1);
+	});
+
+	it('requires saved consent and its current version for an ordinary test message', async () => {
+		const transport = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+		const test = () => telegramService.testPersonalBot(c, { chatId: config.chatId }, userId);
+		await setProfile(null);
+		await expect(test()).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
+		await setProfile({ ...config, enabled: false });
+		await expect(test()).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
+		await setProfile(config, { telegramShareVersion: 1 });
+		await expect(test()).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
+		await setProfile(config);
+		await env.kv.put('setting:', JSON.stringify({ ...settings, userTgForward: 0 }));
+		await expect(test()).rejects.toMatchObject({ errorCode: 'telegram_config_mismatch' });
+		expect(transport).not.toHaveBeenCalled();
+	});
+
 	it('keeps mode=all minimal by default and never adds sender or recipient', async () => {
 		const calls = await send({ caller: { sendEmail: 'secret@sender.example', name: 'Secret', toEmail: emailAddress } });
 		expect(calls).toHaveLength(1);
@@ -110,6 +154,14 @@ describe('personal Telegram notification preferences', () => {
 		expect(payload).not.toContain('secret@sender.example');
 		expect(payload).not.toContain(emailAddress);
 		expect(payload).not.toContain('/api/telegram/getEmail/');
+	});
+
+	it('uses the decrypted owner-bound credential only at the mock provider transport', async () => {
+		const sealed = await sealPersonalBotToken(env, userId, config.botToken);
+		const calls = await send({ personalTelegram: { ...config, botToken: sealed, includePreview: true } });
+		expect(calls).toHaveLength(1);
+		expect(calls[0].url).toBe(`https://api.telegram.org/bot${config.botToken}/sendMessage`);
+		expect(calls[0].body.reply_markup.inline_keyboard[0][0].web_app.url).toContain('/api/telegram/getEmail/');
 	});
 
 	it('adds preview and a state-bound link only when includePreview is explicitly true', async () => {

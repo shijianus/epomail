@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
+import { env as workerEnv } from 'cloudflare:test';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import hashUtils from '../src/utils/hash-utils.js';
 import emailCryptoUtils from '../src/utils/email-crypto-utils.js';
+import { emailConst } from '../src/const/entity-const.js';
 import { isSafePublicUrl, assertSafePublicUrl } from '../src/utils/url-utils.js';
 import fileUtils from '../src/utils/file-utils.js';
 import { isAllowedObjectKey, normalizeObjectKey } from '../src/utils/object-key-utils.js';
@@ -19,6 +21,7 @@ import accountService from '../src/service/account-service.js';
 import loginService from '../src/service/login-service.js';
 import rateLimit from '../src/utils/rate-limit.js';
 import cryptoUtils from '../src/utils/crypto-utils.js';
+import { isConfiguredDomain } from '../src/utils/email-utils.js';
 
 const enc = new TextEncoder();
 
@@ -46,7 +49,7 @@ async function signRs256(privateKey, header, payload) {
 }
 
 describe('JWT session tokens', () => {
-	const c = { env: { jwt_secret: 'unit-test-jwt-secret-32-bytes-minimum' } };
+	const c = { env: { db: workerEnv.db, jwt_secret: 'unit-test-jwt-secret-32-bytes-minimum' } };
 
 	it('round-trips a signed token and rejects tampering', async () => {
 		const token = await jwtUtils.generateToken(c, { userId: 7, token: 'session-id' }, 60);
@@ -77,6 +80,35 @@ describe('Email hash tokens', () => {
 		const hash = await hashUtils.encodeEmailHash(42, 7, secret);
 		expect(await hashUtils.decodeEmailHash(hash, 7, secret)).toBe(42);
 		expect(await hashUtils.decodeEmailHash(hash, 8, secret)).toBeNull();
+	});
+
+	it('signs mixed-owner pages with the same wire format and preserves owner isolation', async () => {
+		const rows = [{ emailId: 8, owner: 1 }, { emailId: 8, owner: 2 }];
+		await hashUtils.addEmailHashes(rows, secret, row => row.owner);
+		for (const row of rows) {
+			expect(await hashUtils.decodeEmailHash(row.hash, row.owner, secret)).toBe(8);
+			expect(await hashUtils.decodeEmailHash(row.hash, 3 - row.owner, secret)).toBeNull();
+		}
+		await expect(hashUtils.addEmailHashes(rows, '', row => row.owner)).rejects.toThrow('jwt_secret');
+	});
+
+	it('reads existing URLs across the unsigned ID range and rejects a changed key', async () => {
+		const oldUrlHash = '-___3r6Dmo5mPsyDQsKK';
+		expect(await hashUtils.decodeEmailHash(oldUrlHash, 7, secret)).toBe(3100000001);
+		expect(await hashUtils.decodeEmailHash(oldUrlHash, 8, secret)).toBeNull();
+		expect(await hashUtils.decodeEmailHash(oldUrlHash, 7, secret + '-rotated')).toBeNull();
+	});
+
+	it('assigns opaque IDs across salt batches without losing row ownership', async () => {
+		const rows = Array.from({ length: 135 }, (_, i) => ({ emailId: i, owner: (i % 2) + 1 }));
+		await hashUtils.addEmailHashes(rows, secret, row => row.owner);
+		expect(rows[0].hash).toBe('');
+		for (const index of [1, 127, 128, 134]) {
+			const { hash, emailId, owner } = rows[index];
+			expect(hash).toMatch(/^[A-Za-z0-9_-]{20}$/);
+			expect(await hashUtils.decodeEmailHash(hash, owner, secret)).toBe(emailId);
+			expect(await hashUtils.decodeEmailHash(hash, 3 - owner, secret)).toBeNull();
+		}
 	});
 
 	it('fails closed without a secret', async () => {
@@ -325,8 +357,25 @@ describe('RBAC privileged permission set', () => {
 });
 
 describe('Freeze convergence regressions (P1/P2)', () => {
-	it('only grants isOfficial badge to genuine system rows without inbound/outbound claim keys and blocks reserved labels in rules', () => {
+	it('matches configured domains exactly for JSON and scalar environment values', () => {
+		expect(isConfiguredDomain('["epomail.bond"]', 'epomail.bond')).toBe(true);
+		expect(isConfiguredDomain('["epomail.bond"]', 'mail.bond')).toBe(false);
+		expect(isConfiguredDomain('epomail.bond', 'epomail.bond')).toBe(true);
+	});
+	it('applies the storage policy to delivered, unclaimed, spam and trashed records', () => {
+		const delivered = { status: emailConst.status.DELIVERED };
+		const unclaimed = { status: emailConst.status.NOONE };
+		expect(emailCryptoUtils.shouldEncryptEmail(0, delivered)).toBe(true);
+		for (const row of [unclaimed, { ...delivered, isSpam: 1 }, { ...delivered, isDel: 1 }]) {
+			expect(emailCryptoUtils.shouldEncryptEmail(0, row)).toBe(false);
+			expect(emailCryptoUtils.shouldEncryptEmail(2, row)).toBe(true);
+		}
+		expect(emailCryptoUtils.shouldEncryptEmail(1, delivered)).toBe(false);
+	});
+	it('requires the persistent system writer marker for official mail and blocks reserved labels in rules', () => {
+		expect(isOfficialEmailRow({ sendEmail: 'announcement@epocanvas.com', labels: '["官方"]' })).toBe(false);
 		expect(isOfficialEmailRow({
+			isOfficial: 1,
 			sendEmail: 'announcement@epocanvas.com',
 			receiveClaimKey: null,
 			outboundTaskId: null
@@ -481,8 +530,13 @@ describe('Freeze convergence regressions (P1/P2)', () => {
 
 		// The 6th attempt via a brand-new alias is blocked because canonical@example.com reached 5 failures
 		await expect(loginService.login(c, { email: 'alias6@example.com', password: 'wrong' })).rejects.toThrow();
-		expect(kvStore.get('login_fail:canonical@example.com')).toBe('5');
+		expect(kvStore.get('login_fail:canonical@example.com|ip:local')).toBe('5');
 		expect(verifySpy).toHaveBeenCalledTimes(5);
+
+		// A different source must not inherit the account-wide lockout.
+		c.req.header = (name) => name === 'CF-Connecting-IP' ? '203.0.113.2' : '';
+		await expect(loginService.login(c, { email: 'alias7@example.com', password: 'wrong' })).rejects.toThrow();
+		expect(verifySpy).toHaveBeenCalledTimes(6);
 
 		rlSpy.mockRestore();
 		userByEmailSpy.mockRestore();

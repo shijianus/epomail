@@ -300,9 +300,6 @@ export function RegisterForm({ canvasRef, onSwitch, sysConfig: propsSysConfig }:
         const data = await res.json();
         if (data.code === 200) {
           setStatus("success");
-          if (data.data?.token) {
-            localStorage.setItem("token", data.data.token);
-          }
           cameraState.authSuccessOpacity = 1;
 
           let finalMsg = i18n.registerSuccess || data.message || data.msg;

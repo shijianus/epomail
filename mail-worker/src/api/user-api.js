@@ -4,9 +4,10 @@ import totpService from '../service/totp-service';
 import result from '../model/result';
 import userContext from '../security/user-context';
 import accountService from '../service/account-service';
+import { readJsonObject } from '../utils/request-body.js';
 
 app.post('/user/resetTotp', async (c) => {
-	const { userId, operatorPassword = '' } = await c.req.json();
+	const { userId, operatorPassword = '' } = await readJsonObject(c);
 	await totpService.adminResetTotp(c, userContext.getUserId(c), userId, operatorPassword);
 	return c.json(result.ok());
 });
@@ -17,17 +18,17 @@ app.delete('/user/delete', async (c) => {
 });
 
 app.put('/user/setPwd', async (c) => {
-	await userService.setPwd(c, await c.req.json(), userContext.getUserId(c));
+	await userService.setPwd(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/user/setStatus', async (c) => {
-	await userService.setStatus(c, await c.req.json(), userContext.getUserId(c));
+	await userService.setStatus(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/user/setType', async (c) => {
-	await userService.setType(c, await c.req.json(), userContext.getUserId(c));
+	await userService.setType(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
@@ -50,17 +51,17 @@ app.get('/user/list', handleUserList);
 app.post('/user/list', handleUserList);
 
 app.post('/user/add', async (c) => {
-	await userService.add(c, await c.req.json(), userContext.getUserId(c));
+	await userService.add(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
 app.put('/user/resetSendCount', async (c) => {
-	await userService.resetSendCount(c, await c.req.json());
+	await userService.resetSendCount(c, await readJsonObject(c));
 	return c.json(result.ok());
 });
 
 app.put('/user/restore', async (c) => {
-	await userService.restore(c, await c.req.json(), userContext.getUserId(c));
+	await userService.restore(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok());
 });
 
@@ -75,22 +76,18 @@ app.delete('/user/deleteAccount', async (c) => {
 });
 
 app.post('/user/purgeEmails', async (c) => {
-	const data = await userService.purgeUserEmails(c, await c.req.json(), userContext.getUserId(c));
+	const data = await userService.purgeUserEmails(c, await readJsonObject(c), userContext.getUserId(c));
 	return c.json(result.ok(data));
 });
 
 // 管理员强制为指定用户补发官方欢迎邮件（修复账号恢复后欢迎邮件缺失问题）
 app.post('/user/sendWelcomeEmail', async (c) => {
-	const { userId, email: userEmail } = await c.req.json();
+	const { userId, email: userEmail } = await readJsonObject(c);
 	if (!userId) {
 		return c.json(result.fail('userId 不能为空'));
 	}
-	// 先清除 KV 缓存，强制重新投递
-	try {
-		await c.env.kv.delete('HAS_WELCOME_' + userId);
-	} catch (_) {}
 	const emailService = (await import('../service/email-service')).default;
-	const emailRow = await emailService.ensureWelcomeEmailForUser(c, Number(userId), userEmail || null);
+	const emailRow = await emailService.ensureWelcomeEmailForUser(c, Number(userId), userEmail || null, { repairMissing: true });
 	return c.json(result.ok({ delivered: !!emailRow, emailId: emailRow?.emailId }));
 });
 

@@ -1,9 +1,11 @@
 # Epocanvas Mail - 封版冻结门禁清单 (FROZEN-CHECKLIST.md)
 
-> **当前冻结基线 (Frozen Baseline SHA)**：`4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
+> **本页记录 2026-11-05 的历史冻结。** 本轮源码冻结须核对实际发布分支、候选 SHA 及其三项 push CI。当前审计见 [REPORTS.md](REPORTS.md)，正式条件见[公测制品放行](doc/release/PUBLIC-BETA-PROMOTION.md)。
+>
+> **历史冻结基线 (Frozen Baseline SHA)**：`4d9d9d8d1a87380215b54ca28ba8dbcf0f6b5983` (Short: `4d9d9d8`)
 > **基线分支**：`release/2026-10-31`
 > **发布候选标签 (RC Tags)**：`v1.2.1-freeze`、`backend-freeze-2026-11-05`
-> **状态判定**：**FROZEN (封版冻结就绪)**。所有已知 P0/P1 安全与数据缺陷已清零，未授权禁止合入任何新代码。
+> **该基线当时的状态判定**：**FROZEN (封版冻结就绪)**。所有已知 P0/P1 安全与数据缺陷已清零，未授权禁止合入任何新代码。
 
 ---
 
@@ -63,3 +65,6 @@ flowchart TD
      - 同步编写/更新自动化回归测试用例；
      - 重新执行以上 8 项门禁（GATE-1 至 GATE-8）；
      - 生成全新的 Commit SHA 与 Tag，严禁在旧 Commit 上强制覆盖或追加提交。
+# 2026-11-14 审计基线说明
+
+本文件中的早期冻结结果对应历史提交，不能替代当前分支的公测审计证据。该次审计的基线是 `fix/public-beta-go-blockers-2026-11-07` @ `fb04eeb42a5ec527c78a302bee45dcd5891ffbc4`，详见 `doc/release/PUBLIC-BETA-AUDIT-2026-11-14.md`。

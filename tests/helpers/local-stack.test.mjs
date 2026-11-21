@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
+import { candidateConfig } from '../../scripts/candidate-config.mjs';
 import {
 	localEnvironment, writeLocalConfig, verifyProductionAssets,
 	observeProcess, stopProcessTree, removeTemporaryDirectory,
@@ -20,6 +21,41 @@ async function withDirectory(run) {
 	try { return await run(directory); }
 	finally { await removeTemporaryDirectory(directory); }
 }
+
+test('the archive config keeps deploy targets and strips only source build hooks', () => {
+	const template = [
+		'main="src/index.js"', '[build]', 'command="build source"',
+		'[assets]', 'directory="./dist"', '[env.staging]', 'name="stage"',
+		'[env.staging.build]', 'command="build stage"', '[env.staging.assets]', 'directory="./dist"'
+	].join('\n');
+	const packaged = candidateConfig(template);
+	assert.match(packaged, /^main = "bundle\/index.js"\nno_bundle = true/);
+	assert.doesNotMatch(packaged, /build|command=/);
+	assert.match(packaged, /\[assets\]\ndirectory="\.\/dist"/);
+	assert.match(packaged, /\[env\.staging\]\nname="stage"/);
+	assert.match(packaged, /\[env\.staging\.assets\]\ndirectory="\.\/dist"/);
+});
+
+test('local archive smoke loads identical ESM bytes with bundling off and outbound fetch blocked', async () => {
+	await withDirectory(async base => {
+		const bundle = path.join(base, 'packed/bundle');
+		const temp = path.join(base, 'isolated');
+		await fs.mkdir(bundle, { recursive: true });
+		await fs.mkdir(temp);
+		const worker = path.join(bundle, 'index.js');
+		const bytes = 'export default { fetch() { return new Response("candidate"); } };';
+		await fs.writeFile(worker, bytes);
+		const { configPath, entryPath } = await writeLocalConfig(temp, base, path.join(base, 'packed/dist'), worker, true);
+		const config = JSON.parse(await fs.readFile(configPath, 'utf8'));
+		assert.equal(entryPath, config.main);
+		assert.equal(config.no_bundle, true);
+		assert.equal(config.find_additional_modules, true);
+		assert.equal(await fs.readFile(path.join(config.base_dir, 'bundle/index.js'), 'utf8'), bytes);
+		const wrapper = await fs.readFile(config.main, 'utf8');
+		assert.match(wrapper, /from "\.\/bundle\/index.js"/);
+		assert.match(wrapper, /External network is disabled/);
+	});
+});
 
 test('config uses only local dummy bindings and absolute repository assets; each run has fresh secrets', async () => {
 	await withDirectory(async directory => {
@@ -449,4 +485,38 @@ test('real native process tree exits before locked state is removed', { timeout:
 		await removeTemporaryDirectory(directory);
 		await assert.rejects(fs.access(directory), { code: 'ENOENT' });
 	});
+});
+
+test('local-stack runtime helper accepts only loopback worker URLs and prevents duplicate ready emits', async () => {
+	const {
+		READY_URL_PREFIX,
+		createDirectProxyController,
+		formatLoopbackWorkerUrl,
+		parseLocalStackReadyUrl
+	} = await import('./local-stack-runtime.mjs');
+
+	assert.equal(
+		formatLoopbackWorkerUrl({ protocol: 'http:', hostname: '127.0.0.1', port: '45465' }),
+		'http://127.0.0.1:45465'
+	);
+	assert.equal(formatLoopbackWorkerUrl({ protocol: 'https:', hostname: '127.0.0.1', port: 443 }), null);
+	assert.equal(formatLoopbackWorkerUrl({ protocol: 'http:', hostname: 'localhost', port: 8787 }), null);
+	assert.equal(formatLoopbackWorkerUrl({ protocol: 'http:', hostname: '127.0.0.1', port: 0 }), null);
+
+	assert.equal(parseLocalStackReadyUrl(`${READY_URL_PREFIX}http://127.0.0.1:41234`), 'http://127.0.0.1:41234');
+	assert.equal(parseLocalStackReadyUrl(`${READY_URL_PREFIX}http://127.0.0.1:41234/extra`), null);
+	assert.equal(parseLocalStackReadyUrl(`${READY_URL_PREFIX}http://example.com:80`), null);
+
+	const emitted = [];
+	const controller = createDirectProxyController({ onUrl: url => emitted.push(url) });
+	controller.onReloadComplete({ proxyData: { userWorkerUrl: { protocol: 'http:', hostname: 'evil.test', port: 80 } } });
+	assert.deepEqual(emitted, []);
+	controller.onReloadComplete({ proxyData: { userWorkerUrl: { protocol: 'http:', hostname: '127.0.0.1', port: '39123' } } });
+	controller.onReloadComplete({ proxyData: { userWorkerUrl: { protocol: 'http:', hostname: '127.0.0.1', port: '39123' } } });
+	assert.equal((await controller.ready.promise).userWorkerUrl, 'http://127.0.0.1:39123');
+	assert.deepEqual(emitted, ['http://127.0.0.1:39123']);
+
+	const earlyStop = createDirectProxyController();
+	await earlyStop.teardown();
+	await assert.rejects(earlyStop.ready.promise, /stopped before becoming ready/);
 });

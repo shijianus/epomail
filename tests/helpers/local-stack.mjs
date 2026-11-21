@@ -2,24 +2,53 @@ import { spawn, execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { createServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { parseLocalStackReadyUrl } from './local-stack-runtime.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const helperDir = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(helperDir, '../..');
 const execFileAsync = promisify(execFile);
 
-async function freePort() {
-	const server = createServer();
+// Wait for the child runtime to emit its validated loopback HTTP origin.
+function awaitRuntimeUrl(child, signal, timeoutMs) {
+	let stdoutBuffer = '';
 	return new Promise((resolve, reject) => {
-		server.once('error', reject);
-		server.listen(0, '127.0.0.1', () => {
-			const { port } = server.address();
-			server.close(error => error ? reject(error) : resolve(port));
-		});
+		let settled = false;
+		const finish = fn => value => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			signal.removeEventListener('abort', onAbort);
+			child.stdout.off('data', onStdout);
+			child.stdout.off('end', onEnd);
+			fn(value);
+		};
+		const consumeLine = line => {
+			const readyUrl = parseLocalStackReadyUrl(line);
+			if (readyUrl) finish(resolve)(readyUrl);
+		};
+		const onStdout = data => {
+			stdoutBuffer += data.toString();
+			const lines = stdoutBuffer.split(/\r?\n/);
+			stdoutBuffer = lines.pop() ?? '';
+			for (const line of lines) consumeLine(line);
+		};
+		const onEnd = () => {
+			if (stdoutBuffer) consumeLine(stdoutBuffer);
+		};
+		const onAbort = () => finish(reject)(signal.reason || new Error('Local stack aborted before runtime ready'));
+		const timer = setTimeout(() => finish(reject)(new Error(`Timed out waiting ${timeoutMs}ms for local runtime URL`)), timeoutMs);
+		if (signal.aborted) {
+			onAbort();
+			return;
+		}
+		signal.addEventListener('abort', onAbort, { once: true });
+		child.stdout.on('data', onStdout);
+		child.stdout.on('end', onEnd);
 	});
 }
 
@@ -51,19 +80,38 @@ export function localEnvironment(directory, source = process.env) {
 	};
 }
 
-export async function writeLocalConfig(directory, workerDir, assetsDir = path.join(workerDir, 'dist')) {
+export async function writeLocalConfig(directory, workerDir, assetsDir = path.join(workerDir, 'dist'), workerEntry = path.join(workerDir, 'src/index.js'), prebuilt = false, profileRequests = false, enablePatIssuance = false) {
 	const secrets = {
 		jwt_secret: randomBytes(32).toString('base64url'),
 		totp_enc_key: randomBytes(32).toString('base64'),
 		email_enc_key: randomBytes(32).toString('base64')
 	};
-	const entryPath = path.join(directory, 'isolated-worker.mjs');
-	const mainPath = path.resolve(workerDir, 'src/index.js').replaceAll('\\', '/');
-	await fs.writeFile(entryPath, `import worker from ${JSON.stringify(mainPath)};\nObject.defineProperty(globalThis, 'fetch', { value: async () => { throw new Error('External network is disabled in the isolated test worker'); }, writable: false, configurable: false });\nexport default worker;\n`, { mode: 0o600, flag: 'wx' });
+	const moduleDir = prebuilt ? path.join(directory, 'modules') : directory;
+	const entryPath = path.join(moduleDir, 'isolated-worker.mjs');
+	let mainPath = path.resolve(workerEntry).replaceAll('\\', '/');
+	if (prebuilt) {
+		await fs.mkdir(moduleDir, { recursive: true });
+		await fs.cp(path.dirname(mainPath), path.join(moduleDir, 'bundle'), { recursive: true });
+		mainPath = './bundle/' + path.basename(mainPath);
+	}
+	let exportedWorker = 'worker';
+	let profileImport = '';
+	if (profileRequests) {
+		await fs.copyFile(path.join(helperDir, 'profile-local-worker.mjs'), path.join(moduleDir, 'profile-local-worker.mjs'));
+		profileImport = "import { profileWorker } from './profile-local-worker.mjs';\n";
+		exportedWorker = 'profileWorker(worker)';
+	}
+	await fs.writeFile(entryPath, `import worker from ${JSON.stringify(mainPath)};\nObject.defineProperty(globalThis, 'fetch', { value: async () => { throw new Error('External network is disabled in the isolated test worker'); }, writable: false, configurable: false });\n${profileImport}export default ${exportedWorker};\n`, { mode: 0o600, flag: 'wx' });
 	const configPath = path.join(directory, 'wrangler.json');
 	await fs.writeFile(configPath, JSON.stringify({
 		name: 'epomail-local-test',
 		main: entryPath,
+		...(prebuilt ? {
+			no_bundle: true,
+			base_dir: moduleDir,
+			find_additional_modules: true,
+			rules: [{ type: 'ESModule', globs: ['bundle/**/*.js', ...(profileRequests ? ['profile-local-worker.mjs'] : [])], fallthrough: true }]
+		} : {}),
 		compatibility_date: '2025-06-04',
 		compatibility_flags: ['nodejs_als'],
 		send_metrics: false,
@@ -83,6 +131,7 @@ export async function writeLocalConfig(directory, workerDir, assetsDir = path.jo
 		vars: {
 			DEV: 'true',
 			ENVIRONMENT: 'smoke',
+			...(enablePatIssuance ? { ENABLE_PAT_ISSUANCE: 'true' } : {}),
 			EMAIL_OUTBOUND_ENABLED: 'false',
 			OUTBOUND_WHITELIST_ENFORCE: 'true',
 			OUTBOUND_WHITELIST: '',
@@ -98,7 +147,7 @@ export async function writeLocalConfig(directory, workerDir, assetsDir = path.jo
 		Object.entries(secrets).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join('\n') + '\n',
 		{ mode: 0o600 }
 	);
-	return { configPath, secrets };
+	return { configPath, entryPath, secrets };
 }
 
 export async function verifyProductionAssets(workerDir, assetsDir = path.join(workerDir, 'dist')) {
@@ -278,7 +327,10 @@ async function waitForLogin(base, signal, timeoutMs) {
 // in finally; signals still request shutdown when no callback wrapper is used.
 export async function startLocalStack({
 	workerDir = path.join(root, 'mail-worker'),
-	assetsDir = path.join(workerDir, 'dist'),
+	assetsDir = process.env.EPOMAIL_CANDIDATE_DIR ? path.resolve(process.env.EPOMAIL_CANDIDATE_DIR, 'dist') : path.join(workerDir, 'dist'),
+	workerEntry = process.env.EPOMAIL_CANDIDATE_DIR ? path.resolve(process.env.EPOMAIL_CANDIDATE_DIR, 'bundle/index.js') : path.join(workerDir, 'src/index.js'),
+	profileRequests = false,
+	enablePatIssuance = false,
 	startupTimeoutMs = 180000
 } = {}) {
 	let directory, child, state, stopPromise;
@@ -336,21 +388,19 @@ export async function startLocalStack({
 	try {
 		await verifyProductionAssets(workerDir, assetsDir);
 		const require = createRequire(path.join(workerDir, 'package.json'));
-		// Invoke the installed CLI directly: no pnpm/cmd wrapper to orphan its
-		// children, no package download, and paths with spaces remain one argument.
-		const cli = path.resolve(path.dirname(require.resolve('wrangler/bin/wrangler.js')), '../wrangler-dist/cli.js');
+		require.resolve('wrangler');
+		// Run Miniflare directly inside an isolated process without Wrangler's ProxyWorker hop:
+		// ProxyWorker's workerd-to-workerd loopback pool hits Miniflare's 5s HTTP keep-alive close,
+		// and Wrangler's ProxyWorker misclassifies non-root errors as mid-request restarts (503).
+		const runtimeEntry = path.resolve(helperDir, 'local-stack-runtime.mjs');
+		await fs.mkdir(os.tmpdir(), { recursive: true });
 		directory = await fs.mkdtemp(path.join(os.tmpdir(), 'epomail-local-'));
-		const config = await writeLocalConfig(directory, workerDir, assetsDir);
+		const config = await writeLocalConfig(directory, workerDir, assetsDir, workerEntry, Boolean(process.env.EPOMAIL_CANDIDATE_DIR), profileRequests, enablePatIssuance);
 		secrets = config.secrets;
-		const port = await freePort();
-		const base = `http://127.0.0.1:${port}`;
 		controller.signal.throwIfAborted();
 		child = spawn(process.execPath, [
-			'--no-warnings', '--experimental-vm-modules', cli, 'dev',
-			'--config', config.configPath, '--local', '--remote=false',
-			'--ip', '127.0.0.1', '--port', String(port), '--inspector-port', '0',
-			'--persist-to', path.join(directory, 'state'),
-			'--show-interactive-dev-session=false'
+			'--no-warnings', '--experimental-vm-modules', runtimeEntry,
+			config.configPath, path.join(directory, 'state'), workerDir
 		], {
 			cwd: directory,
 			env: localEnvironment(directory),
@@ -363,9 +413,13 @@ export async function startLocalStack({
 		const collect = data => { log = (log + data.toString()).slice(-32768); };
 		child.stdout.on('data', collect);
 		child.stderr.on('data', collect);
+		const startedAt = Date.now();
+		const remainingStartupMs = () => Math.max(1_000, startupTimeoutMs - (Date.now() - startedAt));
+		const runtimeUrlPromise = awaitRuntimeUrl(child, controller.signal, remainingStartupMs());
 		const failure = Promise.race([state.failure, interrupted]);
 		failure.catch(() => {});
-		await Promise.race([waitForLogin(base, controller.signal, startupTimeoutMs), failure]);
+		const base = await Promise.race([runtimeUrlPromise, failure]);
+		await Promise.race([waitForLogin(base, controller.signal, remainingStartupMs()), failure]);
 		controller.signal.throwIfAborted();
 		starting = false;
 		return {
@@ -373,8 +427,13 @@ export async function startLocalStack({
 			jwtSecret: secrets.jwt_secret,
 			secret: secrets.jwt_secret,
 			tempDir: directory,
+			entryPath: config.entryPath,
 			signal: controller.signal,
 			failure,
+			runtimeStatus: () => ({
+				exited: state.exited, closed: state.closed, spawnError: Boolean(state.error),
+				exitCode: child.exitCode, exitSignal: child.signalCode
+			}),
 			addCleanup: cleanup => {
 				if (stopPromise) throw new Error('Cannot register a resource after local-stack shutdown');
 				cleanups.push(cleanup);

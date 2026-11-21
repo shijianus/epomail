@@ -23,6 +23,7 @@ const makeOfficialEmail = () => {
   const toName = 'Translation Test';
   return {
     emailId: 18,
+    isOfficial: 1,
     sendEmail: 'admin@epocanvas.com',
     toEmail,
     toName,
@@ -99,6 +100,10 @@ test('official local templates do not create external payloads even when process
     assert.equal(decision.kind, 'local');
     assert.equal(decision.translation.engine, 'template');
     assert.equal(Object.hasOwn(decision, 'payload'), false);
+  }
+  for (const marker of [undefined, 0]) {
+    const unverified = { ...email, isOfficial: marker };
+    assert.equal(prepare({ email: unverified, settings: {} }).kind, 'blocked');
   }
   const modified = { ...email, content: `${email.content}<p>Additional unit-test text.</p>` };
   assert.equal(prepare({ email: modified }).kind, 'confirmation');

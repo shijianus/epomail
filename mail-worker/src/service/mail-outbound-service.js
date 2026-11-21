@@ -1,11 +1,22 @@
+import { advanceDailyQuota } from '../utils/send-quota-period.js';
 import { getMailDb, getUserDb } from '../utils/db-accessor.js';
 import BizError from '../error/biz-error.js';
+import storageQuotaService from './storage-quota-service.js';
+import { mailQuotaCondition, validatedMailQuotaCondition } from '../utils/mail-pipeline.js';
 import { mailTransactionGuard } from '../utils/mail-transaction.js';
 
 const LEASE_SECONDS = 300;
+const legacyLocalRetry = 'Local delivery will resume from receipts';
+const hasReceipt = 'EXISTS (SELECT 1 FROM mail_local_delivery d WHERE d.task_id=mail_outbound_task.task_id)';
+const hasDelivery = "EXISTS (SELECT 1 FROM mail_local_delivery d WHERE d.task_id=mail_outbound_task.task_id AND d.state='DELIVERED')";
+// Older workers returned partially dispatched local sends to PREPARED. An archive by
+// itself is insufficient evidence of dispatch: its reservation might never have passed.
+const startedLocal = `provider='local' AND (state IN ('SENDING','UNKNOWN')
+	OR (state='PREPARED' AND (COALESCE(last_error,'')='${legacyLocalRetry}' OR ${hasReceipt})))`;
 const error = (message, code, status = 409) => new BizError(message, status, code);
 
-export async function prepareOutboundTask(c, { userId, accountId, idempotencyKey, contentHash, payload = {}, reservedBytes = 0, maxStorageBytes, maxEmails, bypassStorage = false, storageBlocked = false }) {
+export async function prepareOutboundTask(c, request, getNewReservation) {
+	const { userId, accountId, idempotencyKey, contentHash, payload = {} } = request;
 	const db = getMailDb(c);
 	const key = idempotencyKey || crypto.randomUUID();
 	if (typeof key !== 'string' || !/^[A-Za-z0-9_.:-]{8,128}$/.test(key)) throw error('Invalid idempotency key', 'invalid_idempotency_key', 400);
@@ -16,38 +27,60 @@ export async function prepareOutboundTask(c, { userId, accountId, idempotencyKey
 	};
 	const previous = await read();
 	if (previous) return matches(previous);
+	let reservation = request;
+	if (getNewReservation) {
+		try {
+			reservation = await getNewReservation();
+		} catch (cause) {
+			// Another request can reserve the last available bytes under this key.
+			const concurrent = await read();
+			if (concurrent) return matches(concurrent);
+			throw cause;
+		}
+	}
+	const { reservedBytes = 0, maxStorageBytes, maxEmails, bypassStorage = false, storageBlocked = false } = reservation;
 	if (storageBlocked || !Number.isFinite(maxStorageBytes) || maxStorageBytes < 0 || !Number.isSafeInteger(reservedBytes) || reservedBytes < 0
 		|| !Number.isSafeInteger(maxEmails) || maxEmails < 0) {
+		await reservation.explainQuotaFailure?.();
 		throw error('Storage quota is unavailable', 'storage_usage_unknown', 503);
 	}
 	const taskId = crypto.randomUUID();
-	await db.prepare(`INSERT INTO mail_outbound_task
-		(task_id,user_id,account_id,idempotency_key,content_hash,state,payload_json,reserved_bytes,reserved_count,provider)
-		SELECT ?,?,?,?,?,'PREPARED',?,?,1,?
-		WHERE (? = 1 OR ? = 0 OR (
-			COALESCE((SELECT SUM(LENGTH(CAST(IFNULL(subject,'') AS BLOB))+LENGTH(CAST(IFNULL(text,'') AS BLOB))+
-				LENGTH(CAST(IFNULL(content,'') AS BLOB))+LENGTH(CAST(IFNULL(code,'') AS BLOB))) FROM email WHERE user_id=?),0)
-			+ COALESCE((SELECT SUM(size) FROM attachments WHERE user_id=?),0)
-			+ COALESCE((SELECT SUM(reserved_bytes) FROM mail_receive_claim WHERE user_id=? AND state IN ('CLAIMED','SAVING','RETRY') AND lease_until>unixepoch()),0)
-			+ COALESCE((SELECT SUM(reserved_bytes) FROM mail_outbound_task WHERE user_id=? AND state IN ('PREPARED','SENDING','UNKNOWN')),0)
-			+ ? <= ?)) AND (? = 0 OR (
-			(SELECT COUNT(*) FROM email WHERE user_id=?)
-			+ COALESCE((SELECT SUM(reserved_count) FROM mail_receive_claim WHERE user_id=? AND state IN ('CLAIMED','SAVING','RETRY') AND lease_until>unixepoch()),0)
-			+ COALESCE((SELECT SUM(reserved_count) FROM mail_outbound_task WHERE user_id=? AND state IN ('PREPARED','SENDING','UNKNOWN')),0)
-			+ 1 <= ?))
-		ON CONFLICT(user_id,account_id,idempotency_key) DO NOTHING`)
-		.bind(taskId,userId,accountId,key,contentHash,JSON.stringify(payload),reservedBytes,payload.route === 'local' ? 'local' : 'external',bypassStorage?1:0,maxStorageBytes,
-			userId,userId,userId,userId,reservedBytes,maxStorageBytes,maxEmails,userId,userId,userId,maxEmails).run();
+	const leaseToken = request.claimOnInsert ? crypto.randomUUID() : null;
+	const buildQuota = reservation.explainQuotaFailure ? validatedMailQuotaCondition : mailQuotaCondition;
+	const limits = { userId, incomingBytes: reservedBytes, maxStorageBytes, maxEmails, bypassStorage };
+	const quota = buildQuota(limits);
+	const insert = db.prepare(`INSERT INTO mail_outbound_task
+		(task_id,user_id,account_id,idempotency_key,content_hash,state,payload_json,reserved_bytes,reserved_count,provider,lease_token,lease_until)
+		SELECT ?,?,?,?,?,'PREPARED',?,?,1,?,?,CASE WHEN ?=0 THEN 0 ELSE unixepoch()+? END
+		WHERE ${quota.sql}
+		ON CONFLICT(user_id,account_id,idempotency_key) DO NOTHING RETURNING *`)
+		.bind(taskId, userId, accountId, key, contentHash, JSON.stringify(payload), reservedBytes,
+			payload.route === 'local' ? 'local' : 'external', leaseToken, leaseToken ? 1 : 0, LEASE_SECONDS, ...quota.params);
+	let inserted;
+	try { inserted = await insert.first(); }
+	catch (cause) {
+		// Preserve the established 503 if an accounting table/column is missing.
+		await reservation.explainQuotaFailure?.();
+		throw cause;
+	}
+	if (inserted) return leaseToken ? { task: inserted, created: true, leaseToken } : { task: inserted, created: true };
 	const task = await read();
-	if (!task) throw error('Storage quota is exhausted', 'storage_quota_exceeded', 413);
-	return { ...matches(task), created: task.task_id === taskId };
+	if (!task) {
+		if (reservation.explainQuotaFailure) {
+			// Re-read validity and the persisted bytes for the existing error message
+			// together. Pending reservations can block this write without filling storage.
+			const report = validatedMailQuotaCondition(limits, { reportUsage: true });
+			const measured = await db.prepare('SELECT * FROM ' + report.sql).bind(...report.params).first();
+			if (measured?.allowed == null) throw error('Storage quota usage or configuration is unavailable', 'storage_usage_unknown', 503);
+			await reservation.explainQuotaFailure(measured);
+		}
+		throw error('Storage quota is exhausted', 'storage_quota_exceeded', 413);
+	}
+	return matches(task);
 }
 
 export async function claimPreparation(c, taskId) {
 	const db = getMailDb(c);
-	await db.prepare(`UPDATE mail_outbound_task SET state='PREPARED',lease_token=NULL,lease_until=0,updated_at=CURRENT_TIMESTAMP
-		WHERE task_id=? AND provider='local' AND state IN ('SENDING','UNKNOWN') AND lease_until<=unixepoch()`)
-		.bind(taskId).run();
 	const leaseToken = crypto.randomUUID();
 	const row = await db.prepare(`UPDATE mail_outbound_task SET lease_token=?,lease_until=unixepoch()+?,updated_at=CURRENT_TIMESTAMP
 		WHERE task_id=? AND state='PREPARED' AND (lease_token IS NULL OR lease_until<=unixepoch()) RETURNING *`)
@@ -55,6 +88,9 @@ export async function claimPreparation(c, taskId) {
 	if (row) return { task: row, leaseToken };
 	const task = await db.prepare('SELECT * FROM mail_outbound_task WHERE task_id=?').bind(taskId).first();
 	if (task?.state === 'ACCEPTED') return { task, leaseToken: null };
+	if (task?.provider === 'local' && ['SENDING','UNKNOWN'].includes(task.state)) {
+		throw error('Local delivery is pending under this request', 'local_delivery_pending', 503);
+	}
 	if (task?.state === 'SENDING' && task.lease_until <= Math.floor(Date.now()/1000)) {
 		await db.prepare("UPDATE mail_outbound_task SET state='UNKNOWN',lease_until=0,last_error='Provider result requires reconciliation' WHERE task_id=? AND state='SENDING' AND lease_until<=unixepoch()") .bind(taskId).run();
 	}
@@ -63,12 +99,39 @@ export async function claimPreparation(c, taskId) {
 	throw error('The same request is already being prepared', 'outbound_in_flight', 425);
 }
 
-export async function claimOutboundTask(c, taskId, leaseToken) {
-	const task = await getMailDb(c).prepare(`UPDATE mail_outbound_task SET state='SENDING',lease_until=unixepoch()+?,updated_at=CURRENT_TIMESTAMP
-		WHERE task_id=? AND state='PREPARED' AND lease_token=? AND lease_until>unixepoch() AND email_id IS NOT NULL RETURNING *`)
-		.bind(LEASE_SECONDS,taskId,leaseToken).first();
-	if (!task) throw error('Send lease has changed', 'outbound_lease_lost');
-	return { task, leaseToken, dispatch: true };
+export async function claimOutboundTask(c, taskId, leaseToken, { userId, senderAddress, selfDelivery = false }) {
+	const mailDb = getMailDb(c);
+	const userDb = getUserDb(c);
+	const shared = mailDb === userDb;
+	const denied = () => error('Sender is unavailable', 'account_unavailable', 403);
+	let dispatchIdentity = null;
+	if (selfDelivery) {
+		dispatchIdentity = await storageQuotaService.selectMailPolicyIdentity(c, userId, shared ? undefined : senderAddress);
+		const user = dispatchIdentity?.user;
+		if (!user || Number(user.status) !== 0 || Number(user.isDel) !== 0) throw denied();
+	} else if (!shared) {
+		// Different bindings cannot share a transaction. Check USER_DB immediately
+		// before the MAIL_DB claim, and never read its user or audit tables on MAIL_DB.
+		const active = await userDb.prepare(`SELECT 1 FROM user WHERE user_id=? AND status=0 AND is_del=0
+			AND NOT EXISTS (SELECT 1 FROM audit_log WHERE email=? AND warning_type='ban' AND status='banned')`)
+			.bind(userId, senderAddress).first();
+		if (!active) throw denied();
+	}
+	const ownerPolicy = shared ? `AND EXISTS (SELECT 1 FROM user u WHERE u.user_id=a.user_id AND u.status=0 AND u.is_del=0)
+		AND NOT EXISTS (SELECT 1 FROM audit_log b WHERE b.email=a.email AND b.warning_type='ban' AND b.status='banned')` : '';
+	const owned = "task_id=? AND state='PREPARED' AND lease_token=? AND lease_until>unixepoch() AND email_id IS NOT NULL";
+	const task = await mailDb.prepare(`UPDATE mail_outbound_task SET state='SENDING',lease_until=unixepoch()+?,updated_at=CURRENT_TIMESTAMP
+		WHERE ${owned} AND user_id=? AND EXISTS (
+			SELECT 1 FROM account a JOIN email e ON e.email_id=mail_outbound_task.email_id
+			WHERE a.account_id=mail_outbound_task.account_id AND a.user_id=mail_outbound_task.user_id
+			AND a.status=0 AND a.is_del=0 AND a.email=? AND e.send_email=a.email
+			AND e.account_id=a.account_id AND e.user_id=a.user_id AND e.outbound_task_id=mail_outbound_task.task_id
+			${ownerPolicy}) RETURNING *`).bind(LEASE_SECONDS,taskId,leaseToken,userId,senderAddress).first();
+	if (!task) {
+		if (await mailDb.prepare(`SELECT 1 FROM mail_outbound_task WHERE ${owned}`).bind(taskId,leaseToken).first()) throw denied();
+		throw error('Send lease has changed', 'outbound_lease_lost');
+	}
+	return { task, leaseToken, dispatch: true, dispatchIdentity };
 }
 
 export async function markOutboundUnknown(c, { taskId, leaseToken, providerId = null }) {
@@ -86,28 +149,27 @@ export async function reserveSendCount(c, { taskId, userId, quantity, maxCount, 
 	if (!Number.isSafeInteger(userId) || userId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 100
 		|| !Number.isSafeInteger(maxCount) || maxCount < 0) throw error('Send quota is unavailable', 'send_quota_unavailable', 503);
 	const db = getUserDb(c);
-	const existing = await db.prepare('SELECT * FROM mail_send_quota_reservation WHERE task_id=?').bind(taskId).first();
-	if (existing) {
-		if (existing.user_id !== userId || existing.quantity !== quantity || existing.state === 'released') throw error('Send reservation cannot be reused', 'send_quota_conflict');
-		return;
-	}
-	const result = await db.batch([
-		db.prepare(`INSERT INTO mail_send_quota_reservation(task_id,user_id,quantity,quota_day,is_daily,state)
-			SELECT ?,?,?,date('now'),?,'reserved' WHERE EXISTS (
-			SELECT 1 FROM user WHERE user_id=? AND status=0 AND is_del=0 AND (?=0 OR CAST(send_count AS INTEGER)+?<=?))
+	const statements = [
+		db.prepare(`INSERT INTO mail_send_quota_reservation(task_id,user_id,quantity,quota_day,quota_generation,is_daily,state)
+			SELECT ?,user_id,?,date('now'),send_quota_generation,?,'reserved' FROM user
+			WHERE user_id=? AND status=0 AND is_del=0 AND (?=0 OR CAST(send_count AS INTEGER)+?<=?)
 			ON CONFLICT(task_id) DO NOTHING`)
-			.bind(taskId,userId,quantity,daily?1:0,userId,maxCount,quantity,maxCount),
+			.bind(taskId,quantity,daily?1:0,userId,maxCount,quantity,maxCount),
 		db.prepare(`UPDATE user SET send_count=CAST(send_count AS INTEGER)+?
 			WHERE user_id=? AND changes()=1
 			AND EXISTS(SELECT 1 FROM mail_send_quota_reservation WHERE task_id=? AND state='reserved')`).bind(quantity,userId,taskId)
-	]);
-	if (Number(result[0].meta?.changes) !== 1) {
+	];
+	if (daily) statements.unshift(advanceDailyQuota(db, userId));
+	const [inserted] = (await db.batch(statements)).slice(-2);
+	if (Number(inserted.meta?.changes) !== 1) {
 		const raced = await db.prepare('SELECT user_id,quantity,state FROM mail_send_quota_reservation WHERE task_id=?').bind(taskId).first();
 		if (!raced) throw error('Send quota is exhausted', 'send_quota_exceeded', 403);
 		if (raced.user_id !== userId || raced.quantity !== quantity || raced.state === 'released') throw error('Send reservation cannot be reused', 'send_quota_conflict');
 	}
 }
 
+// Older reservations recorded only the UTC date. Refund one against an inherited
+// daily count only if its date already started inside that active business day.
 export async function compensateSendCount(c, { taskId }) {
 	const db = getUserDb(c);
 	await db.batch([
@@ -115,18 +177,95 @@ export async function compensateSendCount(c, { taskId }) {
 			SELECT quantity FROM mail_send_quota_reservation WHERE task_id=?))
 			WHERE user_id=(SELECT user_id FROM mail_send_quota_reservation WHERE task_id=?)
 			AND EXISTS(SELECT 1 FROM mail_send_quota_reservation WHERE task_id=? AND state='reserved'
-			AND (is_daily=0 OR quota_day=date('now')))` ).bind(taskId,taskId,taskId),
+			AND (quota_generation=user.send_quota_generation OR
+				(quota_generation IS NULL AND user.send_quota_generation=0 AND
+					(is_daily=0 OR unixepoch(quota_day) BETWEEN user.send_quota_period AND user.send_quota_period+86399))))`).bind(taskId,taskId,taskId),
 		db.prepare("UPDATE mail_send_quota_reservation SET state='released' WHERE task_id=? AND state='reserved'").bind(taskId)
 	]);
+}
+
+export async function retryLocalOutbound(c, taskId) {
+	const db = getMailDb(c);
+	const token = crypto.randomUUID();
+	const task = await db.prepare(`UPDATE mail_outbound_task SET state='SENDING',lease_token=?,lease_until=unixepoch()+?,
+		updated_at=CURRENT_TIMESTAMP WHERE task_id=? AND (${startedLocal}) AND lease_until<=unixepoch() RETURNING *`)
+		.bind(token, LEASE_SECONDS, taskId).first();
+	if (!task) return false;
+	try {
+		const { resumeArchivedLocalDelivery } = await import('./mail-local-delivery-service.js');
+		await resumeArchivedLocalDelivery(c, task);
+		return true;
+	} catch (cause) {
+		await releaseLocalDispatch(c, taskId, token);
+		throw cause;
+	}
+}
+
+export async function releaseLocalDispatch(c, taskId, token) {
+	await getMailDb(c).prepare(`UPDATE mail_outbound_task SET lease_token=NULL,lease_until=0,
+		last_error=?,updated_at=CURRENT_TIMESTAMP WHERE task_id=? AND provider='local' AND state='SENDING' AND lease_token=?`)
+		.bind(legacyLocalRetry, taskId, token).run();
+}
+
+// Publish the archive and the external task's terminal fact in one D1 batch.
+// A concurrent resolution, or a task under local receipt recovery, changes neither.
+export async function closeExternalUnknown(c, { taskId, providerId = null, state, reason, status, fromStatuses }) {
+	const db = getMailDb(c);
+	const selector = "task_id=? AND provider='external' AND state='UNKNOWN' AND (? IS NULL OR provider_id=?)";
+	const identity = [taskId, providerId, providerId];
+	const results = await db.batch([
+		db.prepare(`UPDATE email SET status=CASE WHEN status IN (${fromStatuses.map(() => '?').join(',')}) THEN ? ELSE status END,
+			resend_email_id=COALESCE(resend_email_id,?) WHERE EXISTS (SELECT 1 FROM mail_outbound_task t
+			WHERE ${selector} AND t.user_id=email.user_id AND t.email_id=email.email_id)`)
+			.bind(...fromStatuses, status, providerId, ...identity),
+		db.prepare(`UPDATE mail_outbound_task SET state=?,reserved_bytes=0,reserved_count=0,lease_until=0,last_error=?,
+			counted_day=CASE WHEN ?='ACCEPTED' THEN date('now') END,
+			counted_recipients=CASE WHEN ?='ACCEPTED' THEN COALESCE(
+				CASE WHEN json_valid(payload_json) THEN
+					CASE WHEN json_type(payload_json,'$.recipients')='array' THEN json_array_length(payload_json,'$.recipients') END END,
+				(SELECT CASE WHEN json_valid(e.recipient) THEN json_array_length(e.recipient) END FROM email e
+					WHERE e.email_id=mail_outbound_task.email_id AND e.user_id=mail_outbound_task.user_id), 0) ELSE 0 END,
+			updated_at=CURRENT_TIMESTAMP WHERE ${selector} RETURNING email_id,user_id`).bind(state, reason, state, state, ...identity)
+	]);
+	return results[1].results?.[0];
+}
+
+export async function readSendStatus(c, userId, accountId, idempotencyKey) {
+	if (!Number.isSafeInteger(userId) || userId <= 0) throw error('Authentication required', 'unauthorized', 401);
+	if (!Number.isSafeInteger(accountId) || accountId <= 0 || typeof idempotencyKey !== 'string'
+		|| !/^[A-Za-z0-9_.:-]{8,128}$/.test(idempotencyKey)) throw error('Invalid send request identity', 'invalid_idempotency_key', 400);
+	const task = await getMailDb(c).prepare(`SELECT state,provider,email_id,${hasDelivery} AS delivered,
+		EXISTS(SELECT 1 FROM mail_local_delivery d WHERE d.task_id=mail_outbound_task.task_id AND d.state='BOUNCED') AS bounced
+		FROM mail_outbound_task WHERE user_id=? AND account_id=? AND idempotency_key=?`)
+		.bind(userId, accountId, idempotencyKey).first();
+	if (!task) return { state: 'NOT_FOUND' };
+	if (task.state === 'ACCEPTED') {
+		const status = { state: 'ACCEPTED', emailId: task.email_id };
+		if (task.provider === 'local' && task.bounced) status.deliveryOutcome = task.delivered ? 'PARTIALLY_BOUNCED' : 'BOUNCED';
+		return status;
+	}
+	if (task.state === 'FAILED') return { state: task.delivered ? 'PARTIAL' : 'FAILED' };
+	if (task.provider !== 'local' && task.state === 'UNKNOWN') return { state: 'UNKNOWN' };
+	return { state: 'PENDING' };
 }
 
 export async function maintainOutboundTasks(c, { limit = 100 } = {}) {
 	const db = getMailDb(c);
 	const bound = Math.max(1, Math.min(Number(limit) || 100, 200));
-	const candidates = await db.prepare(`SELECT task_id FROM mail_outbound_task WHERE state='PREPARED'
+	const pending = await db.prepare(`SELECT task_id FROM mail_outbound_task WHERE (${startedLocal})
+		AND lease_until<=unixepoch() ORDER BY updated_at,task_id LIMIT ?`).bind(Math.min(bound, 10)).all();
+	let recovered = 0;
+	let pendingErrors = 0;
+	for (const row of pending.results || []) {
+		try {
+			if (await retryLocalOutbound(c, row.task_id)) recovered++;
+		} catch (_) { pendingErrors++; }
+	}
+	if (pendingErrors) console.warn('Local mail recovery remains pending', { count: pendingErrors });
+	const candidates = await db.prepare(`SELECT task_id FROM mail_outbound_task WHERE state='PREPARED' AND NOT (${startedLocal})
 		AND lease_until<=unixepoch() AND updated_at<datetime('now','-1 day') LIMIT ?`).bind(bound).all();
 	for (const row of candidates.results || []) {
-		const guard = mailTransactionGuard(c, `EXISTS(SELECT 1 FROM mail_outbound_task WHERE task_id=? AND state='PREPARED'
+		const guard = mailTransactionGuard(c, `EXISTS(SELECT 1 FROM mail_outbound_task WHERE task_id=? AND state='PREPARED' AND NOT (${startedLocal})
 			AND lease_until<=unixepoch() AND updated_at<datetime('now','-1 day'))`, [row.task_id]);
 		try {
 			await db.batch([guard.before,
@@ -143,12 +282,12 @@ export async function maintainOutboundTasks(c, { limit = 100 } = {}) {
 		last_error='Provider result requires reconciliation',updated_at=CURRENT_TIMESTAMP
 		WHERE task_id IN (SELECT task_id FROM mail_outbound_task WHERE state='SENDING' AND provider<>'local'
 		AND lease_until<=unixepoch() LIMIT ?)`).bind(bound).run();
-	const failed = await db.prepare("SELECT task_id FROM mail_outbound_task WHERE state='FAILED' AND quota_reconciled=0 LIMIT ?").bind(bound).all();
+	const failed = await db.prepare(`SELECT task_id FROM mail_outbound_task WHERE state='FAILED' AND quota_reconciled=0 AND NOT ${hasDelivery} LIMIT ?`).bind(bound).all();
 	for (const row of failed.results || []) {
 		await compensateSendCount(c, { taskId: row.task_id });
 		await db.prepare("UPDATE mail_outbound_task SET quota_reconciled=1 WHERE task_id=? AND state='FAILED'").bind(row.task_id).run();
 	}
-	return { expired: candidates.results?.length || 0, compensated: failed.results?.length || 0 };
+	return { recovered, pendingErrors, expired: candidates.results?.length || 0, compensated: failed.results?.length || 0 };
 }
 
 export async function retireOutboundForUser(c, userId) {
@@ -166,4 +305,4 @@ export async function retireOutboundForUser(c, userId) {
 	]);
 }
 
-export default { prepareOutboundTask, claimPreparation, claimOutboundTask, releasePreparation, markOutboundUnknown, reserveSendCount, compensateSendCount, maintainOutboundTasks, retireOutboundForUser };
+export default { prepareOutboundTask, claimPreparation, claimOutboundTask, releasePreparation, markOutboundUnknown, retryLocalOutbound, releaseLocalDispatch, reserveSendCount, compensateSendCount, maintainOutboundTasks, retireOutboundForUser };

@@ -289,6 +289,71 @@ export async function cascadeDeleteSystemEmails(c, emailIdList) {
 }
 
 /**
+ * Administrative purge. Select, account for, queue and delete in one MAIL_DB
+ * transaction. The scoped rows cannot change between these statements. Object
+ * storage is asynchronous; queued keys may still have surviving references.
+ */
+export async function purgeOwnedMail(c, userId, accountId = null, { mailbox, retainLocator = false } = {}) {
+	const uid = ownerId(userId);
+	const db = getMailDb(c);
+	const oneMailbox = accountId !== null;
+	const args = oneMailbox ? [uid, ownerId(accountId)] : [uid];
+	const scope = oneMailbox ? 'user_id = ? AND account_id = ?' : 'user_id = ?';
+	const query = sql => db.prepare(sql).bind(...args);
+	const mailIds = `SELECT email_id FROM email WHERE ${scope}`;
+	// The parent mail identifies whose mailbox is being purged; the attachment
+	// user identifies the storage backend. Legacy/imported rows can differ.
+	// Remove owner-scoped orphan metadata but preserve live foreign mail.
+	const attachmentScope = `email_id IN (${mailIds}) OR ((${scope}) AND
+		NOT EXISTS(SELECT 1 FROM email parent WHERE parent.email_id = attachments.email_id))`;
+	const attachmentArgs = [...args, ...args];
+	const snapshot = mailbox ? ` AND email=? AND name=?${retainLocator ? '' : ' AND is_del=1 AND status=1'}` : '';
+	const mailboxArgs = mailbox ? [...args, mailbox.email, mailbox.name] : args;
+	const scopeGuard = oneMailbox ? `EXISTS(SELECT 1 FROM account WHERE ${scope}${snapshot}) AND` : '';
+	const guard = mailTransactionGuard(c, `${scopeGuard}
+		NOT EXISTS(SELECT 1 FROM email e WHERE ${scope} AND NOT (${MUTABLE}))
+		AND NOT EXISTS(SELECT 1 FROM mail_outbound_task WHERE ${scope} AND state IN ('PREPARED','SENDING','UNKNOWN'))
+		AND NOT EXISTS(SELECT 1 FROM mail_receive_claim WHERE ${scope} AND state IN ('CLAIMED','SAVING','RETRY'))`,
+		[...(oneMailbox ? mailboxArgs : []), ...args, ...args, ...args]);
+	const byteCount = ['subject', 'text', 'content', 'code']
+		.map(field => `LENGTH(CAST(IFNULL(${field}, '') AS BLOB))`).join(' + ');
+	const starDelete = oneMailbox
+		? query(`DELETE FROM star WHERE email_id IN (${mailIds})`)
+		: db.prepare(`DELETE FROM star WHERE user_id = ? OR email_id IN (${mailIds})`).bind(uid, ...args);
+	let result;
+	try {
+		result = await db.batch([
+			guard.before,
+			query(`SELECT COALESCE(SUM(${byteCount}), 0) AS bytes FROM email WHERE ${scope}`),
+			db.prepare(`SELECT COALESCE(SUM(size), 0) AS bytes, COUNT(CASE WHEN typeof(size) <> 'integer' OR size < 0 THEN 1 END) AS invalid
+				FROM attachments WHERE user_id=? AND (${attachmentScope})`).bind(uid, ...attachmentArgs),
+			db.prepare(`INSERT INTO object_deletion_queue(object_key, user_id, next_retry_at)
+				SELECT DISTINCT key, CASE WHEN user_id > 0 THEN user_id ELSE 0 END, CURRENT_TIMESTAMP FROM attachments WHERE ${attachmentScope}
+				ON CONFLICT(object_key, user_id) DO UPDATE SET status='pending', attempts=0,
+					last_error=NULL, next_retry_at=CURRENT_TIMESTAMP`).bind(...attachmentArgs),
+			db.prepare(`DELETE FROM attachments WHERE ${attachmentScope}`).bind(...attachmentArgs),
+			starDelete,
+			query(`DELETE FROM email WHERE ${scope}`),
+			...(oneMailbox ? [query(retainLocator
+				? `UPDATE account SET is_del=1,status=1,all_receive=0 WHERE ${scope}`
+				: `DELETE FROM account WHERE ${scope}`)] : []),
+			guard.after
+		]);
+	} catch (error) {
+		if (!isSnapshotConflict(error)) throw error;
+		throw new BizError('Mailbox changed or delivery is still pending; retry after reconciliation', 409, 'mail_purge_conflict');
+	}
+	const attachmentUsage = result[2].results[0];
+	const releasedQuotaBytes = attachmentUsage.invalid ? null : result[1].results[0].bytes + attachmentUsage.bytes;
+	return {
+		userId: uid, releasedEmails: result[6].meta.changes, removedStars: result[5].meta.changes,
+		removedAttachments: result[4].meta.changes, queuedObjectKeys: result[3].meta.changes,
+		// The legacy storage metric represents logical quota, not object-store reclamation.
+		releasedQuotaBytes, releasedStorageBytes: releasedQuotaBytes, confirmedObjectBytes: null
+	};
+}
+
+/**
  * Unknown-recipient mail has no owner quota and no user trash lifecycle. Keep
  * a bounded retention window so a catch-all domain cannot grow D1/object
  * storage forever.

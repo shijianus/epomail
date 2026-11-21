@@ -8,6 +8,7 @@
  * Usage:
  *   node tests/backend-stress.mjs
  *   node tests/backend-stress.mjs --soak=2m --out=tests/artifacts/backend-stress.json
+ *   node tests/backend-stress.mjs --profile=capacity --soak=1m --out=tests/artifacts/capacity.json
  */
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -21,21 +22,14 @@ import {
   HARD_LIMITS,
   assessSlo,
   createLoopbackClient,
-  percentile,
+  planSoak,
   runStages
 } from './helpers/load-runner.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const STRESS_LIMITS = Object.freeze({
-  ...HARD_LIMITS,
-  maxConcurrency: 32,
-  maxRequestsPerStage: 10_000,
-  maxStageMs: 5 * 60 * 1000,
-  maxTotalMs: 30 * 60 * 1000,
-  requestTimeoutMs: 8_000
-});
+const STRESS_LIMITS = HARD_LIMITS;
 const DEFAULT_SOAK_MS = 3 * 60 * 1000;
-const MAX_SOAK_MS = 5 * 60 * 1000;
+const MAX_SOAK_MS = STRESS_LIMITS.maxStageMs;
 function parseDuration(value) {
   if (value === undefined || value === '') return DEFAULT_SOAK_MS;
   const match = /^(\d+)(ms|s|m)$/i.exec(String(value));
@@ -58,10 +52,10 @@ function parseArgs(argv) {
       if (!['capacity', 'limited-beta'].includes(args.profile)) throw new Error('unknown pressure profile');
     }
     else if (arg === '--help') {
-      console.log('Usage: node tests/backend-stress.mjs [--soak=3m] [--profile=limited-beta|capacity] [--out=path]');
+      console.log('Usage: node tests/backend-stress.mjs [--soak=3m] [--profile=limited-beta|capacity] [--out=path] (local only, maximum soak 30m)');
       process.exit(0);
     } else {
-      throw new Error(`unknown argument ${arg}; only --soak and --out are accepted`);
+      throw new Error(`unknown argument ${arg}; expected --soak, --profile or --out`);
     }
   }
   if (args.out && /https?:\/\//i.test(args.out)) throw new Error('--out must be a local filesystem path');
@@ -77,7 +71,7 @@ function sha() {
 }
 
 function redactText(value) {
-  return String(value || '')
+  return String(value || '').split('\n[wrangler tail]\n', 1)[0]
     .replace(/[A-Za-z0-9_-]{30,}/g, '[redacted]')
     .replace(/password\s*[:=]\s*[^,\s}]+/gi, 'password=[redacted]')
     .replace(/token\s*[:=]\s*[^,\s}]+/gi, 'token=[redacted]');
@@ -109,21 +103,24 @@ function currentGitSha() {
   return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', timeout: 5_000 }).trim();
 }
 
+function failedRequest(result) {
+  return result.timeout || result.transportError || result.abortedByFuse;
+}
+
 function expectedStatus(result, status, errorCode = null) {
+  if (failedRequest(result)) return result;
   const actualStatus = Number(result?.status);
   const actualCode = Number(result?.code);
-  // The Worker contract carries BizError status in JSON `code`; the current
-  // Hono error handler may serialize that body with HTTP 200.
-  const matchesStatus = actualCode === status && (actualStatus === 200 || actualStatus === status);
+  // HTTP error status contract: HTTP status and JSON code must be identical
+  const matchesStatus = actualCode === status && actualStatus === status && Number(result.json?.code) === status;
   const matchesErrorCode = errorCode === null || result?.json?.errorCode === errorCode;
   return { ...result, expected4xx: matchesStatus && matchesErrorCode, contractFailure: !matchesStatus || !matchesErrorCode };
 }
 
-function requireOk(result, label) {
-  if (result.status !== 200 || result.code !== 200) {
-    return { ...result, contractFailure: true, kind: label };
-  }
-  return { ...result, kind: label };
+function requireOk(result) {
+  if (failedRequest(result)) return result;
+  return result.status === 200 && result.code === 200 && Number(result.json?.code) === 200
+    ? result : { ...result, contractFailure: true };
 }
 
 function makeRequest(client, auth = {}) {
@@ -137,16 +134,14 @@ function makeRequest(client, auth = {}) {
 }
 
 async function assertEgressHarness(stack) {
-  const entryPath = path.join(stack.tempDir, 'isolated-worker.mjs');
-  const entry = await fs.readFile(entryPath, 'utf8');
+  const entry = await fs.readFile(stack.entryPath, 'utf8');
   assert.match(entry, /Object\.defineProperty\(globalThis, ['"]fetch['"]/);
   assert.match(entry, /writable:\s*false/);
   assert.match(entry, /configurable:\s*false/);
   assert.match(entry, /External network is disabled/);
 }
 
-async function bootstrap({ base, jwtSecret }) {
-  const client = createLoopbackClient(base);
+export async function bootstrap({ base, jwtSecret }, client = createLoopbackClient(base)) {
   const init = await client('/api/init', { method: 'POST', headers: { 'x-init-secret': jwtSecret } });
   assert.equal(init.status, 200, 'local init must succeed');
 
@@ -233,111 +228,96 @@ function emailIdFrom(result) {
   return Number(row?.emailId || row?.id || 0) || null;
 }
 
-function operationMix({ user, accountId, syntheticEmail }) {
-  const operations = [
-    async ({ signal }) => requireOk(await user('/api/email/list?size=10&type=0', { signal }), 'list'),
-    async ({ signal }) => requireOk(await user('/api/email/sidebarStats', { signal }), 'sidebar'),
-    async ({ signal }) => requireOk(await user(`/api/email/searchSuggestions?query=stress&type=subject_include&accountId=${accountId}`, { signal }), 'search'),
-    async ({ signal }) => requireOk(await user('/api/account/list', { signal }), 'account'),
-    async ({ signal }) => {
-      const list = requireOk(await user('/api/email/list?size=1&type=0', { signal }), 'detail-list');
+export function operationMix({ user, accountId, syntheticEmail }) {
+  const operations = {
+    list: async request => requireOk(await request('/api/email/list?size=10&type=0')),
+    sidebar: async request => requireOk(await request('/api/email/sidebarStats')),
+    search: async request => requireOk(await request(`/api/email/searchSuggestions?query=stress&type=subject_include&accountId=${accountId}`)),
+    account: async request => requireOk(await request('/api/account/list')),
+    detail: async request => {
+      const list = requireOk(await request('/api/email/list?size=1&type=0'));
+      if (failedRequest(list) || list.contractFailure) return list;
       const row = list.json?.data?.list?.[0];
-      if (!row?.emailId) return { kind: 'detail', contractFailure: true, status: 200, code: 200, latencyMs: list.latencyMs };
-      if (list.contractFailure) return { ...list, kind: 'detail' };
-      const detail = requireOk(await user(`/api/email/get?emailId=${encodeURIComponent(row.emailId)}`, { signal }), 'detail');
-      return { ...detail, httpRequests: 2, latencyMs: list.latencyMs + detail.latencyMs };
+      if (!row?.emailId) return { ...list, contractFailure: true };
+      return requireOk(await request(`/api/email/get?emailId=${encodeURIComponent(row.emailId)}`));
     },
-    async ({ signal, requestNumber }) => {
+    'send-internal': async (request, { requestNumber }) => {
       const idempotencyKey = `local-stress-${requestNumber}-${sha().slice(0, 10)}`;
-      const result = await user('/api/email/send', {
+      const result = await request('/api/email/send', {
         method: 'POST',
         headers: jsonHeaders({ 'Idempotency-Key': idempotencyKey }),
         body: JSON.stringify({
-          accountId,
-          receiveEmail: [syntheticEmail],
-          subject: `local stress ${requestNumber}`,
-          content: '<p>local stress</p>',
-          text: 'local stress',
-          sendType: 0,
-          attachments: [],
-          idempotencyKey
-        }),
-        signal
+          accountId, receiveEmail: [syntheticEmail], subject: `local stress ${requestNumber}`,
+          content: '<p>local stress</p>', text: 'local stress', sendType: 0, attachments: [], idempotencyKey
+        })
       });
-      return { kind: 'send-internal', ...requireOk(result, 'send-internal') };
+      return requireOk(result);
     },
-    async ({ signal, requestNumber }) => {
+    'send-replay': async (request, { requestNumber }) => {
       const idempotencyKey = `local-stress-replay-${requestNumber}-${sha().slice(0, 10)}`;
       const subject = `local replay ${requestNumber}-${sha().slice(0, 8)}`;
-      const body = {
-        accountId,
-        receiveEmail: [syntheticEmail],
-        subject,
-        content: '<p>local replay</p>',
-        text: 'local replay',
-        sendType: 0,
-        attachments: [],
-        idempotencyKey
+      const options = {
+        method: 'POST',
+        headers: jsonHeaders({ 'Idempotency-Key': idempotencyKey }),
+        body: JSON.stringify({
+          accountId, receiveEmail: [syntheticEmail], subject,
+          content: '<p>local replay</p>', text: 'local replay', sendType: 0, attachments: [], idempotencyKey
+        })
       };
-      const first = await user('/api/email/send', {
-        method: 'POST',
-        headers: jsonHeaders({ 'Idempotency-Key': idempotencyKey }),
-        body: JSON.stringify(body),
-        signal
-      });
-      const replay = await user('/api/email/send', {
-        method: 'POST',
-        headers: jsonHeaders({ 'Idempotency-Key': idempotencyKey }),
-        body: JSON.stringify(body),
-        signal
-      });
-      const verify = await user('/api/email/list?size=50&type=1', { signal });
+      const first = requireOk(await request('/api/email/send', options));
+      if (failedRequest(first) || first.contractFailure) return first;
+      const replay = requireOk(await request('/api/email/send', options));
+      if (failedRequest(replay) || replay.contractFailure) return replay;
+      const verify = requireOk(await request('/api/email/list?size=50&type=1'));
+      if (failedRequest(verify) || verify.contractFailure) return verify;
       const rows = Array.isArray(verify.json?.data?.list) ? verify.json.data.list : [];
       const matchingRows = rows.filter(row => row.subject === subject && row.sendEmail === syntheticEmail);
       const firstId = emailIdFrom(first);
       const replayId = emailIdFrom(replay);
-      const deduplicated = first.status === 200 && first.code === 200 && replay.status === 200 && replay.code === 200 &&
-        verify.status === 200 && verify.code === 200 && firstId !== null && firstId === replayId &&
+      const deduplicated = firstId !== null && firstId === replayId &&
         matchingRows.length === 1 && Number(matchingRows[0].emailId) === firstId;
-      const subrequests = [first, replay, verify];
-      const failure = subrequests.find(result => result.status !== 200 || result.code !== 200 || result.timeout || result.transportError);
-      return {
-        kind: 'send-replay',
-        status: failure?.status ?? 200,
-        code: failure?.code ?? 200,
-        timeout: subrequests.some(result => result.timeout),
-        transportError: subrequests.some(result => result.transportError),
-        diagnostic: { first: first.code, replay: replay.code, verify: verify.code, firstId, replayId, matching: matchingRows.length },
-        httpRequests: subrequests.length,
-        latencyMs: subrequests.reduce((sum, result) => sum + (result.latencyMs || 0), 0),
-        contractFailure: !deduplicated
-      };
+      return { ...verify, contractFailure: !deduplicated,
+        diagnostic: { firstId, replayId, matching: matchingRows.length } };
     },
-    async ({ signal, requestNumber }) => {
+    'send-external-disabled': async (request, { requestNumber }) => {
       const idempotencyKey = `local-stress-external-${requestNumber}-${sha().slice(0, 10)}`;
-      const result = await user('/api/email/send', {
+      return expectedStatus(await request('/api/email/send', {
         method: 'POST',
         headers: jsonHeaders({ 'Idempotency-Key': idempotencyKey }),
         body: JSON.stringify({
-          accountId,
-          receiveEmail: ['outside@not-in-local-domain.test'],
-          subject: 'local outbound negative',
-          content: '<p>blocked local outbound</p>',
-          text: 'blocked local outbound',
-          sendType: 0,
-          attachments: [],
-          idempotencyKey
-        }),
-        signal
-      });
-      return { kind: 'send-external-disabled', ...expectedStatus(result, 403, 'outbound_disabled') };
+          accountId, receiveEmail: ['outside@not-in-local-domain.test'], subject: 'local outbound negative',
+          content: '<p>blocked local outbound</p>', text: 'blocked local outbound', sendType: 0, attachments: [], idempotencyKey
+        })
+      }), 403, 'outbound_disabled');
     }
-  ];
-  return operations;
+  };
+  return Object.entries(operations).map(([kind, run]) => async context => {
+    context.kind = kind;
+    context.subrequest = 0;
+    let latencyMs = 0;
+    const request = async (path, options) => {
+      context.endpoint = path.split('?', 1)[0];
+      context.method = options?.method || 'GET';
+      context.subrequest++;
+      const result = await user(path, { ...options, signal: context.signal });
+      latencyMs += result.latencyMs || 0;
+      return result;
+    };
+    const result = await run(request, context);
+    return { ...result, kind, httpRequests: context.subrequest, latencyMs };
+  });
+}
+
+function sampleCoverage(stage) {
+  const planned = Math.min(stage.maxRequests, Math.max(1, Math.floor(stage.durationMs * stage.ratePerSecond / 1000)));
+  return {
+    plannedRequests: planned,
+    sampleFloor: Math.max(1, Math.floor(planned * 0.75)),
+    sampleRatio: Number((stage.stats.requests / planned).toFixed(3))
+  };
 }
 
 async function runPressure(fixture, soakMs, log, profile) {
-  const { user, accountId, syntheticEmail, password } = fixture;
   const mix = operationMix(fixture);
   const safeOperation = async context => {
     const operation = mix[context.requestNumber % mix.length];
@@ -357,45 +337,56 @@ async function runPressure(fixture, soakMs, log, profile) {
     })),
     { name: 'burst', concurrency: limited ? 4 : 32, durationMs: 5_000, ratePerSecond: limited ? 8 : 32, maxRequests: limited ? 40 : 160, operation: safeOperation },
     { name: 'recovery', concurrency: 2, durationMs: 10_000, ratePerSecond: 2, maxRequests: 30, operation: safeOperation },
-    { name: 'soak', concurrency: limited ? 4 : 8, durationMs: soakMs, ratePerSecond: limited ? 8 : 32, maxRequests: STRESS_LIMITS.maxRequestsPerStage, operation: safeOperation }
+    { ...planSoak(soakMs, limited), operation: safeOperation }
   ];
   const pressure = await runStages(stages, {
     limits: STRESS_LIMITS,
     onStageComplete: stage => {
-      log.push({ event: 'stage-complete', at: nowIso(), ...stage });
+      log.push({ event: 'stage-complete', at: nowIso(), ...stage, ...sampleCoverage(stage) });
     }
   });
 
+  return assessCompletedPressure(pressure, fixture, profile);
+}
+
+export async function assessCompletedPressure(pressure, fixture, profile) {
   const stageNames = pressure.results.map(stage => stage.name);
+  const limited = profile === 'limited-beta';
   const expectedStageNames = limited
     ? ['baseline', 'ramp-1', 'ramp-2', 'ramp-4', 'burst', 'recovery', 'soak']
     : ['baseline', 'ramp-1', 'ramp-4', 'ramp-8', 'ramp-16', 'ramp-32', 'burst', 'recovery', 'soak'];
+  if (pressure.stopped) {
+    const stopped = pressure.results.find(stage => !stage.stageCompleted);
+    throw new Error(`pressure must not stop early (${stopped?.name ?? 'stage budget'}: ${stopped?.stopReason ?? 'no further stage fits'})`);
+  }
   assert.deepEqual(stageNames, expectedStageNames, 'all pressure stages must complete in order');
-  assert.equal(pressure.stopped, false, 'pressure must not stop early');
+  const sampleFailures = [];
   for (const stage of pressure.results) {
     assert.equal(stage.stageCompleted, true, `stage ${stage.name} did not complete safely`);
-    const scheduled = Math.min(stage.maxRequests, Math.max(1, Math.floor(stage.durationMs * stage.ratePerSecond / 1000)));
-    const sampleFloor = Math.max(1, Math.floor(scheduled * 0.75));
-    stage.sampleFloor = sampleFloor;
-    stage.sampleRatio = Number((stage.stats.requests / scheduled).toFixed(3));
-    assert.ok(stage.stats.requests >= sampleFloor, `stage ${stage.name} sample count too low (${stage.stats.requests}/${scheduled}, floor ${sampleFloor})`);
+    Object.assign(stage, sampleCoverage(stage));
+    if (stage.stats.requests < stage.sampleFloor) {
+      sampleFailures.push(`stage ${stage.name} sample count too low (${stage.stats.requests}/${stage.plannedRequests}, floor ${stage.sampleFloor})`);
+    }
   }
-  const readP95Values = pressure.results.flatMap(stage => Object.entries(stage.byKind)
-    .filter(([kind]) => ['list', 'sidebar', 'search', 'account', 'detail'].includes(kind))
-    .map(([, stats]) => stats.latencyMs?.p95)).filter(Number.isFinite);
-  if (readP95Values.length < 5) throw new Error('insufficient read SLO samples across pressure stages');
-  const readP95 = Math.max(...readP95Values);
-  const readSlo = assessSlo(readP95, { nominalMs: 2_000 });
+  const readP95Values = [];
+  const missingKinds = [];
+  for (const kind of ['list', 'sidebar', 'search', 'account', 'detail']) {
+    const values = pressure.results.map(stage => stage.byKind[kind]?.latencyMs?.p95).filter(Number.isFinite);
+    if (!values.length) missingKinds.push(kind);
+    readP95Values.push(...values);
+  }
+  const readP95 = missingKinds.length ? null : Math.max(...readP95Values);
+  const readSlo = { ...assessSlo(readP95, { nominalMs: 2_000 }), missingKinds };
   const authStartedAt = Date.now();
   const authResults = [];
   for (let i = 0; i < 5; i++) {
     const result = await fixture.client('/api/login', {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({ email: syntheticEmail, password })
+      body: JSON.stringify({ email: fixture.syntheticEmail, password: fixture.password })
     });
     authResults.push(result);
-    if (result.status !== 200 || result.code !== 200 || !result.json?.data?.token) {
+    if (result.status !== 200 || result.code !== 200 || Number(result.json?.code) !== 200 || !result.json?.data?.token) {
       throw new Error('positive login contract failed during bounded auth stage');
     }
   }
@@ -411,23 +402,34 @@ async function runPressure(fixture, soakMs, log, profile) {
       status: 'positive-login-bounded-five-requests'
     }
   };
-  return { pressure, slo };
+  return { pressure, slo, sampleFailures };
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const startedAt = nowIso();
   const reportSha = currentGitSha();
+  let testedWorker = { mode: 'source-checkout', sourceSha: reportSha };
   const log = [];
   let cleanupVerified = false;
   let stackCompleted = false;
   let observedStack = null;
+  let runtimeBeforeShutdown = null;
   let egressConfigured = false;
   let reportPath = null;
   let report;
   try {
+    const archive = process.env.EPOMAIL_CANDIDATE_DIR;
+    if (archive) {
+      testedWorker = { mode: 'extracted-archive', sourceSha: null };
+      const sourceSha = (await fs.readFile(path.join(archive, 'SOURCE_SHA'), 'utf8')).trim();
+      assert.match(sourceSha, /^[a-f0-9]{40}$/);
+      const bundle = await fs.readFile(path.join(archive, 'bundle/index.js'));
+      testedWorker = { mode: 'extracted-archive', sourceSha, bundleSha256: crypto.createHash('sha256').update(bundle).digest('hex') };
+    }
     await withLocalStack(async stack => {
       observedStack = stack;
+      stack.addCleanup(() => { runtimeBeforeShutdown = stack.runtimeStatus(); });
       assert.match(stack.base, /^http:\/\/127\.0\.0\.1:\d+$/);
       log.push({ event: 'stack-started', at: nowIso(), host: '127.0.0.1', port: Number(new URL(stack.base).port) });
       const fixture = await bootstrap(stack);
@@ -446,20 +448,24 @@ async function main() {
         schema: 'epomail.backend-stress.v1',
         startedAt,
         finishedAt: nowIso(),
-        gitSha: reportSha,
+        gitSha: reportSha, testedWorker,
         environment: { localOnly: true, host: '127.0.0.1', egressBlockedByHarness: egressConfigured, providerCalls: 'not-measured', browser: false, deployment: false },
         limits: STRESS_LIMITS,
         configuration: { soakMs: args.soakMs, profile: args.profile },
         stages: result.pressure.results,
+        sampleFailures: result.sampleFailures,
         slo: result.slo,
         log,
         cleanup: { processTreeStopped: 'pending', temporaryDirectoryRemoved: 'pending' }
       };
+      // Preserve the measured SLOs and every failed floor in the failure report.
+      if (report.sampleFailures.length) throw new Error(report.sampleFailures.join('; '));
       stackCompleted = true;
     });
     cleanupVerified = true;
     report.cleanup = { processTreeStopped: true, temporaryDirectoryRemoved: true };
     report.finishedAt = nowIso();
+    report.runtimeBeforeShutdown = runtimeBeforeShutdown;
     reportPath = await writeReport(args.out, report);
   } catch (error) {
     if (observedStack) {
@@ -473,7 +479,7 @@ async function main() {
       schema: 'epomail.backend-stress.v1',
       startedAt,
       finishedAt: nowIso(),
-      gitSha: reportSha,
+      gitSha: reportSha, testedWorker,
       environment: { localOnly: true, host: '127.0.0.1', egressBlockedByHarness: egressConfigured, providerCalls: 'not-measured', browser: false, deployment: false },
       limits: STRESS_LIMITS,
       configuration: { soakMs: args.soakMs, profile: args.profile },
@@ -485,6 +491,7 @@ async function main() {
     };
     report.cleanup = { processTreeStopped: cleanupVerified, temporaryDirectoryRemoved: cleanupVerified };
     report.error = failure;
+    report.runtimeBeforeShutdown = runtimeBeforeShutdown;
     try { reportPath = await writeReport(args.out, report); } catch (_) {}
     if (reportPath) console.error(`backend stress failed; report: ${reportPath}`);
     throw error;
@@ -502,9 +509,14 @@ async function main() {
   console.log(`backend stress PASS; report: ${reportPath}`);
 }
 
-try {
-  await main();
-} catch (error) {
-  console.error(`backend stress FAIL: ${redactText(error.message)}`);
-  process.exitCode = 1;
+const directEntry = import.meta.main ?? (process.argv[1] &&
+  (path.resolve(process.argv[1]) === fileURLToPath(import.meta.url) ||
+   await fs.realpath(process.argv[1]).catch(() => null) === fileURLToPath(import.meta.url)));
+if (directEntry) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(`backend stress FAIL: ${redactText(error.message)}`);
+    process.exitCode = 1;
+  }
 }

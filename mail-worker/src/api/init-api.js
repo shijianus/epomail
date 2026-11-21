@@ -16,4 +16,7 @@ async function initHandler(c) {
 }
 
 app.post('/init', initHandler);
+app.post('/init/security-migrate', async (c) => {
+	return await dbInit.securityMigrate(c);
+});
 app.get('/init/:secret', initHandler);
