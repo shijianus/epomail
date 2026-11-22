@@ -1,3 +1,17 @@
+### 脚本 CSP 收紧：移除 unsafe-inline / unsafe-eval（2026-11-22）
+
+*   **关联提交 (Git Commit)**: `95471bda1a29c3a36f71bf8e3fbb81ac68127561` (Short: `95471bd`)
+*   **部署环境 (Deployment)**: `本地全真栈`（未部署 Cloudflare）
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] Worker 默认 CSP 的 script-src 收紧为 `'self' https://challenges.cloudflare.com`；构建产物无 eval / new Function。
+    - [x] mail-vue/index.html 两段内联启动脚本原样移至 `public/boot-theme.js`、`public/boot-loading.js`，加载位置与同步顺序不变。
+    - [x] 新增 `tests/csp-inline-script.test.mjs`（纳入 Quality Gates 前端作业），index.spec.js 断言精确 script-src。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建核验：mail-vue 构建通过，dist/index.html 无内联脚本
+    - [x] Worker 全量 839/839，Node `tests/*.test.mjs` 257/257，i18n 三件套与工作区密钥扫描通过
+    - [x] 浏览器全真栈：`tests/fullstack-browser-e2e.mjs` 33/33；登录→收件箱→写信 TinyMCE 输入正常，securitypolicyviolation 0 条；拦截主包时 boot-theme 仍预置 dark
+    - [x] 零假数据残留：本地栈临时目录已清理
+
 ### 容量重验与派发授权（2026-11-21）
 
 - [x] 保留 f79e4a8 两轮容量的 1131/871 实测，按既有逐轮 960 门槛判第二轮失败。
