@@ -209,6 +209,8 @@ describe('Public API hardening', () => {
 		expect(csp).toContain("frame-ancestors 'none'");
 		expect(csp).toContain('https://challenges.cloudflare.com');
 		expect(csp).toContain("frame-src 'self' https://challenges.cloudflare.com");
+		const scriptSrc = csp.split(';').map(part => part.trim()).find(part => part.startsWith('script-src '));
+		expect(scriptSrc).toBe("script-src 'self' https://challenges.cloudflare.com");
 	});
 
 	it('rejects unsigned Resend webhooks', async () => {

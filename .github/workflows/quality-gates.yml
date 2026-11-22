@@ -414,4 +414,4 @@ jobs:
         run: pnpm --dir mail-vue run build
 
       - name: UI localization and public audit display regression tests
-        run: node --test tests/ui-localization.test.mjs tests/audit-visitor-display.test.mjs
+        run: node --test tests/ui-localization.test.mjs tests/audit-visitor-display.test.mjs tests/csp-inline-script.test.mjs
