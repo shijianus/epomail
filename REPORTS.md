@@ -11,7 +11,7 @@
 
 ### 当前仓库独立实测审计（2026-11-27）
 
-* **关联提交 (Git Commit)**：源码 `0456cc11df2218cc6c3525a1af1d35da044c617a` (Short: `0456cc1`)。
+* **关联提交 (Git Commit)**：审计 `14bb007e8eba8566264395aea20fe79d3685e13e` (Short: `14bb007`)；源码基线见证据:3。
 * **专项证据索引**：[实测证据](doc/validation/independent-audit-2026-11-27.json)、[隔离复现](doc/validation/independent-audit-2026-11-27.mjs)。下列“证据”行号指该 JSON。
 * **范围与方法**：本地源码/配置扫描、实际命令、隔离全栈/Chromium；业务源码未改。
 
