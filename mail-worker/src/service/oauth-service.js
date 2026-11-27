@@ -491,6 +491,7 @@ const oauthService = {
 				ghTokenPayload.code_verifier = codeVerifier;
 			}
 			const tokenRes = await fetch(meta.tokenUrl, {
+				signal: AbortSignal.timeout(10000),
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -505,6 +506,7 @@ const oauthService = {
 			const accessToken = tokenData.access_token;
 
 			const userRes = await fetch(meta.userInfoUrl, {
+				signal: AbortSignal.timeout(10000),
 				headers: {
 					'Authorization': `Bearer ${accessToken}`,
 					'User-Agent': 'Epocanvas-Mail'
@@ -516,6 +518,7 @@ const oauthService = {
 			let email = '';
 			try {
 				const emailsRes = await fetch('https://api.github.com/user/emails', {
+					signal: AbortSignal.timeout(10000),
 					headers: {
 						'Authorization': `Bearer ${accessToken}`,
 						'User-Agent': 'Epocanvas-Mail'
@@ -549,6 +552,7 @@ const oauthService = {
 			if (codeVerifier) formBody.append('code_verifier', codeVerifier);
 
 			const tokenRes = await fetch(meta.tokenUrl, {
+				signal: AbortSignal.timeout(10000),
 				method: 'POST',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 				body: formBody.toString()
@@ -560,6 +564,7 @@ const oauthService = {
 			}
 			const tokenData = await tokenRes.json();
 			const userRes = await fetch(meta.userInfoUrl, {
+				signal: AbortSignal.timeout(10000),
 				headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
 			});
 			if (!userRes.ok) throw new BizError('Failed to fetch Google user profile');
@@ -588,6 +593,7 @@ const oauthService = {
 			if (codeVerifier) formBody.append('code_verifier', codeVerifier);
 
 			const tokenRes = await fetch(tokenUrl, {
+				signal: AbortSignal.timeout(10000),
 				method: 'POST',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 				body: formBody.toString()
@@ -599,6 +605,7 @@ const oauthService = {
 			}
 			const tokenData = await tokenRes.json();
 			const userRes = await fetch(meta.userInfoUrl, {
+				signal: AbortSignal.timeout(10000),
 				headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
 			});
 			if (!userRes.ok) throw new BizError('Failed to fetch Microsoft user profile');
@@ -631,6 +638,7 @@ const oauthService = {
 				if (codeVerifier) formBody.append('code_verifier', codeVerifier);
 
 				const tokenRes = await fetch(meta.tokenUrl, {
+					signal: AbortSignal.timeout(10000),
 					method: 'POST',
 					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 					body: formBody.toString()
@@ -1176,6 +1184,7 @@ const oauthService = {
 		if (codeVerifier) reqParams.append('code_verifier', codeVerifier)
 
 		const tokenRes = await fetch("https://connect.linux.do/oauth2/token", {
+			signal: AbortSignal.timeout(10000),
 			method: "POST",
 			headers: { "Content-Type": "application/x-www-form-urlencoded" },
 			body: reqParams.toString()
@@ -1188,6 +1197,7 @@ const oauthService = {
 		token = await tokenRes.json()
 
 		const userRes = await fetch('https://connect.linux.do/api/user', {
+			signal: AbortSignal.timeout(10000),
 			headers: {
 				Authorization: 'Bearer ' + token.access_token
 			}

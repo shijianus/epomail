@@ -27,16 +27,16 @@ function isMissingSessionTableError(err) {
 	return /no such table:\s*user_session/i.test(String(err?.message || ''));
 }
 
-export async function ensureUserSessionTable(db) {
+export async function ensureUserSessionTable(db, { force = false } = {}) {
 	if (!db || typeof db.prepare !== 'function') return false;
-	if (ensuredSessionDbs.has(db)) return true;
+	if (!force && ensuredSessionDbs.has(db)) return true;
 	await db.prepare(USER_SESSION_DDL).run();
 	const hashColumn = () => db.prepare("SELECT 1 AS found FROM pragma_table_info('user_session') WHERE name='token_hash'").first();
 	if (!await hashColumn()) {
 		try {
 			await db.prepare('ALTER TABLE user_session ADD COLUMN token_hash TEXT').run();
 		} catch (error) {
-			if (!await hashColumn()) throw error;
+			if (!/duplicate column name/i.test(error.message) || !await hashColumn()) throw error;
 		}
 	}
 	await db.prepare(USER_SESSION_IDX).run();

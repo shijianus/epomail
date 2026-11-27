@@ -103,6 +103,7 @@ export async function ensureMailReliabilitySchema(c) {
 		try {
 			await db.prepare(`ALTER TABLE mail_outbound_task ADD COLUMN ${column} ${ddl}`).run();
 		} catch (cause) {
+			if (!/duplicate column name/i.test(cause.message)) throw cause;
 			const fresh = await db.prepare("PRAGMA table_info('mail_outbound_task')").all();
 			if (!fresh.results?.some(field => field.name === column)) throw cause;
 		}

@@ -45,8 +45,9 @@ export async function ensureNoticeDeliverySchema(c) {
 			if (columns.has(name)) continue;
 			try {
 				await userDb.prepare(`ALTER TABLE notification_outbox ADD COLUMN ${name} ${definition}`).run();
-			} catch (_) {
+			} catch (error) {
 				// Another initializer may have added this column. Only that race is safe.
+				if (!/duplicate column name/i.test(error.message)) throw error;
 				const current = await userDb.prepare("PRAGMA table_info('notification_outbox')").all();
 				if (!current.results.some(row => row.name === name)) throw new Error('Notice schema migration failed');
 			}

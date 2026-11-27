@@ -1404,7 +1404,10 @@ const emailService = {
 			};
 		}
 
-		return await resend.emails.send(sendForm, params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : undefined);
+		return await resend.emails.send(sendForm, {
+			...(params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : {}),
+			signal: AbortSignal.timeout(15000)
+		});
 	},
 
 	async sendByMailjet(mailjetToken, params) {

@@ -1065,8 +1065,7 @@ STRICT RULES:
 
 		for (const endpoint of endpointsToTry) {
 			try {
-				const controller = new AbortController();
-				const timeoutId = setTimeout(() => controller.abort(), 4000);
+				const signal = AbortSignal.timeout(4000);
 
 				const resp = await safeFetch(endpoint, {
 					method: 'GET',
@@ -1077,9 +1076,8 @@ STRICT RULES:
 						'Content-Type': 'application/json',
 						'User-Agent': 'EpocanvasMail/3.0'
 					},
-					signal: controller.signal
+					signal
 				});
-				clearTimeout(timeoutId);
 
 				if (resp.ok) {
 					const data = await resp.json().catch(() => ({}));
@@ -1178,14 +1176,12 @@ STRICT RULES:
 		const modelEndpoints = this.getCandidateModelEndpoints(apiUrl, model);
 		for (const endpoint of modelEndpoints) {
 			try {
-				const controller = new AbortController();
-				const timeoutId = setTimeout(() => controller.abort(), 3500);
+				const signal = AbortSignal.timeout(3500);
 				const resp = await safeFetch(endpoint, {
 					method: 'GET',
 					headers,
-					signal: controller.signal
+					signal
 				});
-				clearTimeout(timeoutId);
 
 				if (resp.ok) {
 					const data = await resp.json().catch(() => ({}));
@@ -1223,8 +1219,7 @@ STRICT RULES:
 
 		for (const endpoint of chatEndpoints) {
 			try {
-				const controller = new AbortController();
-				const timeoutId = setTimeout(() => controller.abort(), 5000);
+				const signal = AbortSignal.timeout(5000);
 				const isAnthropic = endpoint.includes('/messages');
 				const body = isAnthropic
 					? {
@@ -1243,11 +1238,11 @@ STRICT RULES:
 					method: 'POST',
 					headers,
 					body: JSON.stringify(body),
-					signal: controller.signal
+					signal
 				});
-				clearTimeout(timeoutId);
 
 				if (resp.ok) {
+					await resp.text();
 					const latencyMs = Math.max(20, Date.now() - startTime);
 					return {
 						success: true,

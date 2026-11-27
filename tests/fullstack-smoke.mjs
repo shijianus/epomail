@@ -51,10 +51,13 @@ function check(name, fn) {
 await withLocalStack(async ({ base, jwtSecret }) => {
 
 	// 1. Cold start: the only bootstrap call is /api/init with the secret header.
-	const init1 = await call(base, '/api/init', {
-		method: 'POST',
-		headers: { 'x-init-secret': jwtSecret }
+	const initializers = await Promise.all([1, 2].map(() => call(base, '/api/init', {
+		method: 'POST', headers: { 'x-init-secret': jwtSecret }
+	})));
+	check('concurrent cold init admits one migration and rejects the other with 409', () => {
+		assert.deepEqual(initializers.map(result => result.status).sort(), [200, 409]);
 	});
+	const init1 = initializers.find(result => result.status === 200);
 	check('cold init succeeds', () => {
 		assert.equal(init1.status, 200, init1.body.slice(0, 200));
 		assert.match(init1.body, /success/i);

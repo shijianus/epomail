@@ -13,6 +13,7 @@ import { ensureAuthSecurityOperationSchema } from '../utils/auth-security-operat
 import { ensureUserSessionTable } from '../utils/session-auth-store.js';
 import { ensureSessionRevocationSchema } from '../utils/session-revocation.js';
 import { ensureStorageProbeHistory } from '../utils/storage-probe-history.js';
+import { withInitializationLock, verifyMigrationSchema } from './migration-safety.js';
 
 function timingSafeEqual(a, b) {
 	if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
@@ -38,6 +39,14 @@ async function addMissingColumns(db, table, statements) {
 				.bind(column).first();
 			if (!current) throw error;
 		}
+	}
+}
+
+async function runMigrationStatements(db, statements) {
+	for (const statement of statements) {
+		const column = /^ALTER TABLE (\w+) ADD COLUMN /.exec(statement);
+		if (column) await addMissingColumns(db, column[1], [statement]);
+		else await db.prepare(statement).run();
 	}
 }
 
@@ -81,63 +90,70 @@ const dbInit = {
 		const auth = await this.authorizeRequest(c, { allowUrlParam: true });
 		if (!auth.ok) return auth.response;
 
-		await this.intDB(c);
-		await this.v3_23DB(c);
-		await this.v3_18DB(c);
-		await this.v1_1DB(c);
-		await this.v1_2DB(c);
-		await this.v1_3DB(c);
-		await this.v1_3_1DB(c);
-		await this.v1_4DB(c);
-		await this.v1_5DB(c);
-		await this.v1_6DB(c);
-		await this.v1_7DB(c);
-		await this.v2DB(c);
-		await this.v2_3DB(c);
-		await this.v2_4DB(c);
-		await this.v2_5DB(c);
-		await this.v2_6DB(c);
-		await this.v2_7DB(c);
-		await this.v2_8DB(c);
-		await this.v2_9DB(c);
-		await this.v3_0DB(c);
-		await this.v3_1DB(c);
-		await this.v3_2DB(c);
-		await this.v3_3DB(c);
-		await this.v3_4DB(c);
-		await this.v3_5DB(c);
-		await this.v3_6DB(c);
-		await this.v3_7DB(c);
-		await this.v3_8DB(c);
-		await this.v3_9DB(c);
-		await this.v3_10DB(c);
-		await this.v3_11DB(c);
-		await this.v3_12DB(c);
-		await this.v3_13DB(c);
-		await this.v3_14DB(c);
-		await this.v3_15DB(c);
-		await this.v3_16DB(c);
-		await this.v3_17DB(c);
-		await this.v3_19DB(c);
-		await this.v3_20DB(c);
-		await this.v3_21DB(c);
-		await this.v3_22DB(c);
-		await this.v3_23DB(c);
-		await this.v3_24DB(c);
-		await this.v3_25DB(c);
-		await this.v3_26DB(c);
-		await this.v3_27DB(c);
-		await this.v3_28DB(c);
-		await this.v3_29DB(c);
-		await this.v3_30DB(c);
-		await this.v3_31DB(c);
-		await this.v3_32DB(c);
-		await settingService.refresh(c);
-		const generatedAdminPassword = c.get('generatedAdminPassword');
-		if (generatedAdminPassword) {
-			return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
-		}
-		return c.text('success');
+		return withInitializationLock(c, async () => {
+			await this.intDB(c);
+			await this.v3_23DB(c);
+			await this.v3_18DB(c);
+			await this.v1_1DB(c);
+			await this.v1_2DB(c);
+			await this.v1_3DB(c);
+			await this.v1_3_1DB(c);
+			await this.v1_4DB(c);
+			await this.v1_5DB(c);
+			await this.v1_6DB(c);
+			await this.v1_7DB(c);
+			await this.v2DB(c);
+			await this.v2_3DB(c);
+			await this.v2_4DB(c);
+			await this.v2_5DB(c);
+			await this.v2_6DB(c);
+			await this.v2_7DB(c);
+			await this.v2_8DB(c);
+			await this.v2_9DB(c);
+			await this.v3_0DB(c);
+			await this.v3_1DB(c);
+			await this.v3_2DB(c);
+			await this.v3_3DB(c);
+			await this.v3_4DB(c);
+			await this.v3_5DB(c);
+			await this.v3_6DB(c);
+			await this.v3_7DB(c);
+			await this.v3_8DB(c);
+			await this.v3_9DB(c);
+			await this.v3_10DB(c);
+			await this.v3_11DB(c);
+			await this.v3_12DB(c);
+			await this.v3_13DB(c);
+			await this.v3_14DB(c);
+			await this.v3_15DB(c);
+			await this.v3_16DB(c);
+			await this.v3_17DB(c);
+			await this.v3_19DB(c);
+			await this.v3_20DB(c);
+			await this.v3_21DB(c);
+			await this.v3_22DB(c);
+			await this.v3_23DB(c);
+			await this.v3_24DB(c);
+			await this.v3_25DB(c);
+			await this.v3_26DB(c);
+			await this.v3_27DB(c);
+			await this.v3_28DB(c);
+			await this.v3_29DB(c);
+			await this.v3_30DB(c);
+			await this.v3_31DB(c);
+			await this.v3_32DB(c);
+			await this.verifySchema(c);
+			await settingService.refresh(c);
+			const generatedAdminPassword = c.get('generatedAdminPassword');
+			if (generatedAdminPassword) {
+				return c.text(`success\nInitial admin password: ${generatedAdminPassword}\nChange it immediately after login.`);
+			}
+			return c.text('success');
+		});
+	},
+
+	async verifySchema(c) {
+		await verifyMigrationSchema(c);
 	},
 
 	async v3_32DB(c) {
@@ -145,7 +161,7 @@ const dbInit = {
 		const userDb = getUserDb(c);
 		await ensureMailReliabilitySchema(c);
 		await backfillWelcomeReceipts(c);
-		await ensureUserSessionTable(userDb);
+		await ensureUserSessionTable(userDb, { force: true });
 		await ensureSessionRevocationSchema(c);
 		await mailDb.batch([
 			mailDb.prepare(`CREATE INDEX IF NOT EXISTS idx_email_user_body_bytes ON email(user_id,${MAIL_BODY_BYTES_SQL})`),
@@ -182,7 +198,7 @@ const dbInit = {
 			try {
 				await db.prepare('ALTER TABLE email ADD COLUMN is_official INTEGER NOT NULL DEFAULT 0').run();
 			} catch (error) {
-				if (!await hasMarker()) throw error;
+				if (!/duplicate column name/i.test(error.message) || !await hasMarker()) throw error;
 			}
 		}
 		// Only a receipt from the internal notice writer establishes provenance for legacy mail.
@@ -199,7 +215,7 @@ const dbInit = {
 
 	async v3_26DB(c) {
 		const userDb = getUserDb(c);
-		await ensureUserSessionTable(userDb);
+		await ensureUserSessionTable(userDb, { force: true });
 	},
 
 	async securityMigrate(c) {
@@ -258,22 +274,16 @@ const dbInit = {
 		];
 
 		for (const col of roleColumns) {
-			try {
-				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('role') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await userDb.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`跳过 role 字段 ${col.name}：${e.message}`);
+			const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('role') WHERE name = ? limit 1`).bind(col.name).first();
+			if (!colInfo) {
+				await userDb.prepare(col.sql).run();
 			}
 		}
 
 		// 2. Standard 6 default groups (仅在六个标准身份分组均不存在时播种，杜绝站长删除 LV.0 / LV.1 后在此被强制复活)
 		let hasRoleSeeded = false;
-		try {
-			const flag = await c?.env?.kv?.get('roles_seeded_v2');
-			hasRoleSeeded = flag === '1';
-		} catch (_) {}
+		const flag = await c?.env?.kv?.get('roles_seeded_v2');
+		hasRoleSeeded = flag === '1';
 
 		// An absent completion marker includes interrupted seeds. Existing roles
 		// are preserved once the full initial seed has committed successfully.
@@ -457,26 +467,18 @@ const dbInit = {
 		}
 
 		if (c.env.admin) {
-			try {
-				const masterRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
-				if (masterRole) {
-					await userDb.prepare(`UPDATE user SET type = ? WHERE email = ? AND type != ?`).bind(masterRole.role_id, c.env.admin, masterRole.role_id).run();
-				}
-			} catch (e) {
-				console.warn('v3_13DB admin sync warning:', e.message);
+			const masterRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'master' OR name = '站长' LIMIT 1`).first();
+			if (masterRole) {
+				await userDb.prepare(`UPDATE user SET type = ? WHERE email = ? AND type != ?`).bind(masterRole.role_id, c.env.admin, masterRole.role_id).run();
 			}
 		}
 
 		// 确保参观者身份分组绝不包含"用户列表" (user:query) 权限
-		try {
-			await userDb.prepare(`
-				DELETE FROM role_perm 
-				WHERE role_id IN (SELECT role_id FROM role WHERE role_code = 'visitor' OR key = 'visitor' OR name = '参观者')
-				  AND perm_id IN (SELECT perm_id FROM perm WHERE perm_key = 'user:query');
-			`).run();
-		} catch (e) {
-			console.warn('visitor user:query cleanup warning:', e.message);
-		}
+		await userDb.prepare(`
+			DELETE FROM role_perm
+			WHERE role_id IN (SELECT role_id FROM role WHERE role_code = 'visitor' OR key = 'visitor' OR name = '参观者')
+			  AND perm_id IN (SELECT perm_id FROM perm WHERE perm_key = 'user:query');
+		`).run();
 		},
 
 		async v3_25DB(c) {
@@ -490,7 +492,7 @@ const dbInit = {
 				const exists = await userDb.prepare(
 					`SELECT 1 AS present FROM pragma_table_info('user') WHERE name = ? LIMIT 1`
 				).bind(name).first();
-				if (!exists) await userDb.prepare(`ALTER TABLE user ADD COLUMN ${name} ${definition}`).run();
+				if (!exists) await addMissingColumns(userDb, 'user', [`ALTER TABLE user ADD COLUMN ${name} ${definition}`]);
 			}
 			await userDb.prepare(`
 				CREATE TABLE IF NOT EXISTS legal_acceptance (
@@ -566,26 +568,22 @@ const dbInit = {
 	async v3_22DB(c) {
 		const mailDb = getMailDb(c);
 
-		try {
-			await mailDb.prepare(`
-				CREATE TABLE IF NOT EXISTS object_deletion_queue (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					object_key TEXT NOT NULL,
-					user_id INTEGER NOT NULL DEFAULT 0,
-					attempts INTEGER NOT NULL DEFAULT 0,
-					status TEXT NOT NULL DEFAULT 'pending',
-					last_error TEXT,
-					next_retry_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
-					UNIQUE(object_key, user_id)
-				)
-			`).run();
-			await mailDb.prepare(
-				`CREATE INDEX IF NOT EXISTS idx_object_deletion_queue_due ON object_deletion_queue(status, next_retry_at)`
-			).run();
-		} catch (e) {
-			console.warn('v3_22DB object_deletion_queue warning:', e.message);
-		}
+		await mailDb.prepare(`
+			CREATE TABLE IF NOT EXISTS object_deletion_queue (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				object_key TEXT NOT NULL,
+				user_id INTEGER NOT NULL DEFAULT 0,
+				attempts INTEGER NOT NULL DEFAULT 0,
+				status TEXT NOT NULL DEFAULT 'pending',
+				last_error TEXT,
+				next_retry_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+				UNIQUE(object_key, user_id)
+			)
+		`).run();
+		await mailDb.prepare(
+			`CREATE INDEX IF NOT EXISTS idx_object_deletion_queue_due ON object_deletion_queue(status, next_retry_at)`
+		).run();
 
 		const indexes = [
 			`CREATE INDEX IF NOT EXISTS idx_attachments_email_id ON attachments(email_id);`,
@@ -595,11 +593,7 @@ const dbInit = {
 			`CREATE INDEX IF NOT EXISTS idx_email_message_dedupe ON email(message_id, account_id, create_time);`
 		];
 		for (const sql of indexes) {
-			try {
-				await mailDb.prepare(sql).run();
-			} catch (e) {
-				console.warn('v3_22DB index warning:', e.message);
-			}
+			await mailDb.prepare(sql).run();
 		}
 	},
 
@@ -611,27 +605,23 @@ const dbInit = {
 	// 幂等：CREATE TABLE/INDEX IF NOT EXISTS，可重复执行。
 	async v3_21DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS oauth_identity_audit (
-					audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
-					user_id INTEGER NOT NULL,
-					event TEXT NOT NULL,
-					provider TEXT NOT NULL DEFAULT '',
-					oauth_user_id TEXT NOT NULL DEFAULT '',
-					outcome TEXT NOT NULL DEFAULT 'success',
-					ip TEXT NOT NULL DEFAULT '',
-					user_agent TEXT NOT NULL DEFAULT '',
-					detail TEXT NOT NULL DEFAULT '',
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
-				)
-			`).run();
-			await userDb.prepare(
-				`CREATE INDEX IF NOT EXISTS idx_oauth_identity_audit_user ON oauth_identity_audit(user_id, audit_id DESC)`
-			).run();
-		} catch (e) {
-			console.warn('v3_21DB oauth_identity_audit warning:', e.message);
-		}
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS oauth_identity_audit (
+				audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				event TEXT NOT NULL,
+				provider TEXT NOT NULL DEFAULT '',
+				oauth_user_id TEXT NOT NULL DEFAULT '',
+				outcome TEXT NOT NULL DEFAULT 'success',
+				ip TEXT NOT NULL DEFAULT '',
+				user_agent TEXT NOT NULL DEFAULT '',
+				detail TEXT NOT NULL DEFAULT '',
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+			)
+		`).run();
+		await userDb.prepare(
+			`CREATE INDEX IF NOT EXISTS idx_oauth_identity_audit_user ON oauth_identity_audit(user_id, audit_id DESC)`
+		).run();
 	},
 
 	// v3_20DB: OAuth 绑定身份租约与身份唯一性迁移。
@@ -639,48 +629,40 @@ const dbInit = {
 	// 仅靠 proof 单次消费无法阻止同一身份被并发绑定到两个账号。
 	// 隔离按 oauth_user_id 主键的租约，最终绑定用单条条件 UPDATE 同时校验
 	// 租约与未绑定状态。旧库若已存在重复 oauth_user_id，不自动删改数据，
-	// 仅跳过唯一索引（代码侧已有条件写入与 finalize 守卫兜底）。
+	// 必须中止迁移并先修复重复数据，不能在缺少唯一约束时报告成功。
 	// 幂等：CREATE TABLE/INDEX IF NOT EXISTS，可重复执行。
 	async v3_20DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS oauth_bind_claim (
-					oauth_user_id TEXT PRIMARY KEY,
-					claim_token TEXT NOT NULL,
-					email TEXT NOT NULL DEFAULT '',
-					user_id INTEGER NOT NULL DEFAULT 0,
-					reserved_reg_key INTEGER NOT NULL DEFAULT 0,
-					code TEXT NOT NULL DEFAULT '',
-					expires_at INTEGER NOT NULL,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
-				)
-			`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_bind_claim_expires ON oauth_bind_claim(expires_at)`).run();
-		} catch (e) {
-			console.warn('v3_20DB oauth_bind_claim warning:', e.message);
-		}
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS oauth_bind_claim (
+				oauth_user_id TEXT PRIMARY KEY,
+				claim_token TEXT NOT NULL,
+				email TEXT NOT NULL DEFAULT '',
+				user_id INTEGER NOT NULL DEFAULT 0,
+				reserved_reg_key INTEGER NOT NULL DEFAULT 0,
+				code TEXT NOT NULL DEFAULT '',
+				expires_at INTEGER NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_bind_claim_expires ON oauth_bind_claim(expires_at)`).run();
 
-		try {
-			const duplicate = await userDb.prepare(`
-				SELECT oauth_user_id FROM oauth
+		const duplicate = await userDb.prepare(`
+			SELECT oauth_user_id FROM oauth
+			WHERE oauth_user_id IS NOT NULL AND oauth_user_id <> ''
+			GROUP BY oauth_user_id HAVING COUNT(*) > 1
+			LIMIT 1
+		`).first();
+		if (duplicate) {
+			throw new Error('OAuth identity duplicates prevent idx_oauth_user_id_unique migration');
+		} else {
+			// Partial index: legacy rows with an empty identity must not
+			// block the migration.
+			await userDb.prepare(`
+				CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_user_id_unique
+				ON oauth(oauth_user_id)
 				WHERE oauth_user_id IS NOT NULL AND oauth_user_id <> ''
-				GROUP BY oauth_user_id HAVING COUNT(*) > 1
-				LIMIT 1
-			`).first();
-			if (duplicate) {
-				console.warn(`v3_20DB skipped oauth_user_id unique index: duplicate identity ${duplicate.oauth_user_id}`);
-			} else {
-				// Partial index: legacy rows with an empty identity must not
-				// block the migration.
-				await userDb.prepare(`
-					CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_user_id_unique
-					ON oauth(oauth_user_id)
-					WHERE oauth_user_id IS NOT NULL AND oauth_user_id <> ''
-				`).run();
-			}
-		} catch (e) {
-			console.warn('v3_20DB oauth_user_id unique index warning:', e.message);
+			`).run();
 		}
 	},
 
@@ -690,23 +672,19 @@ const dbInit = {
 	// 幂等：CREATE TABLE/INDEX IF NOT EXISTS，可重复执行。
 	async v3_19DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS oauth_one_time_credential (
-					token_hash TEXT PRIMARY KEY,
-					purpose TEXT NOT NULL,
-					provider TEXT NOT NULL DEFAULT '',
-					oauth_user_id TEXT NOT NULL DEFAULT '',
-					payload TEXT NOT NULL,
-					consumed INTEGER NOT NULL DEFAULT 0,
-					expires_at INTEGER NOT NULL,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
-				)
-			`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_otc_expires ON oauth_one_time_credential(expires_at)`).run();
-		} catch (e) {
-			console.warn('v3_19DB oauth_one_time_credential warning:', e.message);
-		}
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS oauth_one_time_credential (
+				token_hash TEXT PRIMARY KEY,
+				purpose TEXT NOT NULL,
+				provider TEXT NOT NULL DEFAULT '',
+				oauth_user_id TEXT NOT NULL DEFAULT '',
+				payload TEXT NOT NULL,
+				consumed INTEGER NOT NULL DEFAULT 0,
+				expires_at INTEGER NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_oauth_otc_expires ON oauth_one_time_credential(expires_at)`).run();
 	},
 
 	// v3_18DB: 系统设置操作报告与IP风控持久化配置迁移（使用独立 setting_ext 键值表，避免超过 Cloudflare D1 单表 100 列上限）
@@ -779,200 +757,162 @@ const dbInit = {
 			{ name: 'original_decision_id', sql: `ALTER TABLE audit_log ADD COLUMN original_decision_id TEXT;` }
 		];
 
-		const tableInfo = await userDb.prepare(`PRAGMA table_info('audit_log')`).all().catch(() => ({ results: [] }));
+		const tableInfo = await userDb.prepare(`PRAGMA table_info('audit_log')`).all();
 		const existingCols = new Set((tableInfo?.results || []).map(r => r.name));
 		for (const col of auditLogCols) {
 			if (!existingCols.has(col.name)) {
-				try {
-					await userDb.prepare(col.sql).run();
-				} catch (err) {
-					console.warn(`v3_17DB 跳过 audit_log 列 ${col.name}:`, err.message);
-				}
+				await userDb.prepare(col.sql).run();
 			}
 		}
 
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS notification_outbox (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					task_id TEXT NOT NULL UNIQUE,
-					case_id INTEGER,
-					ticket_id TEXT,
-					user_id INTEGER,
-					recipient TEXT NOT NULL,
-					channel TEXT NOT NULL DEFAULT 'internal',
-					template_code TEXT NOT NULL,
-					subject TEXT NOT NULL,
-					content TEXT NOT NULL,
-					reason_code TEXT,
-					status TEXT NOT NULL DEFAULT 'pending',
-					provider_message_id TEXT,
-					retry_count INTEGER NOT NULL DEFAULT 0,
-					max_retries INTEGER NOT NULL DEFAULT 5,
-					last_error TEXT,
-					next_retry_at TEXT,
-					delivered_at TEXT,
-					read_at TEXT,
-					claimant_id TEXT,
-					lease_expires_at TEXT,
-					lease_version INTEGER DEFAULT 0,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-					update_time DATETIME DEFAULT CURRENT_TIMESTAMP
-				)
-			`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON notification_outbox(status, next_retry_at)`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_case_id ON notification_outbox(case_id)`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_recipient ON notification_outbox(recipient)`).run();
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS notification_outbox (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				task_id TEXT NOT NULL UNIQUE,
+				case_id INTEGER,
+				ticket_id TEXT,
+				user_id INTEGER,
+				recipient TEXT NOT NULL,
+				channel TEXT NOT NULL DEFAULT 'internal',
+				template_code TEXT NOT NULL,
+				subject TEXT NOT NULL,
+				content TEXT NOT NULL,
+				reason_code TEXT,
+				status TEXT NOT NULL DEFAULT 'pending',
+				provider_message_id TEXT,
+				retry_count INTEGER NOT NULL DEFAULT 0,
+				max_retries INTEGER NOT NULL DEFAULT 5,
+				last_error TEXT,
+				next_retry_at TEXT,
+				delivered_at TEXT,
+				read_at TEXT,
+				claimant_id TEXT,
+				lease_expires_at TEXT,
+				lease_version INTEGER DEFAULT 0,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+				update_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_status_retry ON notification_outbox(status, next_retry_at)`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_case_id ON notification_outbox(case_id)`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_outbox_recipient ON notification_outbox(recipient)`).run();
 
-			// 幂等升级 notification_outbox 租约并发与故障恢复字段
-			const outboxInfo = await userDb.prepare(`PRAGMA table_info('notification_outbox')`).all().catch(() => ({ results: [] }));
-			const existingOutboxCols = new Set((outboxInfo?.results || []).map(r => r.name));
-			const outboxLeaseCols = [
-				{ name: 'claimant_id', sql: `ALTER TABLE notification_outbox ADD COLUMN claimant_id TEXT;` },
-				{ name: 'lease_expires_at', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_expires_at TEXT;` },
-				{ name: 'lease_version', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_version INTEGER DEFAULT 0;` }
-			];
-			for (const col of outboxLeaseCols) {
-				if (!existingOutboxCols.has(col.name)) {
-					try {
-						await userDb.prepare(col.sql).run();
-					} catch (e) {
-						console.warn(`v3_17DB 跳过 notification_outbox 列 ${col.name}:`, e.message);
-					}
-				}
+		// 幂等升级 notification_outbox 租约并发与故障恢复字段
+		const outboxInfo = await userDb.prepare(`PRAGMA table_info('notification_outbox')`).all();
+		const existingOutboxCols = new Set((outboxInfo?.results || []).map(r => r.name));
+		const outboxLeaseCols = [
+			{ name: 'claimant_id', sql: `ALTER TABLE notification_outbox ADD COLUMN claimant_id TEXT;` },
+			{ name: 'lease_expires_at', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_expires_at TEXT;` },
+			{ name: 'lease_version', sql: `ALTER TABLE notification_outbox ADD COLUMN lease_version INTEGER DEFAULT 0;` }
+		];
+		for (const col of outboxLeaseCols) {
+			if (!existingOutboxCols.has(col.name)) {
+				await userDb.prepare(col.sql).run();
 			}
-		} catch (err) {
-			console.warn('v3_17DB notification_outbox warning:', err.message);
 		}
 
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS audit_decision (
-					decision_id TEXT PRIMARY KEY,
-					case_id INTEGER NOT NULL,
-					expected_version INTEGER NOT NULL,
-					expected_status TEXT,
-					action_type TEXT NOT NULL,
-					actor TEXT NOT NULL,
-					idempotency_key TEXT UNIQUE,
-					payload_hash TEXT NOT NULL,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-					UNIQUE(case_id, expected_version)
-				)
-			`).run();
-			try {
-				const col = await userDb.prepare(`SELECT * FROM pragma_table_info('audit_decision') WHERE name = 'expected_status' LIMIT 1`).first();
-				if (!col) {
-					await userDb.prepare(`ALTER TABLE audit_decision ADD COLUMN expected_status TEXT;`).run();
-				}
-			} catch (_) {}
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_case ON audit_decision(case_id)`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_idemp ON audit_decision(idempotency_key)`).run();
-		} catch (err) {
-			console.warn('v3_17DB audit_decision warning:', err.message);
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS audit_decision (
+				decision_id TEXT PRIMARY KEY,
+				case_id INTEGER NOT NULL,
+				expected_version INTEGER NOT NULL,
+				expected_status TEXT,
+				action_type TEXT NOT NULL,
+				actor TEXT NOT NULL,
+				idempotency_key TEXT UNIQUE,
+				payload_hash TEXT NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(case_id, expected_version)
+			)
+		`).run();
+		const col = await userDb.prepare(`SELECT * FROM pragma_table_info('audit_decision') WHERE name = 'expected_status' LIMIT 1`).first();
+		if (!col) {
+			await addMissingColumns(userDb, 'audit_decision', [`ALTER TABLE audit_decision ADD COLUMN expected_status TEXT;`]);
 		}
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_case ON audit_decision(case_id)`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_decision_idemp ON audit_decision(idempotency_key)`).run();
 
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS webhook_event (
-					event_id TEXT PRIMARY KEY,
-					provider TEXT NOT NULL,
-					event_type TEXT NOT NULL,
-					resource_id TEXT,
-					payload TEXT,
-					status TEXT NOT NULL DEFAULT 'processed',
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
-				)
-			`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_webhook_event_resource ON webhook_event(resource_id)`).run();
-		} catch (err) {
-			console.warn('v3_17DB webhook_event warning:', err.message);
-		}
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS webhook_event (
+				event_id TEXT PRIMARY KEY,
+				provider TEXT NOT NULL,
+				event_type TEXT NOT NULL,
+				resource_id TEXT,
+				payload TEXT,
+				status TEXT NOT NULL DEFAULT 'processed',
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_webhook_event_resource ON webhook_event(resource_id)`).run();
 
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS audit_purge_batch (
-					id TEXT PRIMARY KEY,
-					count INTEGER NOT NULL DEFAULT 0,
-					reason TEXT NOT NULL,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
-				)
-			`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_purge_batch_time ON audit_purge_batch(create_time)`).run();
-		} catch (err) {
-			console.warn('v3_17DB audit_purge_batch warning:', err.message);
-		}
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS audit_purge_batch (
+				id TEXT PRIMARY KEY,
+				count INTEGER NOT NULL DEFAULT 0,
+				reason TEXT NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_purge_batch_time ON audit_purge_batch(create_time)`).run();
 
 		// 申诉材料独立台账（第二轮修复）：冷启动引导链同步建表，
 		// 与 audit-service.ensureTables 的幂等迁移定义保持完全一致
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS audit_appeal (
-					appeal_id TEXT PRIMARY KEY,
-					case_id INTEGER NOT NULL,
-					source_case_id INTEGER,
-					decision_id TEXT,
-					user_id INTEGER,
-					email TEXT NOT NULL,
-					round INTEGER NOT NULL,
-					content TEXT NOT NULL,
-					status TEXT NOT NULL DEFAULT 'pending',
-					decision_action TEXT,
-					decision_notes TEXT,
-					decided_by TEXT,
-					decided_at TEXT,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-					update_time DATETIME,
-					UNIQUE(case_id, round)
-				)
-			`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_appeal_case ON audit_appeal(case_id)`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_appeal_status ON audit_appeal(status)`).run();
-		} catch (err) {
-			console.warn('v3_17DB audit_appeal warning:', err.message);
-		}
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS audit_appeal (
+				appeal_id TEXT PRIMARY KEY,
+				case_id INTEGER NOT NULL,
+				source_case_id INTEGER,
+				decision_id TEXT,
+				user_id INTEGER,
+				email TEXT NOT NULL,
+				round INTEGER NOT NULL,
+				content TEXT NOT NULL,
+				status TEXT NOT NULL DEFAULT 'pending',
+				decision_action TEXT,
+				decision_notes TEXT,
+				decided_by TEXT,
+				decided_at TEXT,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+				update_time DATETIME,
+				UNIQUE(case_id, round)
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_appeal_case ON audit_appeal(case_id)`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_appeal_status ON audit_appeal(status)`).run();
 
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS one_time_exchange_code (
-					code_hash TEXT PRIMARY KEY,
-					user_id INTEGER NOT NULL,
-					email TEXT NOT NULL,
-					case_id TEXT,
-					token_payload TEXT NOT NULL,
-					consumed INTEGER NOT NULL DEFAULT 0,
-					expires_at INTEGER NOT NULL,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
-				)
-			`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_exchange_code_expires ON one_time_exchange_code(expires_at)`).run();
-		} catch (err) {
-			console.warn('v3_17DB one_time_exchange_code warning:', err.message);
-		}
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS one_time_exchange_code (
+				code_hash TEXT PRIMARY KEY,
+				user_id INTEGER NOT NULL,
+				email TEXT NOT NULL,
+				case_id TEXT,
+				token_payload TEXT NOT NULL,
+				consumed INTEGER NOT NULL DEFAULT 0,
+				expires_at INTEGER NOT NULL,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_exchange_code_expires ON one_time_exchange_code(expires_at)`).run();
 
-		try {
-			await userDb.prepare(`DROP TRIGGER IF EXISTS trg_audit_decision_version_guard;`).run();
-			await userDb.prepare(`
-				CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
-				BEFORE INSERT ON audit_decision
-				BEGIN
-					SELECT CASE
-						WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
-						THEN RAISE(ABORT, 'Audit case not found')
-						WHEN NEW.expected_version IS NULL
-							OR (SELECT version FROM audit_log WHERE id = NEW.case_id) IS NULL
-							OR typeof((SELECT version FROM audit_log WHERE id = NEW.case_id)) != 'integer'
-							OR (SELECT version FROM audit_log WHERE id = NEW.case_id) < 1
-							OR (SELECT version FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
-						THEN RAISE(ABORT, 'Audit log version mismatch: stale or invalid case version')
-						WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status OR (SELECT status FROM audit_log WHERE id = NEW.case_id) NOT IN ('active', 'pending', 'banned', 'unbanned', 'resolved', 'rejected', 'expired')
-						THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or status invalid')
-					END;
+		await userDb.prepare(`DROP TRIGGER IF EXISTS trg_audit_decision_version_guard;`).run();
+		await userDb.prepare(`
+			CREATE TRIGGER IF NOT EXISTS trg_audit_decision_version_guard
+			BEFORE INSERT ON audit_decision
+			BEGIN
+				SELECT CASE
+					WHEN (SELECT id FROM audit_log WHERE id = NEW.case_id) IS NULL
+					THEN RAISE(ABORT, 'Audit case not found')
+					WHEN NEW.expected_version IS NULL
+						OR (SELECT version FROM audit_log WHERE id = NEW.case_id) IS NULL
+						OR typeof((SELECT version FROM audit_log WHERE id = NEW.case_id)) != 'integer'
+						OR (SELECT version FROM audit_log WHERE id = NEW.case_id) < 1
+						OR (SELECT version FROM audit_log WHERE id = NEW.case_id) != NEW.expected_version
+					THEN RAISE(ABORT, 'Audit log version mismatch: stale or invalid case version')
+					WHEN NEW.expected_status IS NULL OR TRIM(NEW.expected_status) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) IS NULL OR TRIM((SELECT status FROM audit_log WHERE id = NEW.case_id)) = '' OR (SELECT status FROM audit_log WHERE id = NEW.case_id) != NEW.expected_status OR (SELECT status FROM audit_log WHERE id = NEW.case_id) NOT IN ('active', 'pending', 'banned', 'unbanned', 'resolved', 'rejected', 'expired')
+					THEN RAISE(ABORT, 'Audit log status mismatch: case state changed or status invalid')
 				END;
-			`).run();
-		} catch (err) {
-			console.warn('v3_17DB trg_audit_decision_version_guard warning:', err.message);
-		}
+			END;
+		`).run();
 	},
 
 	// v3_16DB：补齐 setting 表缺失列——用户资料控制（TG 推送/邮件转发/API 支援）、
@@ -991,60 +931,52 @@ const dbInit = {
 			{ name: 'oauth_providers', sql: `ALTER TABLE setting ADD COLUMN oauth_providers TEXT NOT NULL DEFAULT '{}';` }
 		];
 		for (const col of missingSettingCols) {
-			try {
-				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await userDb.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`v3_16DB 跳过 setting 字段 ${col.name}：${e.message}`);
+			const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
+			if (!colInfo) {
+				await userDb.prepare(col.sql).run();
 			}
 		}
 	},
 
 	async v3_15DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS audit_log (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					ticket_id TEXT,
-					user_id INTEGER,
-					email TEXT NOT NULL,
-					warning_type TEXT NOT NULL,
-					event_type TEXT NOT NULL,
-					category TEXT NOT NULL,
-					action_text TEXT NOT NULL,
-					detail_text TEXT,
-					ip TEXT,
-					geo TEXT,
-					device TEXT,
-					device_type TEXT DEFAULT 'desktop',
-					fingerprint TEXT,
-					is_reg_ip INTEGER DEFAULT 0,
-					is_multi_ip INTEGER DEFAULT 0,
-					active_ip_count INTEGER DEFAULT 1,
-					reported_by_others INTEGER DEFAULT 0,
-					risk_level TEXT DEFAULT 'normal',
-					priority TEXT DEFAULT 'P2',
-					status TEXT DEFAULT 'active',
-					recommended_action TEXT,
-					appeal_reason TEXT,
-					ban_reason TEXT,
-					ban_time DATETIME,
-					is_internal INTEGER DEFAULT 0,
-					report_category TEXT,
-					report_reason TEXT,
-					resolved_time DATETIME,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
-				)
-			`).run();
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS audit_log (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				ticket_id TEXT,
+				user_id INTEGER,
+				email TEXT NOT NULL,
+				warning_type TEXT NOT NULL,
+				event_type TEXT NOT NULL,
+				category TEXT NOT NULL,
+				action_text TEXT NOT NULL,
+				detail_text TEXT,
+				ip TEXT,
+				geo TEXT,
+				device TEXT,
+				device_type TEXT DEFAULT 'desktop',
+				fingerprint TEXT,
+				is_reg_ip INTEGER DEFAULT 0,
+				is_multi_ip INTEGER DEFAULT 0,
+				active_ip_count INTEGER DEFAULT 1,
+				reported_by_others INTEGER DEFAULT 0,
+				risk_level TEXT DEFAULT 'normal',
+				priority TEXT DEFAULT 'P2',
+				status TEXT DEFAULT 'active',
+				recommended_action TEXT,
+				appeal_reason TEXT,
+				ban_reason TEXT,
+				ban_time DATETIME,
+				is_internal INTEGER DEFAULT 0,
+				report_category TEXT,
+				report_reason TEXT,
+				resolved_time DATETIME,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
 
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_email ON audit_log(email)`).run();
-			await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_warning_type ON audit_log(warning_type)`).run();
-		} catch (e) {
-			console.warn('v3_15DB audit_log migration warning:', e.message);
-		}
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_email ON audit_log(email)`).run();
+		await userDb.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_log_warning_type ON audit_log(warning_type)`).run();
 	},
 
 	async v3_14DB(c) {
@@ -1091,13 +1023,9 @@ const dbInit = {
 		];
 
 		for (const col of aiSettingCols) {
-			try {
-				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await userDb.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`跳过 setting 字段 ${col.name}：${e.message}`);
+			const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
+			if (!colInfo) {
+				await userDb.prepare(col.sql).run();
 			}
 		}
 
@@ -1155,29 +1083,25 @@ const dbInit = {
 		// 2. 演示参观者账号默认关闭：严禁在生产环境自动注入固定可猜测密码或复活已停用账号。
 		// 仅当显式开启 DEMO_VISITOR_ENABLED=true 且提供高强度 DEMO_VISITOR_PASSWORD 时按需播种；存量库既有账号保持原状，由独立运维脚本处置。
 		if (demoEnabled) {
-			try {
-				const visitorRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'visitor' OR key = 'visitor' LIMIT 1`).first();
-				const visitorRoleId = visitorRole ? visitorRole.role_id : 2;
-				let visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(demoEmail).first();
-				if (!visitorUser) {
-					const { salt, hash } = await cryptoUtils.hashPassword(demoPassword, c.env);
-					await userDb.prepare(`
-						INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time)
-						VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'))
-					`).bind(demoEmail, hash, salt, visitorRoleId).run();
-					visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(demoEmail).first();
+			const visitorRole = await userDb.prepare(`SELECT role_id FROM role WHERE role_code = 'visitor' OR key = 'visitor' LIMIT 1`).first();
+			const visitorRoleId = visitorRole ? visitorRole.role_id : 2;
+			let visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(demoEmail).first();
+			if (!visitorUser) {
+				const { salt, hash } = await cryptoUtils.hashPassword(demoPassword, c.env);
+				await userDb.prepare(`
+					INSERT INTO user (email, password, salt, type, status, is_del, create_time, update_time)
+					VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'))
+				`).bind(demoEmail, hash, salt, visitorRoleId).run();
+				visitorUser = await userDb.prepare(`SELECT user_id, type FROM user WHERE email = ?`).bind(demoEmail).first();
+			}
+			if (visitorUser) {
+				const existingAcc = await mailDb.prepare(`SELECT account_id FROM account WHERE email = ?`).bind(demoEmail).first();
+				if (!existingAcc) {
+					await mailDb.prepare(`
+						INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort)
+						VALUES (?, 0, ?, 0, ?, 1, 0)
+					`).bind(demoEmail, visitorUser.user_id, demoEmail).run();
 				}
-				if (visitorUser) {
-					const existingAcc = await mailDb.prepare(`SELECT account_id FROM account WHERE email = ?`).bind(demoEmail).first();
-					if (!existingAcc) {
-						await mailDb.prepare(`
-							INSERT INTO account (email, status, user_id, is_del, name, all_receive, sort)
-							VALUES (?, 0, ?, 0, ?, 1, 0)
-						`).bind(demoEmail, visitorUser.user_id, demoEmail).run();
-					}
-				}
-			} catch (e) {
-				console.warn('demo visitor sync warning:', e.message);
 			}
 		}
 	},
@@ -1206,7 +1130,7 @@ const dbInit = {
 
 	async v3_12DB(c) {
 		const userDb = getUserDb(c);
-		
+
 		// Setting 表附件存储规则配置字段
 		const settingColumns = [
 			{ name: 'attachment_policy', sql: `ALTER TABLE setting ADD COLUMN attachment_policy INTEGER NOT NULL DEFAULT 0;` },
@@ -1215,20 +1139,16 @@ const dbInit = {
 		];
 
 		for (const col of settingColumns) {
-			try {
-				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await userDb.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`跳过 setting 字段 ${col.name}：${e.message}`);
+			const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
+			if (!colInfo) {
+				await userDb.prepare(col.sql).run();
 			}
 		}
 	},
 
 	async v3_11DB(c) {
 		const userDb = getUserDb(c);
-		
+
 		// Setting 表第三方数据库配置字段
 		const settingColumns = [
 			{ name: 'external_db_enabled', sql: `ALTER TABLE setting ADD COLUMN external_db_enabled INTEGER NOT NULL DEFAULT 0;` },
@@ -1240,20 +1160,16 @@ const dbInit = {
 		];
 
 		for (const col of settingColumns) {
-			try {
-				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await userDb.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`跳过 setting 字段 ${col.name}：${e.message}`);
+			const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
+			if (!colInfo) {
+				await userDb.prepare(col.sql).run();
 			}
 		}
 	},
 
 	async v3_10DB(c) {
 		const userDb = getUserDb(c);
-		
+
 		// 1. Setting 表存储扩展字段
 		const settingColumns = [
 			{ name: 'user_byo_storage', sql: `ALTER TABLE setting ADD COLUMN user_byo_storage INTEGER NOT NULL DEFAULT 1;` },
@@ -1262,13 +1178,9 @@ const dbInit = {
 		];
 
 		for (const col of settingColumns) {
-			try {
-				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await userDb.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`跳过 setting 字段 ${col.name}：${e.message}`);
+			const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = ? limit 1`).bind(col.name).first();
+			if (!colInfo) {
+				await userDb.prepare(col.sql).run();
 			}
 		}
 
@@ -1280,54 +1192,46 @@ const dbInit = {
 		];
 
 		for (const col of userColumns) {
-			try {
-				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('user') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await userDb.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`跳过 user 字段 ${col.name}：${e.message}`);
+			const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('user') WHERE name = ? limit 1`).bind(col.name).first();
+			if (!colInfo) {
+				await userDb.prepare(col.sql).run();
 			}
 		}
 	},
 
 	async v3_9DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS oauth_app (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					client_id TEXT NOT NULL UNIQUE,
-					client_secret TEXT NOT NULL,
-					name TEXT NOT NULL,
-					homepage_url TEXT NOT NULL DEFAULT '',
-					description TEXT NOT NULL DEFAULT '',
-					redirect_uris TEXT NOT NULL DEFAULT '[]',
-					logo_url TEXT NOT NULL DEFAULT '',
-					scopes TEXT NOT NULL DEFAULT 'openid profile email',
-					status INTEGER NOT NULL DEFAULT 1,
-					created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-				);
-			`).run();
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS oauth_app (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				client_id TEXT NOT NULL UNIQUE,
+				client_secret TEXT NOT NULL,
+				name TEXT NOT NULL,
+				homepage_url TEXT NOT NULL DEFAULT '',
+				description TEXT NOT NULL DEFAULT '',
+				redirect_uris TEXT NOT NULL DEFAULT '[]',
+				logo_url TEXT NOT NULL DEFAULT '',
+				scopes TEXT NOT NULL DEFAULT 'openid profile email',
+				status INTEGER NOT NULL DEFAULT 1,
+				created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+			);
+		`).run();
 
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS oauth_grant (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					user_id INTEGER NOT NULL,
-					client_id TEXT NOT NULL,
-					scopes TEXT NOT NULL DEFAULT 'openid profile email',
-					created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-					updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-				);
-			`).run();
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS oauth_grant (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				client_id TEXT NOT NULL,
+				scopes TEXT NOT NULL DEFAULT 'openid profile email',
+				created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+			);
+		`).run();
 
-			// Auto-seed default OAuth app via oauthAppService (with dynamic cryptographically secure random secret)
-			const oauthAppService = (await import('../service/oauth-app-service')).default;
-			await oauthAppService.ensureTables(c);
-		} catch (e) {
-			console.warn(`初始化 oauth_app 表跳过：${e.message}`);
-		}
+		// Auto-seed default OAuth app via oauthAppService (with dynamic cryptographically secure random secret)
+		const oauthAppService = (await import('../service/oauth-app-service')).default;
+		await oauthAppService.ensureTables(c);
 	},
 
 	async v3_8DB(c) {
@@ -1342,102 +1246,66 @@ const dbInit = {
 		];
 
 		for (const col of columns) {
-			try {
-				const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('user') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await userDb.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`跳过字段 ${col.name}：${e.message}`);
+			const colInfo = await userDb.prepare(`SELECT * FROM pragma_table_info('user') WHERE name = ? limit 1`).bind(col.name).first();
+			if (!colInfo) {
+				await userDb.prepare(col.sql).run();
 			}
 		}
 	},
 
 	async v3_7DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.batch([
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN welcome_subject TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN welcome_content TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN welcome_text TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN welcome_expire_days INTEGER NOT NULL DEFAULT 7;`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN welcome_auto_send INTEGER NOT NULL DEFAULT 1;`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN welcome_last_broadcast TEXT NOT NULL DEFAULT '';`)
-			]);
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await runMigrationStatements(userDb, [
+			`ALTER TABLE setting ADD COLUMN welcome_subject TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN welcome_content TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN welcome_text TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN welcome_expire_days INTEGER NOT NULL DEFAULT 7;`,
+			`ALTER TABLE setting ADD COLUMN welcome_auto_send INTEGER NOT NULL DEFAULT 1;`,
+			`ALTER TABLE setting ADD COLUMN welcome_last_broadcast TEXT NOT NULL DEFAULT '';`,
+		]);
 	},
 
 	async v3_6DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`ALTER TABLE setting ADD COLUMN all_mail_mode INTEGER NOT NULL DEFAULT 0;`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await addMissingColumns(userDb, 'setting', [`ALTER TABLE setting ADD COLUMN all_mail_mode INTEGER NOT NULL DEFAULT 0;`]);
 	},
 
 	async v3_5DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`ALTER TABLE setting ADD COLUMN public_profile INTEGER NOT NULL DEFAULT 0;`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await addMissingColumns(userDb, 'setting', [`ALTER TABLE setting ADD COLUMN public_profile INTEGER NOT NULL DEFAULT 0;`]);
 	},
 
 	async v3_4DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`ALTER TABLE setting ADD COLUMN auth_i18n TEXT NOT NULL DEFAULT '{}';`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await addMissingColumns(userDb, 'setting', [`ALTER TABLE setting ADD COLUMN auth_i18n TEXT NOT NULL DEFAULT '{}';`]);
 	},
 
 	async v3_3DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.batch([
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN no_landing_nodes TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN no_new_nodes TEXT NOT NULL DEFAULT '';`)
-			]);
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await runMigrationStatements(userDb, [
+			`ALTER TABLE setting ADD COLUMN no_landing_nodes TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN no_new_nodes TEXT NOT NULL DEFAULT '';`,
+		]);
 	},
 
 	async v3_2DB(c) {
 		const mailDb = getMailDb(c);
-		try {
-			await mailDb.prepare(`ALTER TABLE email ADD COLUMN snoozed_end_time DATETIME;`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await addMissingColumns(mailDb, 'email', [`ALTER TABLE email ADD COLUMN snoozed_end_time DATETIME;`]);
 	},
 
 	async v3_0DB(c) {
 		const mailDb = getMailDb(c);
 		const userDb = getUserDb(c);
 
-		try {
-			await mailDb.prepare(`ALTER TABLE email ADD COLUMN code TEXT NOT NULL DEFAULT '';`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await addMissingColumns(mailDb, 'email', [`ALTER TABLE email ADD COLUMN code TEXT NOT NULL DEFAULT '';`]);
 
-		try {
-			await userDb.batch([
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN ai_code INTEGER NOT NULL DEFAULT 1;`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN ai_code_filter TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN black_subject TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN black_content TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN black_from TEXT NOT NULL DEFAULT '';`)
-			]);
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await runMigrationStatements(userDb, [
+			`ALTER TABLE setting ADD COLUMN ai_code INTEGER NOT NULL DEFAULT 1;`,
+			`ALTER TABLE setting ADD COLUMN ai_code_filter TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN black_subject TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN black_content TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN black_from TEXT NOT NULL DEFAULT '';`,
+		]);
 	},
 
 	async v3_1DB(c) {
@@ -1453,145 +1321,101 @@ const dbInit = {
 		];
 
 		for (const col of cols) {
-			try {
-				const colInfo = await col.db.prepare(`SELECT * FROM pragma_table_info('${col.table}') WHERE name = ? limit 1`).bind(col.name).first();
-				if (!colInfo) {
-					await col.db.prepare(col.sql).run();
-				}
-			} catch (e) {
-				console.warn(`跳过 ${col.table} 字段 ${col.name}：${e.message}`);
+			const colInfo = await col.db.prepare(`SELECT * FROM pragma_table_info('${col.table}') WHERE name = ? limit 1`).bind(col.name).first();
+			if (!colInfo) {
+				await col.db.prepare(col.sql).run();
 			}
 		}
 	},
 
 	async v2_9DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`UPDATE setting SET auto_refresh = 5 WHERE auto_refresh = 1;`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await userDb.prepare(`UPDATE setting SET auto_refresh = 5 WHERE auto_refresh = 1;`).run();
 	},
 
 	async v2_8DB(c) {
 		const mailDb = getMailDb(c);
-		try {
-			await mailDb.prepare(`ALTER TABLE account ADD COLUMN sort INTEGER NOT NULL DEFAULT 0;`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await addMissingColumns(mailDb, 'account', [`ALTER TABLE account ADD COLUMN sort INTEGER NOT NULL DEFAULT 0;`]);
 	},
 
 	async v2_7DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			// 仅当旧列 auto_refresh_time 存在且新列 auto_refresh 尚不存在时才重命名（全新库 CREATE TABLE 已含 auto_refresh）
-			const oldCol = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = 'auto_refresh_time' limit 1`).first();
-			const newCol = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = 'auto_refresh' limit 1`).first();
-			if (oldCol && !newCol) {
-				await userDb.prepare(`ALTER TABLE setting RENAME COLUMN auto_refresh_time TO auto_refresh;`).run();
-			}
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
+		// 仅当旧列 auto_refresh_time 存在且新列 auto_refresh 尚不存在时才重命名（全新库 CREATE TABLE 已含 auto_refresh）
+		const oldCol = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = 'auto_refresh_time' limit 1`).first();
+		const newCol = await userDb.prepare(`SELECT * FROM pragma_table_info('setting') WHERE name = 'auto_refresh' limit 1`).first();
+		if (oldCol && !newCol) {
+			await userDb.prepare(`ALTER TABLE setting RENAME COLUMN auto_refresh_time TO auto_refresh;`).run();
 		}
 	},
 
 	async v2_6DB(c) {
 		const mailDb = getMailDb(c);
-		try {
-			await mailDb.prepare(`ALTER TABLE account ADD COLUMN all_receive INTEGER NOT NULL DEFAULT 0;`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await addMissingColumns(mailDb, 'account', [`ALTER TABLE account ADD COLUMN all_receive INTEGER NOT NULL DEFAULT 0;`]);
 	},
 
 	async v2_5DB(c) {
 		const userDb = getUserDb(c);
 		const mailDb = getMailDb(c);
 
-		try {
-			await userDb.prepare(`ALTER TABLE setting ADD COLUMN email_prefix_filter text NOT NULL DEFAULT '';`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await addMissingColumns(userDb, 'setting', [`ALTER TABLE setting ADD COLUMN email_prefix_filter text NOT NULL DEFAULT '';`]);
 
-		try {
+		const exists = await mailDb.prepare("SELECT 1 FROM pragma_table_info('email') WHERE name='unread'").first();
+		if (!exists) {
+			// D1 batch is transactional: roll back the new column if the backfill fails.
 			await mailDb.batch([
 				mailDb.prepare(`ALTER TABLE email ADD COLUMN unread INTEGER NOT NULL DEFAULT 0;`),
 				mailDb.prepare(`UPDATE email SET unread = 1;`)
 			]);
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
 		}
 	},
 
 	async v2_4DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS oauth (
-					oauth_id INTEGER PRIMARY KEY AUTOINCREMENT,
-					oauth_user_id TEXT,
-					username TEXT,
-					name TEXT,
-					avatar TEXT,
-					active INTEGER,
-					trust_level INTEGER,
-					silenced INTEGER,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-					platform INTEGER NOT NULL DEFAULT 0,
-					user_id INTEGER NOT NULL DEFAULT 0
-				)
-			`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS oauth (
+				oauth_id INTEGER PRIMARY KEY AUTOINCREMENT,
+				oauth_user_id TEXT,
+				username TEXT,
+				name TEXT,
+				avatar TEXT,
+				active INTEGER,
+				trust_level INTEGER,
+				silenced INTEGER,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+				platform INTEGER NOT NULL DEFAULT 0,
+				user_id INTEGER NOT NULL DEFAULT 0
+			)
+		`).run();
 
-		try {
-			await userDb.prepare(`ALTER TABLE setting ADD COLUMN min_email_prefix INTEGER NOT NULL DEFAULT 1;`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await addMissingColumns(userDb, 'setting', [`ALTER TABLE setting ADD COLUMN min_email_prefix INTEGER NOT NULL DEFAULT 1;`]);
 	},
 
 	async v2_3DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.batch([
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN force_path_style INTEGER NOT NULL DEFAULT 1;`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN custom_domain TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN tg_msg_to TEXT NOT NULL DEFAULT 'show';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN tg_msg_from TEXT NOT NULL DEFAULT 'only-name';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN tg_msg_text TEXT NOT NULL DEFAULT 'show';`)
-			]);
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await runMigrationStatements(userDb, [
+			`ALTER TABLE setting ADD COLUMN force_path_style INTEGER NOT NULL DEFAULT 1;`,
+			`ALTER TABLE setting ADD COLUMN custom_domain TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN tg_msg_to TEXT NOT NULL DEFAULT 'show';`,
+			`ALTER TABLE setting ADD COLUMN tg_msg_from TEXT NOT NULL DEFAULT 'only-name';`,
+			`ALTER TABLE setting ADD COLUMN tg_msg_text TEXT NOT NULL DEFAULT 'show';`,
+		]);
 	},
 
 	async v2DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.batch([
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN bucket TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN region TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN endpoint TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN s3_access_key TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`ALTER TABLE setting ADD COLUMN s3_secret_key TEXT NOT NULL DEFAULT '';`),
-				userDb.prepare(`DELETE FROM perm WHERE perm_key = 'setting:clean'`)
-			]);
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await runMigrationStatements(userDb, [
+			`ALTER TABLE setting ADD COLUMN bucket TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN region TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN endpoint TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN s3_access_key TEXT NOT NULL DEFAULT '';`,
+			`ALTER TABLE setting ADD COLUMN s3_secret_key TEXT NOT NULL DEFAULT '';`,
+			`DELETE FROM perm WHERE perm_key = 'setting:clean'`,
+		]);
 	},
 
 	async v1_7DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`ALTER TABLE setting ADD COLUMN login_domain INTEGER NOT NULL DEFAULT 0;`).run();
-		} catch (e) {
-			console.warn(`跳过字段：${e.message}`);
-		}
+		await addMissingColumns(userDb, 'setting', [`ALTER TABLE setting ADD COLUMN login_domain INTEGER NOT NULL DEFAULT 0;`]);
 	},
 
 	async v1_6DB(c) {
@@ -1620,13 +1444,9 @@ const dbInit = {
 			`UPDATE role SET avail_domain = '' WHERE role.avail_domain LIKE '@%';`
 		];
 
-		await Promise.all(userColumns.map(async sql => {
-			try { await userDb.prepare(sql).run(); } catch (e) { console.warn(`跳过字段：${e.message}`); }
-		}));
+		await runMigrationStatements(userDb, userColumns);
 
-		try {
-			await mailDb.prepare(`CREATE INDEX IF NOT EXISTS idx_email_user_id_account_id ON email(user_id, account_id);`).run();
-		} catch (e) { console.warn(`跳过索引：${e.message}`); }
+		await mailDb.prepare(`CREATE INDEX IF NOT EXISTS idx_email_user_id_account_id ON email(user_id, account_id);`).run();
 
 		const noticeContent = '欢迎使用 <c7>EpoCanvas Mail</c> 智能协作平台。<br>\n' +
 			'请在严格遵守当地法律法规及平台规范的前提下，开展业务通信流转。';
@@ -1636,18 +1456,14 @@ const dbInit = {
 			'请在严格遵守当地法律法规及平台规范的前提下，开展您的业务通信流转。';
 		const oldNoticeContent3 = '欢迎使用 <c=var(--el-color-primary)>EpoCanvas Mail</c> 智能协作平台。<br>\n' +
 			'请在严格遵守当地法律法规及平台规范的前提下，开展业务通信流转。';
-		
-		try {
-			await userDb.prepare(`UPDATE setting SET notice_content = ? WHERE notice_content = '' OR notice_content = ? OR notice_content = ? OR notice_content = ?;`).bind(noticeContent, oldNoticeContent1, oldNoticeContent2, oldNoticeContent3).run();
-		} catch (e) { console.warn(e.message); }
 
-		try {
-			await this.ensureEmailUniqueIndex(mailDb, 'account', 'idx_account_email', 'idx_account_email_nocase');
-		} catch (e) { console.warn(`account email unique index migration: ${e.message}`); }
+		await userDb.prepare(`UPDATE setting SET notice_content = ? WHERE notice_content = '' OR notice_content = ? OR notice_content = ? OR notice_content = ?;`).bind(noticeContent, oldNoticeContent1, oldNoticeContent2, oldNoticeContent3).run();
 
-		try {
-			await this.ensureEmailUniqueIndex(userDb, 'user', 'idx_user_email', 'idx_user_email_nocase');
-		} catch (e) { console.warn(`user email unique index migration: ${e.message}`); }
+		const accountIndex = await this.ensureEmailUniqueIndex(mailDb, 'account', 'idx_account_email', 'idx_account_email_nocase');
+		if (!accountIndex.ok) throw new Error('account email duplicates prevent unique index migration');
+
+		const userIndex = await this.ensureEmailUniqueIndex(userDb, 'user', 'idx_user_email', 'idx_user_email_nocase');
+		if (!userIndex.ok) throw new Error('user email duplicates prevent unique index migration');
 	},
 
 	/**
@@ -1678,45 +1494,34 @@ const dbInit = {
 
 	async v1_5DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`UPDATE perm SET perm_key = 'all-email:query' WHERE perm_key = 'sys-email:query'`).run();
-			await userDb.prepare(`UPDATE perm SET perm_key = 'all-email:delete' WHERE perm_key = 'sys-email:delete'`).run();
-			await userDb.prepare(`ALTER TABLE role ADD COLUMN avail_domain TEXT NOT NULL DEFAULT ''`).run();
-		} catch (e) {
-			console.warn(`跳过字段添加：${e.message}`);
-		}
+		await userDb.prepare(`UPDATE perm SET perm_key = 'all-email:query' WHERE perm_key = 'sys-email:query'`).run();
+		await userDb.prepare(`UPDATE perm SET perm_key = 'all-email:delete' WHERE perm_key = 'sys-email:delete'`).run();
+		await addMissingColumns(userDb, 'role', [`ALTER TABLE role ADD COLUMN avail_domain TEXT NOT NULL DEFAULT ''`]);
 	},
 
 	async v1_4DB(c) {
 		const userDb = getUserDb(c);
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS reg_key (
-					rege_key_id INTEGER PRIMARY KEY AUTOINCREMENT,
-					code TEXT NOT NULL COLLATE NOCASE DEFAULT '',
-					count INTEGER NOT NULL DEFAULT 0,
-					role_id INTEGER NOT NULL DEFAULT 0,
-					user_id INTEGER NOT NULL DEFAULT 0,
-					expire_time DATETIME,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP
-				)
-			`).run();
-			await userDb.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_setting_code ON reg_key(code COLLATE NOCASE)`).run();
-		} catch (e) {
-			console.warn(`跳过创建索引：${e.message}`);
-		}
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS reg_key (
+				rege_key_id INTEGER PRIMARY KEY AUTOINCREMENT,
+				code TEXT NOT NULL COLLATE NOCASE DEFAULT '',
+				count INTEGER NOT NULL DEFAULT 0,
+				role_id INTEGER NOT NULL DEFAULT 0,
+				user_id INTEGER NOT NULL DEFAULT 0,
+				expire_time DATETIME,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`).run();
+		await userDb.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_setting_code ON reg_key(code COLLATE NOCASE)`).run();
 
-		try {
-			await userDb.prepare(`
-				INSERT INTO perm (perm_id, name, perm_key, pid, type, sort) VALUES
-				(33,'注册密钥', NULL, 0, 1, 5.1),
-				(34,'密钥查看', 'reg-key:query', 33, 2, 0),
-				(35,'密钥添加', 'reg-key:add', 33, 2, 1),
-				(36,'密钥删除', 'reg-key:delete', 33, 2, 2)
-			`).run();
-		} catch (e) {
-			console.warn(`跳过数据：${e.message}`);
-		}
+		await userDb.prepare(`
+			INSERT INTO perm (perm_id, name, perm_key, pid, type, sort) VALUES
+			(33,'注册密钥', NULL, 0, 1, 5.1),
+			(34,'密钥查看', 'reg-key:query', 33, 2, 0),
+			(35,'密钥添加', 'reg-key:add', 33, 2, 1),
+			(36,'密钥删除', 'reg-key:delete', 33, 2, 2)
+			ON CONFLICT(perm_id) DO NOTHING
+		`).run();
 
 		const userColumns = [
 			`ALTER TABLE setting ADD COLUMN reg_key INTEGER NOT NULL DEFAULT 1;`,
@@ -1725,18 +1530,12 @@ const dbInit = {
 			`ALTER TABLE user ADD COLUMN reg_key_id INTEGER NOT NULL DEFAULT 0;`
 		];
 
-		await Promise.all(userColumns.map(async sql => {
-			try { await userDb.prepare(sql).run(); } catch (e) { console.warn(`跳过字段添加：${e.message}`); }
-		}));
+		await runMigrationStatements(userDb, userColumns);
 	},
 
 	async v1_3_1DB(c) {
 		const mailDb = getMailDb(c);
-		try {
-			await mailDb.prepare(`UPDATE email SET name = SUBSTR(send_email, 1, INSTR(send_email, '@') - 1) WHERE (name IS NULL OR name = '') AND type = ${emailConst.type.RECEIVE}`).run();
-		} catch (e) {
-			console.warn(e.message);
-		}
+		await mailDb.prepare(`UPDATE email SET name = SUBSTR(send_email, 1, INSTR(send_email, '@') - 1) WHERE (name IS NULL OR name = '') AND type = ${emailConst.type.RECEIVE}`).run();
 	},
 
 	async v1_3DB(c) {
@@ -1784,15 +1583,12 @@ const dbInit = {
 		await this.receiveEmailToRecipient(c);
 		await this.initAccountName(c);
 
-		try {
-			await userDb.prepare(`
-				INSERT INTO perm (perm_id, name, perm_key, pid, type, sort) VALUES
-				(31,'分析页', NULL, 0, 1, 2.1),
-				(32,'数据查看', 'analysis:query', 31, 2, 1)
-			`).run();
-		} catch (e) {
-			console.warn(`跳过数据：${e.message}`);
-		}
+		await userDb.prepare(`
+			INSERT INTO perm (perm_id, name, perm_key, pid, type, sort) VALUES
+			(31,'分析页', NULL, 0, 1, 2.1),
+			(32,'数据查看', 'analysis:query', 31, 2, 1)
+			ON CONFLICT(perm_id) DO NOTHING
+		`).run();
 	},
 
 	async v1_1DB(c) {
@@ -1832,124 +1628,112 @@ const dbInit = {
 		]);
 
 		// 创建 perm 表并初始化
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS perm (
-					perm_id INTEGER PRIMARY KEY AUTOINCREMENT,
-					name TEXT NOT NULL,
-					perm_key TEXT,
-					pid INTEGER NOT NULL DEFAULT 0,
-					type INTEGER NOT NULL DEFAULT 2,
-					sort INTEGER
-				)
-			`).run();
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS perm (
+				perm_id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				perm_key TEXT,
+				pid INTEGER NOT NULL DEFAULT 0,
+				type INTEGER NOT NULL DEFAULT 2,
+				sort INTEGER
+			)
+		`).run();
 
-			const permInfo = await userDb.prepare(`SELECT COUNT(*) as permTotal FROM perm`).first();
-			if (!permInfo || permInfo.permTotal === 0) {
-				await userDb.prepare(`
-					INSERT INTO perm (perm_id, name, perm_key, pid, type, sort) VALUES
-					(1, '邮件', NULL, 0, 0, 0),
-					(2, '邮件删除', 'email:delete', 1, 2, 1),
-					(3, '邮件发送', 'email:send', 1, 2, 0),
-					(4, '个人设置', '', 0, 1, 2),
-					(5, '用户注销', 'my:delete', 4, 2, 0),
-					(6, '用户信息', NULL, 0, 1, 3),
-					(7, '用户查看', 'user:query', 6, 2, 0),
-					(8, '密码修改', 'user:set-pwd', 6, 2, 2),
-					(9, '状态修改', 'user:set-status', 6, 2, 3),
-					(10, '权限修改', 'user:set-type', 6, 2, 4),
-					(11, '用户删除', 'user:delete', 6, 2, 7),
-					(12, '用户收藏', 'user:star', 6, 2, 5),
-					(13, '权限控制', '', 0, 1, 5),
-					(14, '身份查看', 'role:query', 13, 2, 0),
-					(15, '身份修改', 'role:set', 13, 2, 1),
-					(16, '身份删除', 'role:delete', 13, 2, 2),
-					(17, '系统设置', '', 0, 1, 6),
-					(18, '设置查看', 'setting:query', 17, 2, 0),
-					(19, '设置修改', 'setting:set', 17, 2, 1),
-					(21, '邮箱侧栏', '', 0, 0, 1),
-					(22, '邮箱查看', 'account:query', 21, 2, 0),
-					(23, '邮箱添加', 'account:add', 21, 2, 1),
-					(24, '邮箱删除', 'account:delete', 21, 2, 2),
-					(25, '用户添加', 'user:add', 6, 2, 1),
-					(26, '发件重置', 'user:reset-send', 6, 2, 6),
-					(27, '邮件列表', '', 0, 1, 4),
-					(28, '邮件查看', 'all-email:query', 27, 2, 0),
-					(29, '邮件删除', 'all-email:delete', 27, 2, 0),
-					(30, '身份添加', 'role:add', 13, 2, -1)
-				`).run();
-			}
-			await userDb.prepare(`UPDATE perm SET perm_key = 'setting:clean' WHERE perm_key = 'seting:clear'`).run();
-			await userDb.prepare(`DELETE FROM perm WHERE perm_key = 'user:star'`).run();
-		} catch (e) {
-			console.warn(`初始化 perm 表跳过：${e.message}`);
+		const permInfo = await userDb.prepare(`SELECT COUNT(*) as permTotal FROM perm`).first();
+		if (!permInfo || permInfo.permTotal === 0) {
+			await userDb.prepare(`
+				INSERT INTO perm (perm_id, name, perm_key, pid, type, sort) VALUES
+				(1, '邮件', NULL, 0, 0, 0),
+				(2, '邮件删除', 'email:delete', 1, 2, 1),
+				(3, '邮件发送', 'email:send', 1, 2, 0),
+				(4, '个人设置', '', 0, 1, 2),
+				(5, '用户注销', 'my:delete', 4, 2, 0),
+				(6, '用户信息', NULL, 0, 1, 3),
+				(7, '用户查看', 'user:query', 6, 2, 0),
+				(8, '密码修改', 'user:set-pwd', 6, 2, 2),
+				(9, '状态修改', 'user:set-status', 6, 2, 3),
+				(10, '权限修改', 'user:set-type', 6, 2, 4),
+				(11, '用户删除', 'user:delete', 6, 2, 7),
+				(12, '用户收藏', 'user:star', 6, 2, 5),
+				(13, '权限控制', '', 0, 1, 5),
+				(14, '身份查看', 'role:query', 13, 2, 0),
+				(15, '身份修改', 'role:set', 13, 2, 1),
+				(16, '身份删除', 'role:delete', 13, 2, 2),
+				(17, '系统设置', '', 0, 1, 6),
+				(18, '设置查看', 'setting:query', 17, 2, 0),
+				(19, '设置修改', 'setting:set', 17, 2, 1),
+				(21, '邮箱侧栏', '', 0, 0, 1),
+				(22, '邮箱查看', 'account:query', 21, 2, 0),
+				(23, '邮箱添加', 'account:add', 21, 2, 1),
+				(24, '邮箱删除', 'account:delete', 21, 2, 2),
+				(25, '用户添加', 'user:add', 6, 2, 1),
+				(26, '发件重置', 'user:reset-send', 6, 2, 6),
+				(27, '邮件列表', '', 0, 1, 4),
+				(28, '邮件查看', 'all-email:query', 27, 2, 0),
+				(29, '邮件删除', 'all-email:delete', 27, 2, 0),
+				(30, '身份添加', 'role:add', 13, 2, -1)
+			`).run();
 		}
+		await userDb.prepare(`UPDATE perm SET perm_key = 'setting:clean' WHERE perm_key = 'seting:clear'`).run();
+		await userDb.prepare(`DELETE FROM perm WHERE perm_key = 'user:star'`).run();
 
 		// 创建 role 表并插入默认身份
-		try {
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS role (
+				role_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				key TEXT,
+				create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+				sort INTEGER DEFAULT 0,
+				description TEXT,
+				user_id INTEGER,
+				is_default INTEGER DEFAULT 0,
+				send_count INTEGER,
+				send_type TEXT NOT NULL DEFAULT 'count',
+				account_count INTEGER,
+				storage_quota_mb INTEGER DEFAULT 5,
+				allow_attachment INTEGER DEFAULT 0,
+				role_code TEXT DEFAULT 'custom',
+				tag_text TEXT DEFAULT '',
+				tag_color TEXT DEFAULT '',
+				ai_models TEXT DEFAULT ''
+			)
+		`).run();
+
+		const roleInfo = await userDb.prepare(`SELECT COUNT(*) as roleCount FROM role`).first();
+		if (!roleInfo || roleInfo.roleCount === 0) {
 			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS role (
-					role_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-					name TEXT NOT NULL,
-					key TEXT,
-					create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-					sort INTEGER DEFAULT 0,
-					description TEXT,
-					user_id INTEGER,
-					is_default INTEGER DEFAULT 0,
-					send_count INTEGER,
-					send_type TEXT NOT NULL DEFAULT 'count',
-					account_count INTEGER,
-					storage_quota_mb INTEGER DEFAULT 5,
-					allow_attachment INTEGER DEFAULT 0,
-					role_code TEXT DEFAULT 'custom',
-					tag_text TEXT DEFAULT '',
-					tag_color TEXT DEFAULT '',
-					ai_models TEXT DEFAULT ''
+				INSERT INTO role (
+					role_id, name, key, create_time, sort, description, user_id, is_default, send_count, send_type, account_count
+				) VALUES (
+					1, '普通用户', NULL, '0000-00-00 00:00:00', 0, '只有普通使用权限', 0, 1, NULL, 'ban', 10
 				)
 			`).run();
-
-			const roleInfo = await userDb.prepare(`SELECT COUNT(*) as roleCount FROM role`).first();
-			if (!roleInfo || roleInfo.roleCount === 0) {
-				await userDb.prepare(`
-					INSERT INTO role (
-						role_id, name, key, create_time, sort, description, user_id, is_default, send_count, send_type, account_count
-					) VALUES (
-						1, '普通用户', NULL, '0000-00-00 00:00:00', 0, '只有普通使用权限', 0, 1, NULL, 'ban', 10
-					)
-				`).run();
-			}
-		} catch (e) {
-			console.warn(`初始化 role 表跳过：${e.message}`);
 		}
 
 		// 创建 role_perm 表并初始化数据
-		try {
-			await userDb.prepare(`
-				CREATE TABLE IF NOT EXISTS role_perm (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					role_id INTEGER,
-					perm_id INTEGER
-				)
-			`).run();
+		await userDb.prepare(`
+			CREATE TABLE IF NOT EXISTS role_perm (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				role_id INTEGER,
+				perm_id INTEGER
+			)
+		`).run();
 
-			const rolePermInfo = await userDb.prepare(`SELECT COUNT(*) as rolePermCount FROM role_perm`).first();
-			if (!rolePermInfo || rolePermInfo.rolePermCount === 0) {
-				await userDb.prepare(`
-					INSERT INTO role_perm (id, role_id, perm_id) VALUES
-						(100, 1, 2),
-						(101, 1, 21),
-						(102, 1, 22),
-						(103, 1, 23),
-						(104, 1, 24),
-						(105, 1, 4),
-						(106, 1, 5),
-						(107, 1, 1),
-						(108, 1, 3)
-				`).run();
-			}
-		} catch (e) {
-			console.warn(`初始化 role_perm 表跳过：${e.message}`);
+		const rolePermInfo = await userDb.prepare(`SELECT COUNT(*) as rolePermCount FROM role_perm`).first();
+		if (!rolePermInfo || rolePermInfo.rolePermCount === 0) {
+			await userDb.prepare(`
+				INSERT INTO role_perm (id, role_id, perm_id) VALUES
+					(100, 1, 2),
+					(101, 1, 21),
+					(102, 1, 22),
+					(103, 1, 23),
+					(104, 1, 24),
+					(105, 1, 4),
+					(106, 1, 5),
+					(107, 1, 1),
+					(108, 1, 3)
+			`).run();
 		}
 	},
 
@@ -2104,17 +1888,13 @@ const dbInit = {
 			)
 		`).run();
 
-		try {
-			await userDb.prepare(`
-				INSERT INTO setting (
-					register, receive, add_email, many_email, title, auto_refresh, register_verify, add_email_verify
-				)
-				SELECT 0, 0, 0, 0, 'EpoCanvas Mail', 0, 1, 1
-				WHERE NOT EXISTS (SELECT 1 FROM setting)
-			`).run();
-		} catch (e) {
-			console.warn(e);
-		}
+		await userDb.prepare(`
+			INSERT INTO setting (
+				register, receive, add_email, many_email, title, auto_refresh, register_verify, add_email_verify
+			)
+			SELECT 0, 0, 0, 0, 'EpoCanvas Mail', 0, 1, 1
+			WHERE NOT EXISTS (SELECT 1 FROM setting)
+		`).run();
 
 		await userDb.prepare(`
 			CREATE TABLE IF NOT EXISTS audit_log (
@@ -2320,7 +2100,7 @@ const dbInit = {
 		await ensureMailReliabilitySchema(c);
 		await ensureNoticeDeliverySchema(c);
 		await ensureAuthSecurityOperationSchema(c);
-		await ensureUserSessionTable(userDb);
+		await ensureUserSessionTable(userDb, { force: true });
 		await ensureSessionRevocationSchema(c);
 		await ensureStorageProbeHistory(c);
 	},

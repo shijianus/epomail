@@ -852,26 +852,21 @@ describe('OAuth bind claim schema and migration', () => {
 		expect(await oauthAssociations()).toHaveLength(1);
 	});
 
-	it('skips the unique index instead of rewriting legacy duplicates', async () => {
-		await env.db.prepare('DROP INDEX IF EXISTS idx_oauth_user_id_unique').run();
-		await env.db.prepare('DELETE FROM oauth').run();
-		for (const name of ['one', 'two']) {
-			await env.db.prepare(
-				`INSERT INTO oauth (oauth_user_id, username, name, user_id) VALUES (?, ?, ?, 0)`
-			).bind(IDENTITY, name, name).run();
+	it('aborts the migration without rewriting legacy duplicates', async () => {
+		try {
+			await env.db.prepare('DROP INDEX IF EXISTS idx_oauth_user_id_unique').run();
+			await env.db.prepare('DELETE FROM oauth').run();
+			for (const name of ['one', 'two']) {
+				await env.db.prepare(
+					`INSERT INTO oauth (oauth_user_id, username, name, user_id) VALUES (?, ?, ?, 0)`
+				).bind(IDENTITY, name, name).run();
+			}
+			await expect(dbInit.v3_20DB({ env })).rejects.toThrow('OAuth identity duplicates');
+			expect(await oauthAssociations()).toHaveLength(2);
+		} finally {
+			await env.db.prepare('DELETE FROM oauth').run();
+			await dbInit.v3_20DB({ env });
 		}
-
-		await dbInit.v3_20DB({ env });
-
-		const skipped = await env.db.prepare(
-			`SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_oauth_user_id_unique'`
-		).first();
-		expect(skipped).toBeNull();
-
-		// Clean up the synthetic legacy rows and let the migration restore the
-		// index for the rest of the suite.
-		await env.db.prepare('DELETE FROM oauth').run();
-		await dbInit.v3_20DB({ env });
 		const restored = await env.db.prepare(
 			`SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_oauth_user_id_unique'`
 		).first();

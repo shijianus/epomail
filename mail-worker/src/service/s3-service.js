@@ -6,6 +6,13 @@ import s3Signer from '../utils/s3-signer';
 import { isSafePublicUrl, assertSafePublicUrl } from '../utils/url-utils';
 import safeLogger from '../utils/safe-logger.js';
 
+const S3_TIMEOUT_MS = 15000;
+
+// One deadline covers SDK retries and streaming bodies, including GetObject.
+function sendWithTimeout(client, command) {
+	return client.send(command, { abortSignal: AbortSignal.timeout(S3_TIMEOUT_MS) });
+}
+
 const s3Service = {
 
 	/**
@@ -30,6 +37,7 @@ const s3Service = {
 			region,
 			endpoint: domainUtils.toOssDomain(endpoint),
 			forcePathStyle,
+			requestHandler: { requestTimeout: S3_TIMEOUT_MS },
 			credentials: {
 				accessKeyId,
 				secretAccessKey
@@ -60,7 +68,7 @@ const s3Service = {
 			obj.ContentType = metadata.contentType;
 		}
 
-		await client.send(new PutObjectCommand(obj));
+		await sendWithTimeout(client, new PutObjectCommand(obj));
 	},
 
 	/**
@@ -81,7 +89,7 @@ const s3Service = {
 		// Single-object DELETE does not need Content-MD5 and works on every
 		// S3-compatible provider. Reserve the batch API for real batches.
 		if (keys.length === 1) {
-			await client.send(new DeleteObjectCommand({
+			await sendWithTimeout(client, new DeleteObjectCommand({
 				Bucket: bucket,
 				Key: keys[0]
 			}));
@@ -109,7 +117,7 @@ const s3Service = {
 			{ step: "build", name: "inspectRequestMiddleware" }
 		);
 
-		await client.send(
+		await sendWithTimeout(client,
 			new DeleteObjectsCommand({
 				Bucket: bucket,
 				Delete: {
@@ -130,7 +138,7 @@ const s3Service = {
 		let continuationToken;
 
 		do {
-			const page = await client.send(new ListObjectsV2Command({
+			const page = await sendWithTimeout(client, new ListObjectsV2Command({
 				Bucket: bucket,
 				Prefix: prefix,
 				MaxKeys: Math.min(1000, cap - objects.length),
@@ -153,7 +161,7 @@ const s3Service = {
 		const client = await this.client(c, customConfig);
 		const bucket = customConfig?.bucket || (await settingService.query(c)).bucket;
 
-		const result = await client.send(new GetObjectCommand({
+		const result = await sendWithTimeout(client, new GetObjectCommand({
 			Bucket: bucket,
 			Key: key
 		}));
@@ -238,6 +246,7 @@ const s3Service = {
 				region,
 				endpoint: domainUtils.toOssDomain(endpoint),
 				forcePathStyle,
+				requestHandler: { requestTimeout: S3_TIMEOUT_MS },
 				credentials: {
 					accessKeyId,
 					secretAccessKey
@@ -252,7 +261,7 @@ const s3Service = {
 				provider
 			});
 
-			await client.send(new PutObjectCommand({
+			await sendWithTimeout(client, new PutObjectCommand({
 				Bucket: bucket,
 				Key: probeKey,
 				Body: testData,
@@ -260,7 +269,7 @@ const s3Service = {
 			}));
 
 			// 2. Test GET Object
-			const getRes = await client.send(new GetObjectCommand({
+			const getRes = await sendWithTimeout(client, new GetObjectCommand({
 				Bucket: bucket,
 				Key: probeKey
 			}));
@@ -271,7 +280,7 @@ const s3Service = {
 
 			// 3. Test DELETE Object
 			try {
-				await client.send(new DeleteObjectCommand({
+				await sendWithTimeout(client, new DeleteObjectCommand({
 					Bucket: bucket,
 					Key: probeKey
 				}));

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import i18next from 'i18next';
 import app from '../src/hono/hono.js';
 import {
 	normalizeLanguage,
@@ -27,6 +28,28 @@ function probe(language, pause, explicit) {
 }
 
 describe('request-scoped i18n', () => {
+	it('deep resource merging cannot corrupt inherited built-ins (CVE-2026-63402)', async () => {
+		const instance = i18next.createInstance();
+		const builtins = ['hasOwnProperty', 'toString', 'valueOf'].map(key => ({
+			key, fn: Object.prototype[key], descriptor: Object.getOwnPropertyDescriptor(Object.prototype[key], 'call'),
+		}));
+		let intact;
+		try {
+			await instance.init({ lng: 'en', resources: { en: { translation: {} } } });
+			for (const { key } of builtins) {
+				instance.addResourceBundle('en', 'translation', { [key]: { call: 'corrupted' } }, true, true);
+			}
+			intact = builtins.every(({ fn }) => fn.call === Function.prototype.call);
+		} finally {
+			for (const { fn, descriptor } of builtins) {
+				if (descriptor) Object.defineProperty(fn, 'call', descriptor);
+				else delete fn.call;
+			}
+			instance.removeResourceBundle('en', 'translation');
+		}
+		expect(intact).toBe(true);
+	});
+
 	it('keeps interleaved async requests on their own fixed translator', async () => {
 		const [englishResponse, frenchResponse] = await Promise.all([
 			probe('en-US,en;q=0.8', 25, 'zh-TW'),
