@@ -1,3 +1,27 @@
+### 上线前稳定性、迁移与依赖修复 (2026-11-27)
+*   **关联提交 (Git Commit)**: `b9ae2b93e5a9837dba5d4407b213e0a3df7a8d98` (Short: `b9ae2b9`)
+*   **基准提交 (Baseline)**: `16443181c9b4c301cb3f1a298e34b23e9125c62b` (Short: `1644318`)
+*   **部署环境 (Deployment)**: `本地隔离全真栈 / Chromium / production 离线 dry-run`；未执行远端部署。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 外部请求：Resend 15s、Turnstile/内置 OAuth 每请求 10s、S3 15s SDK requestTimeout + 操作级 AbortSignal；S3 包含重试与 GetObject 流式读体，Resend 保留幂等键与原有 UNKNOWN 对账语义。
+    - [x] AI：模型列表 4s、元数据 3.5s、推理 5s 超时覆盖读体；移除响应头返回即清定时器的缺陷，成功推理也等待读体完成。
+    - [x] 迁移：清理 init.js 旧迁移吞错，PRAGMA 逐列检查，部分 ALTER 可续跑；权限种子仅忽略 perm_id 冲突，unread 加列/回填保持事务原子性；OAuth/邮箱重复值阻断唯一索引迁移并保留数据。
+    - [x] 初始化：D1 owner 锁覆盖跨 isolate GET/POST /init 并发，竞争请求 409；finally 释放锁；验收关键表列、索引列顺序、唯一性与 NOCASE，验收后才刷新配置；会话表迁移强制复核缓存。
+    - [x] 依赖：i18next 25.4.2 → 26.3.4，修复 CVE-2026-63402 / GHSA-6jcc-5g8w-32mx；package.json 与 pnpm-lock.yaml 同步。
+    - [x] 运维文档：`doc/PRELAUNCH-STABILITY.md` 记录时限、重复数据处理及异常终止后锁恢复。锁不自动过期，避免慢迁移被并发接管；仅确认先前实例结束后按 owner 人工清锁。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建：最终 production dry-run 内 React 登录页 3.52s、Vue 22.48s，零警告零报错；Worker dry-run 通过，未上传。
+    - [x] Worker 全量：`pnpm --dir mail-worker test`，67/67 文件、912/912 测试通过，781.11s；零跳过。
+    - [x] 新增 57 项：`external-timeouts.spec.js` 24 项、`migration-safety.spec.js` 32 项、`i18n-request-isolation.spec.js` 公告复现 1 项；实际 SDK + 原生 AbortSignal 验证等待响应头/读体中止、失败传播、D1 互斥/归属释放、单/双库、部分迁移、INSERT/UPDATE 故障与约束验收。
+    - [x] Node 全量：`node --test --test-concurrency=2 tests/*.test.mjs tests/helpers/*.test.mjs tests/test-i18n-gates.mjs` 344/344。首次默认并行受本机构建负载影响触发旧 Windows 进程清理模拟超时；限制并发后完整复跑全过，未修改断言。
+    - [x] 登录：typecheck 通过；29/29 单测；`oauth-bind-login-ui-e2e.mjs` 13/13。
+    - [x] 全真栈 API：`fullstack-smoke.mjs` 24/24，新增真实并发冷启动 200/409 验证，重复初始化与站长登录/收发/附件隔离通过。
+    - [x] 浏览器：`fullstack-browser-e2e.mjs` 37/37，桌面/移动端、CSP、私有附件签名与邮件可读性通过；草稿及受限文书浏览器补充 2/2。一次与生产构建同时运行导致连接中断，构建结束后单独完整复跑通过。
+    - [x] i18n：symmetry/audit/hardcoded/auth-locale 全过，六语对称、零缺失引用、零未包裹界面硬编码；未新增词条。
+    - [x] 依赖审计：官方 npm registry 的 `audit --prod` 零漏洞；包含开发依赖的 audit 仍有既有 16 项（2 critical / 9 high / 4 moderate / 1 low），升级前 17 项；i18next 公告消除，未扩大到 Vitest/Workers/Wrangler 工具链升级。
+    - [x] 零假数据残留：新增夹具 finally 物理删除，网络替身/内建对象 finally 恢复；全真栈临时 D1/KV、凭据和进程均已清理，API/浏览器报告 cleanup complete；无剩余任务 workerd/Vitest 进程。
+    - [x] 安全门禁：工作区扫描与提交前离线扫描零发现，staged 文件名/公开配置检查通过；git diff --check 通过。
+
 ### 上线前安全与防呆修复 (2026-11-27)
 *   **关联提交 (Git Commit)**: `b00e1027db7cd1a4c658c668660a47527be7e161` (Short: `b00e102`)
 *   **基准提交 (Baseline)**: `0eec64d43e0a03b3a6e82822caf9745665c44fc7` (Short: `0eec64d`)
