@@ -131,8 +131,8 @@ export function checkWranglerConfig(suite, configPath = wranglerPath) {
     return;
   }
 
-  // Top-level vars and bindings are the production target for this repository.
-  const vars = config.vars || {};
+  const production = config.env?.production || config;
+  const vars = production.vars || {};
   if (String(vars.ENVIRONMENT) === 'production') {
     suite.pass('CFG-01', '生产环境标识已显式固定为 production');
   } else {
@@ -150,8 +150,8 @@ export function checkWranglerConfig(suite, configPath = wranglerPath) {
     && entries.some(entry => entry.binding === binding && format.test(entry[id] || ''));
   const d1Id = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
   if (['USER_DB', 'MAIL_DB', 'db'].every(binding =>
-    hasBinding(config.d1_databases, binding, 'database_id', d1Id))
-    && hasBinding(config.kv_namespaces, 'kv', 'id', /^[a-f0-9]{32}$/i)) {
+    hasBinding(production.d1_databases, binding, 'database_id', d1Id))
+    && hasBinding(production.kv_namespaces, 'kv', 'id', /^[a-f0-9]{32}$/i)) {
     suite.pass('CFG-03', '生产 D1 和 KV 绑定齐全且格式有效');
   } else {
     suite.fail('CFG-03', '生产 D1 或 KV 绑定缺失、重复或格式无效');

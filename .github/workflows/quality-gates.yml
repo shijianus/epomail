@@ -235,7 +235,7 @@ jobs:
         working-directory: mail-worker
         env:
           EPOMAIL_FREEZE_MANIFEST: '1'
-        run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-dry-run"
+        run: pnpm exec wrangler deploy --env production --dry-run --outdir "$RUNNER_TEMP/worker-dry-run"
 
       - name: Install browser test dependencies (frozen lockfile)
         run: pnpm install --frozen-lockfile
@@ -247,7 +247,7 @@ jobs:
         run: |
           node scripts/verify-production-readiness.mjs
           node scripts/verify-staging-config.mjs --sandbox-outbound
-          node --test tests/verify-production-readiness.test.mjs tests/verify-staging-config.test.mjs tests/public-beta-gate.test.mjs tests/release-promotion.test.mjs tests/recovery-directory.test.mjs tests/candidate-package.test.mjs
+          node --test tests/deploy-environment.test.mjs tests/verify-production-readiness.test.mjs tests/verify-staging-config.test.mjs tests/public-beta-gate.test.mjs tests/release-promotion.test.mjs tests/recovery-directory.test.mjs tests/candidate-package.test.mjs
 
       - name: Freeze two independent builds and compare the release archives
         shell: bash
@@ -260,7 +260,7 @@ jobs:
           (
             cd "$rebuild"
             pnpm --dir mail-worker install --frozen-lockfile
-            (cd mail-worker && pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/worker-rebuild")
+            (cd mail-worker && pnpm exec wrangler deploy --env production --dry-run --outdir "$RUNNER_TEMP/worker-rebuild")
             node scripts/package-candidate.mjs "$RUNNER_TEMP/worker-rebuild" "$RUNNER_TEMP/rebuilt-release" "$GITHUB_SHA"
           )
           cmp "$RUNNER_TEMP/frozen-release/epomail-candidate.tar.gz" "$RUNNER_TEMP/rebuilt-release/epomail-candidate.tar.gz"
@@ -414,4 +414,4 @@ jobs:
         run: pnpm --dir mail-vue run build
 
       - name: UI localization and public audit display regression tests
-        run: node --test tests/ui-localization.test.mjs tests/audit-visitor-display.test.mjs
+        run: node --test tests/ui-localization.test.mjs tests/audit-visitor-display.test.mjs tests/attachment-urls.test.mjs tests/theme-init.test.mjs

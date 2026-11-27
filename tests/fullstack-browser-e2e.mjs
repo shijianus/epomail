@@ -84,8 +84,10 @@ async function sendReaderFixtures(page) {
 		const accounts = await request('account/list');
 		await request('email/send', {
 			...ordinary, accountId: (accounts.list ?? accounts)[0].accountId, receiveEmail: ['admin@example.com'],
-			text: 'Friday at nine', sendType: 0, attachments: [], idempotencyKey: 'reader-e2e-ordinary'
+			text: 'Friday at nine', sendType: 0, attachments: [{ filename: 'private.txt', type: 'text/plain',
+				content: 'data:text/plain;base64,' + btoa('private browser attachment') }], idempotencyKey: 'reader-e2e-ordinary'
 		});
+		await request('setting/set', { r2Domain: 'https://public-objects.invalid' });
 	}, { notice: legacyNotice, ordinary: ordinaryMail });
 }
 
@@ -313,7 +315,23 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 		executablePath: process.env.EPOMAIL_CHROMIUM_PATH || undefined
 	});
 	addCleanup(() => browser.close());
+	const cspViolations = [];
+	async function watchCsp(browserContext) {
+		await browserContext.exposeBinding('recordCspViolation', (_, violation) => cspViolations.push(violation));
+		await browserContext.addInitScript(() => {
+			document.addEventListener('securitypolicyviolation', event => {
+				window.recordCspViolation({ directive: event.effectiveDirective, blocked: event.blockedURI });
+			});
+			document.addEventListener('load', event => {
+				if (event.target.tagName === 'SCRIPT' && event.target.src.endsWith('/theme-init.js')) {
+					window.themeBoot = { dark: document.documentElement.classList.contains('dark'),
+						color: document.getElementById('theme-color-meta').content };
+				}
+			}, true);
+		});
+	}
 	const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+	await watchCsp(context);
 	const page = await context.newPage();
 
 	const apiStatuses = [];
@@ -328,7 +346,12 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 	page.on('pageerror', err => consoleErrors.push(String(err)));
 
 	// 1. Sign in through the real form.
-	await page.goto(`${base}/login/`, { waitUntil: 'domcontentloaded' });
+	const loginResponse = await page.goto(`${base}/login/`, { waitUntil: 'domcontentloaded' });
+	check('login CSP permits self and Turnstile without inline scripts or eval', () => {
+		const directive = loginResponse.headers()['content-security-policy'].split(';').map(item => item.trim())
+			.find(item => item.startsWith('script-src '));
+		assert.equal(directive, "script-src 'self' https://challenges.cloudflare.com");
+	});
 	await page.waitForSelector('input[type="email"]', { timeout: 30000 });
 	await page.fill('input[type="email"]', 'admin@example.com');
 	const recoveryHref = await page.locator('a[href*="/appeal/"]').first().getAttribute('href');
@@ -375,6 +398,12 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 	);
 	check('mail app mounts after login', () => {
 		assert.match(page.url(), /#inbox/);
+	});
+	const themeBoot = await page.evaluate(() => ({ ...window.themeBoot, loadingStart: window.__EPO_LOADING_START__ }));
+	check('external theme script executes before the mail app mounts under CSP', () => {
+		assert.equal(typeof themeBoot?.dark, 'boolean');
+		assert.match(themeBoot.color, /^#[0-9A-F]{6}$/);
+		assert.equal(typeof themeBoot.loadingStart, 'number');
 	});
 	const listRes = await listResponse;
 	check('mailbox list request succeeded during first render', () => {
@@ -435,6 +464,7 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 	await sendReaderFixtures(page);
 	// The mobile app must authenticate and render real mail, not an error or login shell.
 	const phone = await browser.newContext({ locale: 'zh-CN', viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+	await watchCsp(phone);
 	const mobile = await phone.newPage();
 	await mobile.goto(`${base}/login/`, { waitUntil: 'domcontentloaded' });
 	await mobile.locator('input[type="email"]').fill('admin@example.com');
@@ -492,6 +522,21 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 		return route.abort();
 	});
 	await checkMailReadability(mobile, ordinaryMail.subject, 'ordinary mail');
+	const attachmentLink = mobile.locator('.att-item a[download]').first();
+	await attachmentLink.waitFor({ state: 'visible' });
+	await mobile.waitForFunction(() => document.querySelector('.att-item a[download]')?.getAttribute('href')?.includes('sig='));
+	const attachmentUrl = new URL(await attachmentLink.getAttribute('href'), base);
+	const attachmentResponse = await fetch(attachmentUrl);
+	const attachmentBody = await attachmentResponse.text();
+	const unsignedResponse = await fetch(new URL(attachmentUrl.pathname, base));
+	check('a configured public object domain still uses signed private downloads', () => {
+		assert.equal(attachmentUrl.origin, base);
+		assert.match(attachmentUrl.pathname, /^\/oss\/attachments\//);
+		assert.ok(attachmentUrl.searchParams.get('sig'));
+		assert.equal(attachmentResponse.status, 200);
+		assert.equal(attachmentBody, 'private browser attachment');
+		assert.equal(unsignedResponse.status, 404);
+	});
 	if (process.env.EPOMAIL_SCREENSHOT_DIR) {
 		const fs = await import('node:fs/promises');
 		const path = await import('node:path');
@@ -547,6 +592,9 @@ async function runBrowserChecks({ base, jwtSecret, addCleanup }) {
 			!/favicon|net::ERR_|Failed to load resource|STATUS_BREAKPOINT|401 \(Unauthorized\)/i.test(text)
 		);
 		assert.deepEqual(serious, [], serious.join(' | '));
+	});
+	check('desktop and mobile login/mail flows have no CSP violations', () => {
+		assert.deepEqual(cspViolations, []);
 	});
 
 }

@@ -349,6 +349,7 @@ export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Chec
 	checks.pass('CFG-01', 'wrangler config is readable', path.relative(ROOT, configPath));
 
 	const toml = parseToml(text);
+	const production = getPath(toml, 'env.production') || toml;
 	const staging = getPath(toml, 'env.staging');
 	if (!staging || typeof staging !== 'object') {
 		checks.fail('CFG-02', 'isolated [env.staging] block exists', 'No [env.staging] section; no staging environment can be deployed');
@@ -356,7 +357,7 @@ export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Chec
 	}
 	checks.pass('CFG-02', 'isolated [env.staging] block exists');
 
-	const prodName = String(toml.name || '');
+	const prodName = String(production.name || '');
 	const stagingName = String(staging.name || '');
 	if (!stagingName) {
 		checks.fail('CFG-03', 'staging Worker has its own name', 'env.staging.name is empty');
@@ -368,7 +369,7 @@ export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Chec
 		checks.pass('CFG-03', 'staging Worker has its own name', stagingName);
 	}
 
-	const prodD1 = Array.isArray(toml.d1_databases) ? toml.d1_databases : [];
+	const prodD1 = Array.isArray(production.d1_databases) ? production.d1_databases : [];
 	const stagingD1 = Array.isArray(getPath(toml, 'env.staging.d1_databases'))
 		? getPath(toml, 'env.staging.d1_databases')
 		: [];
@@ -400,7 +401,7 @@ export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Chec
 		checks.pass('CFG-06', 'staging D1 is physically separate from production');
 	}
 
-	const prodKv = Array.isArray(toml.kv_namespaces) ? toml.kv_namespaces : [];
+	const prodKv = Array.isArray(production.kv_namespaces) ? production.kv_namespaces : [];
 	const stagingKv = Array.isArray(getPath(toml, 'env.staging.kv_namespaces'))
 		? getPath(toml, 'env.staging.kv_namespaces')
 		: [];
@@ -422,7 +423,7 @@ export function runStaticChecks({ configPath = DEFAULT_CONFIG, checks = new Chec
 		checks.pass('CFG-08', 'staging KV is provisioned and separate', String(kv.id));
 	}
 
-	const prodR2 = Array.isArray(toml.r2_buckets) ? toml.r2_buckets : [];
+	const prodR2 = Array.isArray(production.r2_buckets) ? production.r2_buckets : [];
 	const stagingR2 = Array.isArray(getPath(toml, 'env.staging.r2_buckets'))
 		? getPath(toml, 'env.staging.r2_buckets')
 		: [];

@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_CONFIG } from '../scripts/lib/oauth-staging.mjs';
+import { DEFAULT_CONFIG, Checks, runStaticChecks } from '../scripts/lib/oauth-staging.mjs';
 import { verifyStagingConfig } from '../scripts/verify-staging-config.mjs';
 
 const source = readFileSync(DEFAULT_CONFIG, 'utf8');
@@ -62,7 +62,7 @@ test('tracks rotated production IDs across primary and preview D1 and auxiliary 
 });
 
 test('compares normalized domains and the route Wrangler would inherit from production', t => {
-	const changedProd = prod.replace('name = "epomail"', 'name = "epomail"\nroutes = [{pattern="edge.example.test/*"}]')
+	const changedProd = prod.replace('name = "epomail-select-environment"', 'name = "epomail-select-environment"\nroutes = [{pattern="edge.example.test/*"}]')
 		.replace(/^(domain = ).+$/m, '$1["new.example.test"]');
 	const candidate = staging.replace(/^(domain = ).+$/m, '$1[\n  "@NEW.example.test.",\n]')
 		.replace(/^(admin = ).+$/m, '$1"admin@new.example.test"');
@@ -107,10 +107,25 @@ test('malformed mail domains, admin addresses and array-valued booleans cannot p
 });
 
 test('optional R2 declarations must use an isolated Staging bucket including its preview target', t => {
-	const r2 = '\n[[r2_buckets]]\nbinding="r2"\nbucket_name="prod-attachments"\n';
+	const r2 = '\n[[env.production.r2_buckets]]\nbinding="r2"\nbucket_name="prod-attachments"\n';
 	const r2Staging = '\n[[env.staging.r2_buckets]]\nbinding="r2"\nbucket_name="stage-attachments"\n';
 	assert.ok(verifyStagingConfig(fixture(t, staging, prod + r2), { allowSandboxOutbound: true }).errors.some(message => message.includes('R2')));
 	assert.deepEqual(verifyStagingConfig(fixture(t, staging + r2Staging, prod + r2), { allowSandboxOutbound: true }), { errors: [], placeholder: false });
 	const shared = fixture(t, staging + r2Staging + 'preview_bucket_name="prod-attachments"\n', prod + r2);
 	assert.ok(verifyStagingConfig(shared, { allowSandboxOutbound: true }).errors.some(message => message.includes('r2_buckets 指向生产')));
+});
+
+test('named production routes are compared without being inherited by Staging', t => {
+	const production = prod.replace('name = "epomail"', 'name = "epomail"\nroutes = ["edge.example.test/*"]');
+	assert.deepEqual(verifyStagingConfig(fixture(t, staging, production), { allowSandboxOutbound: true }), { errors: [], placeholder: false });
+	const shared = staging.replace('name = "epomail-staging"', 'name = "epomail-staging"\nroutes = ["edge.example.test/*"]');
+	assert.ok(verifyStagingConfig(fixture(t, shared, production), { allowSandboxOutbound: true }).errors.some(message => message.includes('路由')));
+});
+
+test('OAuth preflight still rejects production D1 and KV reuse after naming the production environment', t => {
+	const d1 = prod.match(/^database_id = "([^"]+)"/m)[1];
+	const kv = prod.match(/^id = "([^"]+)"/m)[1];
+	const candidate = staging.replace(/^database_id = .+$/m, `database_id = "${d1}"`).replace(/^id = .+$/m, `id = "${kv}"`);
+	const checks = runStaticChecks({ configPath: fixture(t, candidate), checks: new Checks({ color: false }), allowSandboxOutbound: true });
+	for (const id of ['CFG-06', 'CFG-08']) assert.ok(checks.toJSON().items.some(item => item.id === id && item.status === 'FAIL'));
 });

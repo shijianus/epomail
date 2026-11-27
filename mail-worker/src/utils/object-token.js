@@ -88,6 +88,9 @@ export async function verifyObjectAccess(c, key, url) {
 		const sig = url?.searchParams?.get('sig') || '';
 		if (!Number.isSafeInteger(exp) || exp <= 0 || !sig) return null;
 		if (!Number.isSafeInteger(uid) || uid < 0) return null;
+		// Private objects always need an owner, even on installations with a
+		// public asset domain. Unowned historical capabilities must be renewed.
+		if (key.startsWith('attachments/') && uid === 0) return null;
 
 		const now = Math.floor(Date.now() / 1000);
 		if (exp < now) return null;

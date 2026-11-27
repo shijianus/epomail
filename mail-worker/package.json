@@ -7,12 +7,14 @@
 		"dev": "wrangler dev --config wrangler-dev.toml",
 		"test": "vitest run",
 		"test:serial": "vitest run --maxWorkers=1",
-		"test:unit": "vitest run test/security-hardening.spec.js test/totp-backend-fixes.spec.js test/email-ingest.spec.js",
+		"test:unit": "vitest run test/security-hardening.spec.js test/totp-backend-fixes.spec.js test/email-ingest.spec.js test/webhook-ingress.spec.js test/object-ownership.spec.js test/index.spec.js",
 		"test:integration": "vitest run",
 		"test:mailjet": "node test-mailjet.js",
-		"deploy": "wrangler deploy",
+		"deploy": "node ./require-deploy-env.mjs",
+		"deploy:staging": "wrangler deploy --env staging",
+		"deploy:prod": "wrangler deploy --env production",
 		"deploy:test": "wrangler deploy --config wrangler-test.toml",
-		"start": "wrangler dev"
+		"start": "wrangler dev --config wrangler-dev.toml"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "0.12.0",

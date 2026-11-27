@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 // deployment at the uploaded Worker bytes and remove source-only build hooks.
 export function candidateConfig(source) {
 	let section = '';
-	let mainCount = 0;
+	const entries = new Set();
 	const output = [];
 	for (const line of source.split(/\r?\n/)) {
 		const header = line.match(/^\s*\[{1,2}\s*([^\]]+?)\s*\]{1,2}\s*(?:#.*)?$/);
@@ -15,13 +15,18 @@ export function candidateConfig(source) {
 		const deployment = section === '' || /^env\.[^.]+$/.test(section);
 		if (deployment && /^\s*no_bundle\s*=/.test(line)) continue;
 		if (deployment && /^\s*main\s*=/.test(line)) {
-			if (!section) mainCount++;
+			if (entries.has(section)) throw new Error('Duplicate Worker entry');
+			entries.add(section);
 			output.push('main = "bundle/index.js"', 'no_bundle = true');
 		} else {
 			output.push(line);
 		}
 	}
-	if (mainCount !== 1) throw new Error('Expected exactly one root Worker entry');
+	// Named-only deployments must stay named-only in the release archive.
+	// Keep support for older archives/configs with one root entry.
+	if (!entries.has('') && !(entries.has('env.production') && entries.has('env.staging'))) {
+		throw new Error('Expected a root Worker entry or explicit production and staging entries');
+	}
 	return output.join('\n');
 }
 

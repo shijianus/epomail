@@ -18,6 +18,18 @@ beforeAll(async () => {
 	await env.db.prepare(CREATE_USER).run();
 });
 
+it('enforces the same strict script CSP on API and frontend responses', async () => {
+	for (const path of ['/api/version', '/login/', '/mail/u/0/']) {
+		const request = new Request(`https://example.com${path}`);
+		const response = await worker.fetch(request, {
+			...env, assets: { fetch: async () => new Response('<html></html>', { headers: { 'Content-Type': 'text/html' } }) }
+		}, {});
+		const directive = response.headers.get('Content-Security-Policy').split(';').map(value => value.trim())
+			.find(value => value.startsWith('script-src '));
+		expect(directive).toBe("script-src 'self' https://challenges.cloudflare.com");
+	}
+});
+
 describe('Public object storage isolation', () => {
 	async function cleanup() {
 		await env.db.prepare('DELETE FROM user WHERE user_id = 1').run();

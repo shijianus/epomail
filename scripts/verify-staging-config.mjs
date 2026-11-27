@@ -51,18 +51,19 @@ export function verifyStagingConfig(configPath, { allowSandboxOutbound = false }
 	const { experimental_readRawConfig } = requireWorker('wrangler');
 	const { rawConfig: config } = experimental_readRawConfig({ config: path.resolve(configPath) });
 	const staging = config.env?.staging;
+	const production = config.env?.production || config;
 	if (!staging) throw new Error('缺少 env.staging');
 	const errors = new Set();
 	const placeholder = /PLACEHOLDER_[A-Z0-9_]+/.test(JSON.stringify(staging));
 
-	if (typeof config.name !== 'string' || !config.name.trim() || typeof staging.name !== 'string'
-		|| !staging.name.trim() || staging.name === config.name) {
+	if (typeof production.name !== 'string' || !production.name.trim() || typeof staging.name !== 'string'
+		|| !staging.name.trim() || staging.name === production.name) {
 		errors.add('Staging Worker 名称缺失或与生产重复');
 	}
 	for (const { table, keys, required, format } of resourceTypes) {
 		const productionIds = new Set();
-		if (table === 'r2_buckets' && config[table]?.length && !staging[table]?.length) errors.add('Staging 缺少独立的 R2 存储桶');
-		for (const [env, resources] of [['production', config[table]], ['staging', staging[table]]]) {
+		if (table === 'r2_buckets' && production[table]?.length && !staging[table]?.length) errors.add('Staging 缺少独立的 R2 存储桶');
+		for (const [env, resources] of [['production', production[table]], ['staging', staging[table]]]) {
 			const bindings = new Set();
 			if (resources !== undefined && !Array.isArray(resources)) errors.add(`${env}.${table} 绑定格式无效`);
 			for (const row of Array.isArray(resources) ? resources : []) {
@@ -94,7 +95,7 @@ export function verifyStagingConfig(configPath, { allowSandboxOutbound = false }
 		errors.add('Staging 必须关闭外发，或显式选择启用严格收件人白名单的沙箱模式');
 	}
 
-	const prodDomains = mailHosts(config.vars?.domain);
+	const prodDomains = mailHosts(production.vars?.domain);
 	if (!prodDomains.length) errors.add('缺少用于隔离比对的生产邮件域名');
 	const prodHost = host => isProductionHost(host) || prodDomains.some(domain => host === domain || host.endsWith(`.${domain}`));
 	const stagingDomains = mailHosts(vars.domain);
@@ -108,7 +109,7 @@ export function verifyStagingConfig(configPath, { allowSandboxOutbound = false }
 	}
 
 	// Wrangler inherits route and routes from the top-level deployment individually.
-	const prodRoutes = routeHosts(config);
+	const prodRoutes = routeHosts({ route: production.route ?? config.route, routes: production.routes ?? config.routes });
 	const stagingRoutes = routeHosts({ route: staging.route ?? config.route, routes: staging.routes ?? config.routes });
 	const prodHosts = [...PRODUCTION_SUFFIXES, ...prodDomains, ...prodRoutes];
 	const matches = (pattern, host) => pattern.startsWith('*') ? host.endsWith(pattern.slice(1)) : pattern === host;

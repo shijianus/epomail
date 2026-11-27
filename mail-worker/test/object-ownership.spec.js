@@ -4,6 +4,7 @@ import { parseHTML } from 'linkedom';
 import jwtUtils from '../src/utils/jwt-utils.js';
 import attService from '../src/service/att-service.js';
 import settingService from '../src/service/setting-service.js';
+import { buildSignedObjectUrl } from '../src/utils/object-token.js';
 
 const CREATE_ATTACHMENTS = `
 CREATE TABLE IF NOT EXISTS attachments (
@@ -168,6 +169,38 @@ describe('Object ownership and capability signing', () => {
 		});
 		const body = await response.json();
 		expect(body.code).toBe(401);
+	});
+
+	it('keeps attachments private with r2Domain set, including all legacy read aliases', async () => {
+		settingService.query.mockResolvedValue({ userByoStorage: 1, r2Domain: 'https://cdn.example.test' });
+		const key = 'attachments/owned-by-2.txt';
+		try {
+			await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename) VALUES (2, 10, 20, ?, ?)')
+				.bind(key, 'private.txt').run();
+			await env.kv.put(key, 'private-body');
+			const token = await seedAuth(2, 'user2@example.com', 'session-private');
+			const otherToken = await seedAuth(3, 'user3@example.com', 'session-other');
+			const batch = await SELF.fetch('https://example.com/api/oss-url/batch', {
+				method: 'POST', headers: { token, 'Content-Type': 'application/json' }, body: JSON.stringify({ keys: [key] })
+			});
+			const signed = new URL((await batch.json()).data.urls[key], 'https://example.com');
+			expect(signed.pathname).toBe(`/oss/${key}`);
+			expect(signed.searchParams.get('uid')).toBe('2');
+			expect(Number(signed.searchParams.get('exp')) - Math.floor(Date.now() / 1000)).toBeLessThanOrEqual(3600);
+			const single = await SELF.fetch(`https://example.com/api/oss-url/${key}`, { headers: { token } });
+			expect((await single.json()).data.url).toMatch(/^\/oss\/attachments\/.*sig=/);
+			const foreign = await SELF.fetch(`https://example.com/api/oss-url/${key}`, { headers: { token: otherToken } });
+			expect((await foreign.json()).code).toBe(404);
+			const unowned = new URL(await buildSignedObjectUrl({ env }, key), 'https://example.com');
+			for (const prefix of ['/oss/', '/api/oss/', '/']) {
+				const base = `https://example.com${prefix}${key}`;
+				expect((await SELF.fetch(base)).status).toBe(404);
+				expect((await SELF.fetch(base + unowned.search)).status).toBe(404);
+				const response = await SELF.fetch(base + signed.search);
+				expect(response.status).toBe(200);
+				expect(await response.text()).toBe('private-body');
+			}
+		} finally { await cleanup(); }
 	});
 
 	it('preserves the HTML serializer bytes for plain text and simple paragraphs', async () => {

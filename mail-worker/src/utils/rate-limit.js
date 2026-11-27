@@ -4,7 +4,7 @@ import { getUserDb } from './db-accessor.js';
 import { ensureAuthSecurityOperationSchema } from './auth-security-operation.js';
 
 const RATE_PREFIX = 'rate-limit:';
-const SENSITIVE_SCOPE = /^(login|login-totp|register|security-|oauth-|oidc-|initial-password)/;
+const SENSITIVE_SCOPE = /^(login|login-totp|register|security-|oauth-|oidc-|initial-password|webhook-)/;
 
 function isMissingCounterTable(error) {
 	return /no such table|no such column/i.test(String(error?.message || error || ''));
