@@ -9,6 +9,22 @@
 
 ---
 
+### 当前仓库独立实测审计（2026-11-27）
+
+* **关联提交 (Git Commit)**：源码 `0456cc11df2218cc6c3525a1af1d35da044c617a` (Short: `0456cc1`)。
+* **专项证据索引**：[实测证据](doc/validation/independent-audit-2026-11-27.json)、[隔离复现](doc/validation/independent-audit-2026-11-27.mjs)。下列“证据”行号指该 JSON。
+* **范围与方法**：本地源码/配置扫描、实际命令、隔离全栈/Chromium；业务源码未改。
+
+1. **架构**：Vue3.5/React18/Vite、Hono4.13/Drizzle0.45/Workers；Node22.18，CI24.14。D1/KV、可选R2/S3；Email Routing、Resend/Mailjet、Svix Webhook、D1 Outbox/Cron，无自建SMTP/IMAP。版本、两层目录及配置清单见证据:5、:24、:90、:137。
+2. **实测**：lint **Fail**：`Missing script: lint`；登录typecheck **Pass**；Worker **839/839**、登录 **29/29**、Node **330/330 Pass**。构建 **Pass**：React3.13s、Vue38.47s、Worker dry-run，警告未指定目标环境。全栈 **23/23**、浏览器 **33/33 Pass**，cleanup complete。i18n/密钥扫描通过；无行/分支覆盖率（证据:206）。
+3. **链路**：会话/RBAC → Email Routing/PostalMime → D1与加密原文/对象存储；API发送经配额/幂等任务转交供应商，Webhook更新状态；Cron重试，Vue Axios交互。逐入口文件及行号见证据:159。
+4. **发现矩阵**：P0未证实。**P1**：Webhook验签前无界读体，探针读完2MiB才401；旧迁移两次写失败仅告警、正常返回。**P2**：Resend无请求超时；i18next中危，未发现应用触发路径；CSP允许inline/eval；无D1/KV就绪探针。逐条源码与复现见证据:346、:385；依赖高危门槛通过，中危失败（:300）。
+5. **遗留/待确认**：655文件无待办注释/跳过声明；两处TODO为校验数据。真实外部收发、云Cron、长稳/容量、历史凭据轮换未核实（证据:367、:417）。上线前三项：①Webhook限体；②迁移失败中止/结构验收；③补超时/依赖、门禁/就绪及真实投递/回滚/轮换验收。
+
+* **治理与回归**：交付审计记录和无网络/数据库写入的复现；全栈临时D1/KV经finally清理（证据:417），本地通过不代表生产验收。
+
+---
+
 ### 发信派发授权、邮箱容量及加密开销（2026-11-21）
 
 `f79e4a84e9191cb60df0965ba13dab04a9a6823d` 已通过 811 项 Worker、328 项 Node、29 项登录单测、13 项登录浏览器和 32 项收件箱浏览器检查。隔离 Worker 的两轮 32 并发 10 秒分别完成 1131 和 871 次，逐轮下限 960。八类业务都有样本，两轮没有意外 HTTP、超时或协议错误。第二轮失格。两轮主机负载有差异，数据不足以把失败归因给机器。最终结果按交付包内实际源 SHA 和制品摘要核验。

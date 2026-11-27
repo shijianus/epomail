@@ -1,0 +1,449 @@
+{
+  "audit_date": "2026-11-27",
+  "source_commit": "0456cc11df2218cc6c3525a1af1d35da044c617a",
+  "scope": "Local independent audit; production and staging services were not exercised. Source unchanged.",
+  "runtime_versions": {
+    "node": "v22.18.0",
+    "pnpm": "10.34.5",
+    "CI_node": "24.14.0",
+    "worker_compatibility_date": "2025-06-04",
+    "vitest_compatibility_date": "2025-03-10",
+    "mail-worker/hono": "4.13.18",
+    "mail-worker/drizzle-orm": "0.45.4",
+    "mail-worker/postal-mime": "2.4.4",
+    "mail-worker/resend": "6.4.1",
+    "mail-worker/i18next": "25.4.2",
+    "mail-worker/wrangler": "4.90.0",
+    "mail-worker/vitest": "3.2.7",
+    "mail-vue/vue": "3.5.44",
+    "mail-vue/vite": "7.3.7",
+    "temp_login_ui/react": "18.3.1",
+    "temp_login_ui/vite": "6.4.5",
+    "temp_login_ui/typescript": "5.9.3"
+  },
+  "top_level_depth2": {
+    ".github": [
+      "workflows/"
+    ],
+    ".githooks": [
+      "pre-commit"
+    ],
+    "doc": [
+      "demo/",
+      "images/",
+      "release/",
+      "skills/",
+      "validation/"
+    ],
+    "mail-worker": [
+      ".dev.vars.example",
+      "build.mjs",
+      "package.json",
+      "patches/",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "scripts/",
+      "src/",
+      "test/",
+      "vitest.config.js",
+      "wrangler-action.toml",
+      "wrangler-dev.toml",
+      "wrangler-test.toml",
+      "wrangler-vitest.toml",
+      "wrangler.toml"
+    ],
+    "mail-vue": [
+      "jsconfig.json",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "public/",
+      "src/",
+      "vite.config.js"
+    ],
+    "temp_login_ui": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "public/",
+      "src/",
+      "test/",
+      "tsconfig.json",
+      "vite.config.ts",
+      "wrangler.jsonc"
+    ],
+    "scripts": [
+      "lib/"
+    ],
+    "tests": [
+      "helpers/",
+      "shots/"
+    ],
+    "reports": [
+      "final/",
+      "p0/"
+    ],
+    "resources": [
+      "RedesignEpoMailLogoAnimation/"
+    ]
+  },
+  "core_source_children": {
+    "mail-worker/src": [
+      "api/",
+      "const/",
+      "dao/",
+      "email/",
+      "entity/",
+      "error/",
+      "hono/",
+      "i18n/",
+      "index.js",
+      "init/",
+      "model/",
+      "security/",
+      "service/",
+      "template/",
+      "utils/"
+    ],
+    "mail-vue/src": [
+      "App.vue",
+      "axios/",
+      "components/",
+      "const/",
+      "db/",
+      "echarts/",
+      "enums/",
+      "i18n/",
+      "icons/",
+      "init/",
+      "layout/",
+      "main.js",
+      "perm/",
+      "request/",
+      "router/",
+      "store/",
+      "style.css",
+      "utils/",
+      "views/"
+    ],
+    "temp_login_ui/src": [
+      "app/",
+      "assets/",
+      "main.tsx",
+      "styles/",
+      "vite-env.d.ts"
+    ]
+  },
+  "configuration": [
+    "package.json",
+    "build.mjs",
+    "scripts/build-prod.mjs",
+    "mail-worker/wrangler.toml",
+    "mail-worker/wrangler-dev.toml",
+    "mail-worker/wrangler-test.toml",
+    "mail-worker/wrangler-action.toml",
+    "mail-worker/wrangler-vitest.toml",
+    "mail-worker/vitest.config.js",
+    "mail-worker/.dev.vars.example",
+    "mail-vue/vite.config.js",
+    "mail-vue/.env.release",
+    "temp_login_ui/vite.config.ts",
+    "temp_login_ui/tsconfig.json",
+    "temp_login_ui/wrangler.jsonc",
+    ".github/workflows/quality-gates.yml",
+    ".github/workflows/public-beta-promotion.yml",
+    ".github/workflows/release.yml",
+    ".github/workflows/secret-scanning.yml",
+    ".github/workflows/security.yml"
+  ],
+  "data_flow": [
+    {
+      "stage": "Authentication",
+      "evidence": [
+        "mail-worker/src/security/security.js:177",
+        "mail-worker/src/utils/session-auth-store.js"
+      ],
+      "summary": "JWT plus durable session/auth-version checks and RBAC; ownership scoped in mail queries."
+    },
+    {
+      "stage": "Inbound",
+      "evidence": [
+        "mail-worker/src/index.js:294",
+        "mail-worker/src/email/email.js:73",
+        "mail-worker/src/email/email.js:137",
+        "mail-worker/src/service/mail-reliability-service.js:213"
+      ],
+      "summary": "Cloudflare Email Routing -> bounded raw MIME -> PostalMime -> durable receive claim -> D1 metadata/body and encrypted raw/object storage."
+    },
+    {
+      "stage": "Outbound",
+      "evidence": [
+        "mail-worker/src/api/email-api.js:51",
+        "mail-worker/src/service/email-service.js:932",
+        "mail-worker/src/service/email-service.js:1384",
+        "mail-worker/src/api/resend-api.js:5"
+      ],
+      "summary": "Authenticated API -> quota and idempotency task -> internal delivery or Resend/Mailjet/optional Cloudflare send binding -> signed Svix webhook projection."
+    },
+    {
+      "stage": "Async",
+      "evidence": [
+        "mail-worker/src/index.js:295",
+        "mail-worker/src/service/mail-forward-service.js:9",
+        "mail-worker/src/service/mail-forward-service.js:126"
+      ],
+      "summary": "D1 task/outbox tables, leases, five-minute Cron; forwarding retries every 300s up to five attempts, not exponential backoff. No Cloudflare Queues binding or standalone SMTP/IMAP daemon found."
+    },
+    {
+      "stage": "Browser",
+      "evidence": [
+        "mail-vue/src/axios/index.js:11",
+        "mail-vue/src/components/shadow-html/index.vue:58"
+      ],
+      "summary": "Axios session-bound API calls -> Vue/Pinia interface; DOMPurify for mail HTML; React login sub-app."
+    }
+  ],
+  "commands": [
+    {
+      "step": "lint",
+      "command": "pnpm run lint",
+      "exit_code": 1,
+      "seconds": 0.42,
+      "summary": "ERR_PNPM_NO_SCRIPT Missing script: lint"
+    },
+    {
+      "step": "i18n-symmetry",
+      "command": "node scripts/i18n-symmetry.mjs",
+      "exit_code": 0,
+      "seconds": 0.1,
+      "summary": "ALL SYMMETRIC; Vue 3296 / Worker 1950 keys per language"
+    },
+    {
+      "step": "i18n-audit",
+      "command": "node scripts/i18n-audit.mjs",
+      "exit_code": 0,
+      "seconds": 0.27,
+      "summary": "PASS: duplicate keys=0, dictionary differences=0, missing references=0"
+    },
+    {
+      "step": "i18n-hardcoded",
+      "command": "node scripts/i18n-hardcoded.mjs",
+      "exit_code": 0,
+      "seconds": 0.72,
+      "summary": "PASS: 0 suspicious lines, 0 resource failures, 0 data exception failures"
+    },
+    {
+      "step": "i18n-auth",
+      "command": "node scripts/i18n-auth-locale.mjs",
+      "exit_code": 0,
+      "seconds": 0.27,
+      "summary": "PASS: 159 keys per language; WARN: 11 unused keys"
+    },
+    {
+      "step": "secret-scan",
+      "command": "node scripts/secret-scan.mjs",
+      "exit_code": 0,
+      "seconds": 1.45,
+      "summary": "working tree (1397 files): no secrets found by configured rules"
+    },
+    {
+      "step": "typecheck",
+      "command": "pnpm run typecheck:login",
+      "exit_code": 0,
+      "seconds": 7.09,
+      "summary": "tsc --noEmit; login sub-app only"
+    },
+    {
+      "step": "test-worker",
+      "command": "pnpm test",
+      "exit_code": 0,
+      "seconds": 663.5,
+      "summary": "Test Files 64 passed (64); Tests 839 passed (839)"
+    },
+    {
+      "step": "test-login",
+      "command": "pnpm run test:login",
+      "exit_code": 0,
+      "seconds": 0.95,
+      "summary": "tests 29; pass 29; fail 0; skipped 0; todo 0"
+    },
+    {
+      "step": "test-node",
+      "command": "node --test tests/*.test.mjs tests/helpers/*.test.mjs tests/test-i18n-gates.mjs",
+      "exit_code": 0,
+      "seconds": 7.57,
+      "summary": "tests 330; pass 330; fail 0; skipped 0; todo 0"
+    },
+    {
+      "step": "build",
+      "command": "pnpm --dir mail-worker exec wrangler deploy --dry-run --outdir <temporary-directory>/worker-dry-run",
+      "exit_code": 0,
+      "seconds": 62.64,
+      "summary": "React Vite build 3.13s; Vue Vite build 38.47s; Worker dry-run exit 0; total 5876.95 KiB, gzip 1238.27 KiB",
+      "warning": "Multiple environments are defined in the Wrangler configuration file, but no target environment was specified for the deploy command."
+    },
+    {
+      "step": "fullstack",
+      "command": "pnpm run test:fullstack",
+      "exit_code": 0,
+      "seconds": 12.93,
+      "summary": "23/23 full-stack checks passed (cleanup complete)"
+    },
+    {
+      "step": "browser",
+      "command": "pnpm run test:fullstack:browser",
+      "exit_code": 0,
+      "seconds": 21.63,
+      "summary": "33/33 browser checks passed (cleanup complete)"
+    }
+  ],
+  "dependency_audits": [
+    {
+      "command": "pnpm --dir mail-worker audit --registry=https://registry.npmjs.org --prod --audit-level=high --json",
+      "exit_code": 0,
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 1,
+        "high": 0,
+        "critical": 0
+      }
+    },
+    {
+      "command": "pnpm --dir mail-vue audit --registry=https://registry.npmjs.org --prod --audit-level=high --json",
+      "exit_code": 0,
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0
+      }
+    },
+    {
+      "command": "pnpm --dir temp_login_ui audit --registry=https://registry.npmjs.org --prod --audit-level=high --json",
+      "exit_code": 0,
+      "counts": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0
+      }
+    },
+    {
+      "command": "pnpm --dir mail-worker audit --registry=https://registry.npmjs.org --prod --audit-level=moderate --json",
+      "exit_code": 1,
+      "module": "i18next",
+      "version": "25.4.2",
+      "advisory": "GHSA-6jcc-5g8w-32mx",
+      "severity": "moderate",
+      "patched_versions": ">=26.3.4",
+      "url": "https://github.com/advisories/GHSA-6jcc-5g8w-32mx",
+      "reachability": "No addResourceBundle use found in application sources; static resources initialized at mail-worker/src/i18n/i18n.js:16."
+    }
+  ],
+  "isolated_source_probes": [
+    {
+      "probe": "migration-v3_20DB",
+      "injectedWritesFailed": 2,
+      "rejected": false,
+      "warnings": 2
+    },
+    {
+      "probe": "unsigned-webhook",
+      "consumedBytes": 2097152,
+      "status": 401,
+      "body": "webhook_rejected"
+    },
+    {
+      "probe": "resend-timeout",
+      "url": "https://api.resend.com/emails",
+      "signalPresent": false,
+      "realNetwork": false
+    }
+  ],
+  "probe_reproduction": "node --import ./tests/rc-register-loader.mjs doc/validation/independent-audit-2026-11-27.mjs",
+  "scan": {
+    "tracked_files": 1397,
+    "scanned_source_and_test_files": 655,
+    "todo_matches": [
+      {
+        "file": "scripts/lib/oauth-staging.mjs",
+        "line": 319,
+        "text": "return !text || /PLACEHOLDER|CHANGE_ME|TODO|YOUR[_-]/i.test(text);"
+      },
+      {
+        "file": "tests/privacy-readiness.test.mjs",
+        "line": 112,
+        "text": "for (const value of [undefined, null, '', '   ', true, 1, [], {}, 'TODO', '待填写', '<operator-name>']) {"
+      }
+    ],
+    "skipped_test_declarations": [],
+    "docker_files": []
+  },
+  "findings": [
+    {
+      "priority": "P1",
+      "file": "mail-worker/src/api/resend-api.js:7",
+      "finding": "Unsigned Webhook body is fully buffered before signature checks without an application size cap. Local Hono probe consumed 2097152 bytes before HTTP 401. No memory-exhaustion exploit was attempted."
+    },
+    {
+      "priority": "P1",
+      "file": "mail-worker/src/init/init.js:660",
+      "finding": "v3_20DB suppresses DDL/index write failures. Injecting two write failures produced two warnings and a resolved migration promise; missing schema can survive an upgrade. Catch for unique index at line 682."
+    },
+    {
+      "priority": "P2",
+      "file": "mail-worker/src/service/email-service.js:1407",
+      "finding": "Resend send call provides no AbortSignal; SDK 6.4.1 also calls fetch without adding a timeout. Stubbed provider probe observed signalPresent=false. Leases/UNKNOWN reconciliation limit duplicate sending but do not provide an outbound request deadline."
+    },
+    {
+      "priority": "P2",
+      "file": "mail-worker/pnpm-lock.yaml:45",
+      "finding": "i18next 25.4.2 is below patched 26.3.4 for GHSA-6jcc-5g8w-32mx. No untrusted deep-resource merge path found, so exploitability in this application is unconfirmed."
+    },
+    {
+      "priority": "P2",
+      "file": "mail-worker/src/index.js:44",
+      "finding": "CSP permits unsafe-inline and unsafe-eval for scripts; this weakens XSS containment. DOMPurify is present; no working XSS bypass was demonstrated."
+    },
+    {
+      "priority": "P2",
+      "file": "mail-worker/src/index.js:199",
+      "finding": "Version endpoint checks release metadata only. No health/ready route probing D1/KV dependencies found. No Docker files exist; Worker runtime manages process lifecycle, so server SIGTERM/connection-pool checks are not directly applicable."
+    }
+  ],
+  "coverage_and_limits": {
+    "measured": "839 Worker, 29 login, 330 Node, 23 real local-stack, 33 browser assertions; runtime skips=0 where reported.",
+    "covered": [
+      "auth and RBAC denial",
+      "mail/attachment ownership",
+      "Svix signature validation",
+      "SQL parameters and mailbox scoping",
+      "SSRF URL policy and mocked egress",
+      "MIME bounds and malformed MIME",
+      "DOMPurify/SVG sanitization",
+      "atomic quota and duplicate dispatch",
+      "cold start, repeat initialization and migration regression",
+      "isolated cleanup"
+    ],
+    "missing": "No lint script, no main Vue/Worker typecheck, no line/branch coverage percentages or thresholds in current Vitest config. Real SMTP delivery/redelivery, provider integrations, cloud Cron, cloud secrets, alerts, sustained-load leaks and production data migration were not tested.",
+    "evidence": [
+      "package.json:3",
+      "mail-vue/package.json:6",
+      "mail-worker/vitest.config.js:36",
+      "mail-worker/test/setup-network.js:6",
+      "tests/helpers/local-stack.mjs:104",
+      "scripts/oauth-staging-preflight.mjs:78",
+      "mail-worker/wrangler.toml:63",
+      ".secret-scan-baseline.json:2"
+    ],
+    "historical_credentials": "History baseline contains 30 acknowledged entries, mixing synthetic fixtures and historical credentials; rotation state not established by current working-tree secret scan.",
+    "priorities_before_launch": [
+      "Enforce a bounded Webhook body and reject missing signature headers before consuming it.",
+      "Make schema migration failures fatal and verify required columns/indexes after upgrade.",
+      "Close release validation gaps: provider timeout and dependency update, whole-app checks/readiness, real external delivery/rollback/credential-rotation evidence."
+    ]
+  }
+}
