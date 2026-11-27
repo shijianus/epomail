@@ -1,3 +1,25 @@
+### 上线前安全与防呆修复 (2026-11-27)
+*   **关联提交 (Git Commit)**: `b00e1027db7cd1a4c658c668660a47527be7e161` (Short: `b00e102`)
+*   **基准提交 (Baseline)**: `0eec64d43e0a03b3a6e82822caf9745665c44fc7` (Short: `0eec64d`)
+*   **部署环境 (Deployment)**: `本地隔离全真栈 / Chromium / production 与 staging 离线 dry-run`；未执行远端部署。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] CSP：script-src 移除 unsafe-eval 与 unsafe-inline；主题初始化、加载动画兜底改为同源外链，保留 Turnstile 官方脚本。
+    - [x] Webhook：缺失/空白签名头在读体前 401；按 Cloudflare 客户端 IP 每 60 秒最多 120 次，超限 429，计数不可用 503；按流式实际字节限制 512 KiB，超限 413；保留 HMAC、±300s 时间窗及幂等事件处理。
+    - [x] 附件：r2Domain 不再绕过签名接口；签名失败不回退公开直链；后端拒绝无所有者能力链接，兼容旧签名读取路由；单个链接 300s、批量 3600s 有效期保持原规则。
+    - [x] 部署：deploy 默认报错，显式 deploy:staging / deploy:prod；生产配置迁至 env.production，保留 epomail 名称及 D1/KV；原生无 --env 部署因缺少默认入口/静态资源而失败；CI、候选打包、预检及本地 start 同步适配。
+    - [x] 兼容与运维说明：`doc/PRELAUNCH-SECURITY.md`、`mail-worker/DEPLOY-SECRETS.md`；私有附件桶必须关闭匿名直读及公开 CDN 入口，Worker 无法保护绕过它的公开桶。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 本地构建：React 登录页 3.12s、Vue 18.10s；最终构建零警告、零报错；production Worker dry-run 通过。
+    - [x] Staging 候选 dry-run 通过，预编译 Worker 输出与输入逐字节相同；默认 npm deploy 与原生无 --env deploy 均实测失败，未上传。
+    - [x] Worker 全量：`pnpm --dir mail-worker test`，65/65 文件、855/855 测试通过，耗时 759.99s；新增 Webhook 14 项覆盖缺头零读体、流式取消、实际字节/UTF-8、512 KiB 边界、伪造长度、限流/存储故障、验签/时间窗与双路由。
+    - [x] 登录：typecheck 通过；`pnpm --dir temp_login_ui test` 29/29；`node tests/oauth-bind-login-ui-e2e.mjs` 13/13。
+    - [x] Node：`node --test tests/*.test.mjs tests/helpers/*.test.mjs tests/test-i18n-gates.mjs` 344/344，零跳过；覆盖主题、私有附件前端成功/失败、默认部署阻断、候选配置及生产资源隔离。
+    - [x] 全真栈：`node tests/fullstack-smoke.mjs` 23/23；实际冷启动、角色初始化、登录、收发/幂等、附件读取与用户隔离通过。
+    - [x] 浏览器：`node tests/fullstack-browser-e2e.mjs` 37/37；桌面/移动登录和邮箱零 CSP 违规，外链主题与加载脚本实际执行，配置公开域名后附件签名下载 200、无签名 404。
+    - [x] 附加浏览器：`tests/compose-draft-browser.mjs`、`tests/restricted-notice-browser.mjs` 2/2；草稿/附件 IndexedDB 与受限文书窄屏回归通过。
+    - [x] 静态门禁：i18n-symmetry / i18n-audit / i18n-hardcoded / i18n-auth-locale 全过；六语对称，无新增词条；工作区与提交前密钥扫描均零发现；git diff --check 通过。
+    - [x] 零假数据残留：新增用例 finally 清理/恢复；全真栈与浏览器隔离 D1/KV、临时凭据和进程在 finally 物理删除，均报告 cleanup complete。
+
 ### 容量重验与派发授权（2026-11-21）
 
 - [x] 保留 f79e4a8 两轮容量的 1131/871 实测，按既有逐轮 960 门槛判第二轮失败。
