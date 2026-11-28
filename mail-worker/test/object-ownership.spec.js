@@ -116,8 +116,19 @@ describe('Object ownership and capability signing', () => {
 			headers: { Authorization: user2Token }
 		});
 		const crossBody = await crossRequest.json();
+		expect(crossRequest.status).toBe(404);
 		expect(crossBody.code).toBe(404);
+		expect(crossBody.data?.url).toBeUndefined();
 	});
+
+	it.each(['auth-uid:2', 'attachments/missing.txt', 'static/avatar/3/private.png'])(
+		'returns HTTP 404 without a URL when signing rejects %s', async key => {
+			const token = await seedAuth(2, 'user2@example.com', 'session-rejected-object');
+			const response = await SELF.fetch(`http://example.com/api/oss-url/${key}`, { headers: { token } });
+			expect(response.status).toBe(404);
+			expect(await response.json()).toEqual({ code: 404, message: 'Object Not Found' });
+		}
+	);
 
 	it('allows an administrator to sign existing attachment keys for mailbox audit views', async () => {
 		await env.db.prepare('INSERT INTO attachments (user_id, email_id, account_id, key, filename, size, type) VALUES (?, ?, ?, ?, ?, ?, ?)')
@@ -188,8 +199,10 @@ describe('Object ownership and capability signing', () => {
 			expect(signed.searchParams.get('uid')).toBe('2');
 			expect(Number(signed.searchParams.get('exp')) - Math.floor(Date.now() / 1000)).toBeLessThanOrEqual(3600);
 			const single = await SELF.fetch(`https://example.com/api/oss-url/${key}`, { headers: { token } });
+			expect(single.status).toBe(200);
 			expect((await single.json()).data.url).toMatch(/^\/oss\/attachments\/.*sig=/);
 			const foreign = await SELF.fetch(`https://example.com/api/oss-url/${key}`, { headers: { token: otherToken } });
+			expect(foreign.status).toBe(404);
 			expect((await foreign.json()).code).toBe(404);
 			const unowned = new URL(await buildSignedObjectUrl({ env }, key), 'https://example.com');
 			for (const prefix of ['/oss/', '/api/oss/', '/']) {

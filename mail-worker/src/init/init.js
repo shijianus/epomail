@@ -280,16 +280,17 @@ const dbInit = {
 			}
 		}
 
-		// 2. Standard 6 default groups (仅在六个标准身份分组均不存在时播种，杜绝站长删除 LV.0 / LV.1 后在此被强制复活)
-		let hasRoleSeeded = false;
-		const flag = await c?.env?.kv?.get('roles_seeded_v2');
-		hasRoleSeeded = flag === '1';
-
-		// An absent completion marker includes interrupted seeds. Existing roles
-		// are preserved once the full initial seed has committed successfully.
-		const shouldSeedRoles = !hasRoleSeeded;
+		// The historical marker records initial completion, not current integrity.
+		// Repair missing standard roles while preserving existing role policies.
+		const hasRoleSeeded = await c?.env?.kv?.get('roles_seeded_v2') === '1';
+		const standardCount = await userDb.prepare(`
+			SELECT COUNT(DISTINCT role_code) AS count FROM role
+			WHERE role_code IN ('visitor','user_base','user_lv0','user_lv1','moderator','master')
+		`).first();
+		const shouldSeedRoles = !hasRoleSeeded || Number(standardCount?.count) !== 6;
 
 		if (shouldSeedRoles) {
+			const hasDefaultRole = await userDb.prepare('SELECT 1 FROM role WHERE is_default = 1 LIMIT 1').first();
 			const standardRoles = [
 				{
 					roleCode: 'visitor',
@@ -395,9 +396,13 @@ const dbInit = {
 
 			for (const defRole of standardRoles) {
 				try {
-					let existing = await userDb.prepare(`SELECT * FROM role WHERE role_code = ? OR name = ? LIMIT 1`).bind(defRole.roleCode, defRole.name).first();
+					const existing = await userDb.prepare(`
+						SELECT * FROM role WHERE role_code = ?
+							OR ((role_code IS NULL OR role_code IN ('', 'custom')) AND name = ?)
+						ORDER BY CASE WHEN role_code = ? THEN 0 ELSE 1 END, role_id ASC LIMIT 1
+					`).bind(defRole.roleCode, defRole.name, defRole.roleCode).first();
 					if (!existing) {
-						const insRes = await userDb.prepare(`
+						const insert = userDb.prepare(`
 							INSERT INTO role (
 								name, key, description, ban_email, ban_email_type, avail_domain,
 								sort, is_default, send_count, send_type, account_count,
@@ -405,18 +410,23 @@ const dbInit = {
 							) VALUES (?, ?, ?, '', 0, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 						`).bind(
 							defRole.name, defRole.key, defRole.description,
-							defRole.sort, defRole.isDefault, defRole.sendCount, defRole.sendType, defRole.accountCount,
+							defRole.sort, hasRoleSeeded && hasDefaultRole ? 0 : defRole.isDefault,
+							defRole.sendCount, defRole.sendType, defRole.accountCount,
 							defRole.storageQuotaMb, defRole.allowAttachment, defRole.roleCode,
 							defRole.tagText, defRole.tagColor
-						).run();
-
-						const roleId = insRes.meta?.last_row_id;
-						if (roleId) {
-							await this.assignRolePerms(userDb, roleId, defRole.permKeys);
-						}
+						);
+						// Commit the role and permissions together, even with a stale marker.
+						await this.assignRolePerms(userDb, defRole.roleCode, defRole.permKeys, insert);
 					} else if (!existing.role_code || existing.role_code === 'custom') {
+						if (hasRoleSeeded) {
+							// Adopt the legacy row in place without changing user membership,
+							// quotas, permissions or the operator's registration default.
+							await userDb.prepare('UPDATE role SET role_code = ? WHERE role_id = ?')
+								.bind(defRole.roleCode, existing.role_id).run();
+							continue;
+						}
 						// v1_1DB 预插入的遗留「普通用户」行尚无标准 role_code，在此原位对齐为标准角色并赋予权限
-						await userDb.prepare(`
+						const update = userDb.prepare(`
 							UPDATE role SET
 								key = ?, description = ?, sort = ?, is_default = ?,
 								send_count = ?, send_type = ?, account_count = ?,
@@ -428,10 +438,10 @@ const dbInit = {
 							defRole.sendCount, defRole.sendType, defRole.accountCount,
 							defRole.storageQuotaMb, defRole.allowAttachment, defRole.roleCode,
 							defRole.tagText, defRole.tagColor, existing.role_id
-						).run();
-						await this.assignRolePerms(userDb, existing.role_id, defRole.permKeys);
-					} else {
-						await this.assignRolePerms(userDb, existing.role_id, defRole.permKeys);
+						);
+						await this.assignRolePerms(userDb, defRole.roleCode, defRole.permKeys, update);
+					} else if (!hasRoleSeeded) {
+						await this.assignRolePerms(userDb, defRole.roleCode, defRole.permKeys);
 					}
 				} catch (e) {
 					throw new Error(`Standard role bootstrap failed (${defRole.roleCode})`, { cause: e });
@@ -1106,23 +1116,26 @@ const dbInit = {
 		}
 	},
 
-	async assignRolePerms(userDb, roleId, permKeys) {
+	async assignRolePerms(userDb, roleCode, permKeys, roleMutation) {
 		if (!permKeys || permKeys.length === 0) return;
 		try {
+			const statements = roleMutation ? [roleMutation] : [];
+			const roleId = '(SELECT role_id FROM role WHERE role_code = ? ORDER BY role_id ASC LIMIT 1)';
 			if (permKeys.includes('*')) {
-				await userDb.prepare(`
+				statements.push(userDb.prepare(`
 					INSERT OR IGNORE INTO role_perm (role_id, perm_id)
-					SELECT ?, perm_id FROM perm
-				`).bind(roleId).run();
-				return;
+					SELECT ${roleId}, perm_id FROM perm
+				`).bind(roleCode));
+			} else {
+				const placeholders = permKeys.map(() => '?').join(',');
+				statements.push(userDb.prepare(`
+					INSERT OR IGNORE INTO role_perm (role_id, perm_id)
+					SELECT DISTINCT ${roleId}, perm_id FROM perm WHERE perm_key IN (${placeholders})
+					UNION
+					SELECT DISTINCT ${roleId}, pid FROM perm WHERE perm_key IN (${placeholders}) AND pid > 0
+				`).bind(roleCode, ...permKeys, roleCode, ...permKeys));
 			}
-			const placeholders = permKeys.map(() => '?').join(',');
-			await userDb.prepare(`
-				INSERT OR IGNORE INTO role_perm (role_id, perm_id)
-				SELECT DISTINCT ?, perm_id FROM perm WHERE perm_key IN (${placeholders})
-				UNION
-				SELECT DISTINCT ?, pid FROM perm WHERE perm_key IN (${placeholders}) AND pid > 0
-			`).bind(roleId, ...permKeys, roleId, ...permKeys).run();
+			await userDb.batch(statements);
 		} catch (e) {
 			throw new Error('Standard role permission bootstrap failed', { cause: e });
 		}

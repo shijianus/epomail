@@ -218,6 +218,88 @@ describe('legacy migrations fail closed and retry safely', () => {
 		} finally { await clean(c); }
 	});
 
+	it.each([false, true])('init repairs stale role markers without resetting existing policies (dual DB: %s)', async dual => {
+		const c = context(dual);
+		const db = c.env.db;
+		try {
+			vi.spyOn(settingService, 'refresh').mockResolvedValue(undefined);
+			expect((await dbInit.init(c)).status).toBe(200);
+			expect(await c.env.kv.get('roles_seeded_v2')).toBe('1');
+			await db.prepare("UPDATE role SET role_code='custom', send_count=17, storage_quota_mb=23, is_default=0 WHERE role_code='user_base'").run();
+			await db.prepare("UPDATE role SET is_default=1 WHERE role_code='visitor'").run();
+			await db.prepare("DELETE FROM role_perm WHERE role_id IN (SELECT role_id FROM role WHERE role_code='user_lv0') AND perm_id IN (SELECT perm_id FROM perm WHERE perm_key='email:send')").run();
+			const legacy = await db.prepare("SELECT * FROM role WHERE name='普通用户'").first();
+			const lv1 = await db.prepare("SELECT role_id FROM role WHERE role_code='user_lv1'").first();
+			await db.batch([
+				db.prepare('DELETE FROM role_perm WHERE role_id=?').bind(lv1.role_id),
+				db.prepare('DELETE FROM role WHERE role_id=?').bind(lv1.role_id),
+				db.prepare("INSERT INTO role(name,key,role_code,send_type) VALUES('Operator custom','operator-custom','custom','ban')")
+			]);
+			const beforeRoles = (await db.prepare('SELECT * FROM role ORDER BY role_id').all()).results;
+			const beforePerms = (await db.prepare('SELECT * FROM role_perm ORDER BY id').all()).results;
+			expect((await dbInit.init(c)).status).toBe(200);
+			const repaired = (await db.prepare('SELECT * FROM role ORDER BY role_id').all()).results;
+			expect(repaired.filter(row => row.role_code !== 'custom').map(row => row.role_code).sort())
+				.toEqual(['master', 'moderator', 'user_base', 'user_lv0', 'user_lv1', 'visitor']);
+			for (const original of beforeRoles) {
+				expect(repaired.find(row => row.role_id === original.role_id)).toEqual({
+					...original, role_code: original.role_id === legacy.role_id ? 'user_base' : original.role_code
+				});
+			}
+			const afterPerms = (await db.prepare('SELECT * FROM role_perm ORDER BY id').all()).results;
+			expect(afterPerms.filter(row => beforeRoles.some(role => role.role_id === row.role_id))).toEqual(beforePerms);
+			expect(afterPerms.length).toBeGreaterThan(beforePerms.length);
+			expect((await dbInit.init(c)).status).toBe(200);
+			expect((await db.prepare('SELECT * FROM role ORDER BY role_id').all()).results).toEqual(repaired);
+			expect((await db.prepare('SELECT * FROM role_perm ORDER BY id').all()).results).toEqual(afterPerms);
+		} finally { await clean(c); }
+	}, 60000);
+
+	it('restores every missing standard role and keeps one existing registration default', async () => {
+		const c = context();
+		const db = c.env.db;
+		try {
+			vi.spyOn(settingService, 'refresh').mockResolvedValue(undefined);
+			await dbInit.init(c);
+			for (const code of ['user_base', 'user_lv0', 'user_lv1', 'moderator', 'master', 'visitor']) {
+				await db.prepare("UPDATE role SET is_default=CASE WHEN role_code='visitor' THEN 1 ELSE 0 END").run();
+				const role = await db.prepare('SELECT role_id FROM role WHERE role_code=?').bind(code).first();
+				await db.batch([
+					db.prepare('DELETE FROM role_perm WHERE role_id=?').bind(role.role_id),
+					db.prepare('DELETE FROM role WHERE role_id=?').bind(role.role_id)
+				]);
+				await dbInit.v3_13DB(c);
+				await dbInit.v3_13DB(c);
+				expect(await db.prepare('SELECT COUNT(DISTINCT role_code) AS count FROM role').first()).toEqual({ count: 6 });
+				expect(Number((await db.prepare('SELECT COUNT(*) AS count FROM role_perm WHERE role_id IN (SELECT role_id FROM role WHERE role_code=?)').bind(code).first()).count)).toBeGreaterThan(0);
+				expect((await db.prepare('SELECT role_code FROM role WHERE is_default=1').all()).results)
+					.toEqual([{ role_code: code === 'visitor' ? 'user_base' : 'visitor' }]);
+			}
+		} finally { await clean(c); }
+	});
+
+	it('rolls back a repaired role on permission failure and retries despite the historical marker', async () => {
+		const c = context();
+		const db = c.env.db;
+		try {
+			vi.spyOn(settingService, 'refresh').mockResolvedValue(undefined);
+			await dbInit.init(c);
+			const role = await db.prepare("SELECT role_id FROM role WHERE role_code='user_lv1'").first();
+			await db.batch([
+				db.prepare('DELETE FROM role_perm WHERE role_id=?').bind(role.role_id),
+				db.prepare('DELETE FROM role WHERE role_id=?').bind(role.role_id)
+			]);
+			await db.prepare("CREATE TRIGGER fail_role_repair BEFORE INSERT ON role_perm WHEN NEW.role_id IN (SELECT role_id FROM role WHERE role_code='user_lv1') BEGIN SELECT RAISE(ABORT,'repair permission failure'); END").run();
+			await expect(dbInit.init(c)).rejects.toThrow('Standard role bootstrap failed (user_lv1)');
+			expect(await db.prepare("SELECT role_id FROM role WHERE role_code='user_lv1'").first()).toBeNull();
+			expect(await c.env.kv.get('roles_seeded_v2')).toBe('1');
+			expect(await db.prepare('SELECT * FROM schema_init_lock').first()).toBeNull();
+			await db.prepare('DROP TRIGGER fail_role_repair').run();
+			expect((await dbInit.init(c)).status).toBe(200);
+			expect(Number((await db.prepare("SELECT COUNT(*) AS count FROM role_perm WHERE role_id IN (SELECT role_id FROM role WHERE role_code='user_lv1')").first()).count)).toBeGreaterThan(0);
+		} finally { await clean(c); }
+	}, 60000);
+
 	it.each([false, true])('cold init and repeat init validate key tables/indexes (dual DB: %s)', async dual => {
 		const c = context(dual);
 		try {

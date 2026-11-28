@@ -2,7 +2,9 @@
 
 ## 浏览器 CSP
 
-Worker 对主站、登录页和 API 使用 `script-src 'self' https://challenges.cloudflare.com`，不再允许 `unsafe-inline` 或 `unsafe-eval`。主题初始化由同源、同步加载的 `/theme-init.js` 在首屏绘制前执行。加载动画的兜底计时器由同源 `/loading-init.js` 执行。Turnstile 仍使用官方外链；样式的 `unsafe-inline` 保留以兼容组件样式。
+Worker 对主站、登录页和 API 使用 `script-src 'self' https://challenges.cloudflare.com`，脚本策略不允许 `unsafe-inline` 或 `unsafe-eval`。主题初始化由同源、同步加载的 `/theme-init.js` 在首屏绘制前执行。加载动画的兜底计时器由同源 `/loading-init.js` 执行。Turnstile 仍使用官方外链。
+
+`style-src 'self' 'unsafe-inline'` 是 Vue 组件动态样式及邮件 HTML 内联样式渲染的既定兼容折中，仅适用于样式，不放宽脚本执行。邮件仍需经过 HTML 清洗与渲染隔离；不能将此策略描述为“整个 CSP 不含 unsafe-inline”。后续若收紧样式策略，需要先改造动态样式与邮件渲染并完成视觉回归。
 
 ## Resend Webhook
 

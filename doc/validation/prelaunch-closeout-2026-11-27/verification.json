@@ -1,0 +1,58 @@
+{
+  "at": "2026-11-28T05:13:54Z",
+  "baseline": "7d91e799a7e09a9ac5f4f35860fcd1065d785a41",
+  "runtime": {
+    "node": "24.14.0",
+    "pnpm": "10.34.5"
+  },
+  "scope": "Local regression evidence only; Staging cleanup and Production SELECT evidence are separate files. No deployment in this closeout.",
+  "checks": [
+    {
+      "command": "pnpm --dir mail-worker exec vitest run test/migration-safety.spec.js test/init-visitor-security.spec.js test/object-ownership.spec.js",
+      "exit": 0,
+      "passed": 53,
+      "total": 53,
+      "seconds": 77.53
+    },
+    {
+      "command": "node --test --test-concurrency=1 tests/attachment-http-errors.test.mjs tests/attachment-urls.test.mjs",
+      "exit": 0,
+      "passed": 5,
+      "total": 5,
+      "seconds": 2.046
+    },
+    {
+      "command": "pnpm --dir mail-worker exec wrangler deploy --env staging --dry-run",
+      "exit": 0,
+      "uploaded": false,
+      "login_build_seconds": 3.09,
+      "vue_build_seconds": 18.04,
+      "build_warnings": 0
+    },
+    {
+      "command": "node tests/fullstack-smoke.mjs",
+      "exit": 0,
+      "passed": 24,
+      "total": 24,
+      "cleanup": "complete"
+    },
+    {
+      "command": "node tests/fullstack-browser-e2e.mjs",
+      "exit": 0,
+      "passed": 37,
+      "total": 37,
+      "uncaught_page_errors": 0,
+      "csp_violations": 0,
+      "cleanup": "complete"
+    },
+    {
+      "command": "node scripts/i18n-symmetry.mjs; node scripts/i18n-audit.mjs; node scripts/i18n-hardcoded.mjs",
+      "exit": 0,
+      "result": "six languages symmetric; no missing keys or unwrapped visible text"
+    }
+  ],
+  "resolved_diagnostics": [
+    "Initial cleanup inventory compound SELECT requests returned HTTP 400 (D1 error 7500: too many terms); per-table SELECT succeeded before deletion.",
+    "Parallel Vite SSR tests reported a WebSocket port collision; serial rerun passed 5/5 without that warning."
+  ]
+}

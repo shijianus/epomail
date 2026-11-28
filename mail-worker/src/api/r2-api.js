@@ -28,7 +28,7 @@ app.get('/oss/*', async (c) => {
 app.get('/oss-url/*', async (c) => {
 	const key = normalizeObjectKey(c.req.path.split('/oss-url/')[1]);
 	if (!key) {
-		return c.json(result.fail('Object Not Found', 404));
+		return c.json(result.fail('Object Not Found', 404), 404);
 	}
 
 	const user = userContext.getUser(c);
@@ -39,18 +39,18 @@ app.get('/oss-url/*', async (c) => {
 	if (key.startsWith('attachments/')) {
 		const owners = await attService.findOwnedKeyOwners(c, [key], admin ? null : userId);
 		if (!owners.has(key)) {
-			return c.json(result.fail('Object Not Found', 404));
+			return c.json(result.fail('Object Not Found', 404), 404);
 		}
 		ownerUserId = owners.get(key);
 	} else if (!isPublicStaticKey(key, userId)) {
-		return c.json(result.fail('Object Not Found', 404));
+		return c.json(result.fail('Object Not Found', 404), 404);
 	}
 
 	const downloadUrl = key.startsWith('attachments/')
 		? await buildSignedObjectUrl(c, key, { userId: ownerUserId, ttlSeconds: 300 })
 		: await r2Service.getDownloadUrl(c, key, null, ownerUserId);
 	if (!downloadUrl) {
-		return c.json(result.fail('Object Not Found', 404));
+		return c.json(result.fail('Object Not Found', 404), 404);
 	}
 	return c.json(result.ok({ url: downloadUrl }));
 });

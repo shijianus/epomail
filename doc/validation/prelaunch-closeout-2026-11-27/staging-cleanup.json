@@ -1,0 +1,279 @@
+{
+  "at": "2026-11-28T05:09:40.333Z",
+  "environment": "staging",
+  "email": "audit-a-d4973a0347ec@epomail-staging.epocanvas.workers.dev",
+  "userId": 91076,
+  "accountId": 62,
+  "ms": 77487,
+  "http": 200,
+  "before": [
+    {
+      "table_name": "email",
+      "remaining": 4
+    },
+    {
+      "table_name": "star",
+      "remaining": 1
+    },
+    {
+      "table_name": "attachments",
+      "remaining": 2
+    },
+    {
+      "table_name": "account",
+      "remaining": 1
+    },
+    {
+      "table_name": "user",
+      "remaining": 1
+    },
+    {
+      "table_name": "audit_log",
+      "remaining": 0
+    },
+    {
+      "table_name": "notification_outbox",
+      "remaining": 0
+    },
+    {
+      "table_name": "one_time_exchange_code",
+      "remaining": 0
+    },
+    {
+      "table_name": "role",
+      "remaining": 0
+    },
+    {
+      "table_name": "reg_key",
+      "remaining": 0
+    },
+    {
+      "table_name": "oauth",
+      "remaining": 0
+    },
+    {
+      "table_name": "oauth_grant",
+      "remaining": 0
+    },
+    {
+      "table_name": "audit_appeal",
+      "remaining": 0
+    },
+    {
+      "table_name": "object_deletion_queue",
+      "remaining": 0
+    },
+    {
+      "table_name": "legal_acceptance",
+      "remaining": 0
+    },
+    {
+      "table_name": "oauth_bind_claim",
+      "remaining": 0
+    },
+    {
+      "table_name": "oauth_identity_audit",
+      "remaining": 0
+    },
+    {
+      "table_name": "ai_request_budget",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_receive_claim",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_outbound_task",
+      "remaining": 1
+    },
+    {
+      "table_name": "mail_local_delivery",
+      "remaining": 1
+    },
+    {
+      "table_name": "mail_forward_task",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_send_quota_reservation",
+      "remaining": 1
+    },
+    {
+      "table_name": "notice_delivery_receipt",
+      "remaining": 0
+    },
+    {
+      "table_name": "auth_security_operation",
+      "remaining": 0
+    },
+    {
+      "table_name": "auth_totp_replay",
+      "remaining": 0
+    },
+    {
+      "table_name": "user_session",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_forward_policy",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_welcome_receipt",
+      "remaining": 1
+    },
+    {
+      "table_name": "mail_global_receipt",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_global_audience",
+      "remaining": 0
+    },
+    {
+      "table_name": "session_revocation",
+      "remaining": 0
+    },
+    {
+      "table_name": "session_capacity",
+      "remaining": 0
+    }
+  ],
+  "after": [
+    {
+      "table_name": "email",
+      "remaining": 0
+    },
+    {
+      "table_name": "star",
+      "remaining": 0
+    },
+    {
+      "table_name": "attachments",
+      "remaining": 0
+    },
+    {
+      "table_name": "account",
+      "remaining": 0
+    },
+    {
+      "table_name": "user",
+      "remaining": 0
+    },
+    {
+      "table_name": "audit_log",
+      "remaining": 0
+    },
+    {
+      "table_name": "notification_outbox",
+      "remaining": 0
+    },
+    {
+      "table_name": "one_time_exchange_code",
+      "remaining": 0
+    },
+    {
+      "table_name": "role",
+      "remaining": 0
+    },
+    {
+      "table_name": "reg_key",
+      "remaining": 0
+    },
+    {
+      "table_name": "oauth",
+      "remaining": 0
+    },
+    {
+      "table_name": "oauth_grant",
+      "remaining": 0
+    },
+    {
+      "table_name": "audit_appeal",
+      "remaining": 0
+    },
+    {
+      "table_name": "object_deletion_queue",
+      "remaining": 0
+    },
+    {
+      "table_name": "legal_acceptance",
+      "remaining": 0
+    },
+    {
+      "table_name": "oauth_bind_claim",
+      "remaining": 0
+    },
+    {
+      "table_name": "oauth_identity_audit",
+      "remaining": 0
+    },
+    {
+      "table_name": "ai_request_budget",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_receive_claim",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_outbound_task",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_local_delivery",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_forward_task",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_send_quota_reservation",
+      "remaining": 0
+    },
+    {
+      "table_name": "notice_delivery_receipt",
+      "remaining": 0
+    },
+    {
+      "table_name": "auth_security_operation",
+      "remaining": 0
+    },
+    {
+      "table_name": "auth_totp_replay",
+      "remaining": 0
+    },
+    {
+      "table_name": "user_session",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_forward_policy",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_welcome_receipt",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_global_receipt",
+      "remaining": 0
+    },
+    {
+      "table_name": "mail_global_audience",
+      "remaining": 0
+    },
+    {
+      "table_name": "session_revocation",
+      "remaining": 0
+    },
+    {
+      "table_name": "session_capacity",
+      "remaining": 0
+    }
+  ],
+  "remaining": 0,
+  "attachmentKvAbsent": true
+}
