@@ -1,3 +1,19 @@
+### 上线前收尾：清理 Staging 验收账号、补齐角色与附件 HTTP 404 (2026-11-27)
+*   **关联提交 (Git Commit)**: `0dea80d807cd223a9065a5bc71a556da08a69288` (Short: `0dea80d`)
+*   **基准提交 (Baseline)**: `7d91e799a7e09a9ac5f4f35860fcd1065d785a41` (Short: `7d91e79`)，开始时工作区干净。
+*   **环境 (Environment)**: 真实 Staging D1/KV 清理；Production 仅按本轮明确授权 SELECT role 表，未修改生产数据；代码回归在本地隔离环境完成。本轮未部署，生产部署等待用户确认。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 物理删除 `audit-a-d4973a0347ec@epomail-staging.epocanvas.workers.dev`（user_id=91076/account_id=62）、4 封邮件、2 条附件元数据及相关记录；33 张相关 D1 表残留均 0，KV 私有附件不存在，临时密码文件删除。真实管理 API HTTP 200，清理及核验 77.487 秒。
+    - [x] `/init` 以实际标准 role_code 完整性决定补齐，不被历史 marker 跳过；保留已有角色 ID、权限、配额及默认角色。新增角色和权限在同一 D1 batch 提交，失败回滚后可重试。
+    - [x] Production 只读核查 HTTP 200 / 6.148 秒，六种标准角色齐全，缺失 0，`changed_db=false`；当前默认 `visitor`，未改动。
+    - [x] 单对象签发的四条拒绝路径均返回 HTTP 404 / JSON code 404；Axios 已兼容结构化非 2xx 错误及 noMsg 静默拒绝，无需修改拦截器。
+    - [x] 说明 `style-src` 保留 `unsafe-inline` 为 Vue 动态样式/邮件渲染的既定折中；`script-src` 不含 `unsafe-inline` 或 `unsafe-eval`。旧交接报告已标注账号失效。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Node 24.14：迁移/初始化/附件 Worker 单测 53/53（77.53 秒），Axios/附件前端 5/5；覆盖历史 marker、六种缺失角色、单/双库、权限失败回滚、重复初始化及 HTTP 404/401 行为。
+    - [x] Staging 离线 dry-run 通过（无上传）；登录页构建 3.09 秒、Vue 构建 18.04 秒，无构建警告。本地全栈 24/24，浏览器 37/37，零 CSP 违规/未捕获异常，测试数据与进程 finally 清理完成。
+    - [x] i18n 三项检查、工作区与提交前密钥扫描、文件名/公开配置检查及 diff 检查通过。预查复合 SELECT 触发 D1 HTTP 400 后改逐表查询成功；前端并行测试端口告警在串行复跑中消除。
+*   **证据**: `doc/validation/prelaunch-closeout-2026-11-27/`；包含 Staging 清理、Production 只读角色快照和本地验证摘要。本地回归不计为云端修复实测；上轮外部收发、Email Routing、R2/S3 配置阻塞仍未解除。
+
 ### Staging 真实云端部署与验收 (2026-11-27)
 *   **验收归档提交 (Acceptance Commit)**: `3e9299a683682427f05fe522f054df7be7c7556f` (Short: `3e9299a`)
 *   **关联提交 (Git Commit)**: 被测源码 `d35a74277c2263b69e409ef404e0eb5f54226b45` (Short: `d35a742`)
