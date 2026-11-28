@@ -1,0 +1,14 @@
+{
+  "retainedEmail": "audit-prod-a-7d81e4d30b59@epomail.bond",
+  "retainedUserId": 10000,
+  "retainedForIndependentAudit": true,
+  "automationSessions": 0,
+  "transientBUsers": 0,
+  "privateInitFileRemoved": true,
+  "cleanupAt": "2026-11-28T07:03:08Z",
+  "rawLogsRemoved": [
+    "tail.raw.private.log",
+    "tail.stderr.private.log",
+    "deploy.private.log"
+  ]
+}

@@ -1,0 +1,6 @@
+2026-11-28T05:27:35.4425549Z node: v24.14.0
+2026-11-28T05:33:52.8554453Z  Test Files  67 passed (67)
+2026-11-28T05:33:52.8555005Z       Tests  919 passed (919)
+2026-11-28T05:35:39.0065435Z 24/24 full-stack checks passed (cleanup complete)
+2026-11-28T05:35:44.2476060Z 11 privacy full-stack checks passed; isolated process and data cleanup complete.
+2026-11-28T05:36:00.0379297Z 37/37 browser checks passed (cleanup complete)

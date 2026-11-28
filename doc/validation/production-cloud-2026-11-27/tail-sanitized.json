@@ -1,0 +1,513 @@
+[
+  {
+    "timestamp": 1795849081000,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/webhooks",
+    "method": "POST",
+    "http": 413,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": [
+      {
+        "level": "warn",
+        "status": 413
+      }
+    ]
+  },
+  {
+    "timestamp": 1795849086702,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/oss/attachments/release-smoke-75197a0-absent.txt",
+    "method": "GET",
+    "http": 404,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849124313,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/version",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849131896,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/login",
+    "method": "POST",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849136114,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/user/list",
+    "method": "GET",
+    "http": 403,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": [
+      {
+        "level": "warn",
+        "status": 403,
+        "route": "/user/list",
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "timestamp": 1795849137991,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/login",
+    "method": "POST",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849142045,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/user/list",
+    "method": "GET",
+    "http": 403,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": [
+      {
+        "level": "warn",
+        "status": 403,
+        "route": "/user/list",
+        "method": "GET"
+      }
+    ]
+  },
+  {
+    "timestamp": 1795849147776,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/account/add",
+    "method": "POST",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849149217,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/email/send",
+    "method": "POST",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849152069,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/email/send",
+    "method": "POST",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849152699,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/email/list",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849153153,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/email/attList",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849153513,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/oss-url/attachments/out-e4550cb5e766911dcb66d0867dcb7c96604c3a1cec181f9069c9ffa18dc9cb44.txt",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849153882,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/oss/attachments/out-e4550cb5e766911dcb66d0867dcb7c96604c3a1cec181f9069c9ffa18dc9cb44.txt",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849159706,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/oss/attachments/out-e4550cb5e766911dcb66d0867dcb7c96604c3a1cec181f9069c9ffa18dc9cb44.txt",
+    "method": "GET",
+    "http": 404,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849160460,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/oss-url/attachments/out-e4550cb5e766911dcb66d0867dcb7c96604c3a1cec181f9069c9ffa18dc9cb44.txt",
+    "method": "GET",
+    "http": 404,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849161826,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/email/send",
+    "method": "POST",
+    "http": 403,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": [
+      {
+        "level": "warn",
+        "status": 403,
+        "errorCode": "outbound_disabled",
+        "route": "/email/send",
+        "method": "POST"
+      }
+    ]
+  },
+  {
+    "timestamp": 1795849198548,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/login/",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849198791,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/login/assets/index-ufFHTAk7.css",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849198813,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/login/assets/index-CW3urzio.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849199986,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/login/assets/space-grotesk-latin-var-BhU9QXUp.woff2",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849200010,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/login/assets/inter-latin-var-Dx4kXJAl.woff2",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849199986,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/login/logo.svg",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849200397,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/setting/websiteConfig",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849202400,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "",
+    "method": null,
+    "http": null,
+    "cron": "*/5 * * * *",
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849203490,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/login",
+    "method": "POST",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849208666,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/mail/u/0/",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849208948,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/assets/element-plus-BLV2bwe-.css",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849208980,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/assets/index-BxWRSySE.css",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849208949,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/theme-init.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849208952,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/loading-init.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849208949,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/assets/vue-vendor-AdEWhYsx.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849208948,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/assets/index-CtJ1FJw5.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849210521,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/registerSW.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849212477,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/my/loginUserInfo",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849213001,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/workbox-1ec72418.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849213124,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/assets/index-B69as-hV.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849213128,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/assets/day-C_CfS7_l.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849213159,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/assets/file-utils-BvmFrr7N.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849213152,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/assets/purify.es-BGCr_sdL.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849214195,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/api/email/sidebarStats",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849215283,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/tinymce/plugins/advlist/plugin.min.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849215270,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/tinymce/plugins/preview/plugin.min.js",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  },
+  {
+    "timestamp": 1795849216856,
+    "outcome": "ok",
+    "scriptName": "epomail",
+    "path": "/tinymce/skins/content/default/content.min.css",
+    "method": "GET",
+    "http": 200,
+    "cron": null,
+    "exceptionCount": 0,
+    "logs": []
+  }
+]

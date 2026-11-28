@@ -1,3 +1,24 @@
+### Production 正式发布、平滑迁移与真实云端验收 (2026-11-27)
+*   **关联提交 (Git Commit)**: 部署源码 `75197a0b7f8b56939e9b99fffe940ec416bfb8c5` (Short: `75197a0`)，分支 `fix/public-beta-audited-20261120`；发布前工作区干净，已推送。
+*   **部署环境 (Deployment)**: `生产 Cloudflare / https://mail.epocanvas.com`；Deployment ID: `d68c8695-dbfe-491e-bcdc-d39c215f55d3`；Version ID: `f6a02306-836f-4cb4-9ec1-08ba85535eea`，100% 流量。记录日期为 UTC−08:00；真实云端窗口为 2026-11-28 UTC。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 用户授权后仅轮换 init_secret，48 随机字节、stdin 注入，临时文件 0600、值未打印；验收后该文件及原始操作日志删除。
+    - [x] D1 导出备份保存在本机私密文件并验证完整性；既有 D1/KV 绑定及三个自定义域名保持有效，未删库或替换资源。
+    - [x] 执行显式 deploy:prod 并附目标 SHA tag，退出 0 / 112.876s；主域名 /api/version HTTP200 且 SHA、Version ID 一致。
+    - [x] 保存旧版本 `1aaa552b-fd34-4653-8ed6-3db0d2efb806`；推荐回滚至仅轮换 init secret 后的旧代码版本 `c3483827-2934-4d5d-8a3c-88c99532af85`，命令见报告；本轮未执行回滚。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] 同 SHA 真实 CI：Quality Gates、Security Audit、Offline Secret Scanning 全绿；Node24.14，Worker919/919、全栈24/24、隐私11项、浏览器37/37；CI结果与下述云端实测分开记录。
+    - [x] 真实 /api/init 200 / 29.134s，重复 200 / 27.110s；观察到迁移锁1→0，28关键表/15关键索引/6标准角色完整，默认visitor保留。
+    - [x] 存量123用户、123邮箱、201邮件的已核对身份/归属/正文摘要无删除、无改写；新增记录限于用户授权保留的审计A及其测试邮件、附件。
+    - [x] 首页/登录/API均200，script-src无unsafe-inline/unsafe-eval；style-src保留unsafe-inline为既定Vue/邮件渲染折中。
+    - [x] Webhook单次边界401/413；真实KV私有附件签名下载200且字节一致，已存在对象裸读404，B越权签发HTTP404/JSON404；站内邮件幂等仅收1封。
+    - [x] wrangler tail成功观察324s，44事件均ok、1次自然Cron，0未捕获异常/0error、4条预期拒绝warning；最终迁移锁0。
+    - [x] B在finally清理后D1用户/邮箱/邮件/附件/会话残留0；A自动化会话及缓存撤销，按用户指令保留普通账号、两域邮箱及私有附件供独立审计，密码不入库。
+    - [x] 归档检查：i18n三项、工作区secret scan、暂存区离线扫描（gitleaks可用）、文件名/公开配置与diff检查均通过；26份证据哈希核对一致，已知私密值/JWT/签名查询参数扫描零命中，tail及验收脚本进程已结束。
+    - [ ] 完整签收未通过：真实浏览器登录Console/CSP为1/1、登录至收件箱Console为2，均为Cloudflare自动注入分析脚本被CSP阻止；RUM配置API403/code10000，待仅对该主机停用自动注入并复测。
+    - [ ] 外部入站待人工向A的bond/cyou地址发信；两域MX与Email Routing ready。应用收发启用，外部出站开关仍false，真实外发探测403/outbound_disabled；Resend两域只读检查400/invalid credential，Mailjet未配置。R2/S3未配置，不能声明完成桶权限实测。
+*   **证据与交接**: `doc/PRODUCTION-GO-LIVE-2026-11-27.md`；脱敏证据 `doc/validation/production-cloud-2026-11-27/`。本次归档不修改应用代码、不再次部署；需人工完成项均明确标注。
+
 ### 上线前收尾：清理 Staging 验收账号、补齐角色与附件 HTTP 404 (2026-11-27)
 *   **关联提交 (Git Commit)**: `0dea80d807cd223a9065a5bc71a556da08a69288` (Short: `0dea80d`)
 *   **基准提交 (Baseline)**: `7d91e799a7e09a9ac5f4f35860fcd1065d785a41` (Short: `7d91e79`)，开始时工作区干净。

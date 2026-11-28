@@ -1,0 +1,16 @@
+{
+  "email": "audit-prod-a-7d81e4d30b59@epomail.bond",
+  "userId": 10000,
+  "accountId": 143,
+  "role": "user_lv1",
+  "alias": "audit-prod-a-7d81e4d30b59@epomail.cyou",
+  "subject": "Production private attachment acceptance 7d81e4d30b59",
+  "attachmentFilename": "private-production.txt",
+  "attachmentKey": "attachments/out-e4550cb5e766911dcb66d0867dcb7c96604c3a1cec181f9069c9ffa18dc9cb44.txt",
+  "bareUrl": "https://mail.epocanvas.com/oss/attachments/out-e4550cb5e766911dcb66d0867dcb7c96604c3a1cec181f9069c9ffa18dc9cb44.txt",
+  "sha256": "fb5eb80b999dce7bca2860baa82e23350f3fdc5733c6b05048f556782e13d339",
+  "manualInboundRecipients": [
+    "audit-prod-a-7d81e4d30b59@epomail.bond",
+    "audit-prod-a-7d81e4d30b59@epomail.cyou"
+  ]
+}

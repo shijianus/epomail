@@ -1,0 +1,27 @@
+{
+  "initial": {
+    "http": 200,
+    "ms": 29134
+  },
+  "repeat": {
+    "http": 200,
+    "ms": 27110
+  },
+  "lockObserved": true,
+  "finalLocks": 0,
+  "beforeCounts": {
+    "users": 123,
+    "accounts": 123,
+    "emails": 201,
+    "roles": 6
+  },
+  "afterCounts": {
+    "users": 123,
+    "accounts": 123,
+    "emails": 201,
+    "roles": 6
+  },
+  "tables": 28,
+  "indexes": 15,
+  "missing": []
+}

@@ -1,0 +1,22 @@
+{
+  "applicationSend": true,
+  "applicationReceive": true,
+  "externalOutbound": false,
+  "resendReadOnly": [
+    {
+      "domain": "epomail.bond",
+      "http": 400,
+      "ms": 5553,
+      "errorName": "validation_error",
+      "classification": "credential rejected as invalid"
+    },
+    {
+      "domain": "epomail.cyou",
+      "http": 400,
+      "ms": 643,
+      "errorName": "validation_error",
+      "classification": "credential rejected as invalid"
+    }
+  ],
+  "mailjetConfigured": false
+}

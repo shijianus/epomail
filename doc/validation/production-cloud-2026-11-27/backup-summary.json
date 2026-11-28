@@ -1,0 +1,17 @@
+{
+  "at": "2026-11-28T05:34:33Z",
+  "path": "/tmp/epomail-production-release-20261127/production-before.private.sql",
+  "bytes": 6259743,
+  "sha256": "83153c65b51ef68b016c27e6f8ef2c85380d52ebbbd6eb4007a9c0b5c4ba16a7",
+  "local_restore_check": "ok",
+  "tables": 40,
+  "counts": {
+    "user": 123,
+    "account": 123,
+    "email": 201,
+    "attachments": 0,
+    "role": 6
+  },
+  "verification_ms": 78,
+  "d1_time_travel_bookmark": "00002ec3-00000000-00005131-79cee187f4a092568543f367c97bd558"
+}

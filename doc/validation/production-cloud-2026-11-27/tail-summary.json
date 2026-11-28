@@ -1,0 +1,23 @@
+{
+  "events": 44,
+  "outcomes": {
+    "ok": 44
+  },
+  "uncaughtExceptions": 0,
+  "scheduledEvents": [
+    {
+      "timestamp": 1795849202400,
+      "outcome": "ok",
+      "scriptName": "epomail",
+      "path": "",
+      "method": null,
+      "http": null,
+      "cron": "*/5 * * * *",
+      "exceptionCount": 0,
+      "logs": []
+    }
+  ],
+  "warningLogs": 4,
+  "errorLogs": 0,
+  "eventsWithErrors": []
+}

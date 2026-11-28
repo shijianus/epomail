@@ -1,0 +1,10 @@
+{
+  "at": "2026-11-28T06:52:51.609Z",
+  "oldDeploymentId": "d47008eb-ed19-4c0a-b491-7b060ef6a93c",
+  "oldVersionId": "1aaa552b-fd34-4653-8ed6-3db0d2efb806",
+  "rotationDeploymentId": "69246dc0-1fee-42de-b51a-4bdc649ce1a0",
+  "rotationVersionId": "c3483827-2934-4d5d-8a3c-88c99532af85",
+  "ms": 17822,
+  "credentialFileMode": "0600",
+  "secretValuePrinted": false
+}

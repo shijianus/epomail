@@ -1,0 +1,26 @@
+{
+  "user": {
+    "before": 123,
+    "after": 124,
+    "removedCount": 0,
+    "changedCount": 0
+  },
+  "account": {
+    "before": 123,
+    "after": 125,
+    "removedCount": 0,
+    "changedCount": 0
+  },
+  "email": {
+    "before": 201,
+    "after": 205,
+    "removedCount": 0,
+    "changedCount": 0
+  },
+  "attachments": {
+    "before": 0,
+    "after": 2,
+    "removedCount": 0,
+    "changedCount": 0
+  }
+}

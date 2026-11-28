@@ -1,0 +1,20 @@
+{
+  "worker": "epomail",
+  "main_domain": "mail.epocanvas.com",
+  "main_domain_verified": true,
+  "routing_source": "Cloudflare dashboard custom-domain binding; routes omitted in TOML; Wrangler 4.90 leaves existing custom domains in place when no route configuration supplied",
+  "d1_bindings_match": true,
+  "d1_database": "542cbca1-fce5-41c5-93f2-c1d04fa919e8",
+  "kv_bindings_match": true,
+  "kv_namespace": "e708c64d291e42c3a03b896914d42575",
+  "r2_bindings": 0,
+  "site_s3_configured": false,
+  "user_s3_configured": false,
+  "existing_outbound_enabled": false,
+  "configured_outbound_enabled": false,
+  "existing_domain_bindings": [
+    "mail.epocanvas.com",
+    "mail.epomail.bond",
+    "mail.epomail.cyou"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "sha": "75197a0b7f8b56939e9b99fffe940ec416bfb8c5",
+  "deploymentId": "d68c8695-dbfe-491e-bcdc-d39c215f55d3",
+  "versions": [
+    {
+      "version_id": "f6a02306-836f-4cb4-9ec1-08ba85535eea",
+      "percentage": 100
+    }
+  ],
+  "version": {
+    "sha": "75197a0b7f8b56939e9b99fffe940ec416bfb8c5",
+    "versionId": "f6a02306-836f-4cb4-9ec1-08ba85535eea"
+  },
+  "http": 200,
+  "ms": 1270,
+  "oldDeploymentId": "d47008eb-ed19-4c0a-b491-7b060ef6a93c",
+  "oldVersionId": "1aaa552b-fd34-4653-8ed6-3db0d2efb806",
+  "postRotationVersionId": "c3483827-2934-4d5d-8a3c-88c99532af85"
+}

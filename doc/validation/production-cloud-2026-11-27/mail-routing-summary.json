@@ -1,0 +1,89 @@
+{
+  "webmail_hostname": {
+    "hostname": "mail.epocanvas.com",
+    "mx_result": "ENODATA",
+    "purpose": "Webmail UI; use mailbox domains below for inbound testing"
+  },
+  "domains": [
+    {
+      "domain": "epomail.bond",
+      "mx": [
+        {
+          "exchange": "route2.mx.cloudflare.net",
+          "priority": 16,
+          "type": "MX"
+        },
+        {
+          "exchange": "route1.mx.cloudflare.net",
+          "priority": 55,
+          "type": "MX"
+        },
+        {
+          "exchange": "route3.mx.cloudflare.net",
+          "priority": 7,
+          "type": "MX"
+        }
+      ],
+      "routing": {
+        "enabled": true,
+        "status": "ready"
+      },
+      "catch_all": {
+        "enabled": true,
+        "actions": [
+          {
+            "type": "worker",
+            "value": [
+              "epomail"
+            ]
+          }
+        ]
+      },
+      "read_only_check": {
+        "at": "2026-11-28T05:30:22.234Z",
+        "http": 200,
+        "ms": 725
+      }
+    },
+    {
+      "domain": "epomail.cyou",
+      "mx": [
+        {
+          "exchange": "route1.mx.cloudflare.net",
+          "priority": 43,
+          "type": "MX"
+        },
+        {
+          "exchange": "route3.mx.cloudflare.net",
+          "priority": 7,
+          "type": "MX"
+        },
+        {
+          "exchange": "route2.mx.cloudflare.net",
+          "priority": 87,
+          "type": "MX"
+        }
+      ],
+      "routing": {
+        "enabled": true,
+        "status": "ready"
+      },
+      "catch_all": {
+        "enabled": true,
+        "actions": [
+          {
+            "type": "worker",
+            "value": [
+              "epomail"
+            ]
+          }
+        ]
+      },
+      "read_only_check": {
+        "at": "2026-11-28T05:30:23.491Z",
+        "http": 200,
+        "ms": 565
+      }
+    }
+  ]
+}

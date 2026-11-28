@@ -1,0 +1,48 @@
+[
+  {
+    "path": "/",
+    "http": 200,
+    "ms": 5808,
+    "csp": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenges.cloudflare.com; font-src 'self' data: https:; connect-src 'self' https: wss:",
+    "scriptStrict": true,
+    "pass": true
+  },
+  {
+    "path": "/login/",
+    "http": 200,
+    "ms": 270,
+    "csp": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenges.cloudflare.com; font-src 'self' data: https:; connect-src 'self' https: wss:",
+    "scriptStrict": true,
+    "pass": true
+  },
+  {
+    "path": "/api/version",
+    "http": 200,
+    "ms": 245,
+    "csp": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' https://challenges.cloudflare.com; frame-src 'self' https://challenges.cloudflare.com; font-src 'self' data: https:; connect-src 'self' https: wss:",
+    "scriptStrict": true,
+    "version": {
+      "sha": "75197a0b7f8b56939e9b99fffe940ec416bfb8c5",
+      "versionId": "f6a02306-836f-4cb4-9ec1-08ba85535eea"
+    },
+    "pass": true
+  },
+  {
+    "name": "webhook_missing_headers",
+    "http": 401,
+    "ms": 244,
+    "pass": true
+  },
+  {
+    "name": "webhook_oversize",
+    "http": 413,
+    "ms": 9910,
+    "pass": true
+  },
+  {
+    "name": "unsigned_attachment",
+    "http": 404,
+    "ms": 5878,
+    "pass": true
+  }
+]

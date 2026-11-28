@@ -1,0 +1,808 @@
+[
+  {
+    "at": "2026-11-28T06:25:40.076Z",
+    "label": "Resend read-only readiness",
+    "verdict": "BLOCKED",
+    "domain": "epomail.bond",
+    "http": 400,
+    "ms": 5553,
+    "errorName": "validation_error",
+    "classification": "credential rejected as invalid"
+  },
+  {
+    "at": "2026-11-28T06:25:40.719Z",
+    "label": "Resend read-only readiness",
+    "verdict": "BLOCKED",
+    "domain": "epomail.cyou",
+    "http": 400,
+    "ms": 643,
+    "errorName": "validation_error",
+    "classification": "credential rejected as invalid"
+  },
+  {
+    "at": "2026-11-28T06:26:21.123Z",
+    "label": "Production data baseline integrity-before",
+    "verdict": "PASS"
+  },
+  {
+    "at": "2026-11-28T06:52:17.072Z",
+    "label": "Production data baseline integrity-before",
+    "verdict": "PASS"
+  },
+  {
+    "at": "2026-11-28T06:52:33.785Z",
+    "label": "Pre-secret-rotation deployment baseline",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 5593,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:52:50.954Z",
+    "label": "Production init_secret rotation",
+    "verdict": "PASS",
+    "exitCode": 0,
+    "ms": 17168,
+    "command": "pnpm --dir mail-worker exec wrangler secret put init_secret --env production"
+  },
+  {
+    "at": "2026-11-28T06:52:51.609Z",
+    "label": "Post-secret-rotation deployment baseline",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 654,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:52:51.609Z",
+    "label": "Rotated initialization credential deployment",
+    "verdict": "PASS",
+    "ms": 17822
+  },
+  {
+    "at": "2026-11-28T06:53:17.720Z",
+    "label": "Immediate rollback baseline",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 5479,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:55:10.598Z",
+    "label": "Production deploy command",
+    "verdict": "PASS",
+    "command": "pnpm --dir mail-worker run deploy:prod --tag 75197a0b7f8b56939e9b99fffe940ec416bfb8c5",
+    "exitCode": 0,
+    "ms": 112876
+  },
+  {
+    "at": "2026-11-28T06:55:11.066Z",
+    "label": "New production deployment",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 456,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:55:12.336Z",
+    "label": "Main domain production release identity",
+    "verdict": "OBSERVED",
+    "path": "/api/version",
+    "method": "GET",
+    "http": 200,
+    "ms": 1270,
+    "bytes": 101
+  },
+  {
+    "at": "2026-11-28T06:55:12.337Z",
+    "label": "Production new deployment identity",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 1270
+  },
+  {
+    "at": "2026-11-28T06:55:46.056Z",
+    "label": "Verify target SHA before migration",
+    "verdict": "OBSERVED",
+    "path": "/api/version",
+    "method": "GET",
+    "http": 200,
+    "ms": 832,
+    "bytes": 101
+  },
+  {
+    "at": "2026-11-28T06:55:46.785Z",
+    "label": "Production pre-migration schema",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 727,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:55:47.214Z",
+    "label": "Production pre-migration counts",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 429,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:56:16.349Z",
+    "label": "Production init",
+    "verdict": "OBSERVED",
+    "path": "/api/init",
+    "method": "POST",
+    "http": 200,
+    "ms": 29134,
+    "bytes": 7
+  },
+  {
+    "at": "2026-11-28T06:56:17.117Z",
+    "label": "Production initial migration",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 29134,
+    "lockObserved": true
+  },
+  {
+    "at": "2026-11-28T06:56:17.535Z",
+    "label": "Lock released after initial migration",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 417,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:56:44.639Z",
+    "label": "Post-deploy production custom domains",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 6075,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:56:44.646Z",
+    "label": "Production repeated init",
+    "verdict": "OBSERVED",
+    "path": "/api/init",
+    "method": "POST",
+    "http": 200,
+    "ms": 27110,
+    "bytes": 7
+  },
+  {
+    "at": "2026-11-28T06:56:45.252Z",
+    "label": "Post-deploy production resource bindings",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 612,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:56:45.515Z",
+    "label": "Production Cron schedule inventory",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 263,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:56:45.516Z",
+    "label": "Production retained domain bindings",
+    "verdict": "PASS"
+  },
+  {
+    "at": "2026-11-28T06:56:50.390Z",
+    "label": "Final migration lock",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 5744,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:56:50.824Z",
+    "label": "Production post-migration counts",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 434,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:56:50.824Z",
+    "label": "Production repeat initialization",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 27110
+  },
+  {
+    "at": "2026-11-28T06:56:51.255Z",
+    "label": "Production schema acceptance",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 430,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:56:51.256Z",
+    "label": "Production cloud schema verification",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 430,
+    "requiredTables": 28,
+    "requiredIndexes": 15,
+    "missing": []
+  },
+  {
+    "at": "2026-11-28T06:56:51.663Z",
+    "label": "Production roles after migration",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 406,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:56:51.663Z",
+    "label": "Production six standard roles",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 406,
+    "required": 6,
+    "missing": [],
+    "defaultRoles": [
+      "visitor"
+    ]
+  },
+  {
+    "at": "2026-11-28T06:57:50.525Z",
+    "label": "Production HTTP /",
+    "verdict": "OBSERVED",
+    "path": "/",
+    "method": "GET",
+    "http": 200,
+    "ms": 5808,
+    "bytes": 9149
+  },
+  {
+    "at": "2026-11-28T06:57:50.526Z",
+    "label": "Page CSP and release identity /",
+    "verdict": "PASS",
+    "path": "/",
+    "http": 200,
+    "ms": 5808
+  },
+  {
+    "at": "2026-11-28T06:57:50.796Z",
+    "label": "Production HTTP /login/",
+    "verdict": "OBSERVED",
+    "path": "/login/",
+    "method": "GET",
+    "http": 200,
+    "ms": 270,
+    "bytes": 997
+  },
+  {
+    "at": "2026-11-28T06:57:50.797Z",
+    "label": "Page CSP and release identity /login/",
+    "verdict": "PASS",
+    "path": "/login/",
+    "http": 200,
+    "ms": 270
+  },
+  {
+    "at": "2026-11-28T06:57:51.042Z",
+    "label": "Production HTTP /api/version",
+    "verdict": "OBSERVED",
+    "path": "/api/version",
+    "method": "GET",
+    "http": 200,
+    "ms": 245,
+    "bytes": 101
+  },
+  {
+    "at": "2026-11-28T06:57:51.042Z",
+    "label": "Page CSP and release identity /api/version",
+    "verdict": "PASS",
+    "path": "/api/version",
+    "http": 200,
+    "ms": 245
+  },
+  {
+    "at": "2026-11-28T06:57:51.286Z",
+    "label": "Webhook missing signature headers",
+    "verdict": "OBSERVED",
+    "path": "/api/webhooks",
+    "method": "POST",
+    "http": 401,
+    "ms": 244,
+    "bytes": 16
+  },
+  {
+    "at": "2026-11-28T06:57:51.286Z",
+    "label": "Webhook missing signature headers",
+    "verdict": "PASS",
+    "http": 401,
+    "ms": 244
+  },
+  {
+    "at": "2026-11-28T06:57:54.678Z",
+    "label": "Production browser login smoke",
+    "verdict": "FAIL",
+    "http": 200,
+    "ms": 8429,
+    "consoleErrors": 1,
+    "cspViolations": 1,
+    "uncaughtExceptions": 0
+  },
+  {
+    "at": "2026-11-28T06:58:01.196Z",
+    "label": "Webhook single oversized payload",
+    "verdict": "OBSERVED",
+    "path": "/api/webhooks",
+    "method": "POST",
+    "http": 413,
+    "ms": 9910,
+    "bytes": 16
+  },
+  {
+    "at": "2026-11-28T06:58:01.196Z",
+    "label": "Webhook oversized boundary",
+    "verdict": "PASS",
+    "http": 413,
+    "ms": 9910,
+    "payloadBytes": 524289
+  },
+  {
+    "at": "2026-11-28T06:58:07.075Z",
+    "label": "Unsigned private attachment",
+    "verdict": "OBSERVED",
+    "path": "/oss/attachments/release-smoke-75197a0-absent.txt",
+    "method": "GET",
+    "http": 404,
+    "ms": 5878,
+    "bytes": 16
+  },
+  {
+    "at": "2026-11-28T06:58:07.075Z",
+    "label": "Unsigned private attachment rejection",
+    "verdict": "PASS",
+    "http": 404,
+    "ms": 5878
+  },
+  {
+    "at": "2026-11-28T06:58:44.430Z",
+    "label": "Check source before production account tests",
+    "verdict": "OBSERVED",
+    "path": "/api/version",
+    "method": "GET",
+    "http": 200,
+    "ms": 6083,
+    "bytes": 101
+  },
+  {
+    "at": "2026-11-28T06:58:49.945Z",
+    "label": "Resolve ordinary production roles",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 5513,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:58:50.842Z",
+    "label": "Create temporary ordinary production account A",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 475,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:58:51.342Z",
+    "label": "Create temporary production mailbox A",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 499,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:58:55.963Z",
+    "label": "Production ordinary login A",
+    "verdict": "OBSERVED",
+    "path": "/api/login",
+    "method": "POST",
+    "http": 200,
+    "ms": 4620,
+    "bytes": 589
+  },
+  {
+    "at": "2026-11-28T06:58:55.963Z",
+    "label": "Production ordinary login A",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 4620
+  },
+  {
+    "at": "2026-11-28T06:58:56.276Z",
+    "label": "Production ordinary administration rejection A",
+    "verdict": "OBSERVED",
+    "path": "/api/user/list",
+    "method": "GET",
+    "http": 403,
+    "ms": 312,
+    "bytes": 34
+  },
+  {
+    "at": "2026-11-28T06:58:56.276Z",
+    "label": "Non-admin account boundary A",
+    "verdict": "PASS",
+    "http": 403,
+    "ms": 312,
+    "code": 403
+  },
+  {
+    "at": "2026-11-28T06:58:57.367Z",
+    "label": "Create temporary ordinary production account B",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 544,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:58:57.807Z",
+    "label": "Create temporary production mailbox B",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 439,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:59:01.892Z",
+    "label": "Production ordinary login B",
+    "verdict": "OBSERVED",
+    "path": "/api/login",
+    "method": "POST",
+    "http": 200,
+    "ms": 4082,
+    "bytes": 589
+  },
+  {
+    "at": "2026-11-28T06:59:01.893Z",
+    "label": "Production ordinary login B",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 4082
+  },
+  {
+    "at": "2026-11-28T06:59:02.210Z",
+    "label": "Production ordinary administration rejection B",
+    "verdict": "OBSERVED",
+    "path": "/api/user/list",
+    "method": "GET",
+    "http": 403,
+    "ms": 317,
+    "bytes": 34
+  },
+  {
+    "at": "2026-11-28T06:59:02.210Z",
+    "label": "Non-admin account boundary B",
+    "verdict": "PASS",
+    "http": 403,
+    "ms": 317,
+    "code": 403
+  },
+  {
+    "at": "2026-11-28T06:59:08.704Z",
+    "label": "Create Account A secondary inbound mailbox",
+    "verdict": "OBSERVED",
+    "path": "/api/account/add",
+    "method": "POST",
+    "http": 200,
+    "ms": 6494,
+    "bytes": 281
+  },
+  {
+    "at": "2026-11-28T06:59:08.704Z",
+    "label": "Secondary domain mailbox",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 6494,
+    "code": 200
+  },
+  {
+    "at": "2026-11-28T06:59:11.921Z",
+    "label": "Production internal send with private attachment",
+    "verdict": "OBSERVED",
+    "path": "/api/email/send",
+    "method": "POST",
+    "http": 200,
+    "ms": 3216,
+    "bytes": 1184
+  },
+  {
+    "at": "2026-11-28T06:59:11.921Z",
+    "label": "Production internal send",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 3216,
+    "code": 200
+  },
+  {
+    "at": "2026-11-28T06:59:12.573Z",
+    "label": "Production same-key internal replay",
+    "verdict": "OBSERVED",
+    "path": "/api/email/send",
+    "method": "POST",
+    "http": 200,
+    "ms": 652,
+    "bytes": 1184
+  },
+  {
+    "at": "2026-11-28T06:59:13.010Z",
+    "label": "Production audit inbox",
+    "verdict": "OBSERVED",
+    "path": "/api/email/list",
+    "method": "GET",
+    "http": 200,
+    "ms": 436,
+    "bytes": 38041
+  },
+  {
+    "at": "2026-11-28T06:59:13.010Z",
+    "label": "Production internal idempotence",
+    "verdict": "PASS",
+    "http": [
+      200,
+      200
+    ],
+    "ms": 1088,
+    "delivered": 1
+  },
+  {
+    "at": "2026-11-28T06:59:13.370Z",
+    "label": "Production audit mail attachment metadata",
+    "verdict": "OBSERVED",
+    "path": "/api/email/attList",
+    "method": "GET",
+    "http": 200,
+    "ms": 360,
+    "bytes": 383
+  },
+  {
+    "at": "2026-11-28T06:59:13.756Z",
+    "label": "Production owner signs private attachment",
+    "verdict": "OBSERVED",
+    "path": "/api/oss-url/attachments/out-e4550cb5e766911dcb66d0867dcb7c96604c3a1cec181f9069c9ffa18dc9cb44.txt",
+    "method": "GET",
+    "http": 200,
+    "ms": 386,
+    "bytes": 216
+  },
+  {
+    "at": "2026-11-28T06:59:14.215Z",
+    "label": "Production owner private download",
+    "verdict": "OBSERVED",
+    "path": "/oss/attachments/out-e4550cb5e766911dcb66d0867dcb7c96604c3a1cec181f9069c9ffa18dc9cb44.txt",
+    "method": "GET",
+    "http": 200,
+    "ms": 459,
+    "bytes": 54
+  },
+  {
+    "at": "2026-11-28T06:59:14.216Z",
+    "label": "Production private download bytes",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 459,
+    "bytes": 54,
+    "sha256": "fb5eb80b999dce7bca2860baa82e23350f3fdc5733c6b05048f556782e13d339",
+    "matchesUploadedBytes": true
+  },
+  {
+    "at": "2026-11-28T06:59:15.339Z",
+    "label": "Inspect Cloudflare Web Analytics injection scope",
+    "verdict": "FAIL",
+    "http": 405,
+    "ms": 5415,
+    "errorCodes": [
+      10405
+    ]
+  },
+  {
+    "at": "2026-11-28T06:59:15.340Z",
+    "label": "Web Analytics configuration inspection",
+    "verdict": "BLOCKED"
+  },
+  {
+    "at": "2026-11-28T06:59:19.954Z",
+    "label": "Production unsigned existing attachment",
+    "verdict": "OBSERVED",
+    "path": "/oss/attachments/out-e4550cb5e766911dcb66d0867dcb7c96604c3a1cec181f9069c9ffa18dc9cb44.txt",
+    "method": "GET",
+    "http": 404,
+    "ms": 5738,
+    "bytes": 16
+  },
+  {
+    "at": "2026-11-28T06:59:19.955Z",
+    "label": "Unsigned existing private object rejection",
+    "verdict": "PASS",
+    "http": 404,
+    "ms": 5738
+  },
+  {
+    "at": "2026-11-28T06:59:20.640Z",
+    "label": "Production B signs A attachment",
+    "verdict": "OBSERVED",
+    "path": "/api/oss-url/attachments/out-e4550cb5e766911dcb66d0867dcb7c96604c3a1cec181f9069c9ffa18dc9cb44.txt",
+    "method": "GET",
+    "http": 404,
+    "ms": 685,
+    "bytes": 41
+  },
+  {
+    "at": "2026-11-28T06:59:20.641Z",
+    "label": "Production cross-user signing rejection",
+    "verdict": "PASS",
+    "http": 404,
+    "ms": 685,
+    "code": 404,
+    "urlIssued": false
+  },
+  {
+    "at": "2026-11-28T06:59:22.031Z",
+    "label": "Production configured outbound boundary",
+    "verdict": "OBSERVED",
+    "path": "/api/email/send",
+    "method": "POST",
+    "http": 403,
+    "ms": 1390,
+    "bytes": 112
+  },
+  {
+    "at": "2026-11-28T06:59:22.031Z",
+    "label": "Production outbound remains disabled",
+    "verdict": "PASS",
+    "http": 403,
+    "ms": 1390,
+    "code": 403,
+    "errorCode": "outbound_disabled",
+    "delivery": "Not sent: existing production outbound policy"
+  },
+  {
+    "at": "2026-11-28T06:59:22.566Z",
+    "label": "Resolve temporary account for cleanup",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 533,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:59:22.975Z",
+    "label": "Validate cleanup role",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 409,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T06:59:23.440Z",
+    "label": "Locate temporary owned attachments",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 464,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T07:00:07.602Z",
+    "label": "Physically delete temporary ordinary account",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 448,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T07:00:08.026Z",
+    "label": "Verify temporary D1 cleanup",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 424,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T07:00:08.027Z",
+    "label": "Temporary account physically cleaned",
+    "verdict": "PASS",
+    "http": 200,
+    "remaining": {
+      "users": 0,
+      "accounts": 0,
+      "emails": 0,
+      "attachments": 0,
+      "sessions": 0
+    }
+  },
+  {
+    "at": "2026-11-28T07:00:17.661Z",
+    "label": "Production browser ordinary login and inbox",
+    "verdict": "FAIL",
+    "http": [
+      200,
+      200
+    ],
+    "ms": 19751,
+    "consoleErrors": 2,
+    "cspViolations": 1,
+    "uncaughtExceptions": 0
+  },
+  {
+    "at": "2026-11-28T07:00:32.883Z",
+    "label": "List Web Analytics sites",
+    "verdict": "FAIL",
+    "http": 403,
+    "ms": 5502,
+    "errorCodes": [
+      10000
+    ]
+  },
+  {
+    "at": "2026-11-28T07:01:39.560Z",
+    "label": "Final production active deployment",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 5569,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T07:01:40.017Z",
+    "label": "Final cloud migration lock count",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 455,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T07:01:40.652Z",
+    "label": "Verify retained audit identity and mailbox ownership",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 635,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T07:02:25.932Z",
+    "label": "Remove automation sessions for newly created audit account",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 5848,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T07:02:26.520Z",
+    "label": "Remove automation auth cache for audit account",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 585,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T07:02:27.088Z",
+    "label": "Verify audit automation sessions revoked",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 568,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T07:02:27.525Z",
+    "label": "Verify transient B user remains absent",
+    "verdict": "PASS",
+    "http": 200,
+    "ms": 436,
+    "errorCodes": []
+  },
+  {
+    "at": "2026-11-28T07:02:27.525Z",
+    "label": "Acceptance session cleanup",
+    "verdict": "PASS",
+    "automationSessions": 0,
+    "transientBUsers": 0
+  }
+]

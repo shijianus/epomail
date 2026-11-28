@@ -1,0 +1,34 @@
+{
+  "sourceSha": "75197a0b7f8b56939e9b99fffe940ec416bfb8c5",
+  "branch": "fix/public-beta-audited-20261120",
+  "node": "24.14.0",
+  "pnpm": "10.34.5",
+  "wrangler": "4.90.0",
+  "cleanBeforeRelease": true,
+  "sourcePushed": true,
+  "deploymentCommand": {
+    "at": "2026-11-28T06:55:10.598Z",
+    "label": "Production deploy command",
+    "verdict": "PASS",
+    "command": "pnpm --dir mail-worker run deploy:prod --tag 75197a0b7f8b56939e9b99fffe940ec416bfb8c5",
+    "exitCode": 0,
+    "ms": 112876
+  },
+  "rotationCommand": {
+    "at": "2026-11-28T06:52:50.954Z",
+    "label": "Production init_secret rotation",
+    "verdict": "PASS",
+    "exitCode": 0,
+    "ms": 17168,
+    "command": "pnpm --dir mail-worker exec wrangler secret put init_secret --env production"
+  },
+  "fixtureSetup": "Scoped inserts for two new ordinary users in real Production D1; real application HTTP login, alias, send, inbox and attachment flows; not a registration test",
+  "retention": "Account A explicitly retained for independent audit; Account B removed in finally; automation sessions revoked",
+  "strictAcceptance": "NOT_FULLY_PASSED",
+  "openItems": [
+    "Cloudflare auto-injected analytics causes browser CSP/console errors; RUM API permission denied HTTP 403 code 10000",
+    "External inbound requires a real message from a user-controlled external mailbox",
+    "External outbound remains disabled; Resend read-only credentials rejected; Mailjet absent"
+  ],
+  "secretHandling": "Rotated init secret passed via stdin and request header, never printed; temporary init file and raw operational logs deleted; no account passwords or signed URLs archived"
+}

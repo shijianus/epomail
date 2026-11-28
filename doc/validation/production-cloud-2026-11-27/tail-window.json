@@ -1,0 +1,5 @@
+{
+  "startedAt": "2026-11-28T06:57:44Z",
+  "endedAt": "2026-11-28T07:03:08Z",
+  "command": "wrangler tail --env production --format json"
+}

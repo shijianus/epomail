@@ -9,6 +9,20 @@
 
 ---
 
+### Production 真实云端发布与独立审计交接（2026-11-27）
+
+* **关联提交 (Git Commit)**：部署及被测源码 `75197a0b7f8b56939e9b99fffe940ec416bfb8c5`（Short: `75197a0`）。
+* **专项文档索引 (Detailed Doc)**：[完整实测报告与交接包](doc/PRODUCTION-GO-LIVE-2026-11-27.md)；[脱敏证据清单](doc/validation/production-cloud-2026-11-27/manifest.json)。
+* **范围与方法**：用户明确授权的 Production init_secret 轮换、指定 SHA 部署、主域名真实 HTTP/Chromium、Cloudflare D1/KV、DNS/Email Routing 配置读取、Resend 只读就绪检查及 wrangler tail；没有用本地模拟结果替代云端验收。
+* **核心发现与缺陷矩阵**：
+  - **[P1·验收不符]**：登录及收件箱均可访问，但 Cloudflare 自动注入的 analytics beacon 被严格 script-src 拦截；登录 Console/CSP 各1，登录至收件箱 Console2，未捕获异常0。RUM API403/code10000，未改分析配置或放宽CSP；需仅对 mail.epocanvas.com 排除自动注入后复测。
+  - **[P1·外发未就绪]**：生产应用收发功能启用，独立外发开关保持false；Resend两域凭据只读检查HTTP400/validation_error，Mailjet未配置。没有真实外部送达或供应商超时/幂等验收结论。
+  - **[待人工·外部入站]**：epomail.bond/cyou的Cloudflare MX、Email Routing enabled/ready及catch-all至epomail已核对；仍需外部邮箱向交接账号两域地址发信确认最终送达。mail.epocanvas.com是无MX的Webmail主机名。
+* **治理与实测结果**：三套同SHA CI成功；新Deployment `d68c8695-dbfe-491e-bcdc-d39c215f55d3` / Version `f6a02306-836f-4cb4-9ec1-08ba85535eea`。迁移与重复初始化200、28关键表/15关键索引/6角色齐全、锁0；存量已核对字段摘要无删除/改写；Webhook401/413、真实KV私有附件200/无签名404/跨账号签发404、站内幂等通过；tail324秒含1次自然Cron，0exception/0error、4预期warning。
+* **交接与清理**：A为普通user_lv1，按用户指令保留其测试邮件和附件，密码仅会话交付；B物理清理，A自动化会话撤销；init secret本地文件和原始操作日志已删除。生产发布完成，**完整签收尚未通过**，人工修复/复测步骤与保留init轮换的回滚命令见报告。
+
+---
+
 ### Staging 真实云端上线验收（2026-11-27）
 
 * **验收归档提交 (Acceptance Commit)**：`3e9299a683682427f05fe522f054df7be7c7556f`（Short: `3e9299a`）。

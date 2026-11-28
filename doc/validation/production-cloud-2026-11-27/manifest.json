@@ -1,0 +1,141 @@
+{
+  "sourceSha": "75197a0b7f8b56939e9b99fffe940ec416bfb8c5",
+  "localDate": "2026-11-27",
+  "timezone": "UTC-08:00",
+  "cloudEvidenceUTC": "2026-11-28T05:28:36Z–2026-11-28T07:03:08Z",
+  "cloudOrigin": "https://mail.epocanvas.com",
+  "scope": "Real Production Cloudflare Worker, D1, KV; optional R2/S3 not configured. CI evidence identified separately. No local mocks counted as cloud acceptance.",
+  "redaction": "Explicit public file/field allowlist; no request credentials, response tokens, signed-link query strings, private backup contents or ordinary-account passwords. Known-private-value scan passed.",
+  "files": [
+    {
+      "path": "account-browser-evidence.json",
+      "bytes": 1382,
+      "sha256": "767d82913a3e713d1b71905d64a64b0de18247551dd2ec548a2b30f178c31009"
+    },
+    {
+      "path": "account-browser-summary.json",
+      "bytes": 123,
+      "sha256": "bce52cdccb7ea3887b7e0aa13bc260f41a5c4735b6458479f50060fd65a44ca5"
+    },
+    {
+      "path": "backup-summary.json",
+      "bytes": 493,
+      "sha256": "9a0bed0e5107e45ae01ee3e3ef434d4a8c9fa9a60b8734a62e7e33b7f7e7c192"
+    },
+    {
+      "path": "binding-verification.json",
+      "bytes": 720,
+      "sha256": "179c15ffe63122a4cafbba0383d368eca15afe211df8055765175f05e96aad76"
+    },
+    {
+      "path": "browser-evidence.json",
+      "bytes": 686,
+      "sha256": "6a2bac6d779a700fe363648646bf2da847c17665a8f346f8d43ab3db9b5ef48a"
+    },
+    {
+      "path": "browser-summary.json",
+      "bytes": 103,
+      "sha256": "043df392920ca3662c215a9f19ed728c2c13284ed0001382cd461bba64057cdf"
+    },
+    {
+      "path": "ci-core-log-excerpts.txt",
+      "bytes": 425,
+      "sha256": "f8806a2e4dade87f8eab16d7bb1efc3753e4b96e0a8d79b3bb16043ce5f5bdf4"
+    },
+    {
+      "path": "ci-passed.json",
+      "bytes": 4131,
+      "sha256": "a0b272326e8a3f6e56f9eb5faeb9fcf78396fea4dbce24a20ba7a1217fbdd65f"
+    },
+    {
+      "path": "data-integrity-summary.json",
+      "bytes": 406,
+      "sha256": "b909e002e46c07755f5fa9735c61f1b54705d360930508a9780313d22eb51ad7"
+    },
+    {
+      "path": "deploy-result.json",
+      "bytes": 577,
+      "sha256": "8b786ef4146e73944a13aaf1ff7e054e27266870f7c69999fafb9bd72b148181"
+    },
+    {
+      "path": "events-sanitized.json",
+      "bytes": 18406,
+      "sha256": "c3abd4e16b2721aaf3d7fd50d26f9b539e4b5f534ecb9adbb0f41c4ab7905769"
+    },
+    {
+      "path": "execution-summary.json",
+      "bytes": 1644,
+      "sha256": "f1c13ffe775927d867325fe863e783feef57033e176add21b35b0257bd54889a"
+    },
+    {
+      "path": "final-cloud-state.json",
+      "bytes": 742,
+      "sha256": "4d4099d48306620a2e3e77eb57ca687fe6434a28b1bcf193c8f594befe2ef3b7"
+    },
+    {
+      "path": "handoff-public.json",
+      "bytes": 736,
+      "sha256": "4fb278e8d589a248f182b7b903fc15130ea2847a024ca68fa98a667279b77de7"
+    },
+    {
+      "path": "http-smoke.json",
+      "bytes": 1792,
+      "sha256": "879d3f6fe72495de19321ac5ac4d9264429615758ee9bd127aab4b2b761db775"
+    },
+    {
+      "path": "mail-readiness-final.json",
+      "bytes": 500,
+      "sha256": "315ae9ce35214eda89b799fc163ade31a96eee499510b164d1d4c6f1fc085cfd"
+    },
+    {
+      "path": "mail-routing-summary.json",
+      "bytes": 1836,
+      "sha256": "3d10dfd22518a63296598dd06e7224c52d6a9d2a4381075a09899300d17b7b0f"
+    },
+    {
+      "path": "migration-lock-observations.json",
+      "bytes": 408,
+      "sha256": "06546d1001a120603fe7fce320823f000acfa4f1ef8f2fba4f9f780563d61e68"
+    },
+    {
+      "path": "migration-summary.json",
+      "bytes": 396,
+      "sha256": "7a96b66725dd6838c95e2ab99c9f38f6823aae095ecf88c392242f83e92c357c"
+    },
+    {
+      "path": "roles-after.json",
+      "bytes": 458,
+      "sha256": "9117944cb8f36d68ac4bcfb791f1ee822ac82f5f9d77ab1daad3d04ef3bf961e"
+    },
+    {
+      "path": "rotation-summary.json",
+      "bytes": 365,
+      "sha256": "fcb76f3790fc8faf6a1fcf63368a65877525011888db532037de33eaff0db63b"
+    },
+    {
+      "path": "schema-after.json",
+      "bytes": 9788,
+      "sha256": "a0535747db665cf197ad8c2094e22aaf1215a86f0412669335e5f050580b3831"
+    },
+    {
+      "path": "tail-sanitized.json",
+      "bytes": 10701,
+      "sha256": "82dec1cd175a22ea44a222793a5f3bf7d08d78c462f2a0dbed63749ace68c71c"
+    },
+    {
+      "path": "tail-summary.json",
+      "bytes": 404,
+      "sha256": "79ead73006c1b535f2d229a6359634626e77d519240daa3fa0f78207d28cfe3e"
+    },
+    {
+      "path": "tail-window.json",
+      "bytes": 140,
+      "sha256": "d846c1b94a249931b920a61dfb758a8e270500f074ab135b1f243ceedcf199fa"
+    },
+    {
+      "path": "test-cleanup-summary.json",
+      "bytes": 365,
+      "sha256": "f3c95d1f1f1885afb9f2333407f53a5102e6166f5b416c00c555d9b9bce6659a"
+    }
+  ]
+}

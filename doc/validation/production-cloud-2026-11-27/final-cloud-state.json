@@ -1,0 +1,31 @@
+{
+  "deploymentId": "d68c8695-dbfe-491e-bcdc-d39c215f55d3",
+  "versions": [
+    {
+      "version_id": "f6a02306-836f-4cb4-9ec1-08ba85535eea",
+      "percentage": 100
+    }
+  ],
+  "locks": 0,
+  "retainedAccount": [
+    {
+      "user_id": 10000,
+      "email": "audit-prod-a-7d81e4d30b59@epomail.bond",
+      "role_code": "user_lv1",
+      "is_del": 0,
+      "status": 0,
+      "account_id": 143,
+      "mailbox": "audit-prod-a-7d81e4d30b59@epomail.bond"
+    },
+    {
+      "user_id": 10000,
+      "email": "audit-prod-a-7d81e4d30b59@epomail.bond",
+      "role_code": "user_lv1",
+      "is_del": 0,
+      "status": 0,
+      "account_id": 145,
+      "mailbox": "audit-prod-a-7d81e4d30b59@epomail.cyou"
+    }
+  ],
+  "preExistingAccount": false
+}

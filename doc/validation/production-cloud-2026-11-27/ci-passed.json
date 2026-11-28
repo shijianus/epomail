@@ -1,0 +1,132 @@
+[
+  {
+    "conclusion": "success",
+    "createdAt": "2026-11-28T05:27:20Z",
+    "databaseId": 46112182141,
+    "event": "push",
+    "headSha": "75197a0b7f8b56939e9b99fffe940ec416bfb8c5",
+    "status": "completed",
+    "url": "https://github.com/shijianus/epomail/actions/runs/46112182141",
+    "workflowName": "Quality Gates",
+    "jobs": [
+      {
+        "name": "Secret scan (working tree)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:27:22Z",
+        "completedAt": "2026-11-28T05:27:35Z",
+        "activeSteps": []
+      },
+      {
+        "name": "Worker (full test suite + deploy dry-run)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:27:22Z",
+        "completedAt": "2026-11-28T05:36:25Z",
+        "activeSteps": []
+      },
+      {
+        "name": "Diff hygiene (whitespace & conflict markers)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:27:22Z",
+        "completedAt": "2026-11-28T05:27:31Z",
+        "activeSteps": []
+      },
+      {
+        "name": "i18n gates (6-language dictionaries)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:27:22Z",
+        "completedAt": "2026-11-28T05:27:38Z",
+        "activeSteps": []
+      },
+      {
+        "name": "Login UI (typecheck + unit tests + build)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:27:22Z",
+        "completedAt": "2026-11-28T05:27:52Z",
+        "activeSteps": []
+      },
+      {
+        "name": "mail-vue production build",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:27:53Z",
+        "completedAt": "2026-11-28T05:28:32Z",
+        "activeSteps": []
+      },
+      {
+        "name": "Login UI OAuth browser regression (Playwright, local only)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:27:55Z",
+        "completedAt": "2026-11-28T05:29:27Z",
+        "activeSteps": []
+      },
+      {
+        "name": "Backend load and recovery (isolated local Worker)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:36:28Z",
+        "completedAt": "2026-11-28T05:57:43Z",
+        "activeSteps": []
+      }
+    ],
+    "startedAt": "2026-11-28T05:27:20Z",
+    "updatedAt": "2026-11-28T05:57:43Z"
+  },
+  {
+    "conclusion": "success",
+    "createdAt": "2026-11-28T05:27:20Z",
+    "databaseId": 46112182223,
+    "event": "push",
+    "headSha": "75197a0b7f8b56939e9b99fffe940ec416bfb8c5",
+    "status": "completed",
+    "url": "https://github.com/shijianus/epomail/actions/runs/46112182223",
+    "workflowName": "Security Audit",
+    "jobs": [
+      {
+        "name": "Worker security tests",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:27:22Z",
+        "completedAt": "2026-11-28T05:36:01Z",
+        "activeSteps": []
+      },
+      {
+        "name": "Secret scan (working tree + history)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:27:22Z",
+        "completedAt": "2026-11-28T05:27:46Z",
+        "activeSteps": []
+      }
+    ],
+    "startedAt": "2026-11-28T05:27:20Z",
+    "updatedAt": "2026-11-28T05:36:02Z"
+  },
+  {
+    "conclusion": "success",
+    "createdAt": "2026-11-28T05:27:20Z",
+    "databaseId": 46112182220,
+    "event": "push",
+    "headSha": "75197a0b7f8b56939e9b99fffe940ec416bfb8c5",
+    "status": "completed",
+    "url": "https://github.com/shijianus/epomail/actions/runs/46112182220",
+    "workflowName": "Offline Secret Scanning Gate",
+    "jobs": [
+      {
+        "name": "Offline Credential & Fixture Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-28T05:27:22Z",
+        "completedAt": "2026-11-28T05:27:38Z",
+        "activeSteps": []
+      }
+    ],
+    "startedAt": "2026-11-28T05:27:20Z",
+    "updatedAt": "2026-11-28T05:27:39Z"
+  }
+]
