@@ -1,4 +1,5 @@
 ### Staging 真实云端部署与验收 (2026-11-27)
+*   **验收归档提交 (Acceptance Commit)**: `3e9299a683682427f05fe522f054df7be7c7556f` (Short: `3e9299a`)
 *   **关联提交 (Git Commit)**: 被测源码 `d35a74277c2263b69e409ef404e0eb5f54226b45` (Short: `d35a742`)
 *   **部署环境 (Deployment)**: `真实 Cloudflare Staging / epomail-staging`；Deployment ID: `7879ec27-42f8-42f8-a317-1badbc2e354a`；Version ID: `323e1f5e-7d00-42ad-9d30-0708cd5f14b0`。无生产部署或生产资源操作。
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:

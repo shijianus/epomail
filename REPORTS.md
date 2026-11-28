@@ -11,6 +11,7 @@
 
 ### Staging 真实云端上线验收（2026-11-27）
 
+* **验收归档提交 (Acceptance Commit)**：`3e9299a683682427f05fe522f054df7be7c7556f`（Short: `3e9299a`）。
 * **关联提交 (Git Commit)**：被测及部署源码 `d35a74277c2263b69e409ef404e0eb5f54226b45`（Short: `d35a742`）。
 * **专项文档索引 (Detailed Doc)**：[完整报告与独立审计交接包](doc/STAGING-CLOUD-ACCEPTANCE-2026-11-27.md)；[脱敏证据清单](doc/validation/staging-cloud-2026-11-27/manifest.json)。
 * **范围与方法**：同 SHA 真实 GitHub push CI、显式 Staging 部署、真实 Cloudflare D1/KV/Worker API、Access 服务认证、Chromium、wrangler tail；没有生产资源访问或变更。
