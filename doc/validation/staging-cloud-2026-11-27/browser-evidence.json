@@ -1,0 +1,32 @@
+{
+  "errors": [],
+  "csp": [],
+  "consoleErrors": [],
+  "api": [
+    {
+      "path": "/api/setting/websiteConfig",
+      "http": 200
+    },
+    {
+      "path": "/api/login",
+      "http": 200
+    },
+    {
+      "path": "/api/setting/websiteConfig",
+      "http": 200
+    },
+    {
+      "path": "/api/my/loginUserInfo",
+      "http": 200
+    },
+    {
+      "path": "/api/email/sidebarStats",
+      "http": 200
+    },
+    {
+      "path": "/api/email/list",
+      "http": 200
+    }
+  ],
+  "blocked": []
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "role_id": 1,
+    "role_code": "custom",
+    "is_default": 0
+  },
+  {
+    "role_id": 2,
+    "role_code": "visitor",
+    "is_default": 0
+  },
+  {
+    "role_id": 3,
+    "role_code": "user_lv0",
+    "is_default": 1
+  },
+  {
+    "role_id": 4,
+    "role_code": "user_lv1",
+    "is_default": 0
+  },
+  {
+    "role_id": 5,
+    "role_code": "moderator",
+    "is_default": 0
+  },
+  {
+    "role_id": 6,
+    "role_code": "master",
+    "is_default": 0
+  }
+]

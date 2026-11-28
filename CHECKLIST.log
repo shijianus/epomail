@@ -1,3 +1,20 @@
+### Staging 真实云端部署与验收 (2026-11-27)
+*   **关联提交 (Git Commit)**: 被测源码 `d35a74277c2263b69e409ef404e0eb5f54226b45` (Short: `d35a742`)
+*   **部署环境 (Deployment)**: `真实 Cloudflare Staging / epomail-staging`；Deployment ID: `7879ec27-42f8-42f8-a317-1badbc2e354a`；Version ID: `323e1f5e-7d00-42ad-9d30-0708cd5f14b0`。无生产部署或生产资源操作。
+*   **功能需求与变更清单 (Changes & Feature Alignment)**:
+    - [x] 核对干净工作区与目标HEAD，快进推送指定分支；同SHA三个push CI全绿后执行显式deploy:staging并附源码tag。
+    - [x] 归档真实D1/KV/Worker、Webhook、附件、浏览器与Cron证据；完整交接包见 `doc/STAGING-CLOUD-ACCEPTANCE-2026-11-27.md`，专项发现见 `REPORTS.md`。
+    - [x] 保持既有Access邮箱白名单；临时Service Auth测试身份与策略测试后撤销并核验原策略恢复。
+*   **自动化测试与核验清单 (Verification Checklist)**:
+    - [x] Node24.14部署构建：登录页3.18s、mail-vue19.78s；Wrangler4.90部署98.623s、退出0。
+    - [x] 真实CI：Quality Gates1834s、Security Audit400s、Offline Secret Scanning Gate23s通过。Worker912/912、全栈24/24、浏览器37/37；15分钟负载7200请求、两轮容量各1920请求通过；这些结果仅记为CI证据。
+    - [x] 云端迁移：三路200/409/409，重复200，28张关键表和15索引齐全，最终锁0。
+    - [x] 云端Webhook：缺签名401、超512KiB为413、130次无效签名含11次429，跨窗口恢复401，临时限流计数清理。
+    - [x] 云端附件：A签名下载200且SHA-256一致，三个裸路径404、B裸读404，站内发送幂等只收1封。
+    - [x] 云端浏览器：登录与收件箱200，Console error/CSP违规/未捕获异常均0；3次自然Cron outcome=ok，tail观察129事件、0未捕获异常/0error。
+    - [x] 清理：B物理删除，D1用户/账号/邮件/附件/会话均0；A本轮会话撤销，按用户要求保留独立复测账号与私有附件，验收后须物理删除。
+    - [ ] 严格验收未通过：style-src仍含unsafe-inline；B签发接口HTTP200/JSON404；存量user_base缺失。无外发通道、Email Routing、R2/S3配置，外部能力标记BLOCKED并附人工步骤。
+
 ### 上线前稳定性、迁移与依赖修复 (2026-11-27)
 *   **关联提交 (Git Commit)**: `b9ae2b93e5a9837dba5d4407b213e0a3df7a8d98` (Short: `b9ae2b9`)
 *   **基准提交 (Baseline)**: `16443181c9b4c301cb3f1a298e34b23e9125c62b` (Short: `1644318`)

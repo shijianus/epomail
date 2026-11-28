@@ -1,0 +1,122 @@
+{
+  "sourceCommit": "d35a74277c2263b69e409ef404e0eb5f54226b45",
+  "environment": "cloud-staging",
+  "createdAt": "2026-11-28T03:00:04.992615+00:00",
+  "files": [
+    {
+      "file": "access-cleanup-verified.json",
+      "bytes": 254,
+      "sha256": "ba54cc95154e55f16576c6e4c18aa330c672829a613c3035be06094e08983b5a"
+    },
+    {
+      "file": "access-events.jsonl",
+      "bytes": 812,
+      "sha256": "8d3e8e7b79ba65318063669f35fa685c07bfa069fcc9e3d1482280f7a7f616fb"
+    },
+    {
+      "file": "baseline.json",
+      "bytes": 342,
+      "sha256": "7de86192392549181e04fc693cfb44274eccd66dd66c27d2b7e41eebcea4b7bb"
+    },
+    {
+      "file": "browser-evidence.json",
+      "bytes": 502,
+      "sha256": "cb805686faac5540da73b52a9946e624d168280334fb27edef8fdf4bca96ef4f"
+    },
+    {
+      "file": "ci-load-summary.json",
+      "bytes": 6107,
+      "sha256": "b81a160ae8d31273f2f9a48496cea11d4cc4600fc070d959364e00e1a3a45630"
+    },
+    {
+      "file": "ci-summary.json",
+      "bytes": 1194,
+      "sha256": "6dc827be13832d1f649e5491a477b289ff55e7a907343cde46fa2648402fe889"
+    },
+    {
+      "file": "deploy-result.json",
+      "bytes": 678,
+      "sha256": "869fb2247d40850721daa27a19481a753543702874894616fda9372160739fe9"
+    },
+    {
+      "file": "deployment.json",
+      "bytes": 283,
+      "sha256": "36e9fd65a63f55e52d3aa6b33d0cac52e9bd33d4267e4ab995281310ab210875"
+    },
+    {
+      "file": "events.jsonl",
+      "bytes": 27610,
+      "sha256": "75f8bbfdd21312ce34073b94dc2d37ac9130d5fb51b218276cc710631ad18322"
+    },
+    {
+      "file": "final-data-state.json",
+      "bytes": 131,
+      "sha256": "fe1389c6f0909bc565368d414d44d34bbb3552b022e0fc51ba8e9c95187f8f94"
+    },
+    {
+      "file": "handoff-public.json",
+      "bytes": 401,
+      "sha256": "a26561cc19d5efbbfd79ca479688f401d9733441dc919781667406eb99cc4dd5"
+    },
+    {
+      "file": "inbox-cloud.png",
+      "bytes": 114838,
+      "sha256": "30bcd7bc93bc017fb8e5af61fa3cb239d4a63bfee4d00b544b803cf825a91986"
+    },
+    {
+      "file": "login-browser-log-excerpts.txt",
+      "bytes": 148,
+      "sha256": "e4fc4a20d67f7c1a5608f8605835457a2dcc8a6c835d326383b95c3b5e3053e0"
+    },
+    {
+      "file": "login-cloud.png",
+      "bytes": 1219841,
+      "sha256": "c71222b0180a077f44de949b90b63757dc71b1b94e2070f4688a4d7c75b236ab"
+    },
+    {
+      "file": "roles-after.json",
+      "bytes": 455,
+      "sha256": "d30477caa2ba228415178987186c2d48647db635963a6a56ffb8ee2c4ad23730"
+    },
+    {
+      "file": "schedules-current.json",
+      "bytes": 168,
+      "sha256": "9e9edac9599e2953a356755a9311d35f5c1f44167e72d73ff07230471e34a362"
+    },
+    {
+      "file": "schema-after.json",
+      "bytes": 9788,
+      "sha256": "a0535747db665cf197ad8c2094e22aaf1215a86f0412669335e5f050580b3831"
+    },
+    {
+      "file": "schema-before.json",
+      "bytes": 9727,
+      "sha256": "1cba6ec9884b6e4eaedf1fbfcf1463c50067e03571091a0c41abc0518266d009"
+    },
+    {
+      "file": "security-worker-log-excerpts.txt",
+      "bytes": 357,
+      "sha256": "f629a12b361845b94b71be1f646a4d71dbbba92400d053d18fbb8260242a84dd"
+    },
+    {
+      "file": "tail-sanitized.json",
+      "bytes": 35489,
+      "sha256": "93e3bd4589d58839dbe9c3d6a61dd809275ab39e65d24ecd9d42364f85cd576e"
+    },
+    {
+      "file": "tail-summary.json",
+      "bytes": 899,
+      "sha256": "8917a8ed46183b5d48e31f4ed04f23b175eda64e49ba7ebb3c8db3200b9da2b4"
+    },
+    {
+      "file": "webhook-burst.json",
+      "bytes": 12876,
+      "sha256": "d91430f2c6d84d2ab75053de3c5f0afbf158d9d2bb378500ede96b35bb84986b"
+    },
+    {
+      "file": "worker-log-excerpts.txt",
+      "bytes": 622,
+      "sha256": "8bca59a537ffcf55ca4df32b9540a30a9864a3cb385c0efff6dbee551db87779"
+    }
+  ]
+}

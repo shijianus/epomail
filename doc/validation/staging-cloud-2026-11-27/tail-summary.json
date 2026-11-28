@@ -1,0 +1,45 @@
+{
+  "events": 129,
+  "outcomes": {
+    "ok": 129
+  },
+  "uncaughtExceptions": 0,
+  "scheduledEvents": [
+    {
+      "timestamp": 1795833608031,
+      "outcome": "ok",
+      "scriptName": "epomail-staging",
+      "path": "",
+      "method": null,
+      "http": null,
+      "cron": "*/5 * * * *",
+      "exceptionCount": 0,
+      "logs": []
+    },
+    {
+      "timestamp": 1795833907955,
+      "outcome": "ok",
+      "scriptName": "epomail-staging",
+      "path": "",
+      "method": null,
+      "http": null,
+      "cron": "*/5 * * * *",
+      "exceptionCount": 0,
+      "logs": []
+    },
+    {
+      "timestamp": 1795834207952,
+      "outcome": "ok",
+      "scriptName": "epomail-staging",
+      "path": "",
+      "method": null,
+      "http": null,
+      "cron": "*/5 * * * *",
+      "exceptionCount": 0,
+      "logs": []
+    }
+  ],
+  "warningLogs": 81,
+  "errorLogs": 0,
+  "eventsWithErrors": []
+}

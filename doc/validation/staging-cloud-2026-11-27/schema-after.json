@@ -1,0 +1,570 @@
+[
+  {
+    "name": "idx_account_email_nocase",
+    "type": "index"
+  },
+  {
+    "name": "idx_account_user_order",
+    "type": "index"
+  },
+  {
+    "name": "idx_attachments_account_id",
+    "type": "index"
+  },
+  {
+    "name": "idx_attachments_email_id",
+    "type": "index"
+  },
+  {
+    "name": "idx_attachments_key",
+    "type": "index"
+  },
+  {
+    "name": "idx_attachments_user_id",
+    "type": "index"
+  },
+  {
+    "name": "idx_attachments_user_size",
+    "type": "index"
+  },
+  {
+    "name": "idx_audit_appeal_case",
+    "type": "index"
+  },
+  {
+    "name": "idx_audit_appeal_status",
+    "type": "index"
+  },
+  {
+    "name": "idx_audit_decision_case",
+    "type": "index"
+  },
+  {
+    "name": "idx_audit_decision_idemp",
+    "type": "index"
+  },
+  {
+    "name": "idx_audit_log_email",
+    "type": "index"
+  },
+  {
+    "name": "idx_audit_log_warning_type",
+    "type": "index"
+  },
+  {
+    "name": "idx_audit_purge_batch_time",
+    "type": "index"
+  },
+  {
+    "name": "idx_auth_security_operation_expiry",
+    "type": "index"
+  },
+  {
+    "name": "idx_auth_totp_replay_expiry",
+    "type": "index"
+  },
+  {
+    "name": "idx_email_live_notice",
+    "type": "index"
+  },
+  {
+    "name": "idx_email_message_dedupe",
+    "type": "index"
+  },
+  {
+    "name": "idx_email_outbound_task",
+    "type": "index"
+  },
+  {
+    "name": "idx_email_receive_claim",
+    "type": "index"
+  },
+  {
+    "name": "idx_email_trash_expiry",
+    "type": "index"
+  },
+  {
+    "name": "idx_email_user_body_bytes",
+    "type": "index"
+  },
+  {
+    "name": "idx_email_user_id_account_id",
+    "type": "index"
+  },
+  {
+    "name": "idx_email_user_labels",
+    "type": "index"
+  },
+  {
+    "name": "idx_email_user_page",
+    "type": "index"
+  },
+  {
+    "name": "idx_exchange_code_expires",
+    "type": "index"
+  },
+  {
+    "name": "idx_global_pending",
+    "type": "index"
+  },
+  {
+    "name": "idx_legal_acceptance_user",
+    "type": "index"
+  },
+  {
+    "name": "idx_mail_counted_day",
+    "type": "index"
+  },
+  {
+    "name": "idx_mail_forward_task_due",
+    "type": "index"
+  },
+  {
+    "name": "idx_mail_outbound_task_state",
+    "type": "index"
+  },
+  {
+    "name": "idx_mail_receive_claim_cleanup_due",
+    "type": "index"
+  },
+  {
+    "name": "idx_mail_receive_claim_cleanup_failures",
+    "type": "index"
+  },
+  {
+    "name": "idx_mail_receive_claim_content",
+    "type": "index"
+  },
+  {
+    "name": "idx_mail_receive_claim_expiry",
+    "type": "index"
+  },
+  {
+    "name": "idx_mail_receive_claim_lease",
+    "type": "index"
+  },
+  {
+    "name": "idx_mail_receive_claim_message",
+    "type": "index"
+  },
+  {
+    "name": "idx_oauth_bind_claim_expires",
+    "type": "index"
+  },
+  {
+    "name": "idx_oauth_grant_user_client",
+    "type": "index"
+  },
+  {
+    "name": "idx_oauth_identity_audit_user",
+    "type": "index"
+  },
+  {
+    "name": "idx_oauth_otc_expires",
+    "type": "index"
+  },
+  {
+    "name": "idx_oauth_user_id_unique",
+    "type": "index"
+  },
+  {
+    "name": "idx_object_deletion_queue_due",
+    "type": "index"
+  },
+  {
+    "name": "idx_outbound_active_user",
+    "type": "index"
+  },
+  {
+    "name": "idx_outbox_case_id",
+    "type": "index"
+  },
+  {
+    "name": "idx_outbox_provider_message",
+    "type": "index"
+  },
+  {
+    "name": "idx_outbox_recipient",
+    "type": "index"
+  },
+  {
+    "name": "idx_outbox_status_retry",
+    "type": "index"
+  },
+  {
+    "name": "idx_rate_limit_counter_expiry",
+    "type": "index"
+  },
+  {
+    "name": "idx_receive_active_user",
+    "type": "index"
+  },
+  {
+    "name": "idx_role_perm_membership",
+    "type": "index"
+  },
+  {
+    "name": "idx_session_capacity_expiry",
+    "type": "index"
+  },
+  {
+    "name": "idx_session_revocation_expiry",
+    "type": "index"
+  },
+  {
+    "name": "idx_setting_code",
+    "type": "index"
+  },
+  {
+    "name": "idx_star_user_email",
+    "type": "index"
+  },
+  {
+    "name": "idx_user_email_nocase",
+    "type": "index"
+  },
+  {
+    "name": "idx_user_session_uid_seq",
+    "type": "index"
+  },
+  {
+    "name": "idx_webhook_event_resource",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_ai_request_budget_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_audit_appeal_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_audit_appeal_2",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_audit_decision_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_audit_decision_2",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_audit_decision_3",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_audit_purge_batch_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_auth_security_operation_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_auth_totp_replay_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_mail_forward_task_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_mail_forward_task_2",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_mail_global_operation_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_mail_ingress_stat_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_mail_local_delivery_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_mail_outbound_task_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_mail_outbound_task_2",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_mail_receive_claim_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_mail_send_quota_reservation_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_mail_transaction_guard_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_notice_delivery_receipt_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_notice_delivery_receipt_2",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_notification_outbox_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_oauth_app_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_oauth_bind_claim_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_oauth_one_time_credential_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_object_deletion_queue_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_one_time_exchange_code_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_rate_limit_counter_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_session_revocation_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_setting_ext_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_storage_probe_history_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_user_session_1",
+    "type": "index"
+  },
+  {
+    "name": "sqlite_autoindex_webhook_event_1",
+    "type": "index"
+  },
+  {
+    "name": "_cf_KV",
+    "type": "table"
+  },
+  {
+    "name": "account",
+    "type": "table"
+  },
+  {
+    "name": "ai_request_budget",
+    "type": "table"
+  },
+  {
+    "name": "attachments",
+    "type": "table"
+  },
+  {
+    "name": "audit_appeal",
+    "type": "table"
+  },
+  {
+    "name": "audit_decision",
+    "type": "table"
+  },
+  {
+    "name": "audit_log",
+    "type": "table"
+  },
+  {
+    "name": "audit_purge_batch",
+    "type": "table"
+  },
+  {
+    "name": "auth_security_operation",
+    "type": "table"
+  },
+  {
+    "name": "auth_totp_replay",
+    "type": "table"
+  },
+  {
+    "name": "email",
+    "type": "table"
+  },
+  {
+    "name": "legal_acceptance",
+    "type": "table"
+  },
+  {
+    "name": "mail_forward_policy",
+    "type": "table"
+  },
+  {
+    "name": "mail_forward_task",
+    "type": "table"
+  },
+  {
+    "name": "mail_global_audience",
+    "type": "table"
+  },
+  {
+    "name": "mail_global_operation",
+    "type": "table"
+  },
+  {
+    "name": "mail_global_receipt",
+    "type": "table"
+  },
+  {
+    "name": "mail_ingress_stat",
+    "type": "table"
+  },
+  {
+    "name": "mail_local_delivery",
+    "type": "table"
+  },
+  {
+    "name": "mail_outbound_task",
+    "type": "table"
+  },
+  {
+    "name": "mail_receive_claim",
+    "type": "table"
+  },
+  {
+    "name": "mail_send_quota_reservation",
+    "type": "table"
+  },
+  {
+    "name": "mail_transaction_guard",
+    "type": "table"
+  },
+  {
+    "name": "mail_welcome_receipt",
+    "type": "table"
+  },
+  {
+    "name": "notice_delivery_receipt",
+    "type": "table"
+  },
+  {
+    "name": "notification_outbox",
+    "type": "table"
+  },
+  {
+    "name": "oauth",
+    "type": "table"
+  },
+  {
+    "name": "oauth_app",
+    "type": "table"
+  },
+  {
+    "name": "oauth_bind_claim",
+    "type": "table"
+  },
+  {
+    "name": "oauth_grant",
+    "type": "table"
+  },
+  {
+    "name": "oauth_identity_audit",
+    "type": "table"
+  },
+  {
+    "name": "oauth_one_time_credential",
+    "type": "table"
+  },
+  {
+    "name": "object_deletion_queue",
+    "type": "table"
+  },
+  {
+    "name": "one_time_exchange_code",
+    "type": "table"
+  },
+  {
+    "name": "perm",
+    "type": "table"
+  },
+  {
+    "name": "rate_limit_counter",
+    "type": "table"
+  },
+  {
+    "name": "reg_key",
+    "type": "table"
+  },
+  {
+    "name": "role",
+    "type": "table"
+  },
+  {
+    "name": "role_perm",
+    "type": "table"
+  },
+  {
+    "name": "schema_init_lock",
+    "type": "table"
+  },
+  {
+    "name": "session_capacity",
+    "type": "table"
+  },
+  {
+    "name": "session_revocation",
+    "type": "table"
+  },
+  {
+    "name": "setting",
+    "type": "table"
+  },
+  {
+    "name": "setting_ext",
+    "type": "table"
+  },
+  {
+    "name": "sqlite_sequence",
+    "type": "table"
+  },
+  {
+    "name": "star",
+    "type": "table"
+  },
+  {
+    "name": "storage_probe_history",
+    "type": "table"
+  },
+  {
+    "name": "user",
+    "type": "table"
+  },
+  {
+    "name": "user_session",
+    "type": "table"
+  },
+  {
+    "name": "verify_record",
+    "type": "table"
+  },
+  {
+    "name": "webhook_event",
+    "type": "table"
+  }
+]

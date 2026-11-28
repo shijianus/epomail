@@ -1,0 +1,275 @@
+[
+  {
+    "name": "backend-stress.json",
+    "gitSha": "d35a74277c2263b69e409ef404e0eb5f54226b45",
+    "configuration": {
+      "soakMs": 900000,
+      "profile": "limited-beta"
+    },
+    "environment": {
+      "localOnly": true,
+      "host": "127.0.0.1",
+      "egressBlockedByHarness": true,
+      "providerCalls": "not-measured",
+      "browser": false,
+      "deployment": false
+    },
+    "startedAt": "2026-11-28T02:13:30.657Z",
+    "finishedAt": "2026-11-28T02:29:30.383Z",
+    "sampleFailures": [],
+    "slo": {
+      "readP95": {
+        "status": "pass",
+        "pass": true,
+        "p95": 39.98,
+        "thresholdMs": 2000,
+        "missingKinds": []
+      },
+      "auth": {
+        "p95": 421.16,
+        "thresholdMs": 8000,
+        "elapsedMs": 1953,
+        "pass": true,
+        "status": "positive-login-bounded-five-requests"
+      }
+    },
+    "cleanup": {
+      "processTreeStopped": true,
+      "temporaryDirectoryRemoved": true
+    },
+    "stages": [
+      {
+        "name": "baseline",
+        "requests": 20,
+        "plannedRequests": 20,
+        "sampleFloor": 15
+      },
+      {
+        "name": "ramp-1",
+        "requests": 40,
+        "plannedRequests": 40,
+        "sampleFloor": 30
+      },
+      {
+        "name": "ramp-2",
+        "requests": 80,
+        "plannedRequests": 80,
+        "sampleFloor": 60
+      },
+      {
+        "name": "ramp-4",
+        "requests": 160,
+        "plannedRequests": 160,
+        "sampleFloor": 120
+      },
+      {
+        "name": "burst",
+        "requests": 40,
+        "plannedRequests": 40,
+        "sampleFloor": 30
+      },
+      {
+        "name": "recovery",
+        "requests": 20,
+        "plannedRequests": 20,
+        "sampleFloor": 15
+      },
+      {
+        "name": "soak",
+        "requests": 7200,
+        "plannedRequests": 7200,
+        "sampleFloor": 5400
+      }
+    ]
+  },
+  {
+    "name": "capacity-1.json",
+    "gitSha": "d35a74277c2263b69e409ef404e0eb5f54226b45",
+    "configuration": {
+      "soakMs": 60000,
+      "profile": "capacity"
+    },
+    "environment": {
+      "localOnly": true,
+      "host": "127.0.0.1",
+      "egressBlockedByHarness": true,
+      "providerCalls": "not-measured",
+      "browser": false,
+      "deployment": false
+    },
+    "startedAt": "2026-11-28T02:29:30.430Z",
+    "finishedAt": "2026-11-28T02:31:50.433Z",
+    "sampleFailures": [],
+    "slo": {
+      "readP95": {
+        "status": "pass",
+        "pass": true,
+        "p95": 27.21,
+        "thresholdMs": 2000,
+        "missingKinds": []
+      },
+      "auth": {
+        "p95": 445.5,
+        "thresholdMs": 8000,
+        "elapsedMs": 2046,
+        "pass": true,
+        "status": "positive-login-bounded-five-requests"
+      }
+    },
+    "cleanup": {
+      "processTreeStopped": true,
+      "temporaryDirectoryRemoved": true
+    },
+    "stages": [
+      {
+        "name": "baseline",
+        "requests": 20,
+        "plannedRequests": 20,
+        "sampleFloor": 15
+      },
+      {
+        "name": "ramp-1",
+        "requests": 40,
+        "plannedRequests": 40,
+        "sampleFloor": 30
+      },
+      {
+        "name": "ramp-4",
+        "requests": 160,
+        "plannedRequests": 160,
+        "sampleFloor": 120
+      },
+      {
+        "name": "ramp-8",
+        "requests": 320,
+        "plannedRequests": 320,
+        "sampleFloor": 240
+      },
+      {
+        "name": "ramp-16",
+        "requests": 640,
+        "plannedRequests": 640,
+        "sampleFloor": 480
+      },
+      {
+        "name": "ramp-32",
+        "requests": 1280,
+        "plannedRequests": 1280,
+        "sampleFloor": 960
+      },
+      {
+        "name": "burst",
+        "requests": 160,
+        "plannedRequests": 160,
+        "sampleFloor": 120
+      },
+      {
+        "name": "recovery",
+        "requests": 20,
+        "plannedRequests": 20,
+        "sampleFloor": 15
+      },
+      {
+        "name": "soak",
+        "requests": 1920,
+        "plannedRequests": 1920,
+        "sampleFloor": 1440
+      }
+    ]
+  },
+  {
+    "name": "capacity-2.json",
+    "gitSha": "d35a74277c2263b69e409ef404e0eb5f54226b45",
+    "configuration": {
+      "soakMs": 60000,
+      "profile": "capacity"
+    },
+    "environment": {
+      "localOnly": true,
+      "host": "127.0.0.1",
+      "egressBlockedByHarness": true,
+      "providerCalls": "not-measured",
+      "browser": false,
+      "deployment": false
+    },
+    "startedAt": "2026-11-28T02:31:50.470Z",
+    "finishedAt": "2026-11-28T02:34:10.475Z",
+    "sampleFailures": [],
+    "slo": {
+      "readP95": {
+        "status": "pass",
+        "pass": true,
+        "p95": 29.45,
+        "thresholdMs": 2000,
+        "missingKinds": []
+      },
+      "auth": {
+        "p95": 446.04,
+        "thresholdMs": 8000,
+        "elapsedMs": 2028,
+        "pass": true,
+        "status": "positive-login-bounded-five-requests"
+      }
+    },
+    "cleanup": {
+      "processTreeStopped": true,
+      "temporaryDirectoryRemoved": true
+    },
+    "stages": [
+      {
+        "name": "baseline",
+        "requests": 20,
+        "plannedRequests": 20,
+        "sampleFloor": 15
+      },
+      {
+        "name": "ramp-1",
+        "requests": 40,
+        "plannedRequests": 40,
+        "sampleFloor": 30
+      },
+      {
+        "name": "ramp-4",
+        "requests": 160,
+        "plannedRequests": 160,
+        "sampleFloor": 120
+      },
+      {
+        "name": "ramp-8",
+        "requests": 320,
+        "plannedRequests": 320,
+        "sampleFloor": 240
+      },
+      {
+        "name": "ramp-16",
+        "requests": 640,
+        "plannedRequests": 640,
+        "sampleFloor": 480
+      },
+      {
+        "name": "ramp-32",
+        "requests": 1280,
+        "plannedRequests": 1280,
+        "sampleFloor": 960
+      },
+      {
+        "name": "burst",
+        "requests": 160,
+        "plannedRequests": 160,
+        "sampleFloor": 120
+      },
+      {
+        "name": "recovery",
+        "requests": 20,
+        "plannedRequests": 20,
+        "sampleFloor": 15
+      },
+      {
+        "name": "soak",
+        "requests": 1920,
+        "plannedRequests": 1920,
+        "sampleFloor": 1440
+      }
+    ]
+  }
+]

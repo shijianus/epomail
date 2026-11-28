@@ -1,0 +1,24 @@
+{
+  "startedAt": "2026-11-28T02:35:30.165Z",
+  "sourceSha": "d35a74277c2263b69e409ef404e0eb5f54226b45",
+  "node": "v24.14.0",
+  "command": "pnpm --dir mail-worker run deploy:staging --tag d35a74277c2263b69e409ef404e0eb5f54226b45",
+  "uploadReported": true,
+  "versionId": "323e1f5e-7d00-42ad-9d30-0708cd5f14b0",
+  "observedFinishedAt": "2026-11-28T02:38:21.397033+00:00",
+  "commandExitCode": 0,
+  "wranglerCompletion": [
+    {
+      "durationMs": 98623,
+      "nodeVersion": 24,
+      "wranglerVersion": "4.90.0",
+      "sanitizedCommand": "deploy"
+    }
+  ],
+  "buildSeconds": {
+    "login": 3.18,
+    "webmail": 19.78
+  },
+  "uploadSeconds": 51.59,
+  "triggerSeconds": 1.69
+}

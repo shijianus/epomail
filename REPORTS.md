@@ -9,6 +9,20 @@
 
 ---
 
+### Staging 真实云端上线验收（2026-11-27）
+
+* **关联提交 (Git Commit)**：被测及部署源码 `d35a74277c2263b69e409ef404e0eb5f54226b45`（Short: `d35a742`）。
+* **专项文档索引 (Detailed Doc)**：[完整报告与独立审计交接包](doc/STAGING-CLOUD-ACCEPTANCE-2026-11-27.md)；[脱敏证据清单](doc/validation/staging-cloud-2026-11-27/manifest.json)。
+* **范围与方法**：同 SHA 真实 GitHub push CI、显式 Staging 部署、真实 Cloudflare D1/KV/Worker API、Access 服务认证、Chromium、wrangler tail；没有生产资源访问或变更。
+* **核心发现与缺陷矩阵**：
+  - **[P1·验收不符]**：完整 CSP 的 `style-src` 仍含 `unsafe-inline`；跨账号签发拒绝为 HTTP 200 / JSON code 404，未签发链接，但不符合要求的 HTTP 403/404。
+  - **[P1·配置阻塞]**：无 Resend/Mailjet 发信通道、workers.dev 邮箱域无 MX/Email Routing、无 Staging R2/S3 桶；三类能力未伪记为通过。
+  - **[P2·存量配置]**：6 个角色行缺少标准 `user_base`，含 `custom`，重复初始化未修复；迁移约耗时 89–94 秒。
+* **治理修复与回归结果**：三个 CI 全绿后部署；Deployment ID `7879ec27-42f8-42f8-a317-1badbc2e354a`，Version ID `323e1f5e-7d00-42ad-9d30-0708cd5f14b0`。并发初始化 200/409、重复 200、28 表/15 索引、零残留迁移锁；Webhook 401/413/429/恢复401；A 私有附件200、无签名404、B裸读404；真实浏览器 Console/CSP/未捕获异常均0；3次自然Cron成功。
+* **交接与清理**：B在finally物理清理；A按用户要求保留普通账号与测试附件，密码仅会话交付，测试会话已撤销。临时Access身份和策略已删除，原3条策略与邮箱白名单恢复，审计方使用用户本人既有Access身份。整体严格验收 **NO-GO**；人工补验步骤见报告。
+
+---
+
 ### 当前仓库独立实测审计（2026-11-27）
 
 * **关联提交 (Git Commit)**：审计 `14bb007e8eba8566264395aea20fe79d3685e13e` (Short: `14bb007`)；源码基线见证据:3。

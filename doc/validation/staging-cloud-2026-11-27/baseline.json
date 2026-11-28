@@ -1,0 +1,10 @@
+{
+  "sha": "d35a74277c2263b69e409ef404e0eb5f54226b45",
+  "branch": "fix/public-beta-audited-20261120",
+  "initialWorktree": "clean",
+  "remoteBefore": "0456cc11df2218cc6c3525a1af1d35da044c617a",
+  "push": "fast-forward successful",
+  "checkedAt": "2026-11-28T02:07:59.116647+00:00",
+  "environment": "staging",
+  "deploymentExecuted": false
+}
