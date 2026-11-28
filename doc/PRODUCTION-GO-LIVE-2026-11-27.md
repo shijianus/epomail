@@ -2,6 +2,8 @@
 
 部署源码：`75197a0b7f8b56939e9b99fffe940ec416bfb8c5`（`75197a0`）。分支：`fix/public-beta-audited-20261120`。
 
+验收归档提交：`314afd1e389ad9ba85fd28afe064020645fa0eca`（`314afd1`），仅包含报告及脱敏证据；当前应用仍为上述部署源码。
+
 记录日期按工作区 UTC−08:00 为 2026-11-27；云端证据时间为 2026-11-28 UTC。Production 已发布并运行指定源码，迁移、私有附件隔离和自然 Cron 通过。**完整签收仍未通过**：浏览器存在 Cloudflare 自动注入分析脚本产生的 CSP 错误；外部收信等待人工投递，外部发信保持禁用且 Resend 凭据检查失败。
 
 所有应用验收请求均访问 `https://mail.epocanvas.com`，使用真实 Cloudflare Workers、D1、KV。CI 的隔离测试单列，不作为云端验收的替代证据。原始私密备份、请求凭据、签名下载参数和密码未提交；脱敏证据及 SHA-256 清单见 [manifest.json](validation/production-cloud-2026-11-27/manifest.json)。

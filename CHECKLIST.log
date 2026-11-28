@@ -1,4 +1,5 @@
 ### Production 正式发布、平滑迁移与真实云端验收 (2026-11-27)
+*   **验收归档提交 (Acceptance Commit)**: `314afd1e389ad9ba85fd28afe064020645fa0eca` (Short: `314afd1`)，仅报告及脱敏证据，未作为应用版本部署。
 *   **关联提交 (Git Commit)**: 部署源码 `75197a0b7f8b56939e9b99fffe940ec416bfb8c5` (Short: `75197a0`)，分支 `fix/public-beta-audited-20261120`；发布前工作区干净，已推送。
 *   **部署环境 (Deployment)**: `生产 Cloudflare / https://mail.epocanvas.com`；Deployment ID: `d68c8695-dbfe-491e-bcdc-d39c215f55d3`；Version ID: `f6a02306-836f-4cb4-9ec1-08ba85535eea`，100% 流量。记录日期为 UTC−08:00；真实云端窗口为 2026-11-28 UTC。
 *   **功能需求与变更清单 (Changes & Feature Alignment)**:

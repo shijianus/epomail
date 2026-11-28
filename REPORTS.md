@@ -11,6 +11,7 @@
 
 ### Production 真实云端发布与独立审计交接（2026-11-27）
 
+* **验收归档提交 (Acceptance Commit)**：`314afd1e389ad9ba85fd28afe064020645fa0eca`（Short: `314afd1`），仅报告及脱敏证据。
 * **关联提交 (Git Commit)**：部署及被测源码 `75197a0b7f8b56939e9b99fffe940ec416bfb8c5`（Short: `75197a0`）。
 * **专项文档索引 (Detailed Doc)**：[完整实测报告与交接包](doc/PRODUCTION-GO-LIVE-2026-11-27.md)；[脱敏证据清单](doc/validation/production-cloud-2026-11-27/manifest.json)。
 * **范围与方法**：用户明确授权的 Production init_secret 轮换、指定 SHA 部署、主域名真实 HTTP/Chromium、Cloudflare D1/KV、DNS/Email Routing 配置读取、Resend 只读就绪检查及 wrangler tail；没有用本地模拟结果替代云端验收。
